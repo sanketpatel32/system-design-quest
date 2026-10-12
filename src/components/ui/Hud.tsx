@@ -18,7 +18,9 @@ export function HeartsHud({ hearts, max = 3 }: { hearts: number; max?: number })
       aria-label={`${hearts} of ${max} hearts remaining`}
     >
       {Array.from({ length: max }).map((_, i) => (
-        <IconHeart key={i} filled={i < hearts} size={30} />
+        <span key={i} className={`inline-flex ${i < hearts ? 'heart-beat' : ''}`} style={{ animationDelay: `${i * 0.15}s` }}>
+          <IconHeart filled={i < hearts} size={30} />
+        </span>
       ))}
     </div>
   )

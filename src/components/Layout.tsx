@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useGameStore, useLevel, useStreak } from '../stores/gameStore'
 import { BADGE_LABELS } from '../lib/progression/badges'
@@ -22,6 +22,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const badges = useGameStore((s) => s.badges)
   const reducedMotion = useGameStore((s) => s.preferences.reducedMotion)
   const [hudOpen, setHudOpen] = useState(false)
+  // Sparkle on the xp chip whenever xp goes up
+  const prevXp = useRef(xp)
+  const [sparkle, setSparkle] = useState(0)
+  useEffect(() => {
+    if (xp > prevXp.current) setSparkle((k) => k + 1)
+    prevXp.current = xp
+  }, [xp])
   const inQuiz = useLocation().pathname.startsWith('/quiz/')
 
   // The in-app setting applies the same rules as the OS-level prefers-reduced-motion
@@ -69,7 +76,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <span className="tabular-nums">{streak}</span>
               </span>
               <span className="hud-chip text-[#12749f]" title={`Level ${level} · ${xp % 500} of 500 xp to the next level`}>
-                <IconGem />
+                <span className="relative inline-flex">
+                  <IconGem />
+                  {sparkle > 0 && (
+                    <span key={sparkle} className="xp-sparkle" aria-hidden>
+                      <i /><i /><i />
+                    </span>
+                  )}
+                </span>
                 <span className="tabular-nums">{xp} xp</span>
               </span>
               {badges.length > 0 && (
