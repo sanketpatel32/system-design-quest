@@ -16,6 +16,8 @@ interface GameStore extends PersistedState {
   recordQuizAnswer: (topicId: number, question: Question, answer: unknown) => void
   finishQuizIfReady: (topicId: number) => { cleared: boolean; xpGained: number; newBadges: string[] }
   startQuizAttempt: (topicId: number) => void
+  /** Start the quiz over with full hearts (Retry after a failed attempt) */
+  resetQuizAttempt: (topicId: number) => void
   getQuizAttempt: (topicId: number) => { hearts: number; answers: Record<string, unknown>; results: Record<string, boolean> }
   markBossSubmission: (bossId: number, score: number, breakdown: Record<string, number>) => void
   saveBossDraft: (bossId: number, draft: PersistedState['bossProgress']['drafts'][number]) => void
@@ -44,6 +46,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
   startQuizAttempt(topicId) {
     const key = attemptKey(topicId)
     if (get().quizAttempts[key]) return
+    set((s) => ({
+      quizAttempts: {
+        ...s.quizAttempts,
+        [key]: { hearts: INITIAL_HEARTS, answers: {}, results: {}, completed: false },
+      },
+    }))
+    void saveState(get())
+  },
+
+  resetQuizAttempt(topicId) {
+    const key = attemptKey(topicId)
     set((s) => ({
       quizAttempts: {
         ...s.quizAttempts,
