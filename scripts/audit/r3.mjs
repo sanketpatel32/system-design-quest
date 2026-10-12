@@ -108,5 +108,40 @@ export function checkR3(topics, root) {
     info.push(`Numeric feedback: ${n} estimation questions, each 'Why' is a sanity check or design implication`)
   }
 
+  // 10. Every lesson (and the playbook) has one small in-lesson interactive, and it is well-formed
+  {
+    const src = readFileSync(join(root, 'src/lib/interactive/models.ts'), 'utf8')
+    const models = new Map()
+    for (const m of src.matchAll(/^  '?([a-z-]+)'?: \{\n    params: \[([^\]]*)\]/gm)) models.set(m[1], m[2].split(',').map((x) => x.trim().replace(/'/g, '')).filter(Boolean))
+    const kinds = { slider: 0, predict: 0, tradeoff: 0 }
+    let n = 0
+    for (const t of topics) {
+      if (t.kind === 'boss') continue
+      const it = t.interactive
+      const bad = (m) => errors.push(`Topic ${t.id} interactive: ${m}`)
+      if (!it) { bad('missing (every lesson needs one experiment or decision before the quiz)'); continue }
+      n++
+      kinds[it.kind] = (kinds[it.kind] ?? 0) + 1
+      if (!it.title || !it.prompt || it.prompt.length < 30) bad('needs a title and a prompt of 30+ characters')
+      if (it.kind === 'slider') {
+        const need = models.get(it.model)
+        if (!need) { bad(`unknown model ${it.model}`); continue }
+        for (const p of need) if (typeof it.params?.[p] !== 'number') bad(`model ${it.model} needs numeric param ${p}`)
+        const c = it.control ?? {}
+        if (!(c.step > 0) || !(c.min < c.max) || c.initial < c.min || c.initial > c.max) bad('slider range/initial/step invalid')
+        if (((c.initial - c.min) / c.step) % 1 > 1e-9 && ((c.initial - c.min) / c.step) % 1 < 1 - 1e-9) bad('slider initial is not on a step')
+        if (!it.takeaway || it.takeaway.length < 60) bad('slider needs a takeaway of 60+ characters')
+      } else if (it.kind === 'predict' || it.kind === 'tradeoff') {
+        const ids = (it.choices ?? []).map((c) => c.id)
+        if (ids.length < 3 || ids.length > 4 || new Set(ids).size !== ids.length) bad('needs 3–4 choices with unique ids')
+        if (!ids.includes(it.correctId)) bad('correctId is not one of the choices')
+        for (const c of it.choices ?? []) if (!c.feedback || c.feedback.length < 15) bad(`choice ${c.id} needs specific feedback`)
+        if (!it.reveal || it.reveal.length < 60) bad('needs a reveal of 60+ characters')
+      } else bad(`unknown kind ${it.kind}`)
+    }
+    for (const t of topics) if (t.kind === 'boss' && t.interactive) errors.push(`Boss ${t.id}: interactives are for lessons`)
+    info.push(`Interactives: ${n} lessons (${kinds.slider} sliders, ${kinds.predict} predict-then-reveal, ${kinds.tradeoff} choose-the-trade-off)`)
+  }
+
   return { errors, info }
 }

@@ -41,6 +41,24 @@ try {
   if (e.code !== 'ENOENT') throw e
 }
 
+// Merge in-lesson interactives (scripts/authored/interactive/*.json: { "<topicId>": Interactive })
+const interDir = join(authoredDir, 'interactive')
+let interCount = 0
+try {
+  for (const f of readdirSync(interDir).filter((x) => x.endsWith('.json')).sort()) {
+    const chunk = JSON.parse(readFileSync(join(interDir, f), 'utf8'))
+    for (const [id, entry] of Object.entries(chunk)) {
+      const t = topics.find((x) => x.id === Number(id))
+      if (!t) throw new Error(`${f}: unknown topic ${id}`)
+      if (t.interactive) throw new Error(`${f}: topic ${id} has two interactives`)
+      t.interactive = entry
+      interCount += 1
+    }
+  }
+} catch (e) {
+  if (e.code !== 'ENOENT') throw e
+}
+
 // Merge boss study briefs (scripts/authored/boss-deep/*.json: { "<topicId>": BossDeep })
 const bossDeepDir = join(authoredDir, 'boss-deep')
 let bossDeepCount = 0
@@ -88,4 +106,4 @@ for (let i = 0; i < topics.length; i++) topics[i] = supify(topics[i])
 
 topics.sort((a, b) => a.id - b.id)
 writeFileSync(out, JSON.stringify(topics, null, 2))
-console.log(`Assembled ${topics.length} topics from ${files.length} files (+${deepCount} deep lessons, +${bossDeepCount} boss briefs) -> ${out}`)
+console.log(`Assembled ${topics.length} topics from ${files.length} files (+${deepCount} deep lessons, +${bossDeepCount} boss briefs, +${interCount} interactives) -> ${out}`)

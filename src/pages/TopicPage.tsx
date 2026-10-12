@@ -77,10 +77,11 @@ export function TopicPage() {
         <LessonDeck
           key={topic.id}
           cards={topic.cards}
+          interactive={topic.interactive}
           accent={accent}
           finalAction={finalAction}
           initialIndex={completed.has(topic.id) ? 0 : (state.lessonProgress[topic.id]?.card ?? 0)}
-          onIndexChange={(i) => recordLessonCard(topic.id, i, topic.cards.length)}
+          onIndexChange={(i) => recordLessonCard(topic.id, i, topic.cards.length + (topic.interactive ? 1 : 0))}
         />
         {topic.deep && <DeepLessonView deep={topic.deep} accent={accent} topicId={topic.id} numbersInCards={topic.cards.some((c) => c.source === 'deep-numbers')} />}
         {topic.bossDeep && <BossDeepView brief={topic.bossDeep} accent={accent} topicId={topic.id} />}

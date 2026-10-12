@@ -1,0 +1,465 @@
+{
+  "1": {
+    "kind": "predict",
+    "title": "What comes at minute 10?",
+    "prompt": "You have agreed the requirements and done the estimates. Ten minutes have gone. What should you do next?",
+    "choices": [
+      {
+        "id": "a",
+        "label": "Sketch the two or three key endpoints: the API stage",
+        "feedback": "Agreeing the endpoints fixes what the design has to serve before you draw boxes."
+      },
+      {
+        "id": "b",
+        "label": "Go straight into a deep dive on the database",
+        "feedback": "Too early: without an end-to-end design there is nothing to go deep on yet."
+      },
+      {
+        "id": "c",
+        "label": "Draw the full microservice architecture with every component",
+        "feedback": "Drawing everything at once skips the API and burns the time you need for depth."
+      }
+    ],
+    "correctId": "a",
+    "reveal": "The plan is six stages: requirements 0–5, estimation 5–10, API 10–15, high-level design 15–25, deep dive 25–40, wrap-up 40–45. API comes before the boxes because it tells you which reads and writes the design must handle."
+  },
+  "2": {
+    "kind": "slider",
+    "title": "Find the peak your fleet can take",
+    "prompt": "A chat app has 50M daily users sending 40 messages each. Your fleet handles 100K writes per second. Raise the peak factor: where does the fleet run out?",
+    "model": "peak-qps",
+    "params": {
+      "dau": 50000000,
+      "actions": 40,
+      "capacity": 100000
+    },
+    "control": {
+      "label": "Peak factor (assumed)",
+      "min": 1,
+      "max": 10,
+      "step": 0.5,
+      "initial": 1,
+      "unit": "×"
+    },
+    "takeaway": "The average stays near 23K/s whatever you assume; the peak factor decides the capacity. Above about 4.3× the 100K/s fleet runs out, so state the factor you are assuming and ask whether events spike higher."
+  },
+  "3": {
+    "kind": "slider",
+    "title": "How much peak can 40 servers take?",
+    "prompt": "One stateless app server safely handles 2,000 requests per second. You can run 40 servers and want 30% headroom plus one spare. Find the highest peak you can serve.",
+    "model": "servers",
+    "params": {
+      "perServer": 2000,
+      "headroomPct": 30,
+      "spares": 1,
+      "budget": 40
+    },
+    "control": {
+      "label": "Peak load",
+      "min": 2000,
+      "max": 100000,
+      "step": 2000,
+      "initial": 20000,
+      "unit": "req/s"
+    },
+    "takeaway": "About 60,000 requests per second fits: 30 servers of raw capacity, 39 with headroom, 40 with the spare. Scaling out is this linear only when servers are stateless and the database behind them keeps up."
+  },
+  "4": {
+    "kind": "slider",
+    "title": "How far away can the server be?",
+    "prompt": "A cold HTTPS request needs about three round trips before the first byte: TCP, the TLS 1.3 handshake, then the request itself. Keep that under 300 ms. Move the round-trip time.",
+    "model": "rtt-handshake",
+    "params": {
+      "roundTrips": 3,
+      "budgetMs": 300
+    },
+    "control": {
+      "label": "Round-trip time",
+      "min": 10,
+      "max": 250,
+      "step": 10,
+      "initial": 200,
+      "unit": "ms"
+    },
+    "takeaway": "At 200 ms (roughly Mumbai to the US east coast) the user waits about 600 ms before any data arrives. At 100 ms or less you are inside the budget. Distance, not bandwidth, sets this, which is why edges and connection reuse matter."
+  },
+  "5": {
+    "kind": "predict",
+    "title": "A lost packet on a live score feed",
+    "prompt": "Live cricket scores stream to a phone over TCP. Update #41 is lost in the network; update #42 has already arrived. What does the app see?",
+    "choices": [
+      {
+        "id": "a",
+        "label": "Nothing new until #41 is retransmitted, then both arrive in order",
+        "feedback": "Right: TCP hands bytes to the app strictly in order, so #42 waits behind the gap."
+      },
+      {
+        "id": "b",
+        "label": "#42 straight away; #41 is quietly dropped",
+        "feedback": "That is what a UDP-based design could choose to do, not TCP."
+      },
+      {
+        "id": "c",
+        "label": "The connection resets and reconnects",
+        "feedback": "A single loss triggers a retransmission, not a reset."
+      }
+    ],
+    "correctId": "a",
+    "reveal": "This is head-of-line blocking. For data where only the newest value matters, UDP (or separate QUIC streams) lets the app show #42 and skip #41, at the cost of handling loss yourself."
+  },
+  "6": {
+    "kind": "slider",
+    "title": "Pick a TTL for failover",
+    "prompt": "Health checks take about 60 s to notice a dead region; then DNS points to the healthy one. You want everyone moved within 5 minutes. Find the longest TTL you can afford.",
+    "model": "dns-ttl",
+    "params": {
+      "detectS": 60,
+      "budgetS": 300
+    },
+    "control": {
+      "label": "TTL",
+      "min": 30,
+      "max": 3600,
+      "step": 30,
+      "initial": 3600,
+      "unit": "s"
+    },
+    "takeaway": "A TTL of up to about 240 s meets a 5-minute target in the worst case. Shorter TTLs fail over faster but send more queries to resolvers, and some resolvers and clients hold records longer than the TTL, so do not rely on DNS alone for sub-minute failover."
+  },
+  "7": {
+    "kind": "slider",
+    "title": "First byte from Chennai",
+    "prompt": "A user in Chennai reaches a Singapore origin over a fresh TLS 1.3 connection: one round trip for TCP, one for TLS, one for the request. Keep the first byte under 200 ms.",
+    "model": "rtt-handshake",
+    "params": {
+      "roundTrips": 3,
+      "budgetMs": 200
+    },
+    "control": {
+      "label": "Round-trip time",
+      "min": 10,
+      "max": 150,
+      "step": 10,
+      "initial": 60,
+      "unit": "ms"
+    },
+    "takeaway": "At 60 ms the first byte arrives after about 180 ms. TLS 1.3 needs one handshake round trip (TLS 1.2 needed two); terminating TLS at a nearby edge shortens every round trip, and session resumption saves work on repeat visits."
+  },
+  "8": {
+    "kind": "predict",
+    "title": "A retried payment",
+    "prompt": "A POST /v1/payments call times out on a phone, and the app retries. Which design stops a double charge?",
+    "choices": [
+      {
+        "id": "a",
+        "label": "The client sends an Idempotency-Key; the server stores it with the result and returns the stored result on a retry",
+        "feedback": "Right: the retry is recognised and answered from the stored result."
+      },
+      {
+        "id": "b",
+        "label": "Switch the call to PUT, because PUT is idempotent",
+        "feedback": "PUT is idempotent only when the client names the resource and the server enforces it; changing the verb alone stops nothing."
+      },
+      {
+        "id": "c",
+        "label": "Tell the client never to retry",
+        "feedback": "Timeouts are ambiguous: the first call may or may not have worked, so the user is left guessing."
+      }
+    ],
+    "correctId": "a",
+    "reveal": "A timeout does not tell the client whether the charge happened. Idempotency keys make the retry safe: the server records the key and the outcome atomically and replays the outcome for repeats."
+  },
+  "9": {
+    "kind": "tradeoff",
+    "title": "GraphQL, gRPC, or both?",
+    "prompt": "Pick the best fit for these constraints.",
+    "choices": [
+      {
+        "id": "a",
+        "label": "GraphQL at the edge for the apps, gRPC between internal services",
+        "feedback": "Right: each fits the side it is good at."
+      },
+      {
+        "id": "b",
+        "label": "gRPC from the mobile app directly to every service",
+        "feedback": "Works, but each screen then makes several calls and the apps couple to every internal service."
+      },
+      {
+        "id": "c",
+        "label": "GraphQL for every internal service-to-service call too",
+        "feedback": "Flexible queries add parsing and cost-control overhead to high-volume internal calls that have fixed shapes."
+      }
+    ],
+    "correctId": "a",
+    "reveal": "GraphQL lets each screen fetch exactly the fields it needs in one round trip (with query-cost limits to prevent fan-out storms); gRPC's binary, schema-first calls suit high-volume service-to-service traffic.",
+    "setup": [
+      "Mobile home screen needs data from five services",
+      "Each screen wants a different shape",
+      "Internal services call each other thousands of times a second"
+    ]
+  },
+  "10": {
+    "kind": "predict",
+    "title": "One-way live updates",
+    "prompt": "One million users keep an order-status screen open. Updates flow only from server to client, about once every 10 seconds. What is the simplest fit?",
+    "choices": [
+      {
+        "id": "a",
+        "label": "Server-Sent Events (SSE) over HTTP",
+        "feedback": "Right: a one-way stream over plain HTTP, with automatic reconnects."
+      },
+      {
+        "id": "b",
+        "label": "WebSockets",
+        "feedback": "They work, but you pay for full-duplex connections and custom framing you don't need."
+      },
+      {
+        "id": "c",
+        "label": "Short polling every second",
+        "feedback": "That is about a million requests a second, almost all returning 'no change'."
+      }
+    ],
+    "correctId": "a",
+    "reveal": "Match the channel to the direction of traffic. SSE covers server-to-client pushes; WebSockets earn their extra complexity when the client also sends a steady stream (chat, games). Either way, a million open connections need dedicated gateway servers."
+  },
+  "11": {
+    "kind": "predict",
+    "title": "Round robin with uneven requests",
+    "prompt": "Four servers sit behind round robin. Most requests take 5 ms, but report exports take 5 seconds. What happens under load?",
+    "choices": [
+      {
+        "id": "a",
+        "label": "Servers that drew several exports pile up queued work while others sit idle",
+        "feedback": "Right: round robin counts requests, not work."
+      },
+      {
+        "id": "b",
+        "label": "Load evens out because every server gets the same number of requests",
+        "feedback": "Equal counts are not equal work when durations differ by 1,000×."
+      },
+      {
+        "id": "c",
+        "label": "Round robin automatically skips servers that are busy",
+        "feedback": "Plain round robin does not look at load."
+      }
+    ],
+    "correctId": "a",
+    "reveal": "When request cost varies widely, least-connections (or least outstanding requests) sends new work to the server with the least in flight. Better still, move 5-second exports to a background queue."
+  },
+  "12": {
+    "kind": "tradeoff",
+    "title": "Which layer can do this?",
+    "prompt": "Pick the load balancer that meets all three requirements.",
+    "choices": [
+      {
+        "id": "a",
+        "label": "An L7 (HTTP) load balancer",
+        "feedback": "Right: only something that parses HTTP can see paths and headers."
+      },
+      {
+        "id": "b",
+        "label": "An L4 (TCP) load balancer",
+        "feedback": "L4 sees IP addresses and ports, not paths or headers."
+      },
+      {
+        "id": "c",
+        "label": "DNS round robin",
+        "feedback": "DNS picks an address per lookup; it cannot route by path or split traffic by header."
+      }
+    ],
+    "correctId": "a",
+    "reveal": "Path- and header-based routing, canaries and TLS termination need L7. L4 is still useful in front for raw connection spreading and non-HTTP protocols.",
+    "setup": [
+      "/api goes to one pool, /static to another",
+      "5% of requests with header X-Canary: 1 go to a new version",
+      "Terminate TLS once at the edge"
+    ]
+  },
+  "13": {
+    "kind": "predict",
+    "title": "Forward or reverse?",
+    "prompt": "A company sends every employee's web traffic through a box that blocks some sites and logs the rest. What is that box?",
+    "choices": [
+      {
+        "id": "a",
+        "label": "A forward proxy",
+        "feedback": "Right: it acts on behalf of the clients."
+      },
+      {
+        "id": "b",
+        "label": "A reverse proxy",
+        "feedback": "A reverse proxy sits in front of servers, acting on their behalf."
+      },
+      {
+        "id": "c",
+        "label": "An API gateway",
+        "feedback": "A gateway fronts your own APIs; it does not filter employees' browsing."
+      }
+    ],
+    "correctId": "a",
+    "reveal": "Forward proxies sit on the client side (filtering, anonymising). Reverse proxies such as Nginx or Envoy sit on the server side (TLS, caching, routing, hiding backends)."
+  },
+  "14": {
+    "kind": "predict",
+    "title": "Carts in server memory",
+    "prompt": "Shopping carts live in each server's memory. You add a second server behind round robin. What does a shopper see?",
+    "choices": [
+      {
+        "id": "a",
+        "label": "Their cart seems to empty and refill as requests alternate between servers",
+        "feedback": "Right: each server only knows the carts it created."
+      },
+      {
+        "id": "b",
+        "label": "Nothing changes",
+        "feedback": "Each request may land on a server that has never seen this cart."
+      },
+      {
+        "id": "c",
+        "label": "The load balancer copies carts between servers",
+        "feedback": "Load balancers route requests; they do not move application state."
+      }
+    ],
+    "correctId": "a",
+    "reveal": "Move session state to a shared store such as Redis so any instance can serve any request. Sticky sessions hide the symptom but lose carts whenever a server dies or is replaced."
+  },
+  "15": {
+    "kind": "slider",
+    "title": "Find the hit rate the database survives",
+    "prompt": "20,000 reads per second arrive; the database can take about 3,000 per second. Find the lowest cache hit rate that keeps it alive.",
+    "model": "cache-hit",
+    "params": {
+      "reads": 20000,
+      "dbCapacity": 3000
+    },
+    "control": {
+      "label": "Cache hit rate",
+      "min": 50,
+      "max": 99,
+      "step": 1,
+      "initial": 70,
+      "unit": "%"
+    },
+    "takeaway": "You need at least 85%. Every extra percent removes 200 reads per second from the database, so the last few percent matter most, and a cold cache after a restart can take the database down."
+  },
+  "16": {
+    "kind": "tradeoff",
+    "title": "Strategy for a like counter",
+    "prompt": "Choose the caching strategy for these constraints.",
+    "choices": [
+      {
+        "id": "a",
+        "label": "Write-behind: increment in the cache and flush to the database in batches",
+        "feedback": "Right: batching absorbs the write rate, and a few lost seconds are acceptable here."
+      },
+      {
+        "id": "b",
+        "label": "Write-through: update cache and database synchronously on every like",
+        "feedback": "Safe, but every like still costs a database write, which is the load you wanted to avoid."
+      },
+      {
+        "id": "c",
+        "label": "Cache-aside: write the database and delete the cache key on every like",
+        "feedback": "Each like evicts a hot key and forces a reload: heavy churn on the most-read data."
+      }
+    ],
+    "correctId": "a",
+    "reveal": "Write-behind trades durability for write throughput. That is fine for likes and views, never for money: a crash loses whatever has not been flushed.",
+    "setup": [
+      "Thousands of likes per second on popular posts",
+      "Counts are read far more than written",
+      "Losing a few seconds of likes in a crash is acceptable"
+    ]
+  },
+  "17": {
+    "kind": "predict",
+    "title": "A nightly scan meets the cache",
+    "prompt": "A product cache holds a stable set of best-sellers. Each night a batch job reads every product once. Which eviction policy keeps the best-sellers cached?",
+    "choices": [
+      {
+        "id": "a",
+        "label": "LFU (least frequently used)",
+        "feedback": "Right: one read per product cannot outrank items read thousands of times."
+      },
+      {
+        "id": "b",
+        "label": "LRU (least recently used)",
+        "feedback": "The scan makes every product 'recently used' and pushes the best-sellers out."
+      },
+      {
+        "id": "c",
+        "label": "TTL only",
+        "feedback": "TTL removes items by age; it does not protect hot items from a scan."
+      }
+    ],
+    "correctId": "a",
+    "reveal": "One-pass scans pollute LRU. LFU (Redis implements an approximate LFU with decay) keeps a stable hot set. Another fix is to have batch jobs bypass the cache."
+  },
+  "18": {
+    "kind": "predict",
+    "title": "A hot key expires",
+    "prompt": "A key read 10,000 times a second expires, and rebuilding it takes 50 ms. With no protection, how many database reads hit during that window?",
+    "choices": [
+      {
+        "id": "a",
+        "label": "About 500",
+        "feedback": "Right: 10,000 per second × 0.05 s."
+      },
+      {
+        "id": "b",
+        "label": "Exactly 1",
+        "feedback": "Only with request coalescing (single-flight) or a lock."
+      },
+      {
+        "id": "c",
+        "label": "About 10,000",
+        "feedback": "That would be a full second of misses; the window is 50 ms."
+      }
+    ],
+    "correctId": "a",
+    "reveal": "Every request that misses during the rebuild goes to the database. Single-flight lets one request rebuild while the others wait; early refresh and TTL jitter stop many keys expiring together."
+  },
+  "19": {
+    "kind": "slider",
+    "title": "How much must the edge absorb?",
+    "prompt": "A live event pushes 2 Tbps (2,000 Gbps) to viewers. Your origin can send at most 100 Gbps. Find the edge hit ratio you need.",
+    "model": "cdn-offload",
+    "params": {
+      "totalGbps": 2000,
+      "originGbps": 100
+    },
+    "control": {
+      "label": "Edge hit ratio",
+      "min": 80,
+      "max": 99.9,
+      "step": 0.1,
+      "initial": 90,
+      "unit": "%"
+    },
+    "takeaway": "You need at least 95%: at 90% the origin would have to push 200 Gbps. Live streams pre-warm edges and often add an origin shield tier so that misses from many edges collapse into one request."
+  },
+  "20": {
+    "kind": "predict",
+    "title": "Which Redis structure?",
+    "prompt": "A live leaderboard shows the top 10 of 5 million players, and scores change thousands of times a second. Which Redis structure fits?",
+    "choices": [
+      {
+        "id": "a",
+        "label": "A sorted set: ZADD to update, ZREVRANGE for the top 10",
+        "feedback": "Right: updates and rank queries are both O(log N)."
+      },
+      {
+        "id": "b",
+        "label": "A hash of player → score, sorted in the app on each read",
+        "feedback": "Sorting 5 million entries per read is far too slow."
+      },
+      {
+        "id": "c",
+        "label": "A list, re-ordered on every update",
+        "feedback": "Lists keep insertion order; re-ordering costs O(N) per update."
+      }
+    ],
+    "correctId": "a",
+    "reveal": "Sorted sets keep members ordered by score, so rank and range queries stay fast as the board grows. For very large contests, shard by contest, not by player."
+  }
+}
