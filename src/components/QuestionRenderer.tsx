@@ -274,8 +274,8 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
                   checked={selected}
                   onChange={() => setAnswer([c.id])}
                 />
-                <span className="text-sm text-[#d1d5db]">
-                  <kbd className="font-mono text-[10px] text-[var(--color-muted)] mr-2">{idx + 1}</kbd>
+                <span className="text-[15px] text-chalk">
+                  <kbd className="kbd mr-2.5">{idx + 1}</kbd>
                   {c.label}
                 </span>
               </label>
