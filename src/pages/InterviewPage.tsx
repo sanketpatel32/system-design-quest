@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Mascot } from '../components/art/Mascot'
 import { PageHero } from '../components/ui/PageHero'
 import { Link } from 'react-router-dom'
 import { allTopics } from '../content/catalog'
@@ -231,11 +232,17 @@ export function InterviewPage() {
       {startedAt > 0 && finished && boss && (
         <section className="space-y-4" aria-labelledby="mock-summary">
           <div className="panel p-5">
-            <p className="text-sm font-semibold text-[var(--color-clear)]">Mock finished</p>
-            <h2 id="mock-summary" className="font-display text-2xl font-bold text-chalk mt-1">{boss.title}: your answers</h2>
+            <div className="flex items-center gap-4">
+              <Mascot mood="happy" size={84} className="anim-pop shrink-0" />
+              <div>
+                <p className="text-sm font-extrabold uppercase tracking-wide text-[var(--color-clear)]">Mock finished</p>
+                <h2 id="mock-summary" className="font-display text-3xl text-chalk mt-1">{boss.title}: your answers</h2>
+                <p className="font-bold text-dim">Rate each part honestly, then compare with the reference.</p>
+              </div>
+            </div>
             <ol className="mt-3 space-y-2">
               {STAGES.map((s, i) => (
-                <li key={s.label} className="rounded-2xl border border-[var(--color-rail)] bg-[var(--color-ink)] p-3">
+                <li key={s.label} className="rounded-2xl border-2 border-[var(--color-rail)] bg-white p-3">
                   <p className="text-xs text-dim">{s.label}</p>
                   <p className="text-sm text-chalk whitespace-pre-wrap mt-0.5">{stageNotes[i]?.trim() || 'No notes for this stage.'}</p>
                 </li>
@@ -247,7 +254,7 @@ export function InterviewPage() {
           </div>
 
           <fieldset className="panel p-5 space-y-3">
-            <legend className="font-display text-lg font-bold text-chalk px-1">Rate yourself, 1 to 5</legend>
+            <legend className="font-display text-xl text-chalk px-1">Rate yourself, 1 to 5</legend>
             {RUBRIC.map((r) => (
               <div key={r.key} className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center border-b border-[var(--color-rail)] pb-3 last:border-0">
                 <div>
