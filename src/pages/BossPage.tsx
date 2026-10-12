@@ -157,7 +157,7 @@ export function BossPage() {
           {grade.feedback.length > 0 && (
             <div>
               <h3 className="font-display font-semibold text-chalk mb-2">What to fix</h3>
-              <ul className="text-sm text-[#d6d0c2] space-y-1.5">
+              <ul className="text-sm text-chalk space-y-1.5">
                 {grade.feedback.map((f) => (
                   <li key={f} className="flex gap-2">
                     <span aria-hidden className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-amber)]" />
@@ -167,15 +167,15 @@ export function BossPage() {
               </ul>
             </div>
           )}
-          <details className="reference rounded-md border border-[var(--color-rail)] bg-[var(--color-ink)]">
+          <details className="reference rounded-2xl border border-[var(--color-rail)] bg-[var(--color-ink)]">
             <summary className="cursor-pointer px-4 py-3 font-display font-semibold text-chalk">Reference architecture and notes</summary>
-            <div className="px-4 pb-4 space-y-3 text-sm text-[#d6d0c2] leading-relaxed">
+            <div className="px-4 pb-4 space-y-3 text-sm text-chalk leading-relaxed">
               <p>{topic.boss.referenceNotes}</p>
               <p>
                 <span className="text-chalk font-semibold">Estimate: </span>
                 {topic.boss.workedEstimate}
               </p>
-              <pre className="whitespace-pre-wrap rounded-md border border-[var(--color-rail)] bg-[#0a1624] p-3 text-[13px] text-chalk">{topic.boss.exampleApi}</pre>
+              <pre className="whitespace-pre-wrap rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 text-[13px] text-chalk">{topic.boss.exampleApi}</pre>
               <p>
                 <span className="text-chalk font-semibold">Trade-offs: </span>
                 {topic.boss.tradeoffAnalysis}

@@ -69,12 +69,12 @@ function BottleneckDiagram({
   const W = 20 + cols.size * NW + (cols.size - 1) * GX
   const H = 20 + maxRows * NH + (maxRows - 1) * GY
   return (
-    <div className="rounded-md border border-[var(--color-rail)] bg-[#0a1624] p-3 overflow-x-auto">
+    <div className="rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 overflow-x-auto">
       <p className="text-xs text-dim mb-2">Requests flow left to right. Select the component that saturates first.</p>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-full" style={{ minWidth: Math.min(W, 520), maxHeight: 260 }} role="group" aria-label="Request path diagram">
         <defs>
           <marker id={`arrow-${question.id}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-            <path d="M0 0L10 5L0 10z" fill="#4E6680" />
+            <path d="M0 0L10 5L0 10z" fill="#9AA3AF" />
           </marker>
         </defs>
         {question.diagramEdges.map((e) => {
@@ -88,7 +88,7 @@ function BottleneckDiagram({
               y1={a.y + NH / 2}
               x2={b.x - 2}
               y2={b.y + NH / 2}
-              stroke="#4E6680"
+              stroke="#9AA3AF"
               strokeWidth={2}
               markerEnd={`url(#arrow-${question.id})`}
             />
@@ -99,7 +99,7 @@ function BottleneckDiagram({
           const sel = picked.includes(n.id)
           const right = reveal && question.correctNodeIds.includes(n.id)
           const wrong = reveal && sel && !right
-          const stroke = right ? '#6FD38B' : wrong ? '#FF5A4E' : sel ? '#F2B33D' : '#2A4562'
+          const stroke = right ? '#58CC02' : wrong ? '#FF4B4B' : sel ? '#1CB0F6' : '#E6E0D6'
           return (
             <g
               key={n.id}
@@ -117,9 +117,9 @@ function BottleneckDiagram({
                 }
               }}
             >
-              <rect className="station-focus" x={p.x - 4} y={p.y - 4} width={NW + 8} height={NH + 8} rx={9} fill="none" stroke="#F2B33D" strokeWidth={2} />
-              <rect x={p.x} y={p.y} width={NW} height={NH} rx={6} fill={sel ? 'rgba(242,179,61,0.12)' : '#14283D'} stroke={stroke} strokeWidth={2} />
-              <text x={p.x + NW / 2} y={p.y + NH / 2 + 4} textAnchor="middle" fontSize={13} fontWeight={600} fill="#EDE6D6" className="font-display">
+              <rect className="station-focus" x={p.x - 4} y={p.y - 4} width={NW + 8} height={NH + 8} rx={9} fill="none" stroke="#1CB0F6" strokeWidth={3} />
+              <rect x={p.x} y={p.y} width={NW} height={NH} rx={6} fill={sel ? '#DDF4FE' : '#FFFFFF'} stroke={stroke} strokeWidth={2} />
+              <text x={p.x + NW / 2} y={p.y + NH / 2 + 4} textAnchor="middle" fontSize={13} fontWeight={600} fill="#29303D" className="font-display">
                 {n.label}
               </text>
             </g>
@@ -344,7 +344,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
         />
       )}
       {question.type === 'drag_order' && shown && !shown.correct && (
-        <div className="rounded-md border border-[rgba(111,211,139,0.45)] bg-[rgba(111,211,139,0.06)] p-3">
+        <div className="rounded-2xl border border-[#79d634] bg-[#effbe5] p-3">
           <p className="text-sm font-semibold text-[var(--color-clear)] mb-1.5">Correct sequence</p>
           <ol className="list-decimal pl-5 text-sm text-chalk space-y-0.5">
             {question.correctOrder.map((id) => (
@@ -374,7 +374,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
             </span>
           </label>
           {submitted && (
-            <dl className="rounded-md border border-[var(--color-rail)] bg-[#0a1624] p-3 text-sm grid gap-2 sm:grid-cols-[110px_1fr]">
+            <dl className="rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 text-sm grid gap-2 sm:grid-cols-[110px_1fr]">
               <dt className="text-dim">Assumptions</dt>
               <dd className="text-chalk">{question.assumptions.join(' · ')}</dd>
               <dt className="text-dim">Formula</dt>
@@ -387,7 +387,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
       )}
       {question.type === 'tradeoff' && (
         <div className="space-y-3">
-          <div className="rounded-md bg-[#0a1624] border border-[var(--color-rail)] p-3">
+          <div className="rounded-2xl bg-[#f7f5f0] border border-[var(--color-rail)] p-3">
             <p className="text-xs text-dim mb-1.5">Constraints</p>
             <ul className="flex flex-wrap gap-1.5">
               {question.constraints.map((c) => (

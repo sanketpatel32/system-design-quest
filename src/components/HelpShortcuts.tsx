@@ -37,12 +37,12 @@ export function HelpShortcuts() {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-start gap-3">
-          <h2 id="help-title" className="font-display text-lg font-bold text-[#f8fafc]">Keyboard shortcuts</h2>
+          <h2 id="help-title" className="font-display text-lg font-bold text-chalk">Keyboard shortcuts</h2>
           <button type="button" className="btn-quiet text-xs" onClick={() => setOpen(false)} aria-label="Close help">
             Esc
           </button>
         </div>
-        <ul className="text-sm text-[#d1d5db] space-y-2">
+        <ul className="text-sm text-chalk space-y-2">
           <li><kbd className="font-mono text-[var(--color-teal)]">?</kbd> — toggle this help</li>
           <li><kbd className="font-mono text-[var(--color-teal)]">1</kbd>–<kbd className="font-mono text-[var(--color-teal)]">4</kbd> — select MCQ option (quiz)</li>
           <li><kbd className="font-mono text-[var(--color-teal)]">Enter</kbd> — submit current question</li>

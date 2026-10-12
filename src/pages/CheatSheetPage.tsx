@@ -115,7 +115,7 @@ export function CheatSheetPage() {
                 return (
                   <tr key={p} className="border-b border-[var(--color-rail)] last:border-0">
                     <th scope="row" className="py-2 pr-4 font-display font-semibold">{p}</th>
-                    <td className="py-2 pr-4 text-[#d6d0c2]">{u}</td>
+                    <td className="py-2 pr-4 text-chalk">{u}</td>
                     <td className="py-2 pr-4 text-dim">{w}</td>
                     <td className="py-2">
                       {topic && (

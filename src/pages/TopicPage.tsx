@@ -99,7 +99,7 @@ export function TopicPage() {
           <ul className="space-y-2 text-xs text-[var(--color-muted)]">
             {topic.sources.map((s) => (
               <li key={s.url}>
-                <a className="text-[#cbd5e1] hover:text-[var(--color-teal)] underline-offset-2 hover:underline" href={s.url} target="_blank" rel="noreferrer">
+                <a className="text-[#12749f] hover:text-[var(--color-teal)] underline-offset-2 hover:underline" href={s.url} target="_blank" rel="noreferrer">
                   {s.title}
                 </a>
               </li>

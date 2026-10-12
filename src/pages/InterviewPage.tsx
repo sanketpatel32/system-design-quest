@@ -157,7 +157,7 @@ export function InterviewPage() {
         <section className="panel p-5 space-y-4" aria-labelledby="brief">
           <div>
             <h2 id="brief" className="font-display text-xl font-bold text-chalk">Brief: {boss.title}</h2>
-            <p className="text-[15px] text-[#d6d0c2] mt-1">
+            <p className="text-[15px] text-chalk mt-1">
               Your interviewer says: “Design {boss.title}.” Treat the details below as what you would learn by asking.
             </p>
           </div>
@@ -168,7 +168,7 @@ export function InterviewPage() {
           </dl>
           <ol className="grid gap-2 sm:grid-cols-3">
             {STAGES.map((s, i) => (
-              <li key={s.label} className="flex items-center gap-3 rounded-md border border-[var(--color-rail)] bg-[var(--color-ink)] px-3 py-2">
+              <li key={s.label} className="flex items-center gap-3 rounded-2xl border border-[var(--color-rail)] bg-[var(--color-ink)] px-3 py-2">
                 <span className="order-num tabular-nums" aria-hidden>{i + 1}</span>
                 <span className="text-sm text-chalk flex-1">{s.label}</span>
                 <span className="text-sm text-dim tabular-nums">{INTERVIEW_STAGE_MINUTES[i]} min</span>
@@ -238,7 +238,7 @@ export function InterviewPage() {
             <h2 id="mock-summary" className="font-display text-2xl font-bold text-chalk mt-1">{boss.title}: your answers</h2>
             <ol className="mt-3 space-y-2">
               {STAGES.map((s, i) => (
-                <li key={s.label} className="rounded-md border border-[var(--color-rail)] bg-[var(--color-ink)] p-3">
+                <li key={s.label} className="rounded-2xl border border-[var(--color-rail)] bg-[var(--color-ink)] p-3">
                   <p className="text-xs text-dim">{s.label}</p>
                   <p className="text-sm text-chalk whitespace-pre-wrap mt-0.5">{stageNotes[i]?.trim() || 'No notes for this stage.'}</p>
                 </li>
@@ -277,10 +277,10 @@ export function InterviewPage() {
 
           <details className="panel p-5" open>
             <summary className="cursor-pointer font-display text-lg font-bold text-chalk">Reference solution</summary>
-            <div className="mt-3 space-y-2 text-sm text-[#d6d0c2] leading-relaxed">
+            <div className="mt-3 space-y-2 text-sm text-chalk leading-relaxed">
               <p>{boss.boss?.referenceNotes}</p>
               <p><span className="text-chalk font-semibold">Estimate: </span>{boss.boss?.workedEstimate}</p>
-              <pre className="whitespace-pre-wrap rounded-md border border-[var(--color-rail)] bg-[#0a1624] p-3 text-[13px] text-chalk">{boss.boss?.exampleApi}</pre>
+              <pre className="whitespace-pre-wrap rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 text-[13px] text-chalk">{boss.boss?.exampleApi}</pre>
               <p><span className="text-chalk font-semibold">Trade-offs: </span>{boss.boss?.tradeoffAnalysis}</p>
             </div>
           </details>

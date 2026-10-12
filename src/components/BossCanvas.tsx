@@ -191,7 +191,7 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
           </button>
         </div>
       </aside>
-      <div className="boss-flow relative h-[460px] rounded-lg border border-[var(--color-rail)] overflow-hidden bg-[#0a1624]">
+      <div className="boss-flow relative h-[460px] rounded-2xl border border-[var(--color-rail)] overflow-hidden bg-[#f7f5f0]">
         {nodes.length === 0 && (
           <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center p-6 text-center">
             <div className="max-w-xs">
@@ -201,7 +201,7 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
           </div>
         )}
         {nodes.length >= 2 && edges.length === 0 && (
-          <p className="pointer-events-none absolute left-3 top-3 z-10 rounded-md bg-[var(--color-ink)]/90 px-3 py-1.5 text-xs text-chalk">
+          <p className="pointer-events-none absolute left-3 top-3 z-10 rounded-2xl bg-[var(--color-ink)]/90 px-3 py-1.5 text-xs text-chalk">
             Drag from a right-hand amber dot to another node to wire requests, or use Connect.
           </p>
         )}
@@ -215,10 +215,10 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
           colorMode="dark"
           fitView
           fitViewOptions={{ maxZoom: 1.1, padding: 0.3 }}
-          defaultEdgeOptions={{ style: { stroke: '#F2B33D', strokeWidth: 2 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#F2B33D' } }}
+          defaultEdgeOptions={{ style: { stroke: '#8AA0B8', strokeWidth: 3 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#8AA0B8' } }}
         >
-          <Background color="#1F3854" gap={24} size={1.5} />
-          <MiniMap pannable zoomable nodeColor="#2A4562" maskColor="rgba(13,27,42,0.7)" style={{ background: '#0D1B2A' }} />
+          <Background color="#DED7CA" gap={24} size={2} />
+          <MiniMap pannable zoomable nodeColor="#BFD7EA" maskColor="rgba(255,249,240,0.7)" style={{ background: '#FFFFFF' }} />
           <Controls showInteractive={false} />
         </ReactFlow>
       </div>

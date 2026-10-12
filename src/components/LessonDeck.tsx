@@ -64,7 +64,7 @@ export function LessonDeck({
           ))}
         </div>
         {hasRealTitle(card) && <h3 className="font-display text-2xl font-bold text-chalk mb-3">{card.title}</h3>}
-        <p className="text-[#d6d0c2] leading-relaxed text-[17px] max-w-[62ch]">{card.body}</p>
+        <p className="text-chalk leading-relaxed text-[17px] max-w-[62ch]">{card.body}</p>
         {card.steps && card.steps.length > 0 && (
           <ol className="flow mt-5" aria-label="Request flow">
             {card.steps.map((step, i) => (
@@ -76,7 +76,7 @@ export function LessonDeck({
           </ol>
         )}
         {card.diagram && (
-          <div className="mt-4 rounded-md border border-[var(--color-rail)] bg-[#0a1624] p-3 overflow-x-auto" dangerouslySetInnerHTML={{ __html: card.diagram }} />
+          <div className="mt-4 rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 overflow-x-auto" dangerouslySetInnerHTML={{ __html: card.diagram }} />
         )}
         {card.kind === 'animation' && (
           <div className="mt-4 h-1 bg-[var(--color-rail)] rounded-full overflow-hidden" aria-hidden>
