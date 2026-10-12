@@ -64,16 +64,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
               aria-label={`Level ${level}, ${xp} xp, ${streak}-day streak${badges.length ? `, ${badges.length} badges` : ''}. Show details`}
               onClick={() => setHudOpen((v) => !v)}
             >
-              <span className="hud-chip text-[#C25E00]">
+              <span className="hud-chip text-[#C25E00]" title={`${streak}-day streak`}>
                 <IconFlame lit={streak > 0} />
                 <span className="tabular-nums">{streak}</span>
               </span>
-              <span className="hud-chip text-[#12749f]">
+              <span className="hud-chip text-[#12749f]" title={`Level ${level} · ${xp % 500} of 500 xp to the next level`}>
                 <IconGem />
                 <span className="tabular-nums">{xp} xp</span>
               </span>
               {badges.length > 0 && (
-                <span className="hud-chip text-[#8A5A00] hidden sm:inline-flex">
+                <span className="hud-chip text-[#8A5A00] hidden sm:inline-flex" title={`${badges.length} badge${badges.length === 1 ? "" : "s"} earned`}>
                   <IconBadge />
                   <span className="tabular-nums">{badges.length}</span>
                 </span>
