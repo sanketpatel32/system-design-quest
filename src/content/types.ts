@@ -25,6 +25,8 @@ export interface LessonCard {
   /** Ordered steps of a request flow, rendered as a connected sequence */
   steps?: string[]
   accent?: string
+  /** Concepts this card teaches (matched against question.concept by the audit) */
+  teaches?: string[]
 }
 
 export interface SourceRef {
@@ -52,6 +54,8 @@ export interface BaseQuestion {
   explanation: string
   /** For flashcard-derived review */
   tags?: string[]
+  /** Concept this question tests; a card in the topic (or a prerequisite) must teach it */
+  concept?: string
 }
 
 export interface MultipleChoiceQuestion extends BaseQuestion {

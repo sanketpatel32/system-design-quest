@@ -9,6 +9,13 @@ import { fileURLToPath } from 'node:url'
 import { LESSONS, CARDS_ONLY, EXTRA_CARDS, TEXT_FIXES, TITLE_FIXES } from './fixes/lessons.mjs'
 import { BLOCK_OWNER, AUTHORED_BLOCKS } from './fixes/bosses.mjs'
 
+// Authored quizzes (and replacement cards) per topic, one module per group of regions
+const quizDir = join(dirname(fileURLToPath(import.meta.url)), 'fixes/quiz')
+const QUIZ = {}
+for (const f of readdirSync(quizDir).filter((f) => /^r.*\.mjs$/.test(f)).sort()) {
+  Object.assign(QUIZ, (await import(join(quizDir, f))).default)
+}
+
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dir = join(root, 'scripts/authored')
 const files = readdirSync(dir).filter((f) => f.endsWith('.json')).sort()
@@ -91,6 +98,9 @@ for (const t of all.filter((t) => t.kind !== 'boss')) {
   if (L?.cards) t.cards = cardsFrom(t.id, L.cards)
   if (L?.flashcards) t.flashcards = L.flashcards.map(([front, back], i) => ({ id: `t${t.id}-f${i + 1}`, front, back }))
   if (LESSONS[t.id]?.questions) t.questions = LESSONS[t.id].questions.map((q) => structuredClone(q))
+  const Q = QUIZ[t.id]
+  if (Q?.cards) t.cards = cardsFrom(t.id, Q.cards)
+  if (Q) t.questions = Q.q.map((q, i) => ({ id: `t${t.id}-a${i + 1}`, ...structuredClone(q) }))
 
   t.cards = (t.cards ?? []).map(fixCard)
   for (const c of t.cards) for (const [from, to] of TEXT_FIXES) c.body = c.body.replace(from, to)
@@ -145,6 +155,29 @@ for (const t of all.filter((t) => t.kind !== 'boss')) {
 
 // The tutorial is a lesson, not a boss: its leftover template boss stages are never shown
 if (byId.get(74)) delete byId.get(74).bossStages
+
+// ---------- authored concept tags ----------
+for (const t of all.filter((t) => QUIZ[t.id])) {
+  const Q = QUIZ[t.id]
+  for (const [i, c] of (Q.add ?? []).entries()) {
+    const id = `t${t.id}-y${i + 1}`
+    if (!t.cards.some((x) => x.id === id)) t.cards.push({ id, kind: 'text', title: c[0], body: c[1] })
+  }
+  for (const c of t.cards) delete c.teaches
+  ;(Q.cards ?? []).forEach((c, i) => { if (c[3]?.length) t.cards[i].teaches = c[3] })
+  for (const [i, list] of Object.entries(Q.teach ?? {})) {
+    if (!t.cards[i]) throw new Error(`topic ${t.id}: no card ${i} to tag`)
+    t.cards[i].teaches = [...new Set([...(t.cards[i].teaches ?? []), ...list])]
+  }
+  ;(Q.add ?? []).forEach((c) => { const x = t.cards.find((k) => k.title === c[0]); if (x) x.teaches = c[3] })
+  if (Q.objectives) t.objectives = Q.objectives
+  if (Q.cards) {
+    // Replaced lessons get review cards drawn from their own questions
+    t.flashcards = t.questions.filter((q) => q.type === 'multiple_choice').slice(0, 4).map((q, i) => ({
+      id: `t${t.id}-f${i + 1}`, front: q.prompt, back: `${q.choices.find((c) => c.id === q.correctChoiceIds[0]).label}. ${q.explanation}`,
+    }))
+  }
+}
 
 // ---------- bosses ----------
 const bosses = all.filter((t) => t.kind === 'boss')

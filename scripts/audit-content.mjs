@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { checkQuiz } from './audit/quiz-quality.mjs'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -73,16 +74,10 @@ for (const t of topics) {
   if (t.cards.length < 4 || t.cards.length > 6) {
     errors.push(`Topic ${t.id}: card count ${t.cards.length}`)
   }
-  // Fewer, real questions beat padded templates: 3 to 8 per topic
-  if (t.questions.length < 3 || t.questions.length > 8) {
-    errors.push(`Topic ${t.id}: question count ${t.questions.length}`)
-  }
   if (t.flashcards.length < 2) errors.push(`Topic ${t.id}: flashcards < 2`)
   const blob = JSON.stringify(t)
   if (placeholder.test(blob)) errors.push(`Topic ${t.id}: placeholder text`)
   if (fingerprintTok.test(blob)) errors.push(`Topic ${t.id}: fingerprint tok* tokens in content`)
-  const types = new Set(t.questions.map((q) => q.type))
-  if (types.size < 2) warnings.push(`Topic ${t.id}: only one question type`)
   // Regressions of the old template filler
   for (const q of [...t.questions, ...(t.bossStages ?? []).flatMap((s) => s.questions)]) {
     if (/«[^»]*»/.test(q.prompt)) errors.push(`Topic ${t.id}: template prompt using the title as a system name`)
@@ -141,6 +136,16 @@ for (const t of topics) {
     }
   }
 }
+
+// 5–8 authored questions per topic, concept-aligned with the cards, no silly distractors
+const quiz = checkQuiz(topics)
+// While the quiz rewrite lands region by region, failures are reported but only enforced for authored topics
+const pendingTopics = new Set(topics.filter((t) => !t.questions.some((q) => q.concept)).map((t) => t.id))
+const pending = quiz.errors.filter((e) => pendingTopics.has(Number(/^Topic (\d+)/.exec(e)?.[1])))
+errors.push(...quiz.errors.filter((e) => !pending.includes(e)))
+if (pending.length) console.log(`AUDIT PENDING: ${pendingTopics.size} topics not yet rewritten (${pending.length} quiz issues)`)
+if (quiz.notes.length) console.log(`AUDIT NOTE: ${quiz.notes.length} quiz notes (two question types, or a long giveaway answer)${process.env.AUDIT_NOTES ? '' : '; set AUDIT_NOTES=1 to list'}`)
+if (process.env.AUDIT_NOTES) quiz.notes.forEach((n) => console.log(' ·', n))
 
 if (warnings.length && !strict) {
   console.warn(`AUDIT WARN: ${warnings.length} near-duplicate text pairs (run AUDIT_STRICT=1 npm run audit to fail)`)
