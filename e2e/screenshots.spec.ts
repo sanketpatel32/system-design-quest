@@ -1,7 +1,7 @@
 import { test } from '@playwright/test'
 import { mkdirSync } from 'node:fs'
 
-const out = '/opt/cursor/artifacts/screenshots'
+const out = process.env.SDQ_SHOTS_DIR ?? 'test-results/screenshots'
 
 test('capture key screens', async ({ page }) => {
   mkdirSync(out, { recursive: true })
