@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { allTopics } from '../content/catalog'
 import { BossCanvas, type CanvasSnapshot } from '../components/BossCanvas'
 import {
@@ -206,10 +207,31 @@ export function InterviewPage() {
       )}
 
       {summary && (
-        <section className="rounded-xl border border-lime-400/30 p-4 space-y-2">
-          <h2 className="text-xl font-semibold">Mock summary</h2>
-          <p>{summary.auto}</p>
-          <p className="text-sm text-slate-400">Self-assessment rubric (not AI-graded): rate 1–5 on requirements clarity, estimation, and communication.</p>
+        <section className="panel p-5 space-y-4" aria-labelledby="mock-summary">
+          <div>
+            <p className="text-sm font-semibold text-[var(--color-clear)]">Mock finished</p>
+            <h2 id="mock-summary" className="font-display text-2xl font-bold text-chalk mt-1">How did it go?</h2>
+            <p className="text-sm text-dim mt-1">{summary.auto}</p>
+          </div>
+          {notes.trim() && (
+            <div className="rounded-md border border-[var(--color-rail)] bg-[var(--color-ink)] p-3">
+              <p className="text-xs text-dim mb-1">Your notes</p>
+              <p className="text-sm text-chalk whitespace-pre-wrap">{notes}</p>
+            </div>
+          )}
+          <p className="text-sm text-dim">
+            Rate yourself 1 to 5 on requirements clarity, estimation and communication. This is self-assessed, nothing is auto-graded.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {boss && (
+              <Link to={`/topic/${boss.slug}`} className="btn-cta">
+                Compare with the {boss.title} boss
+              </Link>
+            )}
+            <button type="button" className="btn-quiet" onClick={start}>
+              Start a new mock
+            </button>
+          </div>
         </section>
       )}
     </div>
