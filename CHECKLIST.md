@@ -9,5 +9,6 @@
 - [x] localStorage + IndexedDB persistence, import/export/reset
 - [x] Vitest unit tests + Playwright e2e
 - [x] Authored shards in `scripts/authored/` + `npm run content:build`
-- [x] `npm run audit:strict` clean (authored uniques + fingerprint markers)
+- [x] `npm run audit:strict` clean (local prose import, no `tok*` fingerprints)
+- [x] Transit-map UI (Bricolage + Atkinson, DESIGN.md)
 - [ ] Optional: deploy to static host from CI

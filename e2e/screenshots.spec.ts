@@ -9,7 +9,8 @@ test('capture key screens', async ({ page }) => {
   await page.waitForTimeout(800)
   await page.screenshot({ path: `${out}/01-world-map.png`, fullPage: true })
 
-  await page.getByRole('link', { name: /The System Design Interview/i }).first().click()
+  await page.getByTestId('station-1').click()
+  await page.getByTestId('start-topic').click()
   await page.waitForTimeout(600)
   await page.screenshot({ path: `${out}/02-lesson-topic.png`, fullPage: true })
 
@@ -55,4 +56,17 @@ test('capture key screens', async ({ page }) => {
   await page.getByRole('button', { name: 'Start mock' }).click()
   await page.waitForTimeout(700)
   await page.screenshot({ path: `${out}/06-interview.png`, fullPage: true })
+
+  await page.goto('/revision')
+  await page.waitForTimeout(500)
+  if (await page.getByRole('button', { name: 'good' }).isVisible()) {
+    await page.getByRole('button', { name: 'good' }).click()
+    await page.waitForTimeout(300)
+  }
+  await page.screenshot({ path: `${out}/07-review.png`, fullPage: true })
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.waitForTimeout(600)
+  await page.screenshot({ path: `${out}/08-mobile-map.png`, fullPage: true })
 })

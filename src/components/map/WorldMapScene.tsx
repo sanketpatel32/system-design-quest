@@ -1,20 +1,128 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { orderedTopicsInRegion, regions } from '../../content/catalog'
-import { regionPathOrder, regionThemes, themeForRegion } from '../../lib/design/regionTheme'
+import { Link, useNavigate } from 'react-router-dom'
+import { orderedTopicsInRegion, regions, topicsById } from '../../content/catalog'
+import type { RegionId } from '../../content/types'
+import { transitLineColor } from '../../lib/design/transitTheme'
 import { getUnlockHint, topicStatus } from '../../lib/progression/unlocks'
 import { useGameStore } from '../../stores/gameStore'
-import { RegionGlyph } from '../icons/RegionGlyph'
 
-function buildPathD(points: { x: number; y: number }[]): string {
-  if (points.length === 0) return ''
-  const first = points[0]!
-  const rest = points.slice(1)
-  return `M ${first.x} ${first.y} ${rest.map((p) => `L ${p.x} ${p.y}`).join(' ')}`
+const learningRegions = regions.filter((r) => r.id !== 'boss-arena')
+const W = 1000
+const TOP = 120
+const GAP = 104
+const L = 70
+const R = 900
+
+interface Stop {
+  id: number
+  x: number
+  y: number
+  regionId: string
+}
+
+function layoutStops(): Stop[] {
+  const stops: Stop[] = []
+  learningRegions.forEach((r, i) => {
+    const y0 = TOP + i * GAP
+    const ids = orderedTopicsInRegion(r.id).map((t) => t.id)
+    const n = ids.length
+    const ltr = i % 2 === 0
+    ids.forEach((id, j) => {
+      const f = n === 1 ? 0 : j / (n - 1)
+      const x = ltr ? L + f * (R - L) : R - f * (R - L)
+      const y = y0 + (f > 0.5 ? 30 : 0)
+      stops.push({ id, x, y, regionId: r.id })
+    })
+  })
+  return stops
+}
+
+const STOPS = layoutStops()
+const H = TOP + learningRegions.length * GAP + 40
+
+function linePath(regionId: string) {
+  const pts = STOPS.filter((s) => s.regionId === regionId)
+  return pts.map((p, i) => `${i ? 'L' : 'M'}${p.x},${p.y}`).join(' ')
+}
+
+function connector(i: number) {
+  const a = STOPS.filter((s) => s.regionId === learningRegions[i]!.id).at(-1)!
+  const b = STOPS.filter((s) => s.regionId === learningRegions[i + 1]!.id)[0]!
+  const side = i % 2 === 0 ? 1 : -1
+  const cx = a.x + side * 55
+  return `M${a.x},${a.y} C${cx},${a.y} ${cx},${b.y} ${b.x},${b.y}`
+}
+
+type Status = ReturnType<typeof topicStatus>
+
+function StationDot({
+  stop,
+  status,
+  pulse,
+  selected,
+  color,
+  onSelect,
+}: {
+  stop: Stop
+  status: Status
+  pulse: boolean
+  selected: boolean
+  color: string
+  onSelect: () => void
+}) {
+  const { x, y } = stop
+  return (
+    <g
+      role="button"
+      tabIndex={0}
+      data-testid={`station-${stop.id}`}
+      data-status={status}
+      className="cursor-pointer outline-none"
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect()
+        }
+      }}
+    >
+      {pulse && (
+        <circle
+          cx={x}
+          cy={y}
+          r={9}
+          fill="none"
+          stroke={color}
+          strokeWidth={2}
+          className="motion-safe:animate-[pulsering_1.8s_ease-out_infinite]"
+        />
+      )}
+      <circle
+        cx={x}
+        cy={y}
+        r={selected ? 13 : 10}
+        fill={status === 'completed' ? color : '#0D1B2A'}
+        stroke={status === 'locked' ? '#2A4562' : status === 'completed' ? '#EDE6D6' : color}
+        strokeWidth={status === 'locked' ? 2 : 3.5}
+      />
+      {status === 'in_progress' && <circle cx={x} cy={y} r={4} fill={color} />}
+      <text
+        x={x}
+        y={y - 19}
+        textAnchor="middle"
+        className="font-display"
+        fontSize={12}
+        fontWeight={600}
+        fill={status === 'locked' ? '#4E6680' : '#EDE6D6'}
+      >
+        {stop.id}
+      </text>
+    </g>
+  )
 }
 
 export function WorldMapScene() {
-  const [selectedId, setSelectedId] = useState(regionThemes[0]!.id)
+  const nav = useNavigate()
   const unlocked = useGameStore((s) => s.unlockedTopicIds)
   const topicProgress = useGameStore((s) => s.topicProgress)
   const quizAttempts = useGameStore((s) => s.quizAttempts)
@@ -29,159 +137,179 @@ export function WorldMapScene() {
     [topicProgress],
   )
 
-  const selectedRegion = regions.find((r) => r.id === selectedId) ?? regions[0]!
-  const theme = themeForRegion(selectedRegion.id)
-  const topics = orderedTopicsInRegion(selectedRegion.id)
-  const cleared = topics.filter((t) => completed.has(t.id)).length
+  const statusMap = useMemo(() => {
+    const m = new Map<number, Status>()
+    for (const s of STOPS) {
+      const inProgress = Boolean(quizAttempts[`topic-${s.id}`] && !topicProgress[s.id]?.completed)
+      const topic = topicsById.get(s.id)
+      if (topic) m.set(s.id, topicStatus(topic, unlocked, completed, inProgress))
+    }
+    return m
+  }, [unlocked, completed, quizAttempts, topicProgress])
 
-  const pathPoints = regionThemes.map((t) => ({ x: t.mapX, y: t.mapY }))
-  const pathD = buildPathD(pathPoints)
+  const nextId = STOPS.find((s) => {
+    const st = statusMap.get(s.id)
+    return st === 'available' || st === 'in_progress'
+  })?.id
+
+  const [sel, setSel] = useState<number | null>(null)
+  const selectedId = sel ?? nextId ?? 1
+  const selectedStop = STOPS.find((s) => s.id === selectedId)!
+  const selectedRegion = learningRegions.find((r) => r.id === selectedStop.regionId)!
+  const selectedTopic = orderedTopicsInRegion(selectedRegion.id).find((t) => t.id === selectedId)!
+  const lineColor = transitLineColor(selectedRegion.id as import('../../content/types').RegionId)
+  const st = statusMap.get(selectedId) ?? 'locked'
+  const arenaOpen = unlocked.includes(74) || completed.has(74)
+
+  const doneCount = learningRegions.reduce(
+    (acc, r) => acc + orderedTopicsInRegion(r.id).filter((t) => completed.has(t.id)).length,
+    0,
+  )
+  const total = learningRegions.reduce((acc, r) => acc + orderedTopicsInRegion(r.id).length, 0)
 
   return (
-    <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.55fr)] gap-5 items-start">
-      <header className="lg:col-span-2 mb-1">
-        <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted)] mb-1">India-scale interview quest</p>
-        <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-[#f4f5f6] max-w-xl leading-tight">
-          Chart the path from HTTP to hot-path bosses.
-        </h1>
-        <p className="mt-2 text-sm text-[var(--color-muted)] max-w-lg">
-          Regions unlock in order. Boss Colosseum opens after Launchpad. Interview mode is always on the nav rail.
-        </p>
-      </header>
-
-      <div className="panel-slab p-2 sm:p-3 relative overflow-hidden min-h-[420px]">
-        <svg viewBox="0 0 980 560" className="w-full h-auto block" role="img" aria-label="World map of learning regions">
-          <defs>
-            <linearGradient id="pathGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.15" />
-              <stop offset="100%" stopColor="#fbbf24" stopOpacity="0.35" />
-            </linearGradient>
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="2" result="b" />
-              <feMerge>
-                <feMergeNode in="b" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-          <rect width="980" height="560" fill="#080b0f" />
-          <path d="M0 420 Q240 380 480 400 T980 360" fill="none" stroke="#1a2028" strokeWidth="48" />
-          <path d="M0 180 Q320 220 520 160 T980 200" fill="none" stroke="#14181f" strokeWidth="28" />
-          <path
-            d={pathD}
-            fill="none"
-            stroke="url(#pathGrad)"
-            strokeWidth="4"
-            strokeDasharray="10 8"
-            className="map-path-glow"
-            style={{ color: '#2dd4bf' }}
-            filter="url(#glow)"
-          />
-          {regionThemes.map((rt) => {
-            const reg = regions.find((r) => r.id === rt.id)
-            const tTopics = reg ? orderedTopicsInRegion(reg.id) : []
-            const prog = tTopics.length ? tTopics.filter((t) => completed.has(t.id)).length / tTopics.length : 0
-            const active = rt.id === selectedId
-            return (
-              <g
-                key={rt.id}
-                className={`map-region ${active ? 'map-region-selected' : ''}`}
-                style={{ ['--region-glow' as string]: rt.accent }}
-                onClick={() => setSelectedId(rt.id)}
-                onKeyDown={(e) => e.key === 'Enter' && setSelectedId(rt.id)}
-                role="button"
-                tabIndex={0}
-                aria-label={`${rt.label}, ${Math.round(prog * 100)}% cleared`}
-              >
-                <circle
-                  className="region-ring"
-                  cx={rt.mapX}
-                  cy={rt.mapY}
-                  r={active ? 34 : 28}
-                  fill="#0c1016"
-                  stroke={rt.accent}
-                  strokeWidth={active ? 3 : 2}
-                />
-                <circle cx={rt.mapX} cy={rt.mapY} r={22} fill={rt.accentMuted} opacity="0.45" />
-                <foreignObject x={rt.mapX - 14} y={rt.mapY - 14} width="28" height="28">
-                  <div className="flex items-center justify-center w-full h-full">
-                    <RegionGlyph id={rt.glyph} color={rt.accent} size={26} />
-                  </div>
-                </foreignObject>
-                <text
-                  x={rt.mapX}
-                  y={rt.mapY + 46}
-                  textAnchor="middle"
-                  fill="#94a3b8"
-                  fontSize="9"
-                  fontFamily="IBM Plex Sans, sans-serif"
-                  fontWeight="600"
-                >
-                  {rt.label.split(' ')[0]}
-                </text>
-              </g>
-            )
-          })}
-        </svg>
-        <div className="absolute bottom-2 left-2 text-[10px] text-[var(--color-muted)] uppercase tracking-widest">
-          Tap a node · path glows with progress
-        </div>
-      </div>
-
-      <aside
-        className="panel-slab panel-slab-accent lg:sticky lg:top-24"
-        style={{ ['--accent' as string]: theme.accent }}
-      >
-        <div className="p-4 border-b border-[var(--color-line)] flex gap-3 items-start">
-          <RegionGlyph id={theme.glyph} color={theme.accent} size={32} />
-          <div className="min-w-0">
-            <h2 className="font-display text-lg font-bold leading-snug">{selectedRegion.name}</h2>
-            <p className="text-xs text-[var(--color-muted)]">{selectedRegion.subtitle}</p>
-            <p className="text-[11px] mt-1 tabular-nums text-[var(--color-teal)]">
-              {cleared}/{topics.length} cleared
-            </p>
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <section aria-labelledby="map-title" className="min-w-0">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-dim">Transit map</p>
+            <h1 id="map-title" className="font-display text-3xl font-extrabold md:text-4xl text-chalk">
+              The network
+            </h1>
           </div>
+          <p className="text-dim text-sm tabular-nums">{doneCount} of {total} stations cleared</p>
         </div>
-        <ol className="p-3 space-y-1 max-h-[min(52vh,480px)] overflow-y-auto">
-          {topics.map((topic, idx) => {
-            const inProgress = Boolean(quizAttempts[`topic-${topic.id}`] && !topicProgress[topic.id]?.completed)
-            const status = topicStatus(topic, unlocked, completed, inProgress)
-            const locked = status === 'locked'
-            const accent = theme.accent
-            return (
-              <li key={topic.id} className="topic-rail-item" style={{ ['--accent' as string]: accent }}>
-                {locked ? (
-                  <div className="py-2 pr-2 text-xs text-[var(--color-muted)]">
-                    <span className="font-mono text-[10px] text-[#4b5563] mr-2">{String(idx + 1).padStart(2, '0')}</span>
-                    <span className="line-through opacity-60">{topic.title}</span>
-                    <p className="mt-1 text-[10px] leading-snug opacity-80">{getUnlockHint(topic.id, completed)}</p>
-                  </div>
-                ) : (
-                  <Link
-                    to={`/topic/${topic.slug}`}
-                    className="block py-2 pr-2 text-sm text-[#d1d5db] hover:text-white"
+        <div className="panel overflow-x-auto p-2">
+          <svg viewBox={`0 0 ${W} ${H}`} className="min-w-[720px] w-full" role="group" aria-label="World map of learning regions">
+            <defs>
+              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                <path d="M40 0H0V40" fill="none" stroke="#1A3048" strokeWidth="1" />
+              </pattern>
+              <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="5" result="b" />
+                <feMerge>
+                  <feMergeNode in="b" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <rect width={W} height={H} fill="url(#grid)" />
+            <path d={`M${W} 0 C930 180 990 330 925 520 S960 900 ${W} ${H}`} fill="#10314A" opacity=".55" />
+            <g>
+              <path
+                d={`M${STOPS.find((s) => s.id === 7)?.x ?? 200},${STOPS.find((s) => s.id === 7)?.y ?? 200} C960,${TOP} 960,60 880,52`}
+                stroke="#FF5A4E"
+                strokeWidth={6}
+                strokeDasharray={arenaOpen ? '0' : '2 10'}
+                strokeLinecap="round"
+                fill="none"
+                opacity={arenaOpen ? 1 : 0.5}
+                filter={arenaOpen ? 'url(#glow)' : undefined}
+              />
+              <a
+                href="/topic/interview-playbook"
+                onClick={(e) => {
+                  e.preventDefault()
+                  nav('/topic/interview-playbook')
+                }}
+                data-testid="arena-link"
+              >
+                <rect x={690} y={30} width={190} height={46} rx={23} fill="#0D1B2A" stroke="#FF5A4E" strokeWidth={3} />
+                <text x={785} y={50} textAnchor="middle" fontSize={15} fontWeight={800} className="font-display" fill="#EDE6D6">
+                  Architecture Colosseum
+                </text>
+                <text x={785} y={66} textAnchor="middle" fontSize={11} fill={arenaOpen ? '#FF5A4E' : '#8FA0B3'}>
+                  {arenaOpen ? 'Boss arena unlocked' : 'Clear Launchpad first'}
+                </text>
+              </a>
+            </g>
+            {learningRegions.slice(0, -1).map((r, i) => (
+              <path
+                key={`c-${r.id}`}
+                d={connector(i)}
+                stroke={transitLineColor(learningRegions[i + 1]!.id)}
+                strokeWidth={6}
+                fill="none"
+                strokeLinecap="round"
+                opacity={0.75}
+              />
+            ))}
+            {learningRegions.map((r, i) => {
+              const color = transitLineColor(r.id)
+              const first = STOPS.find((s) => s.regionId === r.id)!
+              return (
+                <g key={r.id}>
+                  <path
+                    d={linePath(r.id)}
+                    stroke={color}
+                    strokeWidth={8}
+                    fill="none"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    filter="url(#glow)"
+                    opacity={0.95}
+                  />
+                  <text
+                    x={i % 2 === 0 ? L - 10 : R + 10}
+                    y={first.y - 38}
+                    textAnchor={i % 2 === 0 ? 'start' : 'end'}
+                    fontSize={15}
+                    fontWeight={800}
+                    className="font-display"
+                    fill={color}
                   >
-                    <span className="font-mono text-[10px] mr-2" style={{ color: accent }}>
-                      {String(topic.id).padStart(3, '0')}
-                    </span>
-                    {status === 'completed' && (
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--color-teal)] mr-1.5 align-middle" />
-                    )}
-                    {status === 'in_progress' && (
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--color-amber)] mr-1.5 animate-pulse align-middle" />
-                    )}
-                    {topic.title}
-                  </Link>
-                )}
-              </li>
-            )
-          })}
-        </ol>
-        <div className="p-3 border-t border-[var(--color-line)] text-[10px] text-[var(--color-muted)]">
-          Next region:{' '}
-          {regionPathOrder[regionPathOrder.indexOf(selectedId) + 1]
-            ? themeForRegion(regionPathOrder[regionPathOrder.indexOf(selectedId) + 1] as typeof selectedId).label
-            : 'Summit complete'}
+                    {r.subtitle}
+                    <tspan fill="#8FA0B3" fontWeight={400} fontSize={12}>{`  ${r.name}`}</tspan>
+                  </text>
+                </g>
+              )
+            })}
+            {STOPS.map((s) => (
+              <StationDot
+                key={s.id}
+                stop={s}
+                status={statusMap.get(s.id)!}
+                pulse={s.id === nextId}
+                selected={s.id === selectedId}
+                color={transitLineColor(s.regionId as RegionId)}
+                onSelect={() => setSel(s.id)}
+              />
+            ))}
+          </svg>
+        </div>
+        <p className="mt-2 text-sm text-dim">
+          Filled stations are cleared. A ring means you can enter; the pulsing ring is your next stop.
+        </p>
+      </section>
+
+      <aside className="flex flex-col gap-4" aria-label="Station details">
+        <div
+          className="panel relative overflow-hidden p-5 border-l-[6px]"
+          style={{ borderLeftColor: lineColor }}
+          data-testid="station-panel"
+        >
+          <p className="text-sm" style={{ color: lineColor }}>
+            {selectedRegion.subtitle}, station {selectedTopic.id}
+          </p>
+          <h2 className="mt-1 font-display text-2xl font-extrabold leading-tight text-chalk" data-testid="topic-title">
+            {selectedTopic.title}
+          </h2>
+          <p className="mt-2 text-dim text-sm">{selectedTopic.objectives?.[0]}</p>
+          {st === 'locked' && (
+            <p className="mt-3 text-sm text-fault">{getUnlockHint(selectedTopic.id, completed)}</p>
+          )}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {st !== 'locked' && (
+              <Link to={`/topic/${selectedTopic.slug}`} className="btn" data-testid="start-topic">
+                Open lesson
+              </Link>
+            )}
+            {selectedTopic.kind === 'boss' && st !== 'locked' && (
+              <Link to={`/boss/${selectedTopic.slug}`} className="btn-quiet">
+                Boss fight
+              </Link>
+            )}
+          </div>
         </div>
       </aside>
     </div>

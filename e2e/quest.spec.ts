@@ -2,9 +2,10 @@ import { expect, test } from '@playwright/test'
 
 test('map to lesson navigation', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: /Chart the path/i })).toBeVisible()
-  await page.getByRole('link', { name: /The System Design Interview/i }).first().click()
-  await expect(page.getByRole('heading', { name: 'The System Design Interview' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /The network/i })).toBeVisible()
+  await page.getByTestId('station-1').click()
+  await page.getByTestId('start-topic').click()
+  await expect(page.getByTestId('topic-title')).toHaveText('The System Design Interview')
 })
 
 test('wrong answer costs heart and shows feedback', async ({ page }) => {
@@ -69,7 +70,7 @@ test('quiz clear awards xp and unlocks next topic', async ({ page }) => {
   await page.getByRole('button', { name: 'Claim progress' }).click()
   await expect(page.getByText(/xp/i).first()).toBeVisible()
   await page.goto('/')
-  await expect(page.getByRole('link', { name: /Back-of-Envelope/i }).first()).toBeVisible()
+  await expect(page.getByTestId('station-2')).toHaveAttribute('data-status', 'available')
 })
 
 test('boss canvas submit shows score breakdown', async ({ page }) => {

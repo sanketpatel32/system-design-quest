@@ -67,6 +67,17 @@ def validate_unique(topics: list[dict]) -> None:
 def main() -> None:
     AUTHORED.mkdir(parents=True, exist_ok=True)
 
+    from generate_all_specs import OUT as SPECS_PATH, write_specs  # noqa: WPS433
+    from local_import import patch_specs  # noqa: WPS433
+
+    write_specs()
+    specs = json.loads(SPECS_PATH.read_text())
+    patch_specs(specs)
+    SPECS_PATH.write_text(json.dumps(specs, indent=2) + "\n")
+    import curriculum  # noqa: WPS433
+
+    curriculum.SPECS = json.loads(SPECS_PATH.read_text())
+
     def pack_lessons(ids: list[int]) -> list[dict]:
         out = []
         for tid in ids:

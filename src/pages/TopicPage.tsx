@@ -41,7 +41,7 @@ export function TopicPage() {
       <div className="space-y-5 min-w-0">
         <header>
           <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--color-muted)]">Topic {topic.id}</p>
-          <h1 className="font-display text-3xl font-extrabold text-[#f4f5f6] mt-1">{topic.title}</h1>
+          <h1 className="font-display text-3xl font-extrabold text-chalk mt-1" data-testid="topic-title">{topic.title}</h1>
           <p className="text-sm text-[var(--color-muted)] mt-2 max-w-xl">{topic.objectives.join(' — ')}</p>
         </header>
         <LessonDeck cards={topic.cards} accent={accent} />
