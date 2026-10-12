@@ -23,7 +23,7 @@
         "id": "t75-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 75 · URL Shortener: A bit.ly for SMS links sent by Indian banks and e-commerce apps. In scope: Create short link from long URL; Redirect short link to original; Optional custom alias & expiry.",
+        "body": "Boss 75 · URL Shortener: A short-link service for SMS links sent by Indian banks and shopping apps, where a 160-character SMS cannot fit a long tracking URL. In scope: Create short link from long URL; Redirect short link to original; Optional custom alias & expiry.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -33,7 +33,7 @@
         "id": "t75-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 75 non-functionals: Redirect p99 < 50 ms. 100:1 read/write. Links never collide.",
+        "body": "Boss 75 non-functionals: Redirect p99 < 50 ms. 100:1 read/write. Links never collide. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -54,7 +54,7 @@
         "id": "t75-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 75 risks: Async click analytics via a queue; CDN/edge caching for viral links.",
+        "body": "Boss 75 risks: Id generation: Hashing the long URL and truncating causes collisions that need retries; a counter or Snowflake id encoded in base62 never collides. 301 versus 302: 301 is cached by browsers, which cuts load but hides repeat clicks from analytics and makes link edits sticky; 302 keeps every click visible.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -902,7 +902,7 @@
         "id": "t76-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 76 · Pastebin: Share code snippets and logs between developers. In scope: Create a paste; Read a paste by ID; Expire pastes.",
+        "body": "Boss 76 · Pastebin: Share code snippets and logs between developers, with expiry, like Pastebin or a GitHub gist. In scope: Create a paste; Read a paste by ID; Expire pastes.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -912,7 +912,7 @@
         "id": "t76-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 76 non-functionals: Reads p99 < 100 ms. Durable storage. Read-heavy.",
+        "body": "Boss 76 non-functionals: Reads p99 < 100 ms. Durable storage. Read-heavy. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -933,7 +933,7 @@
         "id": "t76-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 76 risks: TTL cleanup worker deletes expired pastes.",
+        "body": "Boss 76 risks: Content in the database or object storage?: Small pastes could live in SQL, but object storage keeps the database small, makes backups fast and lets a CDN serve public pastes directly; metadata stays in SQL for queries by owner and expiry. Unguessable ids: Sequential ids let anyone scrape private pastes; random ids from a large space (62 to the power 8 ≈ 218 trillion) make guessing impractical.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -1773,7 +1773,7 @@
         "id": "t77-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 77 · Rate Limiter: Protect OTP and login APIs of a fintech from abuse. In scope: Limit requests per user/IP/key; Return 429 with retry hint; Configurable rules.",
+        "body": "Boss 77 · Rate Limiter: Protect the OTP and login APIs of a fintech from abuse, shared across every API server. In scope: Limit requests per user/IP/key; Return 429 with retry hint; Configurable rules.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -1783,7 +1783,7 @@
         "id": "t77-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 77 non-functionals: Adds < 5 ms latency. Highly available. Shared across instances.",
+        "body": "Boss 77 non-functionals: Adds < 5 ms latency. Highly available. Shared across instances. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -1804,7 +1804,7 @@
         "id": "t77-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 77 risks: Fail-open for non-critical APIs, fail-closed for OTP.",
+        "body": "Boss 77 risks: Fail open or fail closed?: Failing closed during a Redis outage blocks every login; failing open lets attackers through. Choosing keys: Indian mobile carriers put many users behind shared IPs, so per-phone and per-user limits are primary and IP limits are loose, catching only obvious floods.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -2642,7 +2642,7 @@
         "id": "t78-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 78 · Unique ID Generator: Send push, SMS and email for an e-commerce app at sale time. In scope: Send push/SMS/email; User preferences & opt-out; Retry failed deliveries.",
+        "body": "Boss 78 · Unique ID Generator: Generate unique, roughly time-sortable 64-bit ids for orders, messages and payments across data centres. In scope: Generate unique 64-bit IDs on demand; IDs roughly sortable by time; Work across many data centres.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -2652,7 +2652,7 @@
         "id": "t78-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 78 non-functionals: At-least-once delivery. Handle 10× sale spikes. Do not spam users.",
+        "body": "Boss 78 non-functionals: Under 1 ms per ID. No duplicates, ever. No single point of failure. Out of scope: Human-readable vanity IDs; Cryptographic secrecy of IDs.",
         "teaches": [
           "requirements",
           "estimation"
@@ -2662,7 +2662,7 @@
         "id": "t78-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 78 reference path: Services publish notification events to a queue. → Channel workers call SMS/push/email providers with retries and DLQ. → Preferences + dedupe store; per-user rate limits.",
+        "body": "Boss 78 reference path: Each generator node has a unique worker ID (Snowflake: timestamp + worker + sequence). → Clock moving backwards is detected and the node waits or refuses. → No central counter on the hot path.",
         "teaches": [
           "api",
           "architecture",
@@ -2673,7 +2673,7 @@
         "id": "t78-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 78 risks: Preferences + dedupe store; per-user rate limits.",
+        "body": "Boss 78 risks: Clock skew: NTP corrections can move clocks backwards; issuing ids then could repeat a timestamp with a reused sequence. Alternatives: UUIDv4 needs no coordination but is 128 bits and random, which hurts B-tree locality; UUIDv7 is time-ordered and standard; database ranges (ticket servers) are simple but depend on a central database.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -3512,7 +3512,7 @@
         "id": "t79-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 79 · Distributed KV Store: Design a Dynamo-style distributed KV store. In scope: put(key, value); get(key); Scale horizontally.",
+        "body": "Boss 79 · Distributed KV Store: Design a Dynamo-style distributed key-value store with tunable consistency. In scope: put(key, value); get(key); Scale horizontally.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -3522,7 +3522,7 @@
         "id": "t79-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 79 non-functionals: Highly available. Tunable consistency. Low latency.",
+        "body": "Boss 79 non-functionals: Highly available. Tunable consistency. Low latency. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -3543,7 +3543,7 @@
         "id": "t79-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 79 risks: Gossip membership, hinted handoff, read repair.",
+        "body": "Boss 79 risks: Tuning R and W: R + W > N gives overlapping quorums; R = 1, W = 1 favours latency; per-request levels let a shopping cart use ONE while an account setting uses QUORUM. Hot keys: Consistent hashing spreads keys, not load; a hot key needs caching in front, read replicas or splitting the key.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -4380,7 +4380,7 @@
         "id": "t80-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 80 · Distributed Cache: Crawl Indian news and e-commerce sites for a search engine. In scope: Fetch pages from seed URLs; Extract and enqueue links; Respect robots.txt and politeness.",
+        "body": "Boss 80 · Distributed Cache: Build a Redis- or Memcached-like distributed cache cluster that application servers share. In scope: get/set with TTL; Eviction; Scale nodes.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -4390,7 +4390,7 @@
         "id": "t80-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 80 non-functionals: Billions of pages. No duplicate fetches. Fault-tolerant.",
+        "body": "Boss 80 non-functionals: Sub-ms latency. Survive node loss. Even load. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -4400,7 +4400,7 @@
         "id": "t80-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 80 reference path: URL frontier queue partitioned by host for politeness. → Fetcher workers store raw HTML in object storage. → Dedup via URL/content hashes; parser enqueues new links.",
+        "body": "Boss 80 reference path: Consistent hashing with vnodes for key placement. → Primary-replica per shard with failover. → LRU eviction; hot key replication.",
         "teaches": [
           "api",
           "architecture",
@@ -4411,7 +4411,7 @@
         "id": "t80-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 80 risks: Dedup via URL/content hashes; parser enqueues new links.",
+        "body": "Boss 80 risks: Eviction policy: LRU suits recency-driven access such as sessions; LFU protects steadily popular items from being pushed out by one-off scans. Node loss: Losing a primary without a replica sends its share of keys to the database at once; replicas, request coalescing and circuit breakers keep the database safe.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -5247,7 +5247,7 @@
         "id": "t81-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 81 · Notification System: An Instagram/ShareChat-style home feed. In scope: Post content; See ranked feed of followed users; Like and comment.",
+        "body": "Boss 81 · Notification System: Send push, SMS and email for an e-commerce app, including sale-time spikes. In scope: Send push/SMS/email; User preferences & opt-out; Retry failed deliveries.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -5257,7 +5257,7 @@
         "id": "t81-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 81 non-functionals: Feed load < 300 ms. Eventual consistency ok. Celebrity fan-out.",
+        "body": "Boss 81 non-functionals: At-least-once delivery. Handle 10× sale spikes. Do not spam users. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -5267,7 +5267,7 @@
         "id": "t81-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 81 reference path: Fan-out-on-write for normal users into Redis feed caches. → Fan-out-on-read for celebrities; merge at read time. → Media on object storage + CDN.",
+        "body": "Boss 81 reference path: Services publish notification events to a queue. → Channel workers call SMS/push/email providers with retries and DLQ. → Preferences + dedupe store; per-user rate limits.",
         "teaches": [
           "api",
           "architecture",
@@ -5278,7 +5278,7 @@
         "id": "t81-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 81 risks: Media on object storage + CDN.",
+        "body": "Boss 81 risks: Not spamming users: Frequency caps per user per day, dedup by idempotency key and quiet hours (no promotional pushes at 2 AM) matter as much as throughput. Spikes: Queues absorb the burst; promotional sends are scheduled and spread over minutes, while transactional ones (order confirmed, OTP) use a separate high-priority queue.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -6126,7 +6126,7 @@
         "id": "t82-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 82 · News Feed: One-to-one and group messaging used across India. In scope: Send 1:1 messages; Group chats; Delivery/read receipts.",
+        "body": "Boss 82 · News Feed: An Instagram- or ShareChat-style home feed: post, follow, and read a ranked feed. In scope: Post content; See ranked feed of followed users; Like and comment.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -6136,7 +6136,7 @@
         "id": "t82-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 82 non-functionals: Low latency. Messages never lost. Offline delivery.",
+        "body": "Boss 82 non-functionals: Feed load < 300 ms. Eventual consistency ok. Celebrity fan-out. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -6146,7 +6146,7 @@
         "id": "t82-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 82 reference path: WebSocket gateways hold connections; a registry maps user → gateway. → Messages persisted in Cassandra-style store partitioned by conversation. → Offline users get push notifications; receipts flow back as events.",
+        "body": "Boss 82 reference path: Fan-out-on-write for normal users into Redis feed caches. → Fan-out-on-read for celebrities; merge at read time. → Media on object storage + CDN.",
         "teaches": [
           "api",
           "architecture",
@@ -6157,7 +6157,7 @@
         "id": "t82-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 82 risks: Offline users get push notifications; receipts flow back as events.",
+        "body": "Boss 82 risks: Push, pull or hybrid: Push makes reads cheap but celebrity posts cost millions of writes; pull makes writes cheap but reads slow; hybrid gets both for most users. Inactive users: Skipping fan-out for users inactive for 30 days saves a large share of writes; their feed is rebuilt on next login.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -7017,7 +7017,7 @@
         "id": "t83-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 83 · Twitter/X: Match riders and drivers in Indian cities. In scope: Request a ride; Match nearby driver; Live location tracking.",
+        "body": "Boss 83 · Twitter/X: Twitter or X: post short messages, follow users and read a home timeline. In scope: Post a short tweet; Follow other users; Read a home timeline.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -7027,7 +7027,7 @@
         "id": "t83-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 83 non-functionals: Match < 5 s. Location updates every 4 s. No double assignment.",
+        "body": "Boss 83 non-functionals: Timeline loads in under 200 ms. Highly available reads. Eventual consistency is fine for timelines. Out of scope: Ads ranking; Direct messages.",
         "teaches": [
           "requirements",
           "estimation"
@@ -7037,7 +7037,7 @@
         "id": "t83-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 83 reference path: Drivers stream locations via WebSocket into a geo index (geohash in Redis). → Matching service queries nearby drivers and locks one with CAS. → Trips in SQL; surge via stream processing.",
+        "body": "Boss 83 reference path: Fan-out on write for most users, read-time merge for celebrities. → Timelines cached in memory per user. → Fan-out workers are idempotent so redelivery does not duplicate tweets.",
         "teaches": [
           "api",
           "architecture",
@@ -7048,7 +7048,7 @@
         "id": "t83-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 83 risks: Trips in SQL; surge via stream processing.",
+        "body": "Boss 83 risks: Timeline cache size: Keeping only the latest 800 ids per active user bounds memory; older history is fetched from storage on deep scroll. Consistency: Timelines are eventually consistent: a tweet may appear seconds later for some followers, which is acceptable; the author sees their own tweet immediately via read-your-writes.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -7904,7 +7904,7 @@
         "id": "t84-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 84 · WhatsApp: Order food, assign riders, track delivery. In scope: Browse & search restaurants; Place order & pay; Track rider live.",
+        "body": "Boss 84 · WhatsApp: One-to-one and group messaging used across India, with receipts and offline delivery. In scope: Send 1:1 messages; Group chats; Delivery/read receipts.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -7914,7 +7914,7 @@
         "id": "t84-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 84 non-functionals: Peak at lunch/dinner. Order state consistent. ETA accuracy.",
+        "body": "Boss 84 non-functionals: Low latency. Messages never lost. Offline delivery. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -7924,7 +7924,7 @@
         "id": "t84-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 84 reference path: Order service with saga: payment → restaurant accept → rider assign. → Search on Elasticsearch with geo filters. → Rider location via WebSocket; notifications via queue.",
+        "body": "Boss 84 reference path: WebSocket gateways hold connections; a registry maps user → gateway. → Messages persisted in Cassandra-style store partitioned by conversation. → Offline users get push notifications; receipts flow back as events.",
         "teaches": [
           "api",
           "architecture",
@@ -7935,7 +7935,7 @@
         "id": "t84-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 84 risks: Rider location via WebSocket; notifications via queue.",
+        "body": "Boss 84 risks: Ordering and duplicates: Per-conversation sequence numbers give order; client-generated message ids let the server and receivers drop retried duplicates. End-to-end encryption: With end-to-end encryption, as WhatsApp publicly describes using the Signal protocol, the server stores only ciphertext, so search and moderation must happen on devices.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -8782,7 +8782,7 @@
         "id": "t85-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 85 · Instagram: Book seats for shows without double booking. In scope: View shows & seat map; Hold seats for 10 min; Pay and confirm.",
+        "body": "Boss 85 · Instagram: Instagram: upload photos, follow users and view a feed of images. In scope: Upload photos; Follow users; View feed.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -8792,7 +8792,7 @@
         "id": "t85-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 85 non-functionals: No double booking. Spikes on blockbuster releases. Fair queueing.",
+        "body": "Boss 85 non-functionals: Read-heavy. Durable media. Feed < 300 ms. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -8802,7 +8802,7 @@
         "id": "t85-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 85 reference path: Seat holds via conditional update or short Redis lock with TTL. → Payment saga releases hold on failure/timeout. → Virtual waiting room queue for blockbuster drops.",
+        "body": "Boss 85 reference path: Object storage + CDN for images, thumbnails via workers. → Graph of follows in SQL/NoSQL; feed cache. → Async fan-out on post.",
         "teaches": [
           "api",
           "architecture",
@@ -8813,7 +8813,7 @@
         "id": "t85-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 85 risks: Virtual waiting room queue for blockbuster drops.",
+        "body": "Boss 85 risks: CDN and image sizes: Serving a 200 KB variant instead of the 2 MB original cuts bandwidth ten times; WebP or AVIF formats save more. Hot photos: A celebrity photo is requested millions of times; the CDN absorbs it, and origin shielding stops thousands of edges from hitting storage at once.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -9681,7 +9681,7 @@
         "id": "t86-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 86 · YouTube: Handle the 10:00 AM Tatkal rush. In scope: Search trains & availability; Book tatkal seats; Payment & PNR.",
+        "body": "Boss 86 · YouTube: YouTube-style video: upload, transcode, and an infinite feed of videos to watch. In scope: Upload video; Infinite scroll feed; Like & share.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -9691,7 +9691,7 @@
         "id": "t86-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 86 non-functionals: 10× spike at 10:00. No overselling. Graceful degradation.",
+        "body": "Boss 86 non-functionals: Fast start on 4G. Massive storage. Personalised. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -9701,7 +9701,7 @@
         "id": "t86-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 86 reference path: Pre-scale before 10:00; waiting-room queue + rate limiter. → Inventory decremented atomically per train/class/quota. → Cache availability with short TTL; payment saga.",
+        "body": "Boss 86 reference path: Pre-signed uploads to object storage, async transcoding. → Recommendation service builds feed cached per user. → CDN delivery; prefetch next videos.",
         "teaches": [
           "api",
           "architecture",
@@ -9712,7 +9712,7 @@
         "id": "t86-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 86 risks: Cache availability with short TTL; payment saga.",
+        "body": "Boss 86 risks: Parallel transcoding: Splitting a video into segments and encoding them in parallel turns an hour of encoding into minutes, at the cost of orchestration. Fast start on 4G: Start with a low bitrate, short first segments and a CDN edge close to the user, then step up as bandwidth allows.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -10580,7 +10580,7 @@
         "id": "t87-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 87 · Netflix: Design a PSP app like PhonePe/GPay over NPCI. In scope: Send money via VPA; Collect requests; Transaction history.",
+        "body": "Boss 87 · Netflix: Netflix-style streaming: browse a catalogue, stream at adaptive quality and resume where you left off. In scope: Browse the catalogue; Stream a title at adaptive quality; Resume where you left off.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -10590,7 +10590,7 @@
         "id": "t87-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 87 non-functionals: Exactly-once debit. High availability. Audit trail.",
+        "body": "Boss 87 non-functionals: Playback starts in under 2 s. Smooth playback on poor mobile networks. Survive a region outage. Out of scope: Live sports; User-uploaded video.",
         "teaches": [
           "requirements",
           "estimation"
@@ -10600,7 +10600,7 @@
         "id": "t87-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 87 reference path: Idempotent transaction service with unique txn ref; ledger in SQL. → Async calls to NPCI with timeouts, circuit breakers per bank. → Reconciliation workers; notifications via queue.",
+        "body": "Boss 87 reference path: Video segments served from CDN edges, not the origin. → Multiple bitrates per title for adaptive streaming. → Watch progress written asynchronously.",
         "teaches": [
           "api",
           "architecture",
@@ -10611,7 +10611,7 @@
         "id": "t87-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 87 risks: Reconciliation workers; notifications via queue.",
+        "body": "Boss 87 risks: Pre-positioning: Popular titles are copied to edge caches during off-peak hours, so evening traffic rarely reaches the origin. Region failure: If a control-plane region fails, traffic shifts to another region; playback from edge caches continues because it does not depend on the failed region.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -11473,7 +11473,7 @@
         "id": "t88-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 88 · Uber/Ola: Accept card/UPI/netbanking for merchants. In scope: Create order & accept payment; Webhooks to merchant; Refunds.",
+        "body": "Boss 88 · Uber/Ola: Uber or Ola: match riders with nearby drivers in Indian cities and track trips live. In scope: Request a ride; Match nearby driver; Live location tracking.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -11483,7 +11483,7 @@
         "id": "t88-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 88 non-functionals: No double charge. PCI compliance. 99.99% availability.",
+        "body": "Boss 88 non-functionals: Match < 5 s. Location updates every 4 s. No double assignment. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -11493,7 +11493,7 @@
         "id": "t88-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 88 reference path: Payment state machine in SQL with idempotency keys. → Card data tokenised in a vault; routing to acquirers with circuit breakers. → Webhook workers with retries + DLQ.",
+        "body": "Boss 88 reference path: Drivers stream locations via WebSocket into a geo index (geohash in Redis). → Matching service queries nearby drivers and locks one with CAS. → Trips in SQL; surge via stream processing.",
         "teaches": [
           "api",
           "architecture",
@@ -11504,7 +11504,7 @@
         "id": "t88-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 88 risks: Webhook workers with retries + DLQ.",
+        "body": "Boss 88 risks: No double assignment: A conditional update on the ride row, or a compare-and-set on the driver's status, guarantees one winner even if two acceptances arrive together. Hot zones: Airports and stations at peak overload a few cells; finer cells and per-zone dispatch partitions keep queries fast.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -12353,7 +12353,7 @@
         "id": "t89-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 89 · Zomato/Swiggy: Wallet balances, top-ups and P2P transfers. In scope: Top-up wallet; Transfer to user; View balance & history.",
+        "body": "Boss 89 · Zomato/Swiggy: Zomato or Swiggy: browse restaurants, order and pay, and track the delivery rider live. In scope: Browse & search restaurants; Place order & pay; Track rider live.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -12363,7 +12363,7 @@
         "id": "t89-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 89 non-functionals: Strong consistency. No negative balances. Audit.",
+        "body": "Boss 89 non-functionals: Peak at lunch/dinner. Order state consistent. ETA accuracy. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -12373,7 +12373,7 @@
         "id": "t89-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 89 reference path: Double-entry ledger in SQL; balance updates in a transaction. → Idempotency keys for transfers. → Async events for notifications and analytics.",
+        "body": "Boss 89 reference path: Order service with saga: payment → restaurant accept → rider assign. → Search on Elasticsearch with geo filters. → Rider location via WebSocket; notifications via queue.",
         "teaches": [
           "api",
           "architecture",
@@ -12384,7 +12384,7 @@
         "id": "t89-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 89 risks: Async events for notifications and analytics.",
+        "body": "Boss 89 risks: Order state consistency: An explicit state machine (placed → paid → accepted → picked → delivered) in SQL, changed only by valid transitions, prevents impossible states. Lunch and dinner peaks: Peaks are predictable, so autoscaling is scheduled ahead, and non-critical work such as review prompts is queued.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -13242,7 +13242,7 @@
         "id": "t90-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 90 · Google Docs: Place orders and stream live prices. In scope: Stream live prices; Place/cancel orders; Portfolio view.",
+        "body": "Boss 90 · Google Docs: Google Docs-style collaborative editing with live cursors and version history. In scope: Edit concurrently; See others’ cursors; Version history.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -13252,7 +13252,7 @@
         "id": "t90-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 90 non-functionals: Market open spikes. Order integrity. Low latency ticks.",
+        "body": "Boss 90 non-functionals: Low latency sync. Convergence. No data loss. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -13262,7 +13262,7 @@
         "id": "t90-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 90 reference path: Market data fan-out via WebSocket from a pub/sub tick bus. → Order service with SQL ledger and exchange connectivity. → Rate limits and pre-scaling for 9:15 AM.",
+        "body": "Boss 90 reference path: WebSocket session per doc; OT/CRDT service orders operations. → Op log in NoSQL, periodic snapshots in object storage. → Presence via pub/sub.",
         "teaches": [
           "api",
           "architecture",
@@ -13273,7 +13273,7 @@
         "id": "t90-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 90 risks: Rate limits and pre-scaling for 9:15 AM.",
+        "body": "Boss 90 risks: OT or CRDT: OT with a central server per document is proven for online editing; CRDTs suit offline-first and peer-to-peer at the cost of metadata. No data loss: Operations are acknowledged only after they are in the durable log; clients keep unacknowledged operations and resend them after reconnecting.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -14128,7 +14128,7 @@
         "id": "t91-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 91 · Dropbox/Drive: Stream IPL live and on-demand to millions. In scope: Watch live and VOD; Adaptive bitrate; Resume playback.",
+        "body": "Boss 91 · Dropbox/Drive: Dropbox or Google Drive: upload, sync across devices and share files with permissions. In scope: Upload/download files; Sync across devices; Share with permissions.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -14138,7 +14138,7 @@
         "id": "t91-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 91 non-functionals: Tens of millions concurrent. Startup < 2 s. Regional CDN.",
+        "body": "Boss 91 non-functionals: Durable. Resumable uploads. Efficient sync. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -14148,7 +14148,7 @@
         "id": "t91-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 91 reference path: Transcode into HLS/DASH ladders via workers; store in object storage. → Multi-CDN delivery; pre-warm edges before matches. → Watch progress in NoSQL; graceful degradation of non-video features.",
+        "body": "Boss 91 reference path: Chunked uploads to object storage with dedupe by hash. → Metadata & permissions in SQL. → Change notifications via queue to sync clients.",
         "teaches": [
           "api",
           "architecture",
@@ -14159,7 +14159,7 @@
         "id": "t91-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 91 risks: Watch progress in NoSQL; graceful degradation of non-video features.",
+        "body": "Boss 91 risks: Efficient sync: Chunk-level hashing means editing a 1 GB file uploads only changed chunks, and identical files across users are stored once. Conflicts: If two devices edit the same version offline, the second commit fails the version check and is saved as a conflicted copy instead of overwriting.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -15026,7 +15026,7 @@
         "id": "t92-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 92 · Payment System UPI-style: Upload and scroll short videos. In scope: Upload video; Infinite scroll feed; Like & share.",
+        "body": "Boss 92 · Payment System UPI-style: A UPI-style payment app (PSP) on top of NPCI: pay to a VPA, collect requests and history. In scope: Send money via VPA; Collect requests; Transaction history.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -15036,7 +15036,7 @@
         "id": "t92-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 92 non-functionals: Fast start on 4G. Massive storage. Personalised.",
+        "body": "Boss 92 non-functionals: Exactly-once debit. High availability. Audit trail. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -15046,7 +15046,7 @@
         "id": "t92-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 92 reference path: Pre-signed uploads to object storage, async transcoding. → Recommendation service builds feed cached per user. → CDN delivery; prefetch next videos.",
+        "body": "Boss 92 reference path: Idempotent transaction service with unique txn ref; ledger in SQL. → Async calls to NPCI with timeouts, circuit breakers per bank. → Reconciliation workers; notifications via queue.",
         "teaches": [
           "api",
           "architecture",
@@ -15057,7 +15057,7 @@
         "id": "t92-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 92 risks: CDN delivery; prefetch next videos.",
+        "body": "Boss 92 risks: Exactly-once debit: The unique transaction reference is enforced at the PSP and checked by the banks, so a retried request can never trigger a second debit. Pending states: Network timeouts are common; showing 'pending, we will update you' and resolving via status checks is safer than guessing success or failure.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -15928,7 +15928,7 @@
         "id": "t93-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 93 · Digital Wallet Paytm/PhonePe: Upload photos and follow users. In scope: Upload photos; Follow users; View feed.",
+        "body": "Boss 93 · Digital Wallet Paytm/PhonePe: A digital wallet like Paytm or PhonePe wallet: top-up, transfer and view balance. In scope: Top-up wallet; Transfer to user; View balance & history.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -15938,7 +15938,7 @@
         "id": "t93-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 93 non-functionals: Read-heavy. Durable media. Feed < 300 ms.",
+        "body": "Boss 93 non-functionals: Strong consistency. No negative balances. Audit. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -15948,7 +15948,7 @@
         "id": "t93-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 93 reference path: Object storage + CDN for images, thumbnails via workers. → Graph of follows in SQL/NoSQL; feed cache. → Async fan-out on post.",
+        "body": "Boss 93 reference path: Double-entry ledger in SQL; balance updates in a transaction. → Idempotency keys for transfers. → Async events for notifications and analytics.",
         "teaches": [
           "api",
           "architecture",
@@ -15959,7 +15959,7 @@
         "id": "t93-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 93 risks: Async fan-out on post.",
+        "body": "Boss 93 risks: No negative balances: The balance check and debit happen in one transaction with row locks (or a conditional update WHERE balance >= amount), so concurrent transfers cannot overdraw. Regulatory audit: Ledger entries are never updated or deleted; corrections are new reversing entries, which keeps the audit trail complete.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -16815,7 +16815,7 @@
         "id": "t94-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 94 · BookMyShow: Search suggestions for an e-commerce app. In scope: Suggest top queries for prefix; Update with trending queries; Handle Hinglish/typos.",
+        "body": "Boss 94 · BookMyShow: BookMyShow: view shows and seat maps, hold seats for 10 minutes, then pay and confirm. In scope: View shows & seat map; Hold seats for 10 min; Pay and confirm.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -16825,7 +16825,7 @@
         "id": "t94-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 94 non-functionals: p99 < 50 ms. Very read-heavy. Fresh within minutes.",
+        "body": "Boss 94 non-functionals: No double booking. Spikes on blockbuster releases. Fair queueing. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -16835,7 +16835,7 @@
         "id": "t94-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 94 reference path: Trie / prefix index of top-k completions cached in memory. → Query logs aggregated by stream/batch jobs to update rankings. → Client debouncing and CDN caching of popular prefixes.",
+        "body": "Boss 94 reference path: Seat holds via conditional update or short Redis lock with TTL. → Payment saga releases hold on failure/timeout. → Virtual waiting room queue for blockbuster drops.",
         "teaches": [
           "api",
           "architecture",
@@ -16846,7 +16846,7 @@
         "id": "t94-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 94 risks: Client debouncing and CDN caching of popular prefixes.",
+        "body": "Boss 94 risks: Double booking: Because the hold only succeeds when the seat is FREE in the same statement, two users clicking the same seat cannot both succeed. Payment after hold expiry: If a payment succeeds after the hold expired and someone else booked the seat, the system must refund automatically; this is why the hold time exceeds typical payment time.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -17704,7 +17704,7 @@
         "id": "t95-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 95 · IRCTC Tatkal Ticketing: Product search on Flipkart. In scope: Keyword search; Filters & facets; Ranking.",
+        "body": "Boss 95 · IRCTC Tatkal Ticketing: IRCTC Tatkal: survive the 10:00 AM rush, sell berths without overselling, issue PNRs. In scope: Search trains & availability; Book tatkal seats; Payment & PNR.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -17714,7 +17714,7 @@
         "id": "t95-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 95 non-functionals: Results < 200 ms. Index updates within a minute. Scale for sales.",
+        "body": "Boss 95 non-functionals: 10× spike at 10:00. No overselling. Graceful degradation. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -17724,7 +17724,7 @@
         "id": "t95-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 95 reference path: Catalogue in SQL, synced via CDC events to Elasticsearch. → Facets and ranking in search cluster; cache hot queries. → Sharded indices with replicas.",
+        "body": "Boss 95 reference path: Pre-scale before 10:00; waiting-room queue + rate limiter. → Inventory decremented atomically per train/class/quota. → Cache availability with short TTL; payment saga.",
         "teaches": [
           "api",
           "architecture",
@@ -17735,7 +17735,7 @@
         "id": "t95-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 95 risks: Sharded indices with replicas.",
+        "body": "Boss 95 risks: Fairness: A queue with tokens admits users in arrival order and rate, instead of rewarding whoever retries fastest. Graceful degradation: Under overload, turn off non-essential features (detailed history, recommendations) and keep search and booking alive.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -18602,7 +18602,7 @@
         "id": "t96-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 96 · Leaderboard: Build a Redis-like cache cluster. In scope: get/set with TTL; Eviction; Scale nodes.",
+        "body": "Boss 96 · Leaderboard: Live fantasy-contest leaderboards during IPL matches: update scores, show rank and top N. In scope: Update scores live; Show rank and top-N; Millions per contest.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -18612,7 +18612,7 @@
         "id": "t96-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 96 non-functionals: Sub-ms latency. Survive node loss. Even load.",
+        "body": "Boss 96 non-functionals: Updates within seconds. Massive spikes at match time. Accurate final ranks. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -18622,7 +18622,7 @@
         "id": "t96-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 96 reference path: Consistent hashing with vnodes for key placement. → Primary-replica per shard with failover. → LRU eviction; hot key replication.",
+        "body": "Boss 96 reference path: Score events streamed; workers update Redis sorted sets per contest. → Sharded sorted sets for huge contests; top-N cached. → Final ranks computed in batch for payouts.",
         "teaches": [
           "api",
           "architecture",
@@ -18633,7 +18633,7 @@
         "id": "t96-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 96 risks: LRU eviction; hot key replication.",
+        "body": "Boss 96 risks: Update fan-out: One wicket changes points for every team containing that bowler, possibly millions of teams; recomputing per team in batches every few seconds is cheaper than per ball per team in real time. Accurate final ranks: Live ranks can be approximate, but prize distribution uses a deterministic batch computation with tie-break rules, audited before payout.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -19489,7 +19489,7 @@
         "id": "t97-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 97 · Typeahead: Real-time collaborative document editing. In scope: Edit concurrently; See others’ cursors; Version history.",
+        "body": "Boss 97 · Typeahead: Typeahead search suggestions for an e-commerce app, including Hinglish and typos. In scope: Suggest top queries for prefix; Update with trending queries; Handle Hinglish/typos.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -19499,7 +19499,7 @@
         "id": "t97-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 97 non-functionals: Low latency sync. Convergence. No data loss.",
+        "body": "Boss 97 non-functionals: p99 < 50 ms. Very read-heavy. Fresh within minutes. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -19509,7 +19509,7 @@
         "id": "t97-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 97 reference path: WebSocket session per doc; OT/CRDT service orders operations. → Op log in NoSQL, periodic snapshots in object storage. → Presence via pub/sub.",
+        "body": "Boss 97 reference path: Trie / prefix index of top-k completions cached in memory. → Query logs aggregated by stream/batch jobs to update rankings. → Client debouncing and CDN caching of popular prefixes.",
         "teaches": [
           "api",
           "architecture",
@@ -19520,7 +19520,7 @@
         "id": "t97-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 97 risks: Presence via pub/sub.",
+        "body": "Boss 97 risks: Freshness versus cost: Rebuilding the full index every few minutes is cheap at 50 MB; a separate trending layer handles sudden spikes such as a new phone launch. Filtering: Offensive or out-of-stock suggestions are filtered at build time, with a block list that applies immediately.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -20377,7 +20377,7 @@
         "id": "t98-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 98 · Web Crawler: Upload, sync and share files. In scope: Upload/download files; Sync across devices; Share with permissions.",
+        "body": "Boss 98 · Web Crawler: A web crawler for Indian news and e-commerce sites feeding a search engine. In scope: Fetch pages from seed URLs; Extract and enqueue links; Respect robots.txt and politeness.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -20387,7 +20387,7 @@
         "id": "t98-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 98 non-functionals: Durable. Resumable uploads. Efficient sync.",
+        "body": "Boss 98 non-functionals: Billions of pages. No duplicate fetches. Fault-tolerant. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -20397,7 +20397,7 @@
         "id": "t98-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 98 reference path: Chunked uploads to object storage with dedupe by hash. → Metadata & permissions in SQL. → Change notifications via queue to sync clients.",
+        "body": "Boss 98 reference path: URL frontier queue partitioned by host for politeness. → Fetcher workers store raw HTML in object storage. → Dedup via URL/content hashes; parser enqueues new links.",
         "teaches": [
           "api",
           "architecture",
@@ -20408,7 +20408,7 @@
         "id": "t98-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 98 risks: Change notifications via queue to sync clients.",
+        "body": "Boss 98 risks: Politeness: Partitioning the frontier by host and assigning each host to one queue enforces per-host rate limits and avoids accidentally overloading small sites. Traps: Infinite calendars and session-id URLs generate endless links; cap depth and URLs per host, and normalise query parameters.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -21256,7 +21256,7 @@
         "id": "t99-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 99 · Search Engine: Run cron-like jobs for many services reliably. In scope: Schedule recurring/one-off jobs; Execute on workers; Retries & history.",
+        "body": "Boss 99 · Search Engine: Product search for a large Indian e-commerce catalogue with filters, facets and ranking. In scope: Keyword search; Filters & facets; Ranking.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -21266,7 +21266,7 @@
         "id": "t99-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 99 non-functionals: No missed jobs. At-least-once. Scale to millions.",
+        "body": "Boss 99 non-functionals: Results < 200 ms. Index updates within a minute. Scale for sales. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -21276,7 +21276,7 @@
         "id": "t99-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 99 reference path: Jobs stored in SQL indexed by next_run_time. → Leader-elected scheduler enqueues due jobs. → Workers execute idempotently, retry, DLQ.",
+        "body": "Boss 99 reference path: Catalogue in SQL, synced via CDC events to Elasticsearch. → Facets and ranking in search cluster; cache hot queries. → Sharded indices with replicas.",
         "teaches": [
           "api",
           "architecture",
@@ -21287,7 +21287,7 @@
         "id": "t99-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 99 risks: Workers execute idempotently, retry, DLQ.",
+        "body": "Boss 99 risks: Freshness: CDC keeps price and stock in the index within a minute; the product page still reads price from the catalogue at checkout. Sale traffic: Replicas scale reads; caching the top queries and pre-scaling before announced sales keeps p99 under 200 ms.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -22144,7 +22144,7 @@
         "id": "t100-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 100 · Metrics & Monitoring: Collect and alert on service metrics. In scope: Ingest metrics; Query dashboards; Alert on thresholds.",
+        "body": "Boss 100 · Metrics & Monitoring: A metrics and monitoring system: ingest metrics, power dashboards and alert within a minute. In scope: Ingest metrics; Query dashboards; Alert on thresholds.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -22154,7 +22154,7 @@
         "id": "t100-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 100 non-functionals: High write volume. Retention & downsampling. Alert < 1 min.",
+        "body": "Boss 100 non-functionals: High write volume. Retention & downsampling. Alert < 1 min. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -22175,7 +22175,7 @@
         "id": "t100-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 100 risks: Alert evaluator triggers notifications.",
+        "body": "Boss 100 risks: Cardinality: Limits on labels per metric and per team prevent one bad deploy from creating millions of series and taking down ingest. Monitoring the monitor: Alerting must keep working during incidents, so it runs separately from dashboards, with its own health checks and a dead-man's-switch alert.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -23018,7 +23018,7 @@
         "id": "t101-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 101 · Distributed Logging: Count ad clicks in real time for billing. In scope: Record clicks; Aggregate per ad per minute; Query reports.",
+        "body": "Boss 101 · Distributed Logging: Distributed logging: collect logs from every service, search them within a minute, keep 30 days. In scope: Collect logs from every service; Search logs by time, service and text; Keep logs for 30 days.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -23028,7 +23028,7 @@
         "id": "t101-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 101 non-functionals: Exactly-once counts for billing. Late events. High throughput.",
+        "body": "Boss 101 non-functionals: Ingest never blocks the application. Logs searchable within 1 minute. Tolerate bursts during incidents. Out of scope: Metrics dashboards; Distributed tracing UI.",
         "teaches": [
           "requirements",
           "estimation"
@@ -23038,7 +23038,7 @@
         "id": "t101-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 101 reference path: Clicks into Kafka keyed by ad_id. → Flink windows with watermarks; dedupe by click_id. → Results to OLAP store; raw to lake for reconciliation.",
+        "body": "Boss 101 reference path: Agents buffer locally and ship asynchronously. → Kafka absorbs incident bursts before indexing. → Old indices rolled to cheap object storage.",
         "teaches": [
           "api",
           "architecture",
@@ -23049,7 +23049,7 @@
         "id": "t101-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 101 risks: Results to OLAP store; raw to lake for reconciliation.",
+        "body": "Boss 101 risks: Never block the app: Agents read files asynchronously; if the pipeline is slow, logs queue on disk or are sampled, rather than making the application wait. Cost: Full-text indexing every field is expensive; label-based indexing with brute-force search on compressed chunks is far cheaper for logs searched rarely.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -23886,7 +23886,7 @@
         "id": "t102-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 102 · Distributed Message Queue: Live fantasy contest leaderboards during IPL. In scope: Update scores live; Show rank and top-N; Millions per contest.",
+        "body": "Boss 102 · Distributed Message Queue: A Kafka-like distributed message log: produce, consume with offsets, retain for days. In scope: Produce messages; Consume with offsets; Retention.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -23896,7 +23896,7 @@
         "id": "t102-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 102 non-functionals: Updates within seconds. Massive spikes at match time. Accurate final ranks.",
+        "body": "Boss 102 non-functionals: Durable replicated log. High throughput. Ordering per partition. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -23906,7 +23906,7 @@
         "id": "t102-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 102 reference path: Score events streamed; workers update Redis sorted sets per contest. → Sharded sorted sets for huge contests; top-N cached. → Final ranks computed in batch for payouts.",
+        "body": "Boss 102 reference path: Partitioned append-only segments on disk, replicated with leader/followers. → Metadata/leadership via Raft. → Consumer groups track offsets.",
         "teaches": [
           "api",
           "architecture",
@@ -23917,7 +23917,7 @@
         "id": "t102-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 102 risks: Final ranks computed in batch for payouts.",
+        "body": "Boss 102 risks: Ordering: Order is guaranteed per partition only; keys map to partitions so related messages stay ordered. Throughput: Sequential disk writes, batching, compression and zero-copy transfer to consumers are why a log broker sustains hundreds of MB per second.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -24762,7 +24762,7 @@
         "id": "t103-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 103 · Distributed Job Scheduler: 10-minute delivery with dark-store inventory. In scope: Show per-store availability; Reserve items at checkout; Restock updates.",
+        "body": "Boss 103 · Distributed Job Scheduler: A distributed job scheduler for cron-like and one-off jobs across many services. In scope: Schedule recurring/one-off jobs; Execute on workers; Retries & history.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -24772,7 +24772,7 @@
         "id": "t103-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 103 non-functionals: No overselling. Fast reads. Per-store accuracy.",
+        "body": "Boss 103 non-functionals: No missed jobs. At-least-once. Scale to millions. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -24782,7 +24782,7 @@
         "id": "t103-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 103 reference path: Inventory in SQL per (store, sku) with atomic decrement. → Redis cache for availability with invalidation events. → Reservation TTL released by worker.",
+        "body": "Boss 103 reference path: Jobs stored in SQL indexed by next_run_time. → Leader-elected scheduler enqueues due jobs. → Workers execute idempotently, retry, DLQ.",
         "teaches": [
           "api",
           "architecture",
@@ -24793,7 +24793,7 @@
         "id": "t103-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 103 risks: Reservation TTL released by worker.",
+        "body": "Boss 103 risks: At-least-once: Workers may crash after running a job but before reporting; jobs must be idempotent or check a run id. Thundering herd at :00: Thousands of jobs scheduled at the top of the hour arrive together; adding a small random offset spreads load.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -25648,7 +25648,7 @@
         "id": "t104-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 104 · Proximity Service Yelp: Search and book hotel rooms. In scope: Search hotels; Reserve room; Pay & confirm.",
+        "body": "Boss 104 · Proximity Service Yelp: A Yelp-style proximity service: find nearby restaurants or shops, view details, add or update places. In scope: Search places nearby; View details; Add/update places.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -25658,7 +25658,7 @@
         "id": "t104-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 104 non-functionals: No double booking. Search < 500 ms. Supplier integrations.",
+        "body": "Boss 104 non-functionals: Read-heavy. Results < 200 ms. Updates within hours. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -25668,7 +25668,7 @@
         "id": "t104-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 104 reference path: Search cluster with availability cache. → Booking saga with supplier hold + payment. → Inventory updates via queue.",
+        "body": "Boss 104 reference path: Geohash/quadtree index cached in memory. → Places in SQL with read replicas. → Batch rebuild of geo index.",
         "teaches": [
           "api",
           "architecture",
@@ -25679,7 +25679,7 @@
         "id": "t104-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 104 risks: Inventory updates via queue.",
+        "body": "Boss 104 risks: Geohash or quadtree: Geohash is simple and works in any key-value store; a quadtree adapts cell size to density, which helps in crowded city centres. Update freshness: Places change rarely, so rebuilding or patching the index every few minutes is enough; real-time updates are not required.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -26516,7 +26516,7 @@
         "id": "t105-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 105 · Flash Sale Big Billion Day: Live comment stream on a cricket match. In scope: Post a comment; See live comments; Moderation.",
+        "body": "Boss 105 · Flash Sale Big Billion Day: A flash sale like Big Billion Days: sell limited stock at a fixed time without overselling. In scope: Show sale item; Buy within limit; Pay.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -26526,7 +26526,7 @@
         "id": "t105-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 105 non-functionals: Millions concurrent viewers. Lag < 2 s. Shed on overload.",
+        "body": "Boss 105 non-functionals: Massive spike. No overselling. Fairness. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -26536,7 +26536,7 @@
         "id": "t105-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 105 reference path: Comments into pub/sub by match; WS gateways fan out. → Sampling when volume too high. → Async moderation workers.",
+        "body": "Boss 105 reference path: Static pages on CDN; waiting room + rate limiting. → Stock counter decremented atomically in Redis, persisted to SQL. → Order queue processed by workers.",
         "teaches": [
           "api",
           "architecture",
@@ -26547,7 +26547,7 @@
         "id": "t105-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 105 risks: Async moderation workers.",
+        "body": "Boss 105 risks: No overselling: The decrement and the check that stock is above zero happen in one atomic operation; the order is created only after a successful decrement. Fairness: A queue with tokens rewards arrival order; per-account limits and bot detection stop scripts from taking most units.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -27406,7 +27406,7 @@
         "id": "t106-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 106 · Hotel Booking Airbnb/OYO: Find nearby restaurants or shops. In scope: Search places nearby; View details; Add/update places.",
+        "body": "Boss 106 · Hotel Booking Airbnb/OYO: Hotel booking like Airbnb or OYO: search, reserve a room for dates, pay and confirm. In scope: Search hotels; Reserve room; Pay & confirm.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -27416,7 +27416,7 @@
         "id": "t106-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 106 non-functionals: Read-heavy. Results < 200 ms. Updates within hours.",
+        "body": "Boss 106 non-functionals: No double booking. Search < 500 ms. Supplier integrations. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -27426,7 +27426,7 @@
         "id": "t106-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 106 reference path: Geohash/quadtree index cached in memory. → Places in SQL with read replicas. → Batch rebuild of geo index.",
+        "body": "Boss 106 reference path: Search cluster with availability cache. → Booking saga with supplier hold + payment. → Inventory updates via queue.",
         "teaches": [
           "api",
           "architecture",
@@ -27437,7 +27437,7 @@
         "id": "t106-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 106 risks: Batch rebuild of geo index.",
+        "body": "Boss 106 risks: Multi-night atomicity: A three-night stay must reserve all three nights or none; one transaction with conditional updates on each date row guarantees that. Supplier integrations: External hotels may confirm slowly or fail; a saga with timeouts and automatic cancellation and refund keeps users informed.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -28294,7 +28294,7 @@
         "id": "t107-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 107 · Ad Click Aggregator: Send, receive and search email. In scope: Send/receive mail; Inbox listing; Full-text search.",
+        "body": "Boss 107 · Ad Click Aggregator: An ad-click aggregator that counts clicks per ad per minute for billing and reports. In scope: Record clicks; Aggregate per ad per minute; Query reports.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -28304,7 +28304,7 @@
         "id": "t107-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 107 non-functionals: Durable. Spam filtering. Large attachments.",
+        "body": "Boss 107 non-functionals: Exactly-once counts for billing. Late events. High throughput. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -28314,7 +28314,7 @@
         "id": "t107-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 107 reference path: SMTP ingress to queue; workers spam-filter and store. → Metadata in DB, bodies/attachments in object storage. → Per-user search index.",
+        "body": "Boss 107 reference path: Clicks into Kafka keyed by ad_id. → Flink windows with watermarks; dedupe by click_id. → Results to OLAP store; raw to lake for reconciliation.",
         "teaches": [
           "api",
           "architecture",
@@ -28325,7 +28325,7 @@
         "id": "t107-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 107 risks: Per-user search index.",
+        "body": "Boss 107 risks: Exactly-once counts: Unique click ids, deduplication in the stream and transactional or idempotent sinks give exactly-once effects; the batch recompute is the safety net. Late events: Mobile clicks can arrive minutes late; watermarks with allowed lateness update the right minute, and anything later is fixed by the daily reconciliation.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -29170,7 +29170,7 @@
         "id": "t108-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 108 · Stock Exchange Matching: Build a Kafka-like log. In scope: Produce messages; Consume with offsets; Retention.",
+        "body": "Boss 108 · Stock Exchange Matching: A stock-exchange matching engine: accept orders, match by price-time priority, publish trades. In scope: Place limit and market orders; Match buy and sell orders by price-time priority; Publish trades and order book updates.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -29180,7 +29180,7 @@
         "id": "t108-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 108 non-functionals: Durable replicated log. High throughput. Ordering per partition.",
+        "body": "Boss 108 non-functionals: Matching latency in microseconds to low milliseconds. Deterministic, auditable ordering. No lost or duplicated orders. Out of scope: Portfolio analytics; KYC onboarding.",
         "teaches": [
           "requirements",
           "estimation"
@@ -29190,7 +29190,7 @@
         "id": "t108-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 108 reference path: Partitioned append-only segments on disk, replicated with leader/followers. → Metadata/leadership via Raft. → Consumer groups track offsets.",
+        "body": "Boss 108 reference path: One single-threaded matching engine per symbol for deterministic order. → Every order sequenced and journaled before matching. → Hot standby replays the journal on failover.",
         "teaches": [
           "api",
           "architecture",
@@ -29201,7 +29201,7 @@
         "id": "t108-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 108 risks: Consumer groups track offsets.",
+        "body": "Boss 108 risks: Determinism: A single thread per symbol and a sequenced input log mean replaying the log always reproduces the same trades, which is what makes audit and failover possible. Latency: Avoiding locks, network hops and garbage-collection pauses in the matching path keeps latency in microseconds; persistence is the replicated log, not a database write per order.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -30049,7 +30049,7 @@
         "id": "t109-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 109 · Zoom/Meet: Issue and redeem coupons and rewards. In scope: Issue rewards; Redeem coupon once; Show wallet of rewards.",
+        "body": "Boss 109 · Zoom/Meet: Zoom or Google Meet: group video calls with screen sharing for classes and meetings. In scope: Join a room; Audio/video; Screen share.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -30059,7 +30059,7 @@
         "id": "t109-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 109 non-functionals: No double redemption. Campaign spikes. Fraud controls.",
+        "body": "Boss 109 non-functionals: Latency < 200 ms. Regional media servers. Adapt to bandwidth. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -30069,7 +30069,7 @@
         "id": "t109-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 109 reference path: Redemption with conditional update (status=ACTIVE → USED). → Rate limits and fraud scoring. → Async ledger events.",
+        "body": "Boss 109 reference path: Signalling via WebSocket; SFU media servers in regions. → Simulcast for bandwidth adaptation. → Room state in cache/NoSQL.",
         "teaches": [
           "api",
           "architecture",
@@ -30080,7 +30080,7 @@
         "id": "t109-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 109 risks: Async ledger events.",
+        "body": "Boss 109 risks: SFU versus MCU: An SFU only forwards packets, scaling well; an MCU decodes and mixes, saving client bandwidth but costing a lot of server CPU. Bad networks: Simulcast plus bandwidth estimation lets a user on a weak mobile network receive 180p while others get 720p, and audio is prioritised over video.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -30927,7 +30927,7 @@
         "id": "t110-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 110 · Hotstar IPL Live Streaming: Track shipments across hubs. In scope: Scan events at hubs; Track shipment; ETA predictions.",
+        "body": "Boss 110 · Hotstar IPL Live Streaming: Hotstar-style IPL live streaming to tens of millions of concurrent viewers. In scope: Watch live and VOD; Adaptive bitrate; Resume playback.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -30937,7 +30937,7 @@
         "id": "t110-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 110 non-functionals: High write rate. Event ordering per shipment. Query by AWB.",
+        "body": "Boss 110 non-functionals: Tens of millions concurrent. Startup < 2 s. Regional CDN. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -30947,7 +30947,7 @@
         "id": "t110-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 110 reference path: Scan events into Kafka keyed by AWB. → Workers update shipment state in NoSQL. → Cache current status; analytics for ETA.",
+        "body": "Boss 110 reference path: Transcode into HLS/DASH ladders via workers; store in object storage. → Multi-CDN delivery; pre-warm edges before matches. → Watch progress in NoSQL; graceful degradation of non-video features.",
         "teaches": [
           "api",
           "architecture",
@@ -30958,7 +30958,7 @@
         "id": "t110-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 110 risks: Cache current status; analytics for ETA.",
+        "body": "Boss 110 risks: Toss-time spike: Millions join in minutes; pre-scaling and caching entitlement checks stops the login path from becoming the bottleneck before video even starts. Latency versus stability: Shorter segments cut delay behind the live action but raise request rates and rebuffering risk; a few seconds is a common compromise.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -31823,7 +31823,7 @@
         "id": "t111-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 111 · Online Judge LeetCode: Group video calls for classes and meetings. In scope: Join a room; Audio/video; Screen share.",
+        "body": "Boss 111 · Online Judge LeetCode: An online judge like LeetCode or Codeforces: submit code, run tests in a sandbox, show a verdict. In scope: Submit code; Run tests in sandbox; Show verdict.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -31833,7 +31833,7 @@
         "id": "t111-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 111 non-functionals: Latency < 200 ms. Regional media servers. Adapt to bandwidth.",
+        "body": "Boss 111 non-functionals: Isolation. Contest spikes. Fair queueing. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -31843,7 +31843,7 @@
         "id": "t111-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 111 reference path: Signalling via WebSocket; SFU media servers in regions. → Simulcast for bandwidth adaptation. → Room state in cache/NoSQL.",
+        "body": "Boss 111 reference path: Submissions enqueued; sandboxed container workers run tests. → Results in DB; push via polling or WS. → Autoscale workers on queue depth.",
         "teaches": [
           "api",
           "architecture",
@@ -31854,7 +31854,7 @@
         "id": "t111-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 111 risks: Room state in cache/NoSQL.",
+        "body": "Boss 111 risks: Isolation: User code is hostile by default; sandboxes need syscall filtering, no network, resource limits and fresh environments per run. Fairness: Per-user and per-contest queues stop one user's flood of submissions from delaying everyone else.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -32701,7 +32701,7 @@
         "id": "t112-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 112 · Email Service: Submit code and get verdicts. In scope: Submit code; Run tests in sandbox; Show verdict.",
+        "body": "Boss 112 · Email Service: An email service: send and receive mail, list the inbox and search it. In scope: Send/receive mail; Inbox listing; Full-text search.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -32711,7 +32711,7 @@
         "id": "t112-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 112 non-functionals: Isolation. Contest spikes. Fair queueing.",
+        "body": "Boss 112 non-functionals: Durable. Spam filtering. Large attachments. Out of scope: Building custom hardware; On-prem mainframe integration.",
         "teaches": [
           "requirements",
           "estimation"
@@ -32721,7 +32721,7 @@
         "id": "t112-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 112 reference path: Submissions enqueued; sandboxed container workers run tests. → Results in DB; push via polling or WS. → Autoscale workers on queue depth.",
+        "body": "Boss 112 reference path: SMTP ingress to queue; workers spam-filter and store. → Metadata in DB, bodies/attachments in object storage. → Per-user search index.",
         "teaches": [
           "api",
           "architecture",
@@ -32732,7 +32732,7 @@
         "id": "t112-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 112 risks: Autoscale workers on queue depth.",
+        "body": "Boss 112 risks: Durability: A message is acknowledged to the sending server only after it is durably queued; otherwise the sender retries, so mail is not lost. Large attachments: Attachments go to object storage and are referenced by id; identical attachments sent to many recipients can be stored once.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -33588,7 +33588,7 @@
         "id": "t113-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 113 · S3-like Object Storage: Sell limited stock at a fixed time. In scope: Show sale item; Buy within limit; Pay.",
+        "body": "Boss 113 · S3-like Object Storage: An S3-like object store: PUT and GET objects by bucket and key, list by prefix, eleven nines durability. In scope: PUT and GET objects by bucket and key; Store objects from bytes to terabytes; List objects by prefix.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -33598,7 +33598,7 @@
         "id": "t113-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 113 non-functionals: Massive spike. No overselling. Fairness.",
+        "body": "Boss 113 non-functionals: Eleven nines durability. High availability for reads. Scale to trillions of objects. Out of scope: POSIX file locking; In-place partial edits.",
         "teaches": [
           "requirements",
           "estimation"
@@ -33608,7 +33608,7 @@
         "id": "t113-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 113 reference path: Static pages on CDN; waiting room + rate limiting. → Stock counter decremented atomically in Redis, persisted to SQL. → Order queue processed by workers.",
+        "body": "Boss 113 reference path: Metadata store separate from data nodes. → Erasure coding or 3 replicas across zones. → Multipart upload for large objects.",
         "teaches": [
           "api",
           "architecture",
@@ -33619,7 +33619,7 @@
         "id": "t113-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 113 risks: Order queue processed by workers.",
+        "body": "Boss 113 risks: Durability: Eleven nines come from spreading fragments across failure domains and repairing faster than further failures occur; checksums catch silent corruption. Listing at scale: Prefix listing needs metadata sorted by key within a bucket, so the metadata store is range-partitioned by (bucket, key), with care for hot prefixes.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -34468,7 +34468,7 @@
         "id": "t114-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 114 · Distributed Counter: Trending hashtags and post search for India. In scope: Search posts; Compute trends per region; Show trending list.",
+        "body": "Boss 114 · Distributed Counter: A distributed counter for likes and views that handles very hot counters. In scope: Increment a counter (likes, views); Read the current count; Handle very hot counters.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -34478,7 +34478,7 @@
         "id": "t114-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 114 non-functionals: Trends fresh within minutes. High ingest. Spam resistance.",
+        "body": "Boss 114 non-functionals: Increments under 10 ms. Counts may lag by a few seconds. No lost increments. Out of scope: Per-user like history UI; Fraud detection.",
         "teaches": [
           "requirements",
           "estimation"
@@ -34488,7 +34488,7 @@
         "id": "t114-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 114 reference path: Posts stream to indexers and trend counters. → Sliding window counts per region; spam filters. → Trends cached; search cluster sharded by time.",
+        "body": "Boss 114 reference path: Hot counters sharded into N sub-counters summed on read. → Increments batched by workers before hitting storage. → Consumers idempotent per event ID.",
         "teaches": [
           "api",
           "architecture",
@@ -34499,7 +34499,7 @@
         "id": "t114-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 114 risks: Trends cached; search cluster sharded by time.",
+        "body": "Boss 114 risks: No lost increments: Redis alone can lose recent writes on failover; the Kafka log or periodic durable snapshots allow counts to be rebuilt exactly. Lag versus cost: Summing 32 keys on every read is cheap with a short cache; allowing counts to lag a few seconds is what makes the design scale.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
