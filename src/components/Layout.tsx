@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { MotionConfig, motion } from 'motion/react'
-import { spring, useCalm } from '../lib/motion'
 import { useGameStore, useLevel, useStreak } from '../stores/gameStore'
 import { BADGE_LABELS } from '../lib/progression/badges'
 import { IconBadge, IconFlame, IconGem, NavIcon } from './icons/HudIcons'
@@ -23,9 +21,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const badges = useGameStore((s) => s.badges)
   const reducedMotion = useGameStore((s) => s.preferences.reducedMotion)
   const [hudOpen, setHudOpen] = useState(false)
-  const { pathname } = useLocation()
-  const inQuiz = pathname.startsWith('/quiz/')
-  const calm = useCalm()
+  const inQuiz = useLocation().pathname.startsWith('/quiz/')
 
   // The in-app setting applies the same rules as the OS-level prefers-reduced-motion
   useEffect(() => {
@@ -33,7 +29,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [reducedMotion])
 
   return (
-    <MotionConfig reducedMotion={calm ? 'always' : 'user'}>
     <div className="min-h-full flex flex-col lg:pl-[248px]">
       <aside className="sidebar hidden lg:flex">
         <Link to="/" className="flex items-center gap-2 px-3 py-2" aria-label="System Design Quest, back to map">
@@ -69,14 +64,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
               aria-label={`Level ${level}, ${xp} xp, ${streak}-day streak${badges.length ? `, ${badges.length} badges` : ''}. Show details`}
               onClick={() => setHudOpen((v) => !v)}
             >
-              <Bump value={streak} className="hud-chip text-[#C25E00]">
-                <span className={streak > 0 ? 'flame-flicker inline-flex' : 'inline-flex'}><IconFlame lit={streak > 0} /></span>
+              <span className="hud-chip text-[#C25E00]">
+                <IconFlame lit={streak > 0} />
                 <span className="tabular-nums">{streak}</span>
-              </Bump>
-              <Bump value={xp} className="hud-chip text-[#12749f]" id="hud-xp">
+              </span>
+              <span className="hud-chip text-[#12749f]">
                 <IconGem />
                 <span className="tabular-nums">{xp} xp</span>
-              </Bump>
+              </span>
               {badges.length > 0 && (
                 <span className="hud-chip text-[#8A5A00] hidden sm:inline-flex">
                   <IconBadge />
@@ -111,12 +106,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="flex-1 w-full max-w-[1180px] mx-auto px-4 py-6 pb-28 lg:pb-10">
-        {/* Enter-only route transition: never delays the new page or blocks input */}
-        <motion.div key={pathname} initial={calm ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={spring.gentle}>
-          {children}
-        </motion.div>
-      </main>
+      <main className="flex-1 w-full max-w-[1180px] mx-auto px-4 py-6 pb-28 lg:pb-10">{children}</main>
       <nav className={`tabbar lg:hidden ${inQuiz ? 'hidden' : ''}`} aria-label="Main">
         {nav.map((item) => (
           <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => `tab ${isActive ? 'tab-active' : ''}`}>
@@ -127,28 +117,5 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </nav>
       <HelpShortcuts />
     </div>
-    </MotionConfig>
-  )
-}
-
-/** A chip that does a quick springy bump whenever its value changes (skipped on first render). */
-function Bump({ value, className, id, children }: { value: number; className: string; id?: string; children: React.ReactNode }) {
-  const [seen, setSeen] = useState(value)
-  const [n, setN] = useState(0)
-  if (seen !== value) {
-    setSeen(value)
-    setN((k) => k + 1)
-  }
-  return (
-    <motion.span
-      id={id}
-      key={n}
-      className={className}
-      initial={n ? { scale: 1.3 } : false}
-      animate={{ scale: 1 }}
-      transition={spring.pop}
-    >
-      {children}
-    </motion.span>
   )
 }

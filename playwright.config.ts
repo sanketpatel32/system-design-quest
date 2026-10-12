@@ -7,8 +7,6 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:43123',
     trace: 'on-first-retry',
     video: 'on',
-    // Animations are decorative; tests run with them off so nothing waits on motion
-    reducedMotion: 'reduce',
   },
   webServer: {
     command: 'npm run dev',
