@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { orderedTopicsInRegion, regions, topicsById } from '../../content/catalog'
 import type { Topic } from '../../content/types'
 import { regionPalette } from '../../lib/design/transitTheme'
-import { getUnlockHint, topicStatus } from '../../lib/progression/unlocks'
+import { getUnlockHint, isTopicUnlocked, topicStatus } from '../../lib/progression/unlocks'
 import { useGameStore } from '../../stores/gameStore'
 import { RegionArt } from '../art/RegionArt'
 import { Mascot, MascotSays } from '../art/Mascot'
@@ -68,7 +68,7 @@ export function WorldMapScene() {
   const total = STATION_N.size
   const doneCount = [...STATION_N.keys()].filter((id) => completed.has(id)).length
   const bossesDone = arenaTopics.filter((t) => completed.has(t.id)).length
-  const arenaOpen = unlocked.includes(74) || completed.has(74)
+  const arenaOpen = isTopicUnlocked(74, unlocked) || completed.has(74)
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_20.625rem] 2xl:grid-cols-[minmax(0,1fr)_23rem]">
