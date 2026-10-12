@@ -292,7 +292,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
   })
 
   return (
-    <div className={sheet ? 'space-y-5' : `panel-slab p-5 space-y-4 ${hotkeys && !submitted ? 'question-active' : ''}`}>
+    <div className={sheet ? 'space-y-5' : `panel-slab p-4 sm:p-5 space-y-4 ${hotkeys && !submitted ? 'question-active' : ''}`}>
       {number !== undefined && (
         <p className="text-sm font-extrabold uppercase tracking-wide text-[#12749f] tabular-nums">
           Question {number}
