@@ -162,4 +162,12 @@ test('mobile viewport core flow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
+  for (const path of ['/', '/quiz/the-system-design-interview', '/revision', '/interview', '/settings', '/boss/url-shortener']) {
+    await page.goto(path)
+    const width = await page.evaluate(() => document.documentElement.scrollWidth)
+    expect(width, `${path} should not scroll sideways`).toBeLessThanOrEqual(390)
+  }
+  await page.goto('/')
+  await page.getByTestId('continue-quest').getByRole('link').click()
+  await expect(page.getByTestId('topic-title')).toBeVisible()
 })
