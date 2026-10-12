@@ -173,7 +173,20 @@ export function BossCanvas({ initial, onChange }: Props) {
           </button>
         </div>
       </aside>
-      <div className="boss-flow h-[460px] rounded-lg border border-[var(--color-rail)] overflow-hidden bg-[#0a1624]">
+      <div className="boss-flow relative h-[460px] rounded-lg border border-[var(--color-rail)] overflow-hidden bg-[#0a1624]">
+        {nodes.length === 0 && (
+          <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center p-6 text-center">
+            <div className="max-w-xs">
+              <p className="font-display text-lg font-semibold text-chalk">Empty platform</p>
+              <p className="text-sm text-dim mt-1">Add components from the palette, then drag them into place. Start where the request starts: the client.</p>
+            </div>
+          </div>
+        )}
+        {nodes.length >= 2 && edges.length === 0 && (
+          <p className="pointer-events-none absolute left-3 top-3 z-10 rounded-md bg-[var(--color-ink)]/90 px-3 py-1.5 text-xs text-chalk">
+            Drag from a right-hand amber dot to another node to wire requests, or use Connect.
+          </p>
+        )}
         <ReactFlow
           nodeTypes={nodeTypes}
           nodes={nodes}
