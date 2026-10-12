@@ -27,7 +27,7 @@ export function PageHero({
   const t = TONES[tone]
   return (
     <header className="unit-banner flex flex-wrap items-center gap-4 p-5 sm:p-6" style={{ background: t.bg, ['--banner-shadow' as string]: t.sh }}>
-      <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white shadow-[0_4px_0_rgba(0,0,0,0.2)] sm:h-20 sm:w-20">
+      <div className="hidden sm:grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-white shadow-[0_4px_0_rgba(0,0,0,0.2)]">
         <NavIcon name={icon} size={44} />
       </div>
       <div className="min-w-0 flex-1">
