@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { ArchNode } from './canvas/ArchNode'
 import {
   ReactFlow,
@@ -42,7 +42,11 @@ interface Props {
   onChange: (snap: CanvasSnapshot) => void
 }
 
-let nodeCounter = 1
+/** Next free id; a module counter would restart at n1 after reload and collide with a restored draft. */
+function nextNodeId(nodes: Node[]) {
+  const max = nodes.reduce((m, n) => Math.max(m, Number(n.id.replace(/^n/, '')) || 0), 0)
+  return `n${max + 1}`
+}
 
 const nodeTypes = { arch: ArchNode }
 
@@ -73,56 +77,52 @@ export function BossCanvas({ initial, onChange }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
 
-  const emit = useCallback(
-    (n: Node[], e: Edge[]) => {
-      onChange({
-        nodes: n.map((node) => ({
-          id: node.id,
-          type: (node.data as { componentType: CanvasComponentType }).componentType,
-          label: String((node.data as { label?: string }).label ?? ''),
-          position: node.position,
-        })),
-        edges: e.map((edge) => ({
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          label: typeof edge.label === 'string' ? edge.label : undefined,
-        })),
-      })
-    },
-    [onChange],
-  )
+  // Emit after React Flow has applied changes, so drags and deletions are saved with their final state
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+  const mounted = useRef(false)
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true
+      return
+    }
+    onChangeRef.current({
+      nodes: nodes.map((node) => ({
+        id: node.id,
+        type: (node.data as { componentType: CanvasComponentType }).componentType,
+        label: String((node.data as { label?: string }).label ?? ''),
+        position: node.position,
+      })),
+      edges: edges.map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        label: typeof edge.label === 'string' ? edge.label : undefined,
+      })),
+    })
+  }, [nodes, edges])
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      setEdges((eds) => {
-        const next = addEdge({ ...connection, id: `e${eds.length + 1}` }, eds)
-        emit(nodes, next)
-        return next
-      })
+      setEdges((eds) => addEdge({ ...connection, id: `e${Date.now().toString(36)}` }, eds))
     },
-    [emit, nodes, setEdges],
+    [setEdges],
   )
 
   const addComponent = (type: CanvasComponentType) => {
-    const id = `n${nodeCounter++}`
+    const id = nextNodeId(nodes)
     const node: Node = {
       id,
       position: { x: 80 + (nodes.length % 4) * 140, y: 60 + Math.floor(nodes.length / 4) * 90 },
       type: 'arch',
       data: { label: type.replace(/_/g, ' '), componentType: type },
     }
-    const next = [...nodes, node]
-    setNodes(next)
-    emit(next, edges)
+    setNodes((ns) => [...ns, node])
   }
 
   const connectViaForm = (sourceId: string, targetId: string) => {
     if (!sourceId || !targetId || sourceId === targetId) return
-    const edge: Edge = { id: `e${edges.length + 1}`, source: sourceId, target: targetId }
-    const next = [...edges, edge]
-    setEdges(next)
-    emit(nodes, next)
+    setEdges((eds) => addEdge({ id: `e${Date.now().toString(36)}`, source: sourceId, target: targetId }, eds))
   }
 
   return (
@@ -178,14 +178,8 @@ export function BossCanvas({ initial, onChange }: Props) {
           nodeTypes={nodeTypes}
           nodes={nodes}
           edges={edges}
-          onNodesChange={(c) => {
-            onNodesChange(c)
-            emit(nodes, edges)
-          }}
-          onEdgesChange={(c) => {
-            onEdgesChange(c)
-            emit(nodes, edges)
-          }}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           colorMode="dark"
           fitView
