@@ -7,7 +7,7 @@ import type { RegionMeta } from '../../content/types'
  * soft:   pastel tint for backgrounds
  */
 export const REGION_PALETTE: Record<string, { bright: string; deep: string; soft: string; shadow: string }> = {
-  'r1-foundations': { bright: '#FF9600', deep: '#A35F00', soft: '#FFF1DB', shadow: '#CC7800' },
+  'r1-foundations': { bright: '#FF9600', deep: '#C2410C', soft: '#FFF1DB', shadow: '#9A3412' },
   'r2-networking': { bright: '#1CB0F6', deep: '#12749F', soft: '#DDF4FE', shadow: '#1590C9' },
   'r3-load-balancing': { bright: '#FF4B4B', deep: '#C73636', soft: '#FFE3E3', shadow: '#D63C3C' },
   'r4-caching': { bright: '#2EC4C4', deep: '#1B7A7A', soft: '#DDF6F6', shadow: '#22A0A0' },
