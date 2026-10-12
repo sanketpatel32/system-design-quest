@@ -1,1902 +1,1902 @@
 {
- "57": {
-  "teaches": [
-   "authn-authz",
-   "sessions",
-   "token-flow",
-   "jwt-revoke"
-  ],
-  "mechanism": {
-   "title": "From login to an authorised request",
-   "steps": [
-    "Authentication (who are you?): the user proves identity with a password plus OTP, a passkey, or a login through an identity provider.",
-    "The server then issues a credential for later requests: either a session id stored server-side (in Redis or a database) and sent as an HttpOnly, Secure, SameSite cookie, or a signed access token such as a JWT.",
-    "On each request the server authenticates the credential: look up the session id, or verify the token's signature, expiry, issuer and audience.",
-    "Authorisation (what may you do?): check the identity against rules: roles (RBAC, such as 'support agent'), attributes (ABAC, such as 'same branch'), or ownership ('order 123 belongs to user 42').",
-    "Authorisation runs on every request and every resource, inside the service that owns the data, not only once at login or at the gateway.",
-    "Logout or revocation: delete the server-side session immediately; for stateless tokens, keep access tokens short-lived (5–15 minutes) and revoke the refresh token, or check a deny-list."
-   ]
+  "57": {
+    "teaches": [
+      "authn-authz",
+      "sessions",
+      "token-flow",
+      "jwt-revoke"
+    ],
+    "mechanism": {
+      "title": "From login to an authorised request",
+      "steps": [
+        "Authentication (who are you?): the user proves identity with a password plus OTP, a passkey, or a login through an identity provider.",
+        "The server then issues a credential for later requests: either a session id stored server-side (in Redis or a database) and sent as an HttpOnly, Secure, SameSite cookie, or a signed access token such as a JWT.",
+        "On each request the server authenticates the credential: look up the session id, or verify the token's signature, expiry, issuer and audience.",
+        "Authorisation (what may you do?): check the identity against rules: roles (RBAC, such as 'support agent'), attributes (ABAC, such as 'same branch'), or ownership ('order 123 belongs to user 42').",
+        "Authorisation runs on every request and every resource, inside the service that owns the data, not only once at login or at the gateway.",
+        "Logout or revocation: delete the server-side session immediately; for stateless tokens, keep access tokens short-lived (5–15 minutes) and revoke the refresh token, or check a deny-list."
+      ]
+    },
+    "useWhen": [
+      "Server-side sessions for web apps where instant logout and revocation matter, such as banking.",
+      "Short-lived tokens for APIs and mobile apps calling many services, where each service verifies locally without a session lookup."
+    ],
+    "avoidWhen": [
+      "Do not treat a valid login as permission to access any record; that is how insecure direct object reference (IDOR) bugs happen.",
+      "Do not issue long-lived JWTs (days) with no revocation path for sensitive apps."
+    ],
+    "tradeoffs": {
+      "columns": [
+        "Credential",
+        "Revocation",
+        "Per-request cost",
+        "Fits"
+      ],
+      "rows": [
+        [
+          "Server-side session + cookie",
+          "Instant (delete session)",
+          "One cache lookup",
+          "Web apps, banking"
+        ],
+        [
+          "Short-lived JWT + refresh token",
+          "At expiry, or revoke refresh",
+          "Signature check only",
+          "APIs, mobile, microservices"
+        ],
+        [
+          "API key",
+          "Rotate or delete key",
+          "Lookup",
+          "Server-to-server"
+        ],
+        [
+          "mTLS certificate",
+          "Revocation lists or short certificate lifetimes",
+          "TLS handshake",
+          "Service-to-service"
+        ]
+      ]
+    },
+    "numbers": {
+      "title": "Revocation window of a stolen token",
+      "assumptions": [
+        "Access token lifetime 15 minutes",
+        "Attacker steals a token at a random moment"
+      ],
+      "steps": [
+        "Remaining lifetime is uniformly between 0 and 15 minutes, so on average 15 ÷ 2 = 7.5 minutes of misuse.",
+        "With a 60-minute lifetime the average window is 60 ÷ 2 = 30 minutes.",
+        "With server-side sessions, deleting the session ends misuse on the next request.",
+        "Adding a deny-list check for high-risk actions (transfers) closes the window for those actions at the cost of one lookup."
+      ],
+      "result": "Token lifetime is the revocation window; keep it short and add server-side checks for sensitive actions."
+    },
+    "india": {
+      "title": "Netbanking and support consoles",
+      "label": "Illustrative estimate",
+      "body": "An Indian bank's netbanking site typically uses server-side sessions with short idle timeouts, so 'log out' or 'session expired' takes effect immediately, and high-value actions such as adding a beneficiary need a fresh OTP (step-up authentication). Inside the bank, a support agent who has logged in successfully (authenticated) may view a customer's profile only for customers assigned to their branch and only certain fields (authorised by role and attributes), and every access is logged for audit. Authentication answers 'is this Priya from the Pune branch?'; authorisation answers 'may Priya see this account?'."
+    },
+    "pitfalls": [
+      {
+        "trap": "'The gateway checks the JWT, so services are secure.'",
+        "say": "'The gateway authenticates; each service still authorises, for example checking that order 123 belongs to this user.'"
+      },
+      {
+        "trap": "'JWTs can't be revoked, so we'll make them last a week.'",
+        "say": "'Access tokens last 15 minutes, refresh tokens are stored and revocable, and sensitive actions check a deny-list.'"
+      }
+    ],
+    "takeaways": [
+      "Authentication proves identity; authorisation decides access.",
+      "Authorise every request against the specific resource.",
+      "Sessions revoke instantly; short tokens bound the damage window.",
+      "Step-up authentication protects high-risk actions."
+    ],
+    "extraQuestions": [
+      {
+        "id": "t57-d1",
+        "type": "multiple_choice",
+        "concept": "authn-authz",
+        "prompt": "A logged-in user changes the order id in a URL and sees someone else's order. Which check failed?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Authorisation"
+          },
+          {
+            "id": "b",
+            "label": "Authentication"
+          },
+          {
+            "id": "c",
+            "label": "TLS"
+          },
+          {
+            "id": "d",
+            "label": "Rate limiting"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The user was correctly authenticated, but the service did not check that the order belongs to them."
+      }
+    ],
+    "diagram": "login (password + OTP) -> issue session cookie / JWT\nrequest -> authenticate credential -> authorise (role? owner? scope?) -> allow / 403"
   },
-  "useWhen": [
-   "Server-side sessions for web apps where instant logout and revocation matter, such as banking.",
-   "Short-lived tokens for APIs and mobile apps calling many services, where each service verifies locally without a session lookup."
-  ],
-  "avoidWhen": [
-   "Do not treat a valid login as permission to access any record; that is how insecure direct object reference (IDOR) bugs happen.",
-   "Do not issue long-lived JWTs (days) with no revocation path for sensitive apps."
-  ],
-  "tradeoffs": {
-   "columns": [
-    "Credential",
-    "Revocation",
-    "Per-request cost",
-    "Fits"
-   ],
-   "rows": [
-    [
-     "Server-side session + cookie",
-     "Instant (delete session)",
-     "One cache lookup",
-     "Web apps, banking"
+  "58": {
+    "teaches": [
+      "oidc-flow",
+      "scopes",
+      "pkce",
+      "id-token"
     ],
-    [
-     "Short-lived JWT + refresh token",
-     "At expiry, or revoke refresh",
-     "Signature check only",
-     "APIs, mobile, microservices"
+    "mechanism": {
+      "title": "Authorization Code flow with PKCE, step by step",
+      "steps": [
+        "The app generates a random code_verifier and sends its SHA-256 hash (code_challenge) when redirecting the user to the authorisation server with client_id, redirect_uri, requested scopes and a random state value.",
+        "The user signs in at the authorisation server (for example Google) and approves the requested scopes, such as 'openid email calendar.readonly'.",
+        "The authorisation server redirects back to redirect_uri with a short-lived authorisation code and the same state, which the app checks to block cross-site request forgery.",
+        "The app exchanges the code plus the original code_verifier at the token endpoint. The server hashes the verifier and compares it with the challenge, so a stolen code alone is useless.",
+        "The response contains an access token (for calling APIs within the granted scopes), usually a refresh token, and with OpenID Connect an ID token: a signed JWT that says who the user is (sub, email, issuer, audience, expiry).",
+        "The app validates the ID token's signature, issuer, audience and nonce to log the user in, and sends the access token only to the resource API."
+      ]
+    },
+    "useWhen": [
+      "OAuth 2.0 when your app needs delegated access to a user's data in another service with limited scopes.",
+      "OpenID Connect for 'Sign in with Google' and single sign-on; PKCE for every public client (mobile, single-page app) and recommended for all."
     ],
-    [
-     "API key",
-     "Rotate or delete key",
-     "Lookup",
-     "Server-to-server"
+    "avoidWhen": [
+      "Do not use the implicit flow or the password grant in new apps; both are discouraged by current OAuth security guidance.",
+      "Do not use an access token as proof of identity in your own app; use the ID token, which is meant for you."
     ],
-    [
-     "mTLS certificate",
-     "Revocation lists or short certificate lifetimes",
-     "TLS handshake",
-     "Service-to-service"
-    ]
-   ]
+    "tradeoffs": {
+      "columns": [
+        "Token",
+        "Audience",
+        "Used for",
+        "Typical lifetime"
+      ],
+      "rows": [
+        [
+          "Authorisation code",
+          "Your backend, once",
+          "Exchange for tokens",
+          "Seconds to a minute"
+        ],
+        [
+          "Access token",
+          "Resource API",
+          "Calling APIs within scopes",
+          "Minutes to an hour"
+        ],
+        [
+          "Refresh token",
+          "Authorisation server",
+          "Getting new access tokens",
+          "Days to months, revocable"
+        ],
+        [
+          "ID token (OIDC)",
+          "Your app (client)",
+          "Knowing who logged in",
+          "Minutes"
+        ]
+      ]
+    },
+    "numbers": {
+      "title": "Why PKCE makes a stolen code worthless",
+      "assumptions": [
+        "code_verifier is 32 random bytes (256 bits)",
+        "Attacker intercepts the authorisation code"
+      ],
+      "steps": [
+        "To redeem the code, the attacker needs a verifier whose SHA-256 hash matches the challenge.",
+        "Guessing 256 random bits takes on the order of 2 to the power 255 tries on average.",
+        "Even at a trillion guesses per second, that is vastly longer than the code's lifetime of under a minute.",
+        "So intercepting the code through a malicious app on the phone gains nothing."
+      ],
+      "result": "PKCE binds the code to a secret only the real app holds, which is why public clients must use it."
+    },
+    "india": {
+      "title": "Sign in with Google and DigiLocker",
+      "label": "Publicly reported",
+      "body": "Many Indian apps offer 'Sign in with Google', which is OpenID Connect: the app receives an ID token proving the user's Google identity and email, and never sees the password. DigiLocker publicly documents an OAuth 2.0 based API through which partner apps, after the user's consent, can fetch issued documents such as a driving licence for KYC. That is delegated authorisation: the user grants a specific scope to a specific app, can revoke it, and the app never learns the user's DigiLocker credentials. The details of each provider's scopes are in their public documentation."
+    },
+    "pitfalls": [
+      {
+        "trap": "'OAuth is for login.'",
+        "say": "'OAuth 2.0 is delegated authorisation; OpenID Connect adds the ID token for login.'"
+      },
+      {
+        "trap": "Skipping PKCE in a mobile app.",
+        "say": "'Mobile apps are public clients, so I'd use the authorisation code flow with PKCE and check state and nonce.'"
+      }
+    ],
+    "takeaways": [
+      "OAuth delegates scoped access; OIDC adds identity via the ID token.",
+      "Use authorisation code with PKCE for all public clients.",
+      "Request the narrowest scopes needed.",
+      "Validate ID tokens: signature, issuer, audience, expiry, nonce."
+    ],
+    "extraQuestions": [
+      {
+        "id": "t58-d1",
+        "type": "multiple_choice",
+        "concept": "id-token",
+        "prompt": "Which token tells your app who the user is in OpenID Connect?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The ID token"
+          },
+          {
+            "id": "b",
+            "label": "The access token"
+          },
+          {
+            "id": "c",
+            "label": "The authorisation code"
+          },
+          {
+            "id": "d",
+            "label": "The refresh token"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The ID token is a signed JWT addressed to your app, carrying the user's identity claims."
+      }
+    ],
+    "diagram": "app --(challenge, scopes, state)--> auth server --login + consent--> redirect ?code&state\napp --(code + verifier)--> token endpoint --> access token, refresh token, ID token"
   },
-  "numbers": {
-   "title": "Revocation window of a stolen token",
-   "assumptions": [
-    "Access token lifetime 15 minutes",
-    "Attacker steals a token at a random moment"
-   ],
-   "steps": [
-    "Remaining lifetime is uniformly between 0 and 15 minutes, so on average 15 ÷ 2 = 7.5 minutes of misuse.",
-    "With a 60-minute lifetime the average window is 60 ÷ 2 = 30 minutes.",
-    "With server-side sessions, deleting the session ends misuse on the next request.",
-    "Adding a deny-list check for high-risk actions (transfers) closes the window for those actions at the cost of one lookup."
-   ],
-   "result": "Token lifetime is the revocation window; keep it short and add server-side checks for sensitive actions."
+  "59": {
+    "teaches": [
+      "jwt-claims",
+      "jwt-verify",
+      "jwt-readable",
+      "jwt-lifetime"
+    ],
+    "mechanism": {
+      "title": "What happens when a service verifies a JWT",
+      "steps": [
+        "A JWT is three base64url parts joined by dots: header (algorithm, key id), payload (claims) and signature. Base64url is encoding, not encryption, so anyone can read the payload.",
+        "The service splits the token and reads the header's alg and kid. It accepts only an allow-listed algorithm (for example RS256 or ES256), never 'none', and never lets the token choose.",
+        "It fetches the issuer's public key for that kid from a cached JWKS endpoint and verifies the signature over header and payload.",
+        "It checks claims: exp (not expired, with small clock-skew leeway), nbf, iss (expected issuer), aud (this service is the intended audience).",
+        "Only then does it trust sub (user id) and scopes or roles in the payload, and authorise the request.",
+        "Because verification is local, no database call is needed, which is why JWTs scale well, and also why revocation before expiry needs extra machinery."
+      ]
+    },
+    "useWhen": [
+      "Stateless authentication between many services, and short-lived access tokens from an identity provider.",
+      "Asymmetric signing (RS256 or ES256) when many services verify but only the issuer signs."
+    ],
+    "avoidWhen": [
+      "Do not put secrets or personal data such as Aadhaar or PAN numbers in a JWT payload; it is readable by anyone holding it.",
+      "Do not use JWTs as long-lived web sessions when instant logout matters; server-side sessions are simpler."
+    ],
+    "tradeoffs": {
+      "columns": [
+        "Choice",
+        "Pros",
+        "Cons"
+      ],
+      "rows": [
+        [
+          "HS256 (shared secret)",
+          "Simple, fast",
+          "Every verifier can also forge tokens"
+        ],
+        [
+          "RS256 / ES256 (key pair)",
+          "Verifiers hold only the public key",
+          "Key distribution via JWKS"
+        ],
+        [
+          "Short lifetime (5–15 min)",
+          "Small misuse window",
+          "Needs refresh flow"
+        ],
+        [
+          "Long lifetime (days)",
+          "Fewer refreshes",
+          "Large window if stolen"
+        ]
+      ]
+    },
+    "numbers": {
+      "title": "Token size on every request",
+      "assumptions": [
+        "JWT of about 900 bytes in the Authorization header",
+        "50,000 requests per second through the gateway"
+      ],
+      "steps": [
+        "Header bytes per second = 50,000 × 900 = 45,000,000, about 45 MB per second.",
+        "Per day = 45 MB × 86,400 ≈ 3.9 TB of header traffic.",
+        "Trimming claims to about 400 bytes saves roughly 2.2 TB a day.",
+        "Keep claims minimal: user id, scopes, expiry, issuer, audience."
+      ],
+      "result": "JWTs travel on every request, so bloated claims cost real bandwidth; keep them small."
+    },
+    "india": {
+      "title": "Tokens in a fintech mobile app",
+      "label": "Illustrative estimate",
+      "body": "A mobile investment app issues 10-minute RS256 access tokens containing only the user id, scopes and expiry, plus a refresh token stored in the phone's secure keystore. Each microservice verifies tokens locally with keys fetched from the identity service's JWKS endpoint and cached for an hour. PAN and bank account details never appear in the token, because anyone who captures it, for example through a misconfigured log, could decode the payload. When a user reports a lost phone, support revokes the refresh token, and the access token dies within 10 minutes."
+    },
+    "pitfalls": [
+      {
+        "trap": "Storing the access token in browser localStorage for a high-value web app.",
+        "say": "'Any XSS can read localStorage, so for the web I'd keep tokens in HttpOnly, Secure cookies or use a backend-for-frontend that holds them server-side.'"
+      },
+      {
+        "trap": "'JWTs are encrypted.'",
+        "say": "'A signed JWT is only encoded; anyone can read the claims, so no secrets go in it.'"
+      },
+      {
+        "trap": "Trusting the alg in the token header.",
+        "say": "'The verifier pins the allowed algorithm and key, so a token claiming alg none or HS256 with the public key is rejected.'"
+      }
+    ],
+    "takeaways": [
+      "JWT payloads are readable; never put secrets in them.",
+      "Verify signature with a pinned algorithm, then exp, iss and aud.",
+      "Prefer asymmetric keys when many services verify.",
+      "Short lifetimes plus refresh tokens make revocation workable."
+    ],
+    "extraQuestions": [
+      {
+        "id": "t59-d1",
+        "type": "multiple_choice",
+        "concept": "jwt-readable",
+        "prompt": "Why should a PAN number not be placed in a JWT payload?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The payload is only encoded; any token holder can read it"
+          },
+          {
+            "id": "b",
+            "label": "JWT payloads cannot contain long numeric values"
+          },
+          {
+            "id": "c",
+            "label": "Adding it would break the token’s signature check"
+          },
+          {
+            "id": "d",
+            "label": "It makes the token expire sooner than other claims"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Signing protects integrity, not confidentiality; the payload is readable by anyone."
+      }
+    ],
+    "diagram": "base64url(header).base64url(payload).signature\n verify: alg allow-listed -> key by kid (JWKS) -> signature ok -> exp/iss/aud ok -> trust sub, scopes"
   },
-  "india": {
-   "title": "Netbanking and support consoles",
-   "label": "Illustrative estimate",
-   "body": "An Indian bank's netbanking site typically uses server-side sessions with short idle timeouts, so 'log out' or 'session expired' takes effect immediately, and high-value actions such as adding a beneficiary need a fresh OTP (step-up authentication). Inside the bank, a support agent who has logged in successfully (authenticated) may view a customer's profile only for customers assigned to their branch and only certain fields (authorised by role and attributes), and every access is logged for audit. Authentication answers 'is this Priya from the Pune branch?'; authorisation answers 'may Priya see this account?'."
+  "60": {
+    "teaches": [
+      "defence",
+      "injection",
+      "secrets",
+      "least-privilege"
+    ],
+    "mechanism": {
+      "title": "Layering defences around a typical web service",
+      "steps": [
+        "Edge: TLS everywhere, a web application firewall and rate limits to absorb bots and common attacks.",
+        "Input handling: validate types and lengths, and use parameterised queries or an ORM so user input is never concatenated into SQL; encode output to prevent cross-site scripting.",
+        "Identity: strong authentication (OTP, passkeys), short-lived tokens, and authorisation checks on every resource.",
+        "Least privilege: each service has its own database user with only the tables and verbs it needs, and each cloud role only the actions it needs.",
+        "Secrets: kept in a secrets manager or vault, injected at runtime, rotated, never committed to Git or printed in logs.",
+        "Data: encrypt at rest and in transit, mask sensitive fields in logs, and keep audit logs; then monitor and alert on anomalies, and patch dependencies promptly."
+      ]
+    },
+    "useWhen": [
+      "Defence in depth for any internet-facing system: assume one layer will fail.",
+      "Least privilege everywhere, so a compromised component can do limited harm."
+    ],
+    "avoidWhen": [
+      "Do not rely on a single control such as the WAF or the gateway as the whole security story.",
+      "Do not roll your own cryptography or password hashing; use vetted libraries such as bcrypt, scrypt or Argon2."
+    ],
+    "tradeoffs": {
+      "columns": [
+        "Threat",
+        "Control",
+        "Layer"
+      ],
+      "rows": [
+        [
+          "SQL injection",
+          "Parameterised queries, least-privilege DB user",
+          "Application, database"
+        ],
+        [
+          "Leaked secrets",
+          "Secrets manager, rotation, secret scanning in CI",
+          "Build and runtime"
+        ],
+        [
+          "Credential stuffing",
+          "Rate limits, OTP or passkeys, breached-password checks",
+          "Edge, identity"
+        ],
+        [
+          "IDOR",
+          "Ownership checks on every resource",
+          "Service"
+        ],
+        [
+          "Data theft at rest",
+          "Encryption, key management, access logs",
+          "Storage"
+        ]
+      ]
+    },
+    "numbers": {
+      "title": "Why slow password hashing matters",
+      "assumptions": [
+        "Attacker steals 1,000,000 password hashes",
+        "Fast unsalted hash: about 10 billion guesses per second on GPUs (illustrative)",
+        "bcrypt at a cost giving about 10,000 guesses per second per GPU (illustrative)"
+      ],
+      "steps": [
+        "A list of the 1,000,000 most common passwords tried against an unsalted fast hash needs just one pass over the list for all users, about 0.0001 seconds of GPU time.",
+        "With per-user salts the attacker must hash each guess per user: 1,000,000 guesses × 1,000,000 users = 1,000,000,000,000 hashes.",
+        "At 10,000 bcrypt hashes per second, that is 100,000,000 seconds, about 3.2 years on one GPU.",
+        "Salting stops the shared pass, and a slow hash multiplies the cost per guess."
+      ],
+      "result": "Salted, deliberately slow password hashing turns a fraction of a second into years of attacker work."
+    },
+    "india": {
+      "title": "Lessons from leaked keys",
+      "label": "Illustrative estimate",
+      "body": "A common incident pattern, reported many times worldwide, is a developer committing cloud access keys to a public GitHub repository; automated scanners find such keys within minutes and use them to run crypto-miners or copy storage buckets. An Indian start-up preventing this would run secret scanning in CI, keep keys in a cloud secrets manager, give each service a narrowly scoped role instead of one admin key, and rotate keys regularly. Under India's Digital Personal Data Protection Act, 2023, organisations are also obliged to protect personal data with reasonable security safeguards, so these controls are legal hygiene as well as engineering hygiene."
+    },
+    "pitfalls": [
+      {
+        "trap": "'We have a firewall, so we're secure.'",
+        "say": "'I'd layer controls: WAF and rate limits at the edge, parameterised queries, per-resource authorisation, least-privilege roles and secrets in a vault.'"
+      },
+      {
+        "trap": "Storing API keys in environment files in the repo.",
+        "say": "'Secrets live in a secrets manager, are injected at runtime, rotated, and CI blocks commits containing keys.'"
+      }
+    ],
+    "takeaways": [
+      "Assume any one control can fail; layer them.",
+      "Parameterised queries stop SQL injection.",
+      "Least privilege limits the blast radius of a compromise.",
+      "Secrets belong in a vault, never in code or logs."
+    ],
+    "extraQuestions": [
+      {
+        "id": "t60-d1",
+        "type": "multiple_choice",
+        "concept": "least-privilege",
+        "prompt": "A reporting service's database user can only SELECT from three tables. Which principle is this?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Least privilege"
+          },
+          {
+            "id": "b",
+            "label": "Eventual consistency"
+          },
+          {
+            "id": "c",
+            "label": "Idempotency"
+          },
+          {
+            "id": "d",
+            "label": "Sharding"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Granting only the access a component needs limits damage if it is compromised."
+      }
+    ],
+    "diagram": "internet -> [WAF + rate limit] -> [gateway: TLS, authn] -> [service: validate, authz] -> [DB user: least privilege]\n secrets from vault | logs masked | audit + alerts"
   },
-  "pitfalls": [
-   {
-    "trap": "'The gateway checks the JWT, so services are secure.'",
-    "say": "'The gateway authenticates; each service still authorises, for example checking that order 123 belongs to this user.'"
-   },
-   {
-    "trap": "'JWTs can't be revoked, so we'll make them last a week.'",
-    "say": "'Access tokens last 15 minutes, refresh tokens are stored and revocable, and sensitive actions check a deny-list.'"
-   }
-  ],
-  "takeaways": [
-   "Authentication proves identity; authorisation decides access.",
-   "Authorise every request against the specific resource.",
-   "Sessions revoke instantly; short tokens bound the damage window.",
-   "Step-up authentication protects high-risk actions."
-  ],
-  "extraQuestions": [
-   {
-    "id": "t57-d1",
-    "type": "multiple_choice",
-    "concept": "authn-authz",
-    "prompt": "A logged-in user changes the order id in a URL and sees someone else's order. Which check failed?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "Authorisation"
-     },
-     {
-      "id": "b",
-      "label": "Authentication"
-     },
-     {
-      "id": "c",
-      "label": "TLS"
-     },
-     {
-      "id": "d",
-      "label": "Rate limiting"
-     }
+  "61": {
+    "teaches": [
+      "metadata",
+      "upload-flow",
+      "presigned",
+      "blob-trap"
     ],
-    "correctChoiceIds": [
-     "a"
+    "mechanism": {
+      "title": "Uploading a file directly to object storage",
+      "steps": [
+        "The client asks the app server for permission to upload 'profile.jpg, 2 MB, image/jpeg'.",
+        "The server authorises the user, checks the declared type and size, creates a metadata row (owner, key, status 'pending') and returns a presigned PUT URL valid for a few minutes, scoped to one object key and content type.",
+        "The client uploads the bytes straight to object storage (S3, GCS, Azure Blob) using that URL, so the large payload never passes through the app servers.",
+        "Storage emits an event on completion, or the client confirms; a worker validates the file (real type, size, malware scan), creates thumbnails and marks the row 'ready'.",
+        "Downloads use short-lived presigned GET URLs or a CDN in front of a private bucket, never a public bucket by default.",
+        "Large files use multipart upload: parts of 5 MB or more are uploaded in parallel and retried individually, then combined."
+      ]
+    },
+    "useWhen": [
+      "Images, videos, documents, backups and logs: large, immutable blobs.",
+      "Direct-to-storage uploads with presigned URLs whenever files are larger than a few hundred kilobytes."
     ],
-    "explanation": "The user was correctly authenticated, but the service did not check that the order belongs to them."
-   }
-  ],
-  "diagram": "login (password + OTP) -> issue session cookie / JWT\nrequest -> authenticate credential -> authorise (role? owner? scope?) -> allow / 403"
- },
- "58": {
-  "teaches": [
-   "oidc-flow",
-   "scopes",
-   "pkce",
-   "id-token"
-  ],
-  "mechanism": {
-   "title": "Authorization Code flow with PKCE, step by step",
-   "steps": [
-    "The app generates a random code_verifier and sends its SHA-256 hash (code_challenge) when redirecting the user to the authorisation server with client_id, redirect_uri, requested scopes and a random state value.",
-    "The user signs in at the authorisation server (for example Google) and approves the requested scopes, such as 'openid email calendar.readonly'.",
-    "The authorisation server redirects back to redirect_uri with a short-lived authorisation code and the same state, which the app checks to block cross-site request forgery.",
-    "The app exchanges the code plus the original code_verifier at the token endpoint. The server hashes the verifier and compares it with the challenge, so a stolen code alone is useless.",
-    "The response contains an access token (for calling APIs within the granted scopes), usually a refresh token, and with OpenID Connect an ID token: a signed JWT that says who the user is (sub, email, issuer, audience, expiry).",
-    "The app validates the ID token's signature, issuer, audience and nonce to log the user in, and sends the access token only to the resource API."
-   ]
+    "avoidWhen": [
+      "Do not store large blobs inside the database; backups, replication and the buffer cache all suffer.",
+      "Do not use object storage for small, frequently updated records; each write replaces the whole object and per-request costs add up."
+    ],
+    "tradeoffs": {
+      "columns": [
+        "Store",
+        "Access",
+        "Strength",
+        "Weakness"
+      ],
+      "rows": [
+        [
+          "Object storage",
+          "HTTP by key",
+          "Cheap, durable, huge scale",
+          "No partial updates, higher latency per request"
+        ],
+        [
+          "Block storage (EBS)",
+          "Mounted disk",
+          "Low latency for one machine",
+          "Attached to one instance at a time"
+        ],
+        [
+          "File storage (EFS, NFS)",
+          "Shared filesystem",
+          "Shared by many servers",
+          "Costlier, throughput limits"
+        ],
+        [
+          "Database BLOB column",
+          "SQL",
+          "Transactional with rows",
+          "Bloats DB, slows backups"
+        ]
+      ]
+    },
+    "numbers": {
+      "title": "Bandwidth saved by presigned uploads",
+      "assumptions": [
+        "100,000 photo uploads per hour at 3 MB each"
+      ],
+      "steps": [
+        "Data per hour = 100,000 × 3 MB = 300,000 MB, which is 300 GB.",
+        "Per second = 300,000 MB ÷ 3,600 ≈ 83 MB per second, about 667 Mbit per second.",
+        "Proxying through app servers would add that much inbound and outbound traffic and tie up connections for each slow mobile upload.",
+        "With presigned URLs the app servers handle only small JSON requests."
+      ],
+      "result": "Presigned direct uploads keep about 667 Mbit per second of photo traffic off the app servers."
+    },
+    "india": {
+      "title": "KYC document uploads",
+      "label": "Illustrative estimate",
+      "body": "A lending app asks users to upload a PAN card photo and a selfie. The server returns presigned URLs to a private bucket with server-side encryption, scoped to keys like kyc/user-42/pan.jpg and valid for 5 minutes. After upload, a worker checks the file really is an image, runs it through OCR and face-match services, and records the result. Reviewers see the image only through short-lived presigned GET URLs, and every access is logged. A misconfigured public bucket of KYC documents is exactly the kind of breach that makes headlines, so 'private by default' is non-negotiable."
+    },
+    "pitfalls": [
+      {
+        "trap": "Trusting the client's declared content type.",
+        "say": "'The presigned URL pins the content type and size limit, and a worker checks the real file signature before marking it ready, so a script renamed .jpg is rejected.'"
+      },
+      {
+        "trap": "Uploading files through the API servers.",
+        "say": "'The server issues a presigned PUT URL and the client uploads straight to object storage; the server only stores metadata.'"
+      },
+      {
+        "trap": "Making the bucket public for easy downloads.",
+        "say": "'The bucket stays private; downloads use short-lived presigned URLs or a CDN with origin access control.'"
+      }
+    ],
+    "takeaways": [
+      "Store blobs in object storage and metadata in the database.",
+      "Presigned URLs keep large payloads off app servers.",
+      "Validate and scan after upload, then mark ready.",
+      "Keep buckets private; serve through presigned URLs or a CDN."
+    ],
+    "extraQuestions": [
+      {
+        "id": "t61-d1",
+        "type": "multiple_choice",
+        "concept": "presigned",
+        "prompt": "What is the main benefit of a presigned PUT URL for uploads?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The client sends the file directly to object storage, bypassing app servers"
+          },
+          {
+            "id": "b",
+            "label": "It makes the uploaded file public to anyone, forever"
+          },
+          {
+            "id": "c",
+            "label": "It stores the file inside the database for faster reads"
+          },
+          {
+            "id": "d",
+            "label": "It removes the need for any authorisation on the API"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The app authorises and signs a short-lived URL; the bytes go straight to storage."
+      }
+    ],
+    "diagram": "client --1. request upload--> app (authz, metadata 'pending') --2. presigned URL--> client\nclient --3. PUT bytes--> object storage --4. event--> worker (scan, thumbnail) --> metadata 'ready'"
   },
-  "useWhen": [
-   "OAuth 2.0 when your app needs delegated access to a user's data in another service with limited scopes.",
-   "OpenID Connect for 'Sign in with Google' and single sign-on; PKCE for every public client (mobile, single-page app) and recommended for all."
-  ],
-  "avoidWhen": [
-   "Do not use the implicit flow or the password grant in new apps; both are discouraged by current OAuth security guidance.",
-   "Do not use an access token as proof of identity in your own app; use the ID token, which is meant for you."
-  ],
-  "tradeoffs": {
-   "columns": [
-    "Token",
-    "Audience",
-    "Used for",
-    "Typical lifetime"
-   ],
-   "rows": [
-    [
-     "Authorisation code",
-     "Your backend, once",
-     "Exchange for tokens",
-     "Seconds to a minute"
+  "62": {
+    "teaches": [
+      "blocks",
+      "namenode",
+      "rack-replication",
+      "hdfs-read",
+      "hdfs-fit"
     ],
-    [
-     "Access token",
-     "Resource API",
-     "Calling APIs within scopes",
-     "Minutes to an hour"
+    "mechanism": {
+      "title": "How HDFS writes and reads a file",
+      "steps": [
+        "A file is split into large blocks, 128 MB by default. The NameNode keeps the namespace (directories, file-to-block mapping) in memory; DataNodes store the blocks on local disks.",
+        "To write, the client asks the NameNode for target DataNodes for each block. With replication factor 3 and rack awareness, the first replica goes on the writer's node (or a random one), the second on a node in a different rack, and the third on another node in that second rack.",
+        "The client streams the block to the first DataNode, which pipelines it to the second, which pipelines it to the third; acknowledgements flow back.",
+        "To read, the client asks the NameNode for block locations and reads each block from the closest replica, ideally on the same node, which is what lets MapReduce and Spark move computation to the data.",
+        "DataNodes send heartbeats and block reports; if one dies, the NameNode re-replicates its blocks from surviving copies.",
+        "The NameNode is critical, so production clusters run a standby NameNode with shared edit logs for high availability."
+      ]
+    },
+    "useWhen": [
+      "Very large files written once and read in big sequential scans by batch jobs: logs, clickstreams, raw data for Spark.",
+      "On-premises big-data clusters where compute and storage sit on the same machines."
     ],
-    [
-     "Refresh token",
-     "Authorisation server",
-     "Getting new access tokens",
-     "Days to months, revocable"
+    "avoidWhen": [
+      "Millions of tiny files: each file and block costs NameNode memory (roughly 150 bytes per object, a commonly cited estimate).",
+      "Low-latency random reads and in-place updates; HDFS files are append-only."
     ],
-    [
-     "ID token (OIDC)",
-     "Your app (client)",
-     "Knowing who logged in",
-     "Minutes"
-    ]
-   ]
+    "tradeoffs": {
+      "columns": [
+        "Aspect",
+        "HDFS",
+        "Cloud object storage"
+      ],
+      "rows": [
+        [
+          "Data locality",
+          "Compute runs next to the data",
+          "Network reads"
+        ],
+        [
+          "Scaling",
+          "Add nodes; NameNode memory limits files",
+          "Practically unlimited objects"
+        ],
+        [
+          "Cost model",
+          "Own hardware, 3× replication",
+          "Pay per GB and request"
+        ],
+        [
+          "Typical today",
+          "On-premises clusters",
+          "Data lakes on S3 or GCS"
+        ]
+      ]
+    },
+    "numbers": {
+      "title": "Blocks and replication for a 1 TB file",
+      "assumptions": [
+        "1 TB file, 128 MB blocks",
+        "Replication factor 3"
+      ],
+      "steps": [
+        "1 TB is 1,048,576 MB in binary units; 1,048,576 ÷ 128 = 8,192 blocks.",
+        "Stored copies = 8,192 × 3 = 24,576 block replicas.",
+        "Raw disk used = 1 TB × 3 = 3 TB.",
+        "If the same data were 8 million files of 128 KB each, the NameNode would track at least 8 million file objects and 8 million block objects instead of 8,193, which is why small files hurt."
+      ],
+      "result": "Large blocks keep NameNode metadata tiny; replication triples raw storage."
+    },
+    "india": {
+      "title": "Telecom call records",
+      "label": "Illustrative estimate",
+      "body": "A large Indian telecom operator generates billions of call-detail and data-session records a day. Historically, operators processed such records on Hadoop clusters: hourly files of several gigabytes land in HDFS, replicated three times across racks, and nightly Spark jobs compute usage, fraud signals and network quality per tower. Each job reads big files sequentially from local disks, which HDFS does well. If the same records were written as one tiny file per call, the NameNode would run out of memory long before the disks filled. Many teams now keep the same layout on cloud object storage instead of HDFS."
+    },
+    "pitfalls": [
+      {
+        "trap": "Storing millions of small images in HDFS.",
+        "say": "'HDFS metadata lives in NameNode memory, so small files hurt; I'd put images in object storage and use HDFS or a lake for large batch files.'"
+      },
+      {
+        "trap": "Forgetting rack awareness.",
+        "say": "'Replicas span two racks so a rack switch failure does not lose all copies.'"
+      }
+    ],
+    "takeaways": [
+      "Files are split into 128 MB blocks, replicated 3 times across racks.",
+      "The NameNode holds all metadata in memory; small files are costly.",
+      "Reads go to the nearest replica, enabling data locality.",
+      "Best for large, write-once, sequentially read files."
+    ],
+    "extraQuestions": [
+      {
+        "id": "t62-d1",
+        "type": "multiple_choice",
+        "concept": "blocks",
+        "prompt": "How many 128 MB blocks does a 1 TB (1,048,576 MB) file use in HDFS?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "8,192"
+          },
+          {
+            "id": "b",
+            "label": "128"
+          },
+          {
+            "id": "c",
+            "label": "1,024"
+          },
+          {
+            "id": "d",
+            "label": "24,576"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "1,048,576 ÷ 128 = 8,192 blocks; with replication factor 3 there are 24,576 replicas."
+      }
+    ],
+    "diagram": "NameNode: /logs/day1 -> [b1: DN1, DN4, DN5] [b2: DN2, DN6, DN7] ...\nwrite pipeline: client -> DN1 (rack A) -> DN4 (rack B) -> DN5 (rack B)"
   },
-  "numbers": {
-   "title": "Why PKCE makes a stolen code worthless",
-   "assumptions": [
-    "code_verifier is 32 random bytes (256 bits)",
-    "Attacker intercepts the authorisation code"
-   ],
-   "steps": [
-    "To redeem the code, the attacker needs a verifier whose SHA-256 hash matches the challenge.",
-    "Guessing 256 random bits takes on the order of 2 to the power 255 tries on average.",
-    "Even at a trillion guesses per second, that is vastly longer than the code's lifetime of under a minute.",
-    "So intercepting the code through a malicious app on the phone gains nothing."
-   ],
-   "result": "PKCE binds the code to a secret only the real app holds, which is why public clients must use it."
+  "63": {
+    "teaches": [
+      "inverted",
+      "analyser",
+      "like-scan",
+      "index-sync",
+      "source-of-truth"
+    ],
+    "mechanism": {
+      "title": "From document to search result in an inverted index",
+      "steps": [
+        "Analysis at index time: the analyser lowercases text, splits it into tokens, removes stop words if configured, and stems or normalises words ('running' to 'run'). Custom analysers can add synonyms or n-grams for typos and partial matches.",
+        "Each term maps to a postings list: the document ids containing it, with positions and frequencies.",
+        "Query time: the query string is analysed the same way, the postings lists for its terms are fetched and intersected or merged, and documents are scored, typically with BM25 using term frequency, inverse document frequency and field length.",
+        "Elasticsearch splits an index into shards across nodes; each query fans out to the shards and the coordinating node merges the top results.",
+        "New documents become searchable after a refresh (by default every second), so search is near real-time, not instant.",
+        "The primary database stays the source of truth; changes flow to the index through events or CDC, and the index can be rebuilt from scratch."
+      ]
+    },
+    "useWhen": [
+      "Full-text search, typo tolerance, relevance ranking, facets and filters over millions of documents.",
+      "Log search and analytics (the ELK stack) over large volumes of semi-structured text."
+    ],
+    "avoidWhen": [
+      "Do not use Elasticsearch as the primary store for orders or payments; it is not transactional and can lose recent writes in some failures.",
+      "Do not use LIKE '%term%' over a large table for search; it cannot use a normal B-tree index and scans every row."
+    ],
+    "tradeoffs": {
+      "columns": [
+        "Approach",
+        "Speed on 10 million rows",
+        "Relevance",
+        "Typo tolerance"
+      ],
+      "rows": [
+        [
+          "SQL LIKE '%term%'",
+          "Full scan",
+          "None",
+          "No"
+        ],
+        [
+          "Postgres full-text (tsvector + GIN)",
+          "Indexed",
+          "Basic ranking",
+          "Limited"
+        ],
+        [
+          "Elasticsearch / OpenSearch",
+          "Indexed, distributed",
+          "BM25, boosts",
+          "Fuzzy queries, n-grams"
+        ]
+      ]
+    },
+    "numbers": {
+      "title": "Why a LIKE scan is slow",
+      "assumptions": [
+        "10,000,000 product rows, 200 bytes of searchable text each",
+        "Disk or memory scan at 1 GB per second"
+      ],
+      "steps": [
+        "Text to scan = 10,000,000 × 200 bytes = 2,000,000,000 bytes, about 2 GB.",
+        "At 1 GB per second that is about 2 seconds per query, with all CPU cores busy.",
+        "An inverted index looks up the postings for 'paneer' directly, typically in milliseconds.",
+        "At 100 searches per second, LIKE would need about 200 seconds of scanning every second, which is impossible."
+      ],
+      "result": "Substring scans grow with table size; an inverted index grows with the number of matching documents."
+    },
+    "india": {
+      "title": "Searching a grocery catalogue",
+      "label": "Illustrative estimate",
+      "body": "A quick-commerce app in India must find 'paneer' when users type 'panner', 'paneer 200g' or 'पनीर'. Its search index uses an analyser with lowercasing, a synonym list (atta, wheat flour), n-grams or fuzzy matching for spelling mistakes, and a transliteration step for Hindi queries. Product data lives in Postgres; a CDC pipeline updates the Elasticsearch index within a second or two of a price or stock change. Results are filtered by the user's dark store and ranked by text match combined with popularity. If the index ever drifts, it is rebuilt from Postgres overnight."
+    },
+    "pitfalls": [
+      {
+        "trap": "Treating the search index as the source of truth.",
+        "say": "'Postgres owns the data; the index is a derived copy updated by CDC and rebuilt if needed.'"
+      },
+      {
+        "trap": "Using LIKE for search at scale.",
+        "say": "'LIKE with a leading wildcard scans every row; I'd use an inverted index with an analyser for typos and synonyms.'"
+      }
+    ],
+    "takeaways": [
+      "An inverted index maps terms to the documents containing them.",
+      "The same analyser must run at index and query time.",
+      "Search is near real-time (refresh about every second).",
+      "Keep the database as source of truth; sync the index by CDC or events."
+    ],
+    "extraQuestions": [
+      {
+        "id": "t63-d1",
+        "type": "multiple_choice",
+        "concept": "analyser",
+        "prompt": "A product is indexed as 'Paneer' but searching 'paneer' finds nothing. What is the most likely cause?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Index-time and query-time analysis differ (e.g. no lowercasing)"
+          },
+          {
+            "id": "b",
+            "label": "The product database is down at the moment"
+          },
+          {
+            "id": "c",
+            "label": "The Bloom filter returned a false positive"
+          },
+          {
+            "id": "d",
+            "label": "The user’s JWT expired during the search"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Terms must be normalised identically at index and query time for postings to match."
+      }
+    ],
+    "diagram": "doc 7: 'Fresh Paneer 200g' -> analyse -> [fresh, paneer, 200g]\nindex: paneer -> [3, 7, 19]   fresh -> [7, 11]\nquery 'panner' -> fuzzy -> paneer -> [3, 7, 19] -> score (BM25) -> top 10"
   },
-  "india": {
-   "title": "Sign in with Google and DigiLocker",
-   "label": "Publicly reported",
-   "body": "Many Indian apps offer 'Sign in with Google', which is OpenID Connect: the app receives an ID token proving the user's Google identity and email, and never sees the password. DigiLocker publicly documents an OAuth 2.0 based API through which partner apps, after the user's consent, can fetch issued documents such as a driving licence for KYC. That is delegated authorisation: the user grants a specific scope to a specific app, can revoke it, and the app never learns the user's DigiLocker credentials. The details of each provider's scopes are in their public documentation."
+  "64": {
+    "teaches": [
+      "mapreduce",
+      "spark",
+      "skew",
+      "batch-fit"
+    ],
+    "mechanism": {
+      "title": "How a MapReduce or Spark job runs",
+      "steps": [
+        "Input is split into chunks (often one per storage block), and one map task per chunk runs on a node near the data.",
+        "Map: each task reads records and emits key-value pairs, for example (city, order_value) for every order.",
+        "Shuffle: pairs are partitioned by key (hash of city), written to local disk and pulled over the network so that all values for one key reach the same reducer. This is usually the most expensive step.",
+        "Reduce: each reducer aggregates the values for its keys, for example summing order values per city, and writes output files.",
+        "Spark generalises this into a graph (DAG) of stages, keeps intermediate data in memory where it fits, and recomputes lost partitions from lineage instead of writing every step to disk, which makes multi-step and iterative jobs much faster.",
+        "Skew: if one key has far more records (one huge city), its reducer runs long after the others finish. Fixes include salting the key into several sub-keys and combining afterwards, or broadcasting a small table instead of shuffling the big one."
+      ]
+    },
+    "useWhen": [
+      "Large batch transformations and aggregations over data far bigger than one machine: daily reports, feature generation, backfills.",
+      "Spark for multi-step pipelines, iterative machine learning and SQL over a data lake."
+    ],
+    "avoidWhen": [
+      "Interactive queries on small data; a single database or DuckDB is faster and simpler.",
+      "Real-time needs measured in seconds; use stream processing instead."
+    ],
+    "tradeoffs": {
+      "columns": [
+        "Aspect",
+        "Hadoop MapReduce",
+        "Spark"
+      ],
+      "rows": [
+        [
+          "Intermediate data",
+          "Written to disk between steps",
+          "Kept in memory where possible"
+        ],
+        [
+          "Programming model",
+          "Map and reduce only",
+          "DAG of transformations, SQL, DataFrames"
+        ],
+        [
+          "Fault tolerance",
+          "Re-run failed tasks from disk",
+          "Recompute from lineage"
+        ],
+        [
+          "Best for",
+          "Simple, very large one-pass jobs",
+          "Multi-step and iterative jobs"
+        ]
+      ]
+    },
+    "numbers": {
+      "title": "Effect of skew on job time",
+      "assumptions": [
+        "100 reducers; total work 10,000 reducer-seconds spread evenly would be 100 seconds each",
+        "One key (Mumbai) holds 20% of all records"
+      ],
+      "steps": [
+        "Even spread: each reducer does 10,000 ÷ 100 = 100 seconds of work.",
+        "The Mumbai reducer gets 20% of all work: 10,000 × 0.2 = 2,000 seconds.",
+        "The job finishes when the slowest reducer does, so about 2,000 seconds instead of 100, a 20× slowdown.",
+        "Salting Mumbai into 20 sub-keys gives each about 100 seconds, then a tiny second step adds the 20 partial sums."
+      ],
+      "result": "One hot key can make a job 20 times slower; salting spreads it across reducers."
+    },
+    "india": {
+      "title": "Daily settlement reports",
+      "label": "Illustrative estimate",
+      "body": "A payments aggregator in India computes daily settlement files for lakhs of merchants: total captured, refunds, fees and GST per merchant. A Spark job reads the day's transaction files from the data lake, maps each transaction to (merchant_id, amounts), shuffles by merchant and sums. A handful of very large merchants produce a large share of transactions, so the job salts their ids to spread the work, then combines the partial sums. The output feeds settlement and reconciliation, and because it is batch, a rerun after a bug fix simply recomputes the day from immutable input."
+    },
+    "pitfalls": [
+      {
+        "trap": "Using Spark for a query over 2 GB.",
+        "say": "'Two gigabytes fits on one machine; Postgres or DuckDB answers faster without cluster overhead.'"
+      },
+      {
+        "trap": "Ignoring skew.",
+        "say": "'Merchant volume is skewed, so I'd salt the biggest merchant keys or broadcast the small dimension table to avoid one slow reducer.'"
+      }
+    ],
+    "takeaways": [
+      "Map emits key-value pairs; shuffle groups by key; reduce aggregates.",
+      "The shuffle is usually the most expensive step.",
+      "Spark keeps intermediates in memory and recovers via lineage.",
+      "Skewed keys dominate job time; salt them."
+    ],
+    "extraQuestions": [
+      {
+        "id": "t64-d1",
+        "type": "multiple_choice",
+        "concept": "skew",
+        "prompt": "One reducer receives 20% of all records while 99 others share the rest. What dominates job time?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The overloaded reducer, so the job slows dramatically"
+          },
+          {
+            "id": "b",
+            "label": "Nothing; Spark balances automatically"
+          },
+          {
+            "id": "c",
+            "label": "The map phase"
+          },
+          {
+            "id": "d",
+            "label": "The network between client and driver"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "A job ends when its slowest task ends; a hot key creates a straggler. Salting the key spreads it."
+      }
+    ],
+    "diagram": "input splits -> map (merchant, amt) -> shuffle by key -> reduce (sum per merchant) -> output\n hot key 'M1' -> salt: M1#0..M1#19 -> partial sums -> combine"
   },
-  "pitfalls": [
-   {
-    "trap": "'OAuth is for login.'",
-    "say": "'OAuth 2.0 is delegated authorisation; OpenID Connect adds the ID token for login.'"
-   },
-   {
-    "trap": "Skipping PKCE in a mobile app.",
-    "say": "'Mobile apps are public clients, so I'd use the authorisation code flow with PKCE and check state and nonce.'"
-   }
-  ],
-  "takeaways": [
-   "OAuth delegates scoped access; OIDC adds identity via the ID token.",
-   "Use authorisation code with PKCE for all public clients.",
-   "Request the narrowest scopes needed.",
-   "Validate ID tokens: signature, issuer, audience, expiry, nonce."
-  ],
-  "extraQuestions": [
-   {
-    "id": "t58-d1",
-    "type": "multiple_choice",
-    "concept": "id-token",
-    "prompt": "Which token tells your app who the user is in OpenID Connect?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "The ID token"
-     },
-     {
-      "id": "b",
-      "label": "The access token"
-     },
-     {
-      "id": "c",
-      "label": "The authorisation code"
-     },
-     {
-      "id": "d",
-      "label": "The refresh token"
-     }
+  "65": {
+    "teaches": [
+      "stream-flow",
+      "stream-fit",
+      "event-time",
+      "windows",
+      "stream-dupes"
     ],
-    "correctChoiceIds": [
-     "a"
+    "mechanism": {
+      "title": "How a stream processor computes a windowed count",
+      "steps": [
+        "Events (clicks, payments, rider pings) arrive continuously from a log such as Kafka, partitioned by key.",
+        "The processor (Flink, Kafka Streams, Spark Structured Streaming) reads each partition and keeps state per key, for example counts per merchant, in a local store that is checkpointed regularly.",
+        "Windows group events in time: tumbling (fixed, non-overlapping 1-minute buckets), sliding or hopping (5-minute windows every minute) and session windows (closed after a gap of inactivity).",
+        "Event time is when the event happened; processing time is when it is processed. Mobile events can arrive minutes late, so correct results use event time.",
+        "Watermarks estimate how far event time has progressed ('no more events older than 12:04:30 expected'). When the watermark passes the end of a window, the window is emitted; later stragglers go to a side output or update the result.",
+        "On failure, the job restarts from the last checkpoint and replays input from the matching offsets; with transactional sinks or idempotent writes, results are exactly-once in effect."
+      ]
+    },
+    "useWhen": [
+      "Fraud detection, live dashboards, alerting, surge pricing and anything that must react within seconds.",
+      "Continuous ETL that keeps search indexes, caches or warehouses fresh."
     ],
-    "explanation": "The ID token is a signed JWT addressed to your app, carrying the user's identity claims."
-   }
-  ],
-  "diagram": "app --(challenge, scopes, state)--> auth server --login + consent--> redirect ?code&state\napp --(code + verifier)--> token endpoint --> access token, refresh token, ID token"
- },
- "59": {
-  "teaches": [
-   "jwt-claims",
-   "jwt-verify",
-   "jwt-readable",
-   "jwt-lifetime"
-  ],
-  "mechanism": {
-   "title": "What happens when a service verifies a JWT",
-   "steps": [
-    "A JWT is three base64url parts joined by dots: header (algorithm, key id), payload (claims) and signature. Base64url is encoding, not encryption, so anyone can read the payload.",
-    "The service splits the token and reads the header's alg and kid. It accepts only an allow-listed algorithm (for example RS256 or ES256), never 'none', and never lets the token choose.",
-    "It fetches the issuer's public key for that kid from a cached JWKS endpoint and verifies the signature over header and payload.",
-    "It checks claims: exp (not expired, with small clock-skew leeway), nbf, iss (expected issuer), aud (this service is the intended audience).",
-    "Only then does it trust sub (user id) and scopes or roles in the payload, and authorise the request.",
-    "Because verification is local, no database call is needed, which is why JWTs scale well, and also why revocation before expiry needs extra machinery."
-   ]
+    "avoidWhen": [
+      "Jobs where hourly or daily results are fine; batch is simpler and cheaper.",
+      "Complex joins over months of history; precompute those in batch and join the stream to the result."
+    ],
+    "tradeoffs": {
+      "columns": [
+        "Aspect",
+        "Batch",
+        "Stream"
+      ],
+      "rows": [
+        [
+          "Latency",
+          "Minutes to hours",
+          "Milliseconds to seconds"
+        ],
+        [
+          "Input",
+          "Bounded files",
+          "Unbounded log"
+        ],
+        [
+          "Late data",
+          "Included at run time",
+          "Needs watermarks and lateness rules"
+        ],
+        [
+          "Reprocessing",
+          "Rerun the job",
+          "Replay from offsets"
+        ],
+        [
+          "Operational load",
+          "Lower",
+          "Always-on state, checkpoints"
+        ]
+      ]
+    },
+    "numbers": {
+      "title": "State size for per-user 5-minute windows",
+      "assumptions": [
+        "2,000,000 active users",
+        "Sliding window of 5 minutes, advancing every minute, so each event belongs to 5 windows",
+        "State per user per window about 100 bytes"
+      ],
+      "steps": [
+        "Windows open per user at any time = 5.",
+        "State = 2,000,000 × 5 = 10,000,000 window entries.",
+        "Memory = 10,000,000 × 100 bytes = 1,000,000,000 bytes, about 1 GB, spread across the job's parallel tasks.",
+        "A 60-minute sliding window advancing every minute would need 12 times as much, about 12 GB."
+      ],
+      "result": "Window length divided by slide sets how many windows each key keeps; size state before choosing windows."
+    },
+    "india": {
+      "title": "Card-fraud checks on UPI and cards",
+      "label": "Illustrative estimate",
+      "body": "A payments processor wants to flag a card used in Delhi and then in Chennai within ten minutes, or more than five failed attempts in a minute. A stream job keyed by card or VPA keeps recent locations and failure counts in state, using event time from the terminal or app so that delayed events from patchy networks still land in the right window. The watermark allows, say, 30 seconds of lateness; events arriving later are routed to a side output for review rather than silently dropped. Decisions flow back within a second or two, quickly enough to step up authentication on the next attempt."
+    },
+    "pitfalls": [
+      {
+        "trap": "Treating late events as impossible.",
+        "say": "'I'd set an allowed lateness, route anything later to a side output, and monitor how many events arrive late so the watermark can be tuned.'"
+      },
+      {
+        "trap": "Windowing by processing time for mobile events.",
+        "say": "'Mobile events arrive late, so I'd window by event time with watermarks and a lateness allowance.'"
+      },
+      {
+        "trap": "Assuming the stream never replays.",
+        "say": "'After a failure the job replays from the checkpoint, so sinks are idempotent or transactional.'"
+      }
+    ],
+    "takeaways": [
+      "Streams give second-level latency with always-on state.",
+      "Use event time and watermarks for correct windows.",
+      "Window size divided by slide multiplies state.",
+      "Checkpoints plus replay need idempotent or transactional sinks."
+    ],
+    "extraQuestions": [
+      {
+        "id": "t65-d1",
+        "type": "multiple_choice",
+        "concept": "event-time",
+        "prompt": "Why do stream processors window by event time rather than processing time for mobile events?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Events can arrive late, and should count in the window when they actually happened"
+          },
+          {
+            "id": "b",
+            "label": "Processing time is not available on stream servers"
+          },
+          {
+            "id": "c",
+            "label": "Event-time windows use less memory than processing time"
+          },
+          {
+            "id": "d",
+            "label": "It removes the need for checkpoints and state backups"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Delayed events would otherwise fall into the wrong window; watermarks decide when a window is complete."
+      }
+    ],
+    "diagram": "Kafka (keyed) -> operator (state per key, checkpoints) -> window [12:00-12:01) closes when watermark > 12:01 -> sink\n late event 12:00:40 arriving at 12:03 -> side output / update"
   },
-  "useWhen": [
-   "Stateless authentication between many services, and short-lived access tokens from an identity provider.",
-   "Asymmetric signing (RS256 or ES256) when many services verify but only the issuer signs."
-  ],
-  "avoidWhen": [
-   "Do not put secrets or personal data such as Aadhaar or PAN numbers in a JWT payload; it is readable by anyone holding it.",
-   "Do not use JWTs as long-lived web sessions when instant logout matters; server-side sessions are simpler."
-  ],
-  "tradeoffs": {
-   "columns": [
-    "Choice",
-    "Pros",
-    "Cons"
-   ],
-   "rows": [
-    [
-     "HS256 (shared secret)",
-     "Simple, fast",
-     "Every verifier can also forge tokens"
+  "66": {
+    "teaches": [
+      "oltp-olap",
+      "columnar",
+      "etl-flow",
+      "olap-on-oltp"
     ],
-    [
-     "RS256 / ES256 (key pair)",
-     "Verifiers hold only the public key",
-     "Key distribution via JWKS"
+    "mechanism": {
+      "title": "From production database to dashboard",
+      "steps": [
+        "OLTP databases serve the app: many small reads and writes by key, row-oriented storage, strict transactions.",
+        "Extract: copy changes out of OLTP, by nightly dumps or, better, CDC streaming.",
+        "Land raw data cheaply in a data lake (files such as Parquet on object storage).",
+        "Transform: clean, deduplicate, join and model into fact tables (orders, payments) and dimension tables (customers, cities, products). With ELT the transformation runs inside the warehouse using SQL tools such as dbt.",
+        "Load into a columnar warehouse or OLAP engine (BigQuery, Snowflake, Redshift, ClickHouse). Columnar storage reads only the columns a query touches and compresses them well, so scans of billions of rows are fast.",
+        "Dashboards and analysts query the warehouse, never the production primary.",
+        "Partition big fact tables by date and cluster them by common filters such as city, so a query for one week reads only that week's files instead of the whole history."
+      ]
+    },
+    "useWhen": [
+      "Warehouse or OLAP for aggregates over large history: revenue by city and month, cohort retention, funnels.",
+      "A lakehouse (open table formats such as Iceberg or Delta on object storage) when many engines must read the same data cheaply."
     ],
-    [
-     "Short lifetime (5–15 min)",
-     "Small misuse window",
-     "Needs refresh flow"
+    "avoidWhen": [
+      "Do not run heavy analytical queries on the OLTP primary; full scans evict hot pages and slow the app.",
+      "Do not use a warehouse to serve per-user app requests at thousands per second; it is built for scans, not point lookups."
     ],
-    [
-     "Long lifetime (days)",
-     "Fewer refreshes",
-     "Large window if stolen"
-    ]
-   ]
+    "tradeoffs": {
+      "columns": [
+        "Aspect",
+        "OLTP",
+        "OLAP / warehouse"
+      ],
+      "rows": [
+        [
+          "Queries",
+          "Small, by key, many per second",
+          "Large scans and aggregates, fewer"
+        ],
+        [
+          "Storage layout",
+          "Row-oriented",
+          "Column-oriented, compressed"
+        ],
+        [
+          "Freshness",
+          "Real time",
+          "Minutes to a day"
+        ],
+        [
+          "Schema",
+          "Normalised",
+          "Star schema: facts and dimensions"
+        ],
+        [
+          "Examples",
+          "Postgres, MySQL",
+          "BigQuery, Snowflake, ClickHouse"
+        ]
+      ]
+    },
+    "numbers": {
+      "title": "Why columnar scans are cheaper",
+      "assumptions": [
+        "1,000,000,000 order rows, 40 columns of 8 bytes each",
+        "Query sums one column grouped by one other column"
+      ],
+      "steps": [
+        "Row store reads every column: 1,000,000,000 × 320 bytes = 320,000,000,000 bytes, about 320 GB.",
+        "Column store reads 2 columns: 1,000,000,000 × 16 bytes = 16,000,000,000 bytes, about 16 GB.",
+        "With typical 5× compression on columnar data, that is about 3.2 GB.",
+        "So the same query reads roughly 100 times less data."
+      ],
+      "result": "Reading only the needed columns, compressed, is why warehouses scan billions of rows in seconds."
+    },
+    "india": {
+      "title": "City-wise sales for a festive season",
+      "label": "Illustrative estimate",
+      "body": "An Indian retail chain wants Diwali-week revenue by city, category and payment method, compared with last year. Running that on the order database during the sale would scan years of orders and slow checkouts. Instead, CDC streams orders into a lake every few minutes, dbt models build an orders fact table with city and product dimensions, and the warehouse answers the query over hundreds of millions of rows in seconds. The finance team accepts data that is 15 minutes old, and the checkout database never sees an analytical query."
+    },
+    "pitfalls": [
+      {
+        "trap": "Assuming the warehouse is real time.",
+        "say": "'CDC into the warehouse gives minutes of delay; for a live operations screen I'd use a stream processor or an OLAP engine like ClickHouse fed from Kafka.'"
+      },
+      {
+        "trap": "Running reports on the production primary.",
+        "say": "'I'd stream changes via CDC into a warehouse; dashboards query that, so the OLTP database only serves the app.'"
+      },
+      {
+        "trap": "Serving app traffic from the warehouse.",
+        "say": "'The warehouse is for scans; precomputed results needed by the app are exported to a cache or key-value store.'"
+      }
+    ],
+    "takeaways": [
+      "OLTP serves the app; OLAP serves analysis.",
+      "Columnar storage reads only needed columns and compresses well.",
+      "Use CDC and ELT to feed the warehouse without loading production.",
+      "Model analytics as facts and dimensions."
+    ],
+    "extraQuestions": [
+      {
+        "id": "t66-d1",
+        "type": "multiple_choice",
+        "concept": "columnar",
+        "prompt": "A query sums one column of a 40-column table with a billion rows. Why is a columnar store much faster?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "It reads only the needed columns, compressed"
+          },
+          {
+            "id": "b",
+            "label": "It keeps all of the table in CPU registers"
+          },
+          {
+            "id": "c",
+            "label": "It skips about half the rows at random"
+          },
+          {
+            "id": "d",
+            "label": "It builds B-tree indexes on every column"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Column stores read the touched columns only: here about 16 GB raw instead of 320 GB."
+      }
+    ],
+    "diagram": "OLTP (Postgres) --CDC--> lake (Parquet) --transform (dbt)--> warehouse (facts + dims) --> dashboards\n          app traffic stays here           analytics traffic stays here"
   },
-  "numbers": {
-   "title": "Token size on every request",
-   "assumptions": [
-    "JWT of about 900 bytes in the Authorization header",
-    "50,000 requests per second through the gateway"
-   ],
-   "steps": [
-    "Header bytes per second = 50,000 × 900 = 45,000,000, about 45 MB per second.",
-    "Per day = 45 MB × 86,400 ≈ 3.9 TB of header traffic.",
-    "Trimming claims to about 400 bytes saves roughly 2.2 TB a day.",
-    "Keep claims minimal: user id, scopes, expiry, issuer, audience."
-   ],
-   "result": "JWTs travel on every request, so bloated claims cost real bandwidth; keep them small."
+  "67": {
+    "teaches": [
+      "geohash",
+      "quadtree",
+      "geo-index",
+      "neighbours",
+      "nearby-flow"
+    ],
+    "mechanism": {
+      "title": "Finding nearby drivers with geohashes",
+      "steps": [
+        "A geohash encodes latitude and longitude into a string by repeatedly halving the world, interleaving longitude and latitude bits, and writing them in base 32. Each extra character narrows the cell.",
+        "Points in the same cell share a prefix, so a prefix lookup in a sorted index or a hash map finds them quickly.",
+        "Precision examples (approximate): 5 characters is about 4.9 km by 4.9 km; 6 characters about 1.2 km by 0.6 km; 7 characters about 153 m by 153 m.",
+        "To search 'within 2 km', choose a precision whose cells are about the radius, look up the user's cell and its 8 neighbours, because a nearby driver may sit just across a cell edge.",
+        "Filter candidates by exact distance (haversine) and rank by distance or estimated arrival time.",
+        "Alternatives: quadtrees split dense areas into smaller cells adaptively; Google's S2 and Uber's H3 use hierarchical cells (H3 uses hexagons, which have uniform neighbour distances)."
+      ]
+    },
+    "useWhen": [
+      "Nearby search for drivers, restaurants, stores, and geofencing such as 'is this rider inside the delivery zone'.",
+      "Geohash or H3 keys in Redis, Elasticsearch or a key-value store; PostGIS for rich polygon queries."
+    ],
+    "avoidWhen": [
+      "Do not scan all drivers and compute distances one by one; it grows linearly with fleet size.",
+      "Do not search only the user's own cell; nearby points across the edge are missed."
+    ],
+    "tradeoffs": {
+      "columns": [
+        "Index",
+        "Cell shape",
+        "Adapts to density",
+        "Typical use"
+      ],
+      "rows": [
+        [
+          "Geohash",
+          "Rectangles",
+          "No (fixed grid per precision)",
+          "Simple prefix search in any store"
+        ],
+        [
+          "Quadtree",
+          "Squares, split on demand",
+          "Yes",
+          "In-memory spatial index"
+        ],
+        [
+          "S2",
+          "Curved squares on a sphere",
+          "Hierarchical",
+          "Region coverage"
+        ],
+        [
+          "H3",
+          "Hexagons",
+          "Hierarchical",
+          "Ride-hailing, delivery zones"
+        ]
+      ]
+    },
+    "numbers": {
+      "title": "Why the 9-cell lookup is cheap",
+      "assumptions": [
+        "50,000 active drivers in a city of about 1,500 square km",
+        "Search with 6-character geohash cells of about 1.2 km × 0.6 km (0.72 square km)"
+      ],
+      "steps": [
+        "Driver density = 50,000 ÷ 1,500 ≈ 33 drivers per square km on average.",
+        "Nine cells cover 9 × 0.72 = 6.48 square km.",
+        "Expected candidates = 33 × 6.48 ≈ 214 drivers, instead of 50,000.",
+        "Computing 214 exact distances takes microseconds; dense areas may need finer cells or a cap on candidates."
+      ],
+      "result": "The 9-cell geohash lookup cuts the candidates from 50,000 to about 200 before exact distance checks."
+    },
+    "india": {
+      "title": "Auto-rickshaw matching in Bengaluru",
+      "label": "Illustrative estimate",
+      "body": "A ride-hailing app receives location pings from auto drivers every few seconds. Each ping updates the driver's cell key (a geohash or H3 index) in an in-memory store. When a rider in Koramangala requests a ride, the dispatcher reads the rider's cell and its neighbours, filters by vehicle type and availability, and ranks by estimated arrival time using road distance rather than straight-line distance, since a flyover or one-way street can make a near driver slow to arrive. In dense areas at peak time, the dispatcher uses finer cells to keep candidate lists short."
+    },
+    "pitfalls": [
+      {
+        "trap": "Searching only the rider's cell.",
+        "say": "'I'd search the cell plus its 8 neighbours, then filter by exact distance, because the nearest driver may be across a cell boundary.'"
+      },
+      {
+        "trap": "Ranking by straight-line distance.",
+        "say": "'I'd shortlist by distance, then rank by estimated arrival time from a routing service.'"
+      }
+    ],
+    "takeaways": [
+      "Geohashes turn 2D proximity into string prefixes.",
+      "Pick a precision near the search radius and include the 8 neighbours.",
+      "Filter candidates by exact distance, rank by ETA.",
+      "Quadtrees and H3 adapt better to density and geometry."
+    ],
+    "extraQuestions": [
+      {
+        "id": "t67-d1",
+        "type": "multiple_choice",
+        "concept": "neighbours",
+        "prompt": "Why does a nearby search read the user's geohash cell plus its 8 neighbours?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Close points can sit just across a cell boundary with a different prefix"
+          },
+          {
+            "id": "b",
+            "label": "To make the geohash index smaller in memory"
+          },
+          {
+            "id": "c",
+            "label": "Because geohashes only work in groups of nine cells"
+          },
+          {
+            "id": "d",
+            "label": "To avoid computing any distances to the points"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Cell edges split nearby points; the neighbours cover that, then exact distance filters the candidates."
+      }
+    ],
+    "diagram": "+----+----+----+\n| NW | N  | NE |\n+----+----+----+\n| W  | ME | E  |   query = my cell + 8 neighbours -> filter by exact distance\n+----+----+----+\n| SW | S  | SE |\n+----+----+----+"
   },
-  "india": {
-   "title": "Tokens in a fintech mobile app",
-   "label": "Illustrative estimate",
-   "body": "A mobile investment app issues 10-minute RS256 access tokens containing only the user id, scopes and expiry, plus a refresh token stored in the phone's secure keystore. Each microservice verifies tokens locally with keys fetched from the identity service's JWKS endpoint and cached for an hour. PAN and bank account details never appear in the token, because anyone who captures it, for example through a misconfigured log, could decode the payload. When a user reports a lost phone, support revokes the refresh token, and the access token dies within 10 minutes."
+  "68": {
+    "teaches": [
+      "ts-shape",
+      "metric-life",
+      "rollups",
+      "cardinality"
+    ],
+    "mechanism": {
+      "title": "How a time-series database stores and ages data",
+      "steps": [
+        "Each series is identified by a metric name plus labels, such as http_requests_total{service='checkout', status='500'}. Each sample is a timestamp and a value.",
+        "Incoming samples are appended to the current time block in memory and to a write-ahead log, then compressed into immutable blocks (for example 2 hours in Prometheus).",
+        "Compression exploits regularity: timestamps are delta-of-delta encoded and values XOR-encoded (the Gorilla technique), which brings typical samples down to roughly 1–2 bytes.",
+        "Queries select series by labels and aggregate over time ranges: rate over 5 minutes, p99 over an hour.",
+        "Retention and rollups: keep raw 15-second samples for, say, 15 days, 5-minute rollups for 90 days and 1-hour rollups for years, deleting whole old blocks cheaply.",
+        "Cardinality, the number of unique label combinations, drives memory and index size; a label such as user_id or order_id can explode it into millions of series."
+      ]
+    },
+    "useWhen": [
+      "Metrics, IoT sensor readings, prices and other append-mostly, time-stamped numeric data queried by time range.",
+      "Prometheus for monitoring; TimescaleDB, InfluxDB or ClickHouse for longer-term or richer time-series analytics."
+    ],
+    "avoidWhen": [
+      "Do not store per-event business records (orders, payments) as metrics; they belong in a database or logs.",
+      "Do not use unbounded labels such as user id, request id or full URL."
+    ],
+    "tradeoffs": {
+      "columns": [
+        "Choice",
+        "Effect"
+      ],
+      "rows": [
+        [
+          "Scrape interval 15 s versus 60 s",
+          "4× more samples at 15 s"
+        ],
+        [
+          "Raw retention 15 days, rollups after",
+          "Bounded disk, long history at low resolution"
+        ],
+        [
+          "Label 'status' (about 5 values)",
+          "Small, useful cardinality"
+        ],
+        [
+          "Label 'user_id' (millions)",
+          "Millions of series; memory blow-up"
+        ]
+      ]
+    },
+    "numbers": {
+      "title": "Cardinality and storage",
+      "assumptions": [
+        "Metric with labels service (20), endpoint (25), status (5), instance (10)",
+        "Scrape every 15 s, about 1.5 bytes per compressed sample"
+      ],
+      "steps": [
+        "Series = 20 × 25 = 500, then 500 × 5 = 2,500, then 2,500 × 10 = 25,000.",
+        "Samples per series per day = 86,400 ÷ 15 = 5,760.",
+        "Samples per day = 25,000 × 5,760 = 144,000,000, so about 216 MB per day compressed.",
+        "Adding a user_id label with 1,000,000 values would multiply series by up to a million, which no monitoring setup can hold."
+      ],
+      "result": "Labels multiply series counts; a few bounded labels are cheap, one unbounded label is fatal."
+    },
+    "india": {
+      "title": "Monitoring a payments switch on festival days",
+      "label": "Illustrative estimate",
+      "body": "During peak days such as Diwali, UPI volumes are publicly reported to hit records. A bank's payment team watches success rate, latency and error codes per partner bank and per API in Prometheus and Grafana, with labels kept to bounded sets such as partner bank, API and response code. Raw 15-second data shows exactly when a partner bank started timing out; hourly rollups kept for two years let the team compare this Diwali with the last two. Investigating one customer's failed payment uses logs and traces keyed by transaction id, not a metric label."
+    },
+    "pitfalls": [
+      {
+        "trap": "Alerting on raw per-instance metrics with no aggregation.",
+        "say": "'I alert on aggregated SLO signals such as checkout error rate across instances, and use per-instance series only to drill down.'"
+      },
+      {
+        "trap": "Adding user_id as a metric label to debug one customer.",
+        "say": "'Per-user detail goes in logs and traces; metric labels stay bounded, such as service, endpoint and status.'"
+      },
+      {
+        "trap": "Keeping raw samples forever.",
+        "say": "'Raw data for 15 days, then 5-minute and hourly rollups, so storage stays bounded.'"
+      }
+    ],
+    "takeaways": [
+      "Time-series stores append, compress and query by time range.",
+      "Cardinality, not sample count, is the usual scaling limit.",
+      "Retention plus rollups keep long history affordable.",
+      "Per-entity detail belongs in logs and traces, not labels."
+    ],
+    "extraQuestions": [
+      {
+        "id": "t68-d1",
+        "type": "multiple_choice",
+        "concept": "cardinality",
+        "prompt": "Labels have 20, 25, 5 and 10 possible values. How many series can the metric create?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "25,000"
+          },
+          {
+            "id": "b",
+            "label": "60"
+          },
+          {
+            "id": "c",
+            "label": "2,500"
+          },
+          {
+            "id": "d",
+            "label": "1,000,000"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Series multiply across labels: 20 × 25 = 500, 500 × 5 = 2,500 and 2,500 × 10 = 25,000."
+      }
+    ],
+    "diagram": "series = name + labels  -> [t1,v1][t2,v2]... (delta-of-delta + XOR, ~1.5 bytes/sample)\nraw 15 s (15 d) -> 5 min rollup (90 d) -> 1 h rollup (2 y)"
   },
-  "pitfalls": [
-   {
-    "trap": "Storing the access token in browser localStorage for a high-value web app.",
-    "say": "'Any XSS can read localStorage, so for the web I'd keep tokens in HttpOnly, Secure cookies or use a backend-for-frontend that holds them server-side.'"
-   },
-   {
-    "trap": "'JWTs are encrypted.'",
-    "say": "'A signed JWT is only encoded; anyone can read the claims, so no secrets go in it.'"
-   },
-   {
-    "trap": "Trusting the alg in the token header.",
-    "say": "'The verifier pins the allowed algorithm and key, so a token claiming alg none or HS256 with the public key is rejected.'"
-   }
-  ],
-  "takeaways": [
-   "JWT payloads are readable; never put secrets in them.",
-   "Verify signature with a pinned algorithm, then exp, iss and aud.",
-   "Prefer asymmetric keys when many services verify.",
-   "Short lifetimes plus refresh tokens make revocation workable."
-  ],
-  "extraQuestions": [
-   {
-    "id": "t59-d1",
-    "type": "multiple_choice",
-    "concept": "jwt-readable",
-    "prompt": "Why should a PAN number not be placed in a JWT payload?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "The payload is only base64url-encoded, so anyone holding the token can read it"
-     },
-     {
-      "id": "b",
-      "label": "JWTs cannot contain numbers"
-     },
-     {
-      "id": "c",
-      "label": "It would break the signature"
-     },
-     {
-      "id": "d",
-      "label": "It makes the token expire sooner"
-     }
+  "71": {
+    "teaches": [
+      "offset",
+      "cursor",
+      "sort-key"
     ],
-    "correctChoiceIds": [
-     "a"
+    "mechanism": {
+      "title": "How offset and cursor pagination execute",
+      "steps": [
+        "Offset: SELECT ... ORDER BY created_at DESC LIMIT 20 OFFSET 10000. The database must walk and discard 10,000 rows before returning 20, so later pages get slower.",
+        "Offset is also unstable: if new rows are inserted while the user scrolls, items shift between pages, causing duplicates or gaps.",
+        "Cursor (keyset): return the sort key of the last item as an opaque cursor. The next query asks for rows strictly after it: WHERE (created_at, id) < (:last_created, :last_id) ORDER BY created_at DESC, id DESC LIMIT 20.",
+        "With an index on (created_at, id), the database seeks directly to the cursor position and reads 20 entries, so every page costs about the same.",
+        "The sort key must be unique and stable; add the id as a tie-breaker because many rows can share a timestamp.",
+        "Encode the cursor (for example base64 of the values) so clients treat it as opaque and you can change its format later."
+      ]
+    },
+    "useWhen": [
+      "Cursor pagination for infinite scroll, feeds, chat history, API list endpoints and large tables.",
+      "Offset pagination for small admin tables where users jump to page 7 and data rarely changes."
     ],
-    "explanation": "Signing protects integrity, not confidentiality; the payload is readable by anyone."
-   }
-  ],
-  "diagram": "base64url(header).base64url(payload).signature\n verify: alg allow-listed -> key by kid (JWKS) -> signature ok -> exp/iss/aud ok -> trust sub, scopes"
- },
- "60": {
-  "teaches": [
-   "defence",
-   "injection",
-   "secrets",
-   "least-privilege"
-  ],
-  "mechanism": {
-   "title": "Layering defences around a typical web service",
-   "steps": [
-    "Edge: TLS everywhere, a web application firewall and rate limits to absorb bots and common attacks.",
-    "Input handling: validate types and lengths, and use parameterised queries or an ORM so user input is never concatenated into SQL; encode output to prevent cross-site scripting.",
-    "Identity: strong authentication (OTP, passkeys), short-lived tokens, and authorisation checks on every resource.",
-    "Least privilege: each service has its own database user with only the tables and verbs it needs, and each cloud role only the actions it needs.",
-    "Secrets: kept in a secrets manager or vault, injected at runtime, rotated, never committed to Git or printed in logs.",
-    "Data: encrypt at rest and in transit, mask sensitive fields in logs, and keep audit logs; then monitor and alert on anomalies, and patch dependencies promptly."
-   ]
+    "avoidWhen": [
+      "Do not use deep offsets on large tables; page 5,000 scans 100,000 rows to show 20.",
+      "Do not build a cursor on a non-unique column alone; ties cause skipped or repeated rows."
+    ],
+    "tradeoffs": {
+      "columns": [
+        "Aspect",
+        "Offset",
+        "Cursor (keyset)"
+      ],
+      "rows": [
+        [
+          "Cost of page n",
+          "Grows with n",
+          "Constant with an index"
+        ],
+        [
+          "Jump to page 50",
+          "Easy",
+          "Not directly"
+        ],
+        [
+          "Stable under inserts",
+          "No: shifts and duplicates",
+          "Yes"
+        ],
+        [
+          "Needs",
+          "LIMIT/OFFSET",
+          "Unique sort key and matching index"
+        ]
+      ]
+    },
+    "numbers": {
+      "title": "Rows touched by deep pages",
+      "assumptions": [
+        "Page size 20",
+        "User at page 5,000"
+      ],
+      "steps": [
+        "Offset skips (5,000 − 1) × 20 = 99,980 rows, then reads 20, so about 100,000 rows touched.",
+        "Cursor seeks once in the index (a few page reads for a B-tree) and reads 20 rows.",
+        "At 200 such requests per second, offset touches about 200 × 100,000 = 20,000,000 rows per second; the cursor touches about 4,000.",
+        "That gap is the difference between a struggling database and an idle one."
+      ],
+      "result": "Offset cost grows linearly with page depth; cursor cost stays at one index seek plus the page."
+    },
+    "india": {
+      "title": "Scrolling a long transaction history",
+      "label": "Illustrative estimate",
+      "body": "A user of a UPI app scrolls back through two years of payments, perhaps thousands of entries. With offset pagination, each 'load more' asks the database to skip more and more rows, and if a new payment arrives mid-scroll, one entry shifts and appears twice. With a cursor of (transaction_time, transaction_id), each request seeks directly to where the last page ended using the index and returns the next 20, and a new payment at the top does not disturb older pages. The app sends the opaque cursor string it received; it never computes page numbers."
+    },
+    "pitfalls": [
+      {
+        "trap": "Exposing raw database ids and timestamps as the cursor format.",
+        "say": "'The cursor is an opaque, encoded string, so clients cannot tamper with its meaning and I can change the sort key later without breaking them.'"
+      },
+      {
+        "trap": "Using OFFSET for an infinite feed.",
+        "say": "'I'd use keyset pagination on (created_at, id) with a matching index, so every page costs one seek.'"
+      },
+      {
+        "trap": "Cursor on timestamp only.",
+        "say": "'Timestamps collide, so the cursor includes the id as a tie-breaker.'"
+      }
+    ],
+    "takeaways": [
+      "Offset cost grows with page depth; cursor cost is constant.",
+      "Cursors are stable when rows are inserted.",
+      "Use a unique sort key with a tie-breaker and a matching index.",
+      "Offset is fine for small admin tables with page jumps."
+    ],
+    "extraQuestions": [
+      {
+        "id": "t71-d1",
+        "type": "multiple_choice",
+        "concept": "cursor",
+        "prompt": "Why is (created_at, id) used as the cursor instead of created_at alone?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Rows share timestamps; the id breaks ties so none repeat"
+          },
+          {
+            "id": "b",
+            "label": "Ids are shorter than timestamps, so cursors are smaller"
+          },
+          {
+            "id": "c",
+            "label": "Because OFFSET pagination requires both columns in the key"
+          },
+          {
+            "id": "d",
+            "label": "To make the cursor human-readable in the page URL"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The sort key must be unique; adding the id makes the order total."
+      }
+    ],
+    "diagram": "offset: [skip skip skip ... 99,980 rows][read 20]\ncursor: index seek -> (ts, id) < cursor -> [read 20]"
   },
-  "useWhen": [
-   "Defence in depth for any internet-facing system: assume one layer will fail.",
-   "Least privilege everywhere, so a compromised component can do limited harm."
-  ],
-  "avoidWhen": [
-   "Do not rely on a single control such as the WAF or the gateway as the whole security story.",
-   "Do not roll your own cryptography or password hashing; use vetted libraries such as bcrypt, scrypt or Argon2."
-  ],
-  "tradeoffs": {
-   "columns": [
-    "Threat",
-    "Control",
-    "Layer"
-   ],
-   "rows": [
-    [
-     "SQL injection",
-     "Parameterised queries, least-privilege DB user",
-     "Application, database"
+  "72": {
+    "teaches": [
+      "optimistic",
+      "contention",
+      "lock-scope"
     ],
-    [
-     "Leaked secrets",
-     "Secrets manager, rotation, secret scanning in CI",
-     "Build and runtime"
+    "mechanism": {
+      "title": "Optimistic versus pessimistic locking in practice",
+      "steps": [
+        "Pessimistic: read the row with SELECT ... FOR UPDATE inside a transaction. Other writers (and other FOR UPDATE readers) wait until you commit, so your read-modify-write is safe.",
+        "Optimistic: read the row and its version number without locking. When writing, run UPDATE ... SET ..., version = version + 1 WHERE id = ? AND version = ?.",
+        "If the update affects 1 row, you won. If it affects 0 rows, someone else changed it first: re-read, reapply the change, and retry or report a conflict.",
+        "Under low contention, optimistic locking avoids holding locks while users think or while the app does other work.",
+        "Under high contention, optimistic locking wastes work on retries, while pessimistic locks queue writers in order.",
+        "Keep lock scope small either way: lock one row, not a table; hold locks for milliseconds, never across a user's think time or an external API call."
+      ]
+    },
+    "useWhen": [
+      "Optimistic for edits that rarely collide: profile updates, document metadata, admin forms (and HTTP ETag with If-Match).",
+      "Pessimistic (or a single conditional update) for hot rows such as inventory counts or seat holds during a flash sale."
     ],
-    [
-     "Credential stuffing",
-     "Rate limits, OTP or passkeys, breached-password checks",
-     "Edge, identity"
+    "avoidWhen": [
+      "Optimistic retries on a hot counter where most attempts conflict; throughput collapses.",
+      "Pessimistic locks held across user interaction, such as while a checkout form is open."
     ],
-    [
-     "IDOR",
-     "Ownership checks on every resource",
-     "Service"
+    "tradeoffs": {
+      "columns": [
+        "Aspect",
+        "Optimistic",
+        "Pessimistic"
+      ],
+      "rows": [
+        [
+          "Conflicts detected",
+          "At write time (version check)",
+          "Prevented by waiting"
+        ],
+        [
+          "Best when",
+          "Conflicts are rare",
+          "Conflicts are frequent"
+        ],
+        [
+          "Cost under contention",
+          "Retries and wasted work",
+          "Waiting in a queue"
+        ],
+        [
+          "Deadlock risk",
+          "None",
+          "Yes, if lock order varies"
+        ]
+      ]
+    },
+    "numbers": {
+      "title": "Retries under contention",
+      "assumptions": [
+        "Each attempt succeeds with probability p (no one else wrote in between)",
+        "Case A: p = 0.95; case B: p = 0.2"
+      ],
+      "steps": [
+        "Expected attempts = 1 ÷ p.",
+        "Case A: 1 ÷ 0.95 ≈ 1.05 attempts, so retries are almost free.",
+        "Case B: 1 ÷ 0.2 = 5 attempts on average, each doing the read and computation again.",
+        "At case B contention, a pessimistic lock or one atomic conditional UPDATE is cheaper."
+      ],
+      "result": "Optimistic locking costs 1 ÷ p attempts; it shines when conflicts are rare and hurts on hot rows."
+    },
+    "india": {
+      "title": "Editing a restaurant menu versus selling the last biryani",
+      "label": "Illustrative estimate",
+      "body": "Two managers of a restaurant on a delivery platform edit the same menu item from different laptops. Conflicts are rare, so the item carries a version number; if the second save finds the version changed, the app shows 'this item was updated by someone else, review changes'. Meanwhile, during dinner rush, the 'portions left' counter for a popular biryani is updated by many orders at once. Here the platform avoids read-modify-write entirely with UPDATE items SET left = left − 1 WHERE id = ? AND left > 0, which the database serialises on that row and which never oversells."
+    },
+    "pitfalls": [
+      {
+        "trap": "Forgetting deadlocks with pessimistic locks.",
+        "say": "'Every transaction locks rows in the same order, such as by ascending id, and has a lock timeout, so two transactions cannot wait on each other forever.'"
+      },
+      {
+        "trap": "Using optimistic locking for a flash-sale counter.",
+        "say": "'At high contention most optimistic attempts fail; I'd use an atomic conditional decrement or a short row lock.'"
+      },
+      {
+        "trap": "Holding a lock while waiting for the payment gateway.",
+        "say": "'I reserve stock with a short transaction, call the gateway outside it, then confirm or release.'"
+      }
     ],
-    [
-     "Data theft at rest",
-     "Encryption, key management, access logs",
-     "Storage"
-    ]
-   ]
+    "takeaways": [
+      "Optimistic checks a version at write time; pessimistic blocks others.",
+      "Expected optimistic attempts are 1 ÷ p.",
+      "Use atomic conditional updates for hot counters.",
+      "Never hold locks across user think time or external calls."
+    ],
+    "extraQuestions": [
+      {
+        "id": "t72-d1",
+        "type": "multiple_choice",
+        "concept": "contention",
+        "prompt": "An optimistic update succeeds only 20% of the time because of contention. How many attempts does it take on average?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "5"
+          },
+          {
+            "id": "b",
+            "label": "1.25"
+          },
+          {
+            "id": "c",
+            "label": "20"
+          },
+          {
+            "id": "d",
+            "label": "2"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Expected attempts are 1 ÷ 0.2 = 5, which is why hot rows suit pessimistic or atomic updates."
+      }
+    ],
+    "diagram": "optimistic: read (v=7) -> compute -> UPDATE ... WHERE version=7 -> 1 row: ok | 0 rows: retry\npessimistic: SELECT ... FOR UPDATE (others wait) -> compute -> UPDATE -> COMMIT (release)"
   },
-  "numbers": {
-   "title": "Why slow password hashing matters",
-   "assumptions": [
-    "Attacker steals 1,000,000 password hashes",
-    "Fast unsalted hash: about 10 billion guesses per second on GPUs (illustrative)",
-    "bcrypt at a cost giving about 10,000 guesses per second per GPU (illustrative)"
-   ],
-   "steps": [
-    "A list of the 1,000,000 most common passwords tried against an unsalted fast hash needs just one pass over the list for all users, about 0.0001 seconds of GPU time.",
-    "With per-user salts the attacker must hash each guess per user: 1,000,000 guesses × 1,000,000 users = 1,000,000,000,000 hashes.",
-    "At 10,000 bcrypt hashes per second, that is 100,000,000 seconds, about 3.2 years on one GPU.",
-    "Salting stops the shared pass, and a slow hash multiplies the cost per guess."
-   ],
-   "result": "Salted, deliberately slow password hashing turns a fraction of a second into years of attacker work."
-  },
-  "india": {
-   "title": "Lessons from leaked keys",
-   "label": "Illustrative estimate",
-   "body": "A common incident pattern, reported many times worldwide, is a developer committing cloud access keys to a public GitHub repository; automated scanners find such keys within minutes and use them to run crypto-miners or copy storage buckets. An Indian start-up preventing this would run secret scanning in CI, keep keys in a cloud secrets manager, give each service a narrowly scoped role instead of one admin key, and rotate keys regularly. Under India's Digital Personal Data Protection Act, 2023, organisations are also obliged to protect personal data with reasonable security safeguards, so these controls are legal hygiene as well as engineering hygiene."
-  },
-  "pitfalls": [
-   {
-    "trap": "'We have a firewall, so we're secure.'",
-    "say": "'I'd layer controls: WAF and rate limits at the edge, parameterised queries, per-resource authorisation, least-privilege roles and secrets in a vault.'"
-   },
-   {
-    "trap": "Storing API keys in environment files in the repo.",
-    "say": "'Secrets live in a secrets manager, are injected at runtime, rotated, and CI blocks commits containing keys.'"
-   }
-  ],
-  "takeaways": [
-   "Assume any one control can fail; layer them.",
-   "Parameterised queries stop SQL injection.",
-   "Least privilege limits the blast radius of a compromise.",
-   "Secrets belong in a vault, never in code or logs."
-  ],
-  "extraQuestions": [
-   {
-    "id": "t60-d1",
-    "type": "multiple_choice",
-    "concept": "least-privilege",
-    "prompt": "A reporting service's database user can only SELECT from three tables. Which principle is this?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "Least privilege"
-     },
-     {
-      "id": "b",
-      "label": "Eventual consistency"
-     },
-     {
-      "id": "c",
-      "label": "Idempotency"
-     },
-     {
-      "id": "d",
-      "label": "Sharding"
-     }
+  "73": {
+    "teaches": [
+      "ot",
+      "crdt",
+      "lww-docs"
     ],
-    "correctChoiceIds": [
-     "a"
+    "mechanism": {
+      "title": "How OT and CRDTs merge concurrent edits",
+      "steps": [
+        "Problem: two users edit the same document at once. Alice inserts 'X' at position 0 while Bob deletes the character at position 3. Applying each other's operations naively shifts positions and corrupts the text.",
+        "Operational transformation (OT): operations go through a central server that orders them. When Bob's delete arrives after Alice's insert, the server transforms it (position 3 becomes 4) so it still deletes the intended character.",
+        "OT needs carefully proven transformation functions for every pair of operation types and is easiest with a central server, which is the approach Google Docs is publicly known to use.",
+        "CRDTs (conflict-free replicated data types) give every character a unique, ordered id (for example based on site id and counter), so inserts and deletes refer to ids, not positions, and replicas can apply operations in any order and still converge.",
+        "CRDTs work peer-to-peer and offline, at the cost of metadata per character and tombstones for deletions, which need compaction.",
+        "Last-writer-wins on the whole document is not collaborative editing: one user's changes silently disappear."
+      ]
+    },
+    "useWhen": [
+      "OT for server-centred real-time editors where a central service orders all operations.",
+      "CRDTs for offline-first and peer-to-peer apps, and for structured data such as counters, sets and maps (libraries such as Yjs and Automerge)."
     ],
-    "explanation": "Granting only the access a component needs limits damage if it is compromised."
-   }
-  ],
-  "diagram": "internet -> [WAF + rate limit] -> [gateway: TLS, authn] -> [service: validate, authz] -> [DB user: least privilege]\n secrets from vault | logs masked | audit + alerts"
- },
- "61": {
-  "teaches": [
-   "metadata",
-   "upload-flow",
-   "presigned",
-   "blob-trap"
-  ],
-  "mechanism": {
-   "title": "Uploading a file directly to object storage",
-   "steps": [
-    "The client asks the app server for permission to upload 'profile.jpg, 2 MB, image/jpeg'.",
-    "The server authorises the user, checks the declared type and size, creates a metadata row (owner, key, status 'pending') and returns a presigned PUT URL valid for a few minutes, scoped to one object key and content type.",
-    "The client uploads the bytes straight to object storage (S3, GCS, Azure Blob) using that URL, so the large payload never passes through the app servers.",
-    "Storage emits an event on completion, or the client confirms; a worker validates the file (real type, size, malware scan), creates thumbnails and marks the row 'ready'.",
-    "Downloads use short-lived presigned GET URLs or a CDN in front of a private bucket, never a public bucket by default.",
-    "Large files use multipart upload: parts of 5 MB or more are uploaded in parallel and retried individually, then combined."
-   ]
-  },
-  "useWhen": [
-   "Images, videos, documents, backups and logs: large, immutable blobs.",
-   "Direct-to-storage uploads with presigned URLs whenever files are larger than a few hundred kilobytes."
-  ],
-  "avoidWhen": [
-   "Do not store large blobs inside the database; backups, replication and the buffer cache all suffer.",
-   "Do not use object storage for small, frequently updated records; each write replaces the whole object and per-request costs add up."
-  ],
-  "tradeoffs": {
-   "columns": [
-    "Store",
-    "Access",
-    "Strength",
-    "Weakness"
-   ],
-   "rows": [
-    [
-     "Object storage",
-     "HTTP by key",
-     "Cheap, durable, huge scale",
-     "No partial updates, higher latency per request"
+    "avoidWhen": [
+      "Do not use last-writer-wins for documents edited concurrently.",
+      "Do not implement OT transformation functions from scratch unless you must; they are notoriously easy to get wrong."
     ],
-    [
-     "Block storage (EBS)",
-     "Mounted disk",
-     "Low latency for one machine",
-     "Attached to one instance at a time"
+    "tradeoffs": {
+      "columns": [
+        "Aspect",
+        "OT",
+        "CRDT",
+        "Last-writer-wins"
+      ],
+      "rows": [
+        [
+          "Needs central server",
+          "Usually",
+          "No",
+          "No"
+        ],
+        [
+          "Offline editing",
+          "Hard",
+          "Natural",
+          "Loses edits"
+        ],
+        [
+          "Metadata overhead",
+          "Low",
+          "Ids and tombstones per element",
+          "Minimal"
+        ],
+        [
+          "Correctness risk",
+          "Complex transform functions",
+          "Memory growth",
+          "Silent data loss"
+        ]
+      ]
+    },
+    "numbers": {
+      "title": "Metadata cost of a text CRDT",
+      "assumptions": [
+        "Document of 50,000 characters",
+        "About 16 bytes of id and ordering metadata per character (illustrative)",
+        "Another 20,000 deleted characters kept as tombstones"
+      ],
+      "steps": [
+        "Live characters: 50,000 × 16 bytes = 800,000 bytes, about 0.8 MB of metadata.",
+        "Tombstones: 20,000 × 16 bytes = 320,000 bytes.",
+        "Total metadata is about 1.12 MB for 50 KB of text, more than 20 times the text itself.",
+        "Libraries reduce this with run-length encoding of consecutive inserts and periodic garbage collection."
+      ],
+      "result": "CRDT convergence is paid for in metadata, so production libraries compress runs and collect tombstones."
+    },
+    "india": {
+      "title": "Co-editing a project report",
+      "label": "Illustrative estimate",
+      "body": "Three engineering students in Pune edit a project report together: two online in a browser editor, one on a train with patchy network. In a server-centred editor using OT, each keystroke travels to the server, which orders and transforms it, so the offline student cannot edit meaningfully until reconnected. In a CRDT-based editor, the offline student keeps typing, and when the train reaches a station with signal, their changes merge with the others' without conflicts or lost paragraphs. Whole-file last-writer-wins, the behaviour of naive file sync, would keep only the last person's save."
+    },
+    "pitfalls": [
+      {
+        "trap": "Ignoring tombstone growth in a CRDT.",
+        "say": "'Deleted elements stay as tombstones, so I'd rely on a library that compacts them and snapshot documents periodically.'"
+      },
+      {
+        "trap": "'We'll lock the document while someone edits.'",
+        "say": "'Real-time editors merge concurrent edits; I'd use OT with a central server or a CRDT library such as Yjs if offline editing matters.'"
+      },
+      {
+        "trap": "Proposing last-writer-wins for documents.",
+        "say": "'LWW drops a user's edits silently; text needs OT or a sequence CRDT.'"
+      }
     ],
-    [
-     "File storage (EFS, NFS)",
-     "Shared filesystem",
-     "Shared by many servers",
-     "Costlier, throughput limits"
+    "takeaways": [
+      "Positions shift under concurrent edits; merging needs OT or CRDTs.",
+      "OT transforms operations through a central server.",
+      "CRDTs use unique ids so replicas converge in any order, even offline.",
+      "Last-writer-wins on documents loses work."
     ],
-    [
-     "Database BLOB column",
-     "SQL",
-     "Transactional with rows",
-     "Bloats DB, slows backups"
-    ]
-   ]
-  },
-  "numbers": {
-   "title": "Bandwidth saved by presigned uploads",
-   "assumptions": [
-    "100,000 photo uploads per hour at 3 MB each"
-   ],
-   "steps": [
-    "Data per hour = 100,000 × 3 MB = 300,000 MB, which is 300 GB.",
-    "Per second = 300,000 MB ÷ 3,600 ≈ 83 MB per second, about 667 Mbit per second.",
-    "Proxying through app servers would add that much inbound and outbound traffic and tie up connections for each slow mobile upload.",
-    "With presigned URLs the app servers handle only small JSON requests."
-   ],
-   "result": "Presigned direct uploads keep about 667 Mbit per second of photo traffic off the app servers."
-  },
-  "india": {
-   "title": "KYC document uploads",
-   "label": "Illustrative estimate",
-   "body": "A lending app asks users to upload a PAN card photo and a selfie. The server returns presigned URLs to a private bucket with server-side encryption, scoped to keys like kyc/user-42/pan.jpg and valid for 5 minutes. After upload, a worker checks the file really is an image, runs it through OCR and face-match services, and records the result. Reviewers see the image only through short-lived presigned GET URLs, and every access is logged. A misconfigured public bucket of KYC documents is exactly the kind of breach that makes headlines, so 'private by default' is non-negotiable."
-  },
-  "pitfalls": [
-   {
-    "trap": "Trusting the client's declared content type.",
-    "say": "'The presigned URL pins the content type and size limit, and a worker checks the real file signature before marking it ready, so a script renamed .jpg is rejected.'"
-   },
-   {
-    "trap": "Uploading files through the API servers.",
-    "say": "'The server issues a presigned PUT URL and the client uploads straight to object storage; the server only stores metadata.'"
-   },
-   {
-    "trap": "Making the bucket public for easy downloads.",
-    "say": "'The bucket stays private; downloads use short-lived presigned URLs or a CDN with origin access control.'"
-   }
-  ],
-  "takeaways": [
-   "Store blobs in object storage and metadata in the database.",
-   "Presigned URLs keep large payloads off app servers.",
-   "Validate and scan after upload, then mark ready.",
-   "Keep buckets private; serve through presigned URLs or a CDN."
-  ],
-  "extraQuestions": [
-   {
-    "id": "t61-d1",
-    "type": "multiple_choice",
-    "concept": "presigned",
-    "prompt": "What is the main benefit of a presigned PUT URL for uploads?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "The client sends the file directly to object storage, bypassing app servers"
-     },
-     {
-      "id": "b",
-      "label": "It makes the file public forever"
-     },
-     {
-      "id": "c",
-      "label": "It stores the file inside the database"
-     },
-     {
-      "id": "d",
-      "label": "It removes the need for authorisation"
-     }
+    "extraQuestions": [
+      {
+        "id": "t73-d1",
+        "type": "multiple_choice",
+        "concept": "ot",
+        "prompt": "Alice inserts one character at position 0 while Bob deletes position 3. Under OT, how is Bob's delete applied after Alice's insert?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Transformed to position 4"
+          },
+          {
+            "id": "b",
+            "label": "Applied at position 3 unchanged"
+          },
+          {
+            "id": "c",
+            "label": "Discarded"
+          },
+          {
+            "id": "d",
+            "label": "Applied at position 0"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Alice's insert shifts later characters right by one, so the delete is transformed to position 4."
+      }
     ],
-    "correctChoiceIds": [
-     "a"
-    ],
-    "explanation": "The app authorises and signs a short-lived URL; the bytes go straight to storage."
-   }
-  ],
-  "diagram": "client --1. request upload--> app (authz, metadata 'pending') --2. presigned URL--> client\nclient --3. PUT bytes--> object storage --4. event--> worker (scan, thumbnail) --> metadata 'ready'"
- },
- "62": {
-  "teaches": [
-   "blocks",
-   "namenode",
-   "rack-replication",
-   "hdfs-read",
-   "hdfs-fit"
-  ],
-  "mechanism": {
-   "title": "How HDFS writes and reads a file",
-   "steps": [
-    "A file is split into large blocks, 128 MB by default. The NameNode keeps the namespace (directories, file-to-block mapping) in memory; DataNodes store the blocks on local disks.",
-    "To write, the client asks the NameNode for target DataNodes for each block. With replication factor 3 and rack awareness, the first replica goes on the writer's node (or a random one), the second on a node in a different rack, and the third on another node in that second rack.",
-    "The client streams the block to the first DataNode, which pipelines it to the second, which pipelines it to the third; acknowledgements flow back.",
-    "To read, the client asks the NameNode for block locations and reads each block from the closest replica, ideally on the same node, which is what lets MapReduce and Spark move computation to the data.",
-    "DataNodes send heartbeats and block reports; if one dies, the NameNode re-replicates its blocks from surviving copies.",
-    "The NameNode is critical, so production clusters run a standby NameNode with shared edit logs for high availability."
-   ]
-  },
-  "useWhen": [
-   "Very large files written once and read in big sequential scans by batch jobs: logs, clickstreams, raw data for Spark.",
-   "On-premises big-data clusters where compute and storage sit on the same machines."
-  ],
-  "avoidWhen": [
-   "Millions of tiny files: each file and block costs NameNode memory (roughly 150 bytes per object, a commonly cited estimate).",
-   "Low-latency random reads and in-place updates; HDFS files are append-only."
-  ],
-  "tradeoffs": {
-   "columns": [
-    "Aspect",
-    "HDFS",
-    "Cloud object storage"
-   ],
-   "rows": [
-    [
-     "Data locality",
-     "Compute runs next to the data",
-     "Network reads"
-    ],
-    [
-     "Scaling",
-     "Add nodes; NameNode memory limits files",
-     "Practically unlimited objects"
-    ],
-    [
-     "Cost model",
-     "Own hardware, 3× replication",
-     "Pay per GB and request"
-    ],
-    [
-     "Typical today",
-     "On-premises clusters",
-     "Data lakes on S3 or GCS"
-    ]
-   ]
-  },
-  "numbers": {
-   "title": "Blocks and replication for a 1 TB file",
-   "assumptions": [
-    "1 TB file, 128 MB blocks",
-    "Replication factor 3"
-   ],
-   "steps": [
-    "1 TB is 1,048,576 MB in binary units; 1,048,576 ÷ 128 = 8,192 blocks.",
-    "Stored copies = 8,192 × 3 = 24,576 block replicas.",
-    "Raw disk used = 1 TB × 3 = 3 TB.",
-    "If the same data were 8 million files of 128 KB each, the NameNode would track at least 8 million file objects and 8 million block objects instead of 8,193, which is why small files hurt."
-   ],
-   "result": "Large blocks keep NameNode metadata tiny; replication triples raw storage."
-  },
-  "india": {
-   "title": "Telecom call records",
-   "label": "Illustrative estimate",
-   "body": "A large Indian telecom operator generates billions of call-detail and data-session records a day. Historically, operators processed such records on Hadoop clusters: hourly files of several gigabytes land in HDFS, replicated three times across racks, and nightly Spark jobs compute usage, fraud signals and network quality per tower. Each job reads big files sequentially from local disks, which HDFS does well. If the same records were written as one tiny file per call, the NameNode would run out of memory long before the disks filled. Many teams now keep the same layout on cloud object storage instead of HDFS."
-  },
-  "pitfalls": [
-   {
-    "trap": "Storing millions of small images in HDFS.",
-    "say": "'HDFS metadata lives in NameNode memory, so small files hurt; I'd put images in object storage and use HDFS or a lake for large batch files.'"
-   },
-   {
-    "trap": "Forgetting rack awareness.",
-    "say": "'Replicas span two racks so a rack switch failure does not lose all copies.'"
-   }
-  ],
-  "takeaways": [
-   "Files are split into 128 MB blocks, replicated 3 times across racks.",
-   "The NameNode holds all metadata in memory; small files are costly.",
-   "Reads go to the nearest replica, enabling data locality.",
-   "Best for large, write-once, sequentially read files."
-  ],
-  "extraQuestions": [
-   {
-    "id": "t62-d1",
-    "type": "multiple_choice",
-    "concept": "blocks",
-    "prompt": "How many 128 MB blocks does a 1 TB (1,048,576 MB) file use in HDFS?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "8,192"
-     },
-     {
-      "id": "b",
-      "label": "128"
-     },
-     {
-      "id": "c",
-      "label": "1,024"
-     },
-     {
-      "id": "d",
-      "label": "24,576"
-     }
-    ],
-    "correctChoiceIds": [
-     "a"
-    ],
-    "explanation": "1,048,576 ÷ 128 = 8,192 blocks; with replication factor 3 there are 24,576 replicas."
-   }
-  ],
-  "diagram": "NameNode: /logs/day1 -> [b1: DN1, DN4, DN5] [b2: DN2, DN6, DN7] ...\nwrite pipeline: client -> DN1 (rack A) -> DN4 (rack B) -> DN5 (rack B)"
- },
- "63": {
-  "teaches": [
-   "inverted",
-   "analyser",
-   "like-scan",
-   "index-sync",
-   "source-of-truth"
-  ],
-  "mechanism": {
-   "title": "From document to search result in an inverted index",
-   "steps": [
-    "Analysis at index time: the analyser lowercases text, splits it into tokens, removes stop words if configured, and stems or normalises words ('running' to 'run'). Custom analysers can add synonyms or n-grams for typos and partial matches.",
-    "Each term maps to a postings list: the document ids containing it, with positions and frequencies.",
-    "Query time: the query string is analysed the same way, the postings lists for its terms are fetched and intersected or merged, and documents are scored, typically with BM25 using term frequency, inverse document frequency and field length.",
-    "Elasticsearch splits an index into shards across nodes; each query fans out to the shards and the coordinating node merges the top results.",
-    "New documents become searchable after a refresh (by default every second), so search is near real-time, not instant.",
-    "The primary database stays the source of truth; changes flow to the index through events or CDC, and the index can be rebuilt from scratch."
-   ]
-  },
-  "useWhen": [
-   "Full-text search, typo tolerance, relevance ranking, facets and filters over millions of documents.",
-   "Log search and analytics (the ELK stack) over large volumes of semi-structured text."
-  ],
-  "avoidWhen": [
-   "Do not use Elasticsearch as the primary store for orders or payments; it is not transactional and can lose recent writes in some failures.",
-   "Do not use LIKE '%term%' over a large table for search; it cannot use a normal B-tree index and scans every row."
-  ],
-  "tradeoffs": {
-   "columns": [
-    "Approach",
-    "Speed on 10 million rows",
-    "Relevance",
-    "Typo tolerance"
-   ],
-   "rows": [
-    [
-     "SQL LIKE '%term%'",
-     "Full scan",
-     "None",
-     "No"
-    ],
-    [
-     "Postgres full-text (tsvector + GIN)",
-     "Indexed",
-     "Basic ranking",
-     "Limited"
-    ],
-    [
-     "Elasticsearch / OpenSearch",
-     "Indexed, distributed",
-     "BM25, boosts",
-     "Fuzzy queries, n-grams"
-    ]
-   ]
-  },
-  "numbers": {
-   "title": "Why a LIKE scan is slow",
-   "assumptions": [
-    "10,000,000 product rows, 200 bytes of searchable text each",
-    "Disk or memory scan at 1 GB per second"
-   ],
-   "steps": [
-    "Text to scan = 10,000,000 × 200 bytes = 2,000,000,000 bytes, about 2 GB.",
-    "At 1 GB per second that is about 2 seconds per query, with all CPU cores busy.",
-    "An inverted index looks up the postings for 'paneer' directly, typically in milliseconds.",
-    "At 100 searches per second, LIKE would need about 200 seconds of scanning every second, which is impossible."
-   ],
-   "result": "Substring scans grow with table size; an inverted index grows with the number of matching documents."
-  },
-  "india": {
-   "title": "Searching a grocery catalogue",
-   "label": "Illustrative estimate",
-   "body": "A quick-commerce app in India must find 'paneer' when users type 'panner', 'paneer 200g' or 'पनीर'. Its search index uses an analyser with lowercasing, a synonym list (atta, wheat flour), n-grams or fuzzy matching for spelling mistakes, and a transliteration step for Hindi queries. Product data lives in Postgres; a CDC pipeline updates the Elasticsearch index within a second or two of a price or stock change. Results are filtered by the user's dark store and ranked by text match combined with popularity. If the index ever drifts, it is rebuilt from Postgres overnight."
-  },
-  "pitfalls": [
-   {
-    "trap": "Treating the search index as the source of truth.",
-    "say": "'Postgres owns the data; the index is a derived copy updated by CDC and rebuilt if needed.'"
-   },
-   {
-    "trap": "Using LIKE for search at scale.",
-    "say": "'LIKE with a leading wildcard scans every row; I'd use an inverted index with an analyser for typos and synonyms.'"
-   }
-  ],
-  "takeaways": [
-   "An inverted index maps terms to the documents containing them.",
-   "The same analyser must run at index and query time.",
-   "Search is near real-time (refresh about every second).",
-   "Keep the database as source of truth; sync the index by CDC or events."
-  ],
-  "extraQuestions": [
-   {
-    "id": "t63-d1",
-    "type": "multiple_choice",
-    "concept": "analyser",
-    "prompt": "A product is indexed as 'Paneer' but searching 'paneer' finds nothing. What is the most likely cause?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "Index-time and query-time analysis differ (e.g. no lowercasing)"
-     },
-     {
-      "id": "b",
-      "label": "The database is down"
-     },
-     {
-      "id": "c",
-      "label": "The Bloom filter has a false positive"
-     },
-     {
-      "id": "d",
-      "label": "The JWT has expired"
-     }
-    ],
-    "correctChoiceIds": [
-     "a"
-    ],
-    "explanation": "Terms must be normalised identically at index and query time for postings to match."
-   }
-  ],
-  "diagram": "doc 7: 'Fresh Paneer 200g' -> analyse -> [fresh, paneer, 200g]\nindex: paneer -> [3, 7, 19]   fresh -> [7, 11]\nquery 'panner' -> fuzzy -> paneer -> [3, 7, 19] -> score (BM25) -> top 10"
- },
- "64": {
-  "teaches": [
-   "mapreduce",
-   "spark",
-   "skew",
-   "batch-fit"
-  ],
-  "mechanism": {
-   "title": "How a MapReduce or Spark job runs",
-   "steps": [
-    "Input is split into chunks (often one per storage block), and one map task per chunk runs on a node near the data.",
-    "Map: each task reads records and emits key-value pairs, for example (city, order_value) for every order.",
-    "Shuffle: pairs are partitioned by key (hash of city), written to local disk and pulled over the network so that all values for one key reach the same reducer. This is usually the most expensive step.",
-    "Reduce: each reducer aggregates the values for its keys, for example summing order values per city, and writes output files.",
-    "Spark generalises this into a graph (DAG) of stages, keeps intermediate data in memory where it fits, and recomputes lost partitions from lineage instead of writing every step to disk, which makes multi-step and iterative jobs much faster.",
-    "Skew: if one key has far more records (one huge city), its reducer runs long after the others finish. Fixes include salting the key into several sub-keys and combining afterwards, or broadcasting a small table instead of shuffling the big one."
-   ]
-  },
-  "useWhen": [
-   "Large batch transformations and aggregations over data far bigger than one machine: daily reports, feature generation, backfills.",
-   "Spark for multi-step pipelines, iterative machine learning and SQL over a data lake."
-  ],
-  "avoidWhen": [
-   "Interactive queries on small data; a single database or DuckDB is faster and simpler.",
-   "Real-time needs measured in seconds; use stream processing instead."
-  ],
-  "tradeoffs": {
-   "columns": [
-    "Aspect",
-    "Hadoop MapReduce",
-    "Spark"
-   ],
-   "rows": [
-    [
-     "Intermediate data",
-     "Written to disk between steps",
-     "Kept in memory where possible"
-    ],
-    [
-     "Programming model",
-     "Map and reduce only",
-     "DAG of transformations, SQL, DataFrames"
-    ],
-    [
-     "Fault tolerance",
-     "Re-run failed tasks from disk",
-     "Recompute from lineage"
-    ],
-    [
-     "Best for",
-     "Simple, very large one-pass jobs",
-     "Multi-step and iterative jobs"
-    ]
-   ]
-  },
-  "numbers": {
-   "title": "Effect of skew on job time",
-   "assumptions": [
-    "100 reducers; total work 10,000 reducer-seconds spread evenly would be 100 seconds each",
-    "One key (Mumbai) holds 20% of all records"
-   ],
-   "steps": [
-    "Even spread: each reducer does 10,000 ÷ 100 = 100 seconds of work.",
-    "The Mumbai reducer gets 20% of all work: 10,000 × 0.2 = 2,000 seconds.",
-    "The job finishes when the slowest reducer does, so about 2,000 seconds instead of 100, a 20× slowdown.",
-    "Salting Mumbai into 20 sub-keys gives each about 100 seconds, then a tiny second step adds the 20 partial sums."
-   ],
-   "result": "One hot key can make a job 20 times slower; salting spreads it across reducers."
-  },
-  "india": {
-   "title": "Daily settlement reports",
-   "label": "Illustrative estimate",
-   "body": "A payments aggregator in India computes daily settlement files for lakhs of merchants: total captured, refunds, fees and GST per merchant. A Spark job reads the day's transaction files from the data lake, maps each transaction to (merchant_id, amounts), shuffles by merchant and sums. A handful of very large merchants produce a large share of transactions, so the job salts their ids to spread the work, then combines the partial sums. The output feeds settlement and reconciliation, and because it is batch, a rerun after a bug fix simply recomputes the day from immutable input."
-  },
-  "pitfalls": [
-   {
-    "trap": "Using Spark for a query over 2 GB.",
-    "say": "'Two gigabytes fits on one machine; Postgres or DuckDB answers faster without cluster overhead.'"
-   },
-   {
-    "trap": "Ignoring skew.",
-    "say": "'Merchant volume is skewed, so I'd salt the biggest merchant keys or broadcast the small dimension table to avoid one slow reducer.'"
-   }
-  ],
-  "takeaways": [
-   "Map emits key-value pairs; shuffle groups by key; reduce aggregates.",
-   "The shuffle is usually the most expensive step.",
-   "Spark keeps intermediates in memory and recovers via lineage.",
-   "Skewed keys dominate job time; salt them."
-  ],
-  "extraQuestions": [
-   {
-    "id": "t64-d1",
-    "type": "multiple_choice",
-    "concept": "skew",
-    "prompt": "One reducer receives 20% of all records while 99 others share the rest. What dominates job time?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "The overloaded reducer, so the job slows dramatically"
-     },
-     {
-      "id": "b",
-      "label": "Nothing; Spark balances automatically"
-     },
-     {
-      "id": "c",
-      "label": "The map phase"
-     },
-     {
-      "id": "d",
-      "label": "The network between client and driver"
-     }
-    ],
-    "correctChoiceIds": [
-     "a"
-    ],
-    "explanation": "A job ends when its slowest task ends; a hot key creates a straggler. Salting the key spreads it."
-   }
-  ],
-  "diagram": "input splits -> map (merchant, amt) -> shuffle by key -> reduce (sum per merchant) -> output\n hot key 'M1' -> salt: M1#0..M1#19 -> partial sums -> combine"
- },
- "65": {
-  "teaches": [
-   "stream-flow",
-   "stream-fit",
-   "event-time",
-   "windows",
-   "stream-dupes"
-  ],
-  "mechanism": {
-   "title": "How a stream processor computes a windowed count",
-   "steps": [
-    "Events (clicks, payments, rider pings) arrive continuously from a log such as Kafka, partitioned by key.",
-    "The processor (Flink, Kafka Streams, Spark Structured Streaming) reads each partition and keeps state per key, for example counts per merchant, in a local store that is checkpointed regularly.",
-    "Windows group events in time: tumbling (fixed, non-overlapping 1-minute buckets), sliding or hopping (5-minute windows every minute) and session windows (closed after a gap of inactivity).",
-    "Event time is when the event happened; processing time is when it is processed. Mobile events can arrive minutes late, so correct results use event time.",
-    "Watermarks estimate how far event time has progressed ('no more events older than 12:04:30 expected'). When the watermark passes the end of a window, the window is emitted; later stragglers go to a side output or update the result.",
-    "On failure, the job restarts from the last checkpoint and replays input from the matching offsets; with transactional sinks or idempotent writes, results are exactly-once in effect."
-   ]
-  },
-  "useWhen": [
-   "Fraud detection, live dashboards, alerting, surge pricing and anything that must react within seconds.",
-   "Continuous ETL that keeps search indexes, caches or warehouses fresh."
-  ],
-  "avoidWhen": [
-   "Jobs where hourly or daily results are fine; batch is simpler and cheaper.",
-   "Complex joins over months of history; precompute those in batch and join the stream to the result."
-  ],
-  "tradeoffs": {
-   "columns": [
-    "Aspect",
-    "Batch",
-    "Stream"
-   ],
-   "rows": [
-    [
-     "Latency",
-     "Minutes to hours",
-     "Milliseconds to seconds"
-    ],
-    [
-     "Input",
-     "Bounded files",
-     "Unbounded log"
-    ],
-    [
-     "Late data",
-     "Included at run time",
-     "Needs watermarks and lateness rules"
-    ],
-    [
-     "Reprocessing",
-     "Rerun the job",
-     "Replay from offsets"
-    ],
-    [
-     "Operational load",
-     "Lower",
-     "Always-on state, checkpoints"
-    ]
-   ]
-  },
-  "numbers": {
-   "title": "State size for per-user 5-minute windows",
-   "assumptions": [
-    "2,000,000 active users",
-    "Sliding window of 5 minutes, advancing every minute, so each event belongs to 5 windows",
-    "State per user per window about 100 bytes"
-   ],
-   "steps": [
-    "Windows open per user at any time = 5.",
-    "State = 2,000,000 × 5 = 10,000,000 window entries.",
-    "Memory = 10,000,000 × 100 bytes = 1,000,000,000 bytes, about 1 GB, spread across the job's parallel tasks.",
-    "A 60-minute sliding window advancing every minute would need 12 times as much, about 12 GB."
-   ],
-   "result": "Window length divided by slide sets how many windows each key keeps; size state before choosing windows."
-  },
-  "india": {
-   "title": "Card-fraud checks on UPI and cards",
-   "label": "Illustrative estimate",
-   "body": "A payments processor wants to flag a card used in Delhi and then in Chennai within ten minutes, or more than five failed attempts in a minute. A stream job keyed by card or VPA keeps recent locations and failure counts in state, using event time from the terminal or app so that delayed events from patchy networks still land in the right window. The watermark allows, say, 30 seconds of lateness; events arriving later are routed to a side output for review rather than silently dropped. Decisions flow back within a second or two, quickly enough to step up authentication on the next attempt."
-  },
-  "pitfalls": [
-   {
-    "trap": "Treating late events as impossible.",
-    "say": "'I'd set an allowed lateness, route anything later to a side output, and monitor how many events arrive late so the watermark can be tuned.'"
-   },
-   {
-    "trap": "Windowing by processing time for mobile events.",
-    "say": "'Mobile events arrive late, so I'd window by event time with watermarks and a lateness allowance.'"
-   },
-   {
-    "trap": "Assuming the stream never replays.",
-    "say": "'After a failure the job replays from the checkpoint, so sinks are idempotent or transactional.'"
-   }
-  ],
-  "takeaways": [
-   "Streams give second-level latency with always-on state.",
-   "Use event time and watermarks for correct windows.",
-   "Window size divided by slide multiplies state.",
-   "Checkpoints plus replay need idempotent or transactional sinks."
-  ],
-  "extraQuestions": [
-   {
-    "id": "t65-d1",
-    "type": "multiple_choice",
-    "concept": "event-time",
-    "prompt": "Why do stream processors window by event time rather than processing time for mobile events?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "Events can arrive late, and should count in the window when they actually happened"
-     },
-     {
-      "id": "b",
-      "label": "Processing time is not available"
-     },
-     {
-      "id": "c",
-      "label": "Event time uses less memory"
-     },
-     {
-      "id": "d",
-      "label": "It removes the need for checkpoints"
-     }
-    ],
-    "correctChoiceIds": [
-     "a"
-    ],
-    "explanation": "Delayed events would otherwise fall into the wrong window; watermarks decide when a window is complete."
-   }
-  ],
-  "diagram": "Kafka (keyed) -> operator (state per key, checkpoints) -> window [12:00-12:01) closes when watermark > 12:01 -> sink\n late event 12:00:40 arriving at 12:03 -> side output / update"
- },
- "66": {
-  "teaches": [
-   "oltp-olap",
-   "columnar",
-   "etl-flow",
-   "olap-on-oltp"
-  ],
-  "mechanism": {
-   "title": "From production database to dashboard",
-   "steps": [
-    "OLTP databases serve the app: many small reads and writes by key, row-oriented storage, strict transactions.",
-    "Extract: copy changes out of OLTP, by nightly dumps or, better, CDC streaming.",
-    "Land raw data cheaply in a data lake (files such as Parquet on object storage).",
-    "Transform: clean, deduplicate, join and model into fact tables (orders, payments) and dimension tables (customers, cities, products). With ELT the transformation runs inside the warehouse using SQL tools such as dbt.",
-    "Load into a columnar warehouse or OLAP engine (BigQuery, Snowflake, Redshift, ClickHouse). Columnar storage reads only the columns a query touches and compresses them well, so scans of billions of rows are fast.",
-    "Dashboards and analysts query the warehouse, never the production primary.",
-    "Partition big fact tables by date and cluster them by common filters such as city, so a query for one week reads only that week's files instead of the whole history."
-   ]
-  },
-  "useWhen": [
-   "Warehouse or OLAP for aggregates over large history: revenue by city and month, cohort retention, funnels.",
-   "A lakehouse (open table formats such as Iceberg or Delta on object storage) when many engines must read the same data cheaply."
-  ],
-  "avoidWhen": [
-   "Do not run heavy analytical queries on the OLTP primary; full scans evict hot pages and slow the app.",
-   "Do not use a warehouse to serve per-user app requests at thousands per second; it is built for scans, not point lookups."
-  ],
-  "tradeoffs": {
-   "columns": [
-    "Aspect",
-    "OLTP",
-    "OLAP / warehouse"
-   ],
-   "rows": [
-    [
-     "Queries",
-     "Small, by key, many per second",
-     "Large scans and aggregates, fewer"
-    ],
-    [
-     "Storage layout",
-     "Row-oriented",
-     "Column-oriented, compressed"
-    ],
-    [
-     "Freshness",
-     "Real time",
-     "Minutes to a day"
-    ],
-    [
-     "Schema",
-     "Normalised",
-     "Star schema: facts and dimensions"
-    ],
-    [
-     "Examples",
-     "Postgres, MySQL",
-     "BigQuery, Snowflake, ClickHouse"
-    ]
-   ]
-  },
-  "numbers": {
-   "title": "Why columnar scans are cheaper",
-   "assumptions": [
-    "1,000,000,000 order rows, 40 columns of 8 bytes each",
-    "Query sums one column grouped by one other column"
-   ],
-   "steps": [
-    "Row store reads every column: 1,000,000,000 × 320 bytes = 320,000,000,000 bytes, about 320 GB.",
-    "Column store reads 2 columns: 1,000,000,000 × 16 bytes = 16,000,000,000 bytes, about 16 GB.",
-    "With typical 5× compression on columnar data, that is about 3.2 GB.",
-    "So the same query reads roughly 100 times less data."
-   ],
-   "result": "Reading only the needed columns, compressed, is why warehouses scan billions of rows in seconds."
-  },
-  "india": {
-   "title": "City-wise sales for a festive season",
-   "label": "Illustrative estimate",
-   "body": "An Indian retail chain wants Diwali-week revenue by city, category and payment method, compared with last year. Running that on the order database during the sale would scan years of orders and slow checkouts. Instead, CDC streams orders into a lake every few minutes, dbt models build an orders fact table with city and product dimensions, and the warehouse answers the query over hundreds of millions of rows in seconds. The finance team accepts data that is 15 minutes old, and the checkout database never sees an analytical query."
-  },
-  "pitfalls": [
-   {
-    "trap": "Assuming the warehouse is real time.",
-    "say": "'CDC into the warehouse gives minutes of delay; for a live operations screen I'd use a stream processor or an OLAP engine like ClickHouse fed from Kafka.'"
-   },
-   {
-    "trap": "Running reports on the production primary.",
-    "say": "'I'd stream changes via CDC into a warehouse; dashboards query that, so the OLTP database only serves the app.'"
-   },
-   {
-    "trap": "Serving app traffic from the warehouse.",
-    "say": "'The warehouse is for scans; precomputed results needed by the app are exported to a cache or key-value store.'"
-   }
-  ],
-  "takeaways": [
-   "OLTP serves the app; OLAP serves analysis.",
-   "Columnar storage reads only needed columns and compresses well.",
-   "Use CDC and ELT to feed the warehouse without loading production.",
-   "Model analytics as facts and dimensions."
-  ],
-  "extraQuestions": [
-   {
-    "id": "t66-d1",
-    "type": "multiple_choice",
-    "concept": "columnar",
-    "prompt": "A query sums one column of a 40-column table with a billion rows. Why is a columnar store much faster?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "It reads only the needed columns, compressed, instead of whole rows"
-     },
-     {
-      "id": "b",
-      "label": "It keeps all data in CPU registers"
-     },
-     {
-      "id": "c",
-      "label": "It skips half the rows at random"
-     },
-     {
-      "id": "d",
-      "label": "It uses B-tree indexes on every column"
-     }
-    ],
-    "correctChoiceIds": [
-     "a"
-    ],
-    "explanation": "Column stores read the touched columns only: here about 16 GB raw instead of 320 GB."
-   }
-  ],
-  "diagram": "OLTP (Postgres) --CDC--> lake (Parquet) --transform (dbt)--> warehouse (facts + dims) --> dashboards\n          app traffic stays here           analytics traffic stays here"
- },
- "67": {
-  "teaches": [
-   "geohash",
-   "quadtree",
-   "geo-index",
-   "neighbours",
-   "nearby-flow"
-  ],
-  "mechanism": {
-   "title": "Finding nearby drivers with geohashes",
-   "steps": [
-    "A geohash encodes latitude and longitude into a string by repeatedly halving the world, interleaving longitude and latitude bits, and writing them in base 32. Each extra character narrows the cell.",
-    "Points in the same cell share a prefix, so a prefix lookup in a sorted index or a hash map finds them quickly.",
-    "Precision examples (approximate): 5 characters is about 4.9 km by 4.9 km; 6 characters about 1.2 km by 0.6 km; 7 characters about 153 m by 153 m.",
-    "To search 'within 2 km', choose a precision whose cells are about the radius, look up the user's cell and its 8 neighbours, because a nearby driver may sit just across a cell edge.",
-    "Filter candidates by exact distance (haversine) and rank by distance or estimated arrival time.",
-    "Alternatives: quadtrees split dense areas into smaller cells adaptively; Google's S2 and Uber's H3 use hierarchical cells (H3 uses hexagons, which have uniform neighbour distances)."
-   ]
-  },
-  "useWhen": [
-   "Nearby search for drivers, restaurants, stores, and geofencing such as 'is this rider inside the delivery zone'.",
-   "Geohash or H3 keys in Redis, Elasticsearch or a key-value store; PostGIS for rich polygon queries."
-  ],
-  "avoidWhen": [
-   "Do not scan all drivers and compute distances one by one; it grows linearly with fleet size.",
-   "Do not search only the user's own cell; nearby points across the edge are missed."
-  ],
-  "tradeoffs": {
-   "columns": [
-    "Index",
-    "Cell shape",
-    "Adapts to density",
-    "Typical use"
-   ],
-   "rows": [
-    [
-     "Geohash",
-     "Rectangles",
-     "No (fixed grid per precision)",
-     "Simple prefix search in any store"
-    ],
-    [
-     "Quadtree",
-     "Squares, split on demand",
-     "Yes",
-     "In-memory spatial index"
-    ],
-    [
-     "S2",
-     "Curved squares on a sphere",
-     "Hierarchical",
-     "Region coverage"
-    ],
-    [
-     "H3",
-     "Hexagons",
-     "Hierarchical",
-     "Ride-hailing, delivery zones"
-    ]
-   ]
-  },
-  "numbers": {
-   "title": "Why the 9-cell lookup is cheap",
-   "assumptions": [
-    "50,000 active drivers in a city of about 1,500 square km",
-    "Search with 6-character geohash cells of about 1.2 km × 0.6 km (0.72 square km)"
-   ],
-   "steps": [
-    "Driver density = 50,000 ÷ 1,500 ≈ 33 drivers per square km on average.",
-    "Nine cells cover 9 × 0.72 = 6.48 square km.",
-    "Expected candidates = 33 × 6.48 ≈ 214 drivers, instead of 50,000.",
-    "Computing 214 exact distances takes microseconds; dense areas may need finer cells or a cap on candidates."
-   ],
-   "result": "The 9-cell geohash lookup cuts the candidates from 50,000 to about 200 before exact distance checks."
-  },
-  "india": {
-   "title": "Auto-rickshaw matching in Bengaluru",
-   "label": "Illustrative estimate",
-   "body": "A ride-hailing app receives location pings from auto drivers every few seconds. Each ping updates the driver's cell key (a geohash or H3 index) in an in-memory store. When a rider in Koramangala requests a ride, the dispatcher reads the rider's cell and its neighbours, filters by vehicle type and availability, and ranks by estimated arrival time using road distance rather than straight-line distance, since a flyover or one-way street can make a near driver slow to arrive. In dense areas at peak time, the dispatcher uses finer cells to keep candidate lists short."
-  },
-  "pitfalls": [
-   {
-    "trap": "Searching only the rider's cell.",
-    "say": "'I'd search the cell plus its 8 neighbours, then filter by exact distance, because the nearest driver may be across a cell boundary.'"
-   },
-   {
-    "trap": "Ranking by straight-line distance.",
-    "say": "'I'd shortlist by distance, then rank by estimated arrival time from a routing service.'"
-   }
-  ],
-  "takeaways": [
-   "Geohashes turn 2D proximity into string prefixes.",
-   "Pick a precision near the search radius and include the 8 neighbours.",
-   "Filter candidates by exact distance, rank by ETA.",
-   "Quadtrees and H3 adapt better to density and geometry."
-  ],
-  "extraQuestions": [
-   {
-    "id": "t67-d1",
-    "type": "multiple_choice",
-    "concept": "neighbours",
-    "prompt": "Why does a nearby search read the user's geohash cell plus its 8 neighbours?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "Close points can sit just across a cell boundary with a different prefix"
-     },
-     {
-      "id": "b",
-      "label": "To make the index smaller"
-     },
-     {
-      "id": "c",
-      "label": "Because geohashes only work in groups of nine"
-     },
-     {
-      "id": "d",
-      "label": "To avoid computing distances"
-     }
-    ],
-    "correctChoiceIds": [
-     "a"
-    ],
-    "explanation": "Cell edges split nearby points; the neighbours cover that, then exact distance filters the candidates."
-   }
-  ],
-  "diagram": "+----+----+----+\n| NW | N  | NE |\n+----+----+----+\n| W  | ME | E  |   query = my cell + 8 neighbours -> filter by exact distance\n+----+----+----+\n| SW | S  | SE |\n+----+----+----+"
- },
- "68": {
-  "teaches": [
-   "ts-shape",
-   "metric-life",
-   "rollups",
-   "cardinality"
-  ],
-  "mechanism": {
-   "title": "How a time-series database stores and ages data",
-   "steps": [
-    "Each series is identified by a metric name plus labels, such as http_requests_total{service='checkout', status='500'}. Each sample is a timestamp and a value.",
-    "Incoming samples are appended to the current time block in memory and to a write-ahead log, then compressed into immutable blocks (for example 2 hours in Prometheus).",
-    "Compression exploits regularity: timestamps are delta-of-delta encoded and values XOR-encoded (the Gorilla technique), which brings typical samples down to roughly 1–2 bytes.",
-    "Queries select series by labels and aggregate over time ranges: rate over 5 minutes, p99 over an hour.",
-    "Retention and rollups: keep raw 15-second samples for, say, 15 days, 5-minute rollups for 90 days and 1-hour rollups for years, deleting whole old blocks cheaply.",
-    "Cardinality, the number of unique label combinations, drives memory and index size; a label such as user_id or order_id can explode it into millions of series."
-   ]
-  },
-  "useWhen": [
-   "Metrics, IoT sensor readings, prices and other append-mostly, time-stamped numeric data queried by time range.",
-   "Prometheus for monitoring; TimescaleDB, InfluxDB or ClickHouse for longer-term or richer time-series analytics."
-  ],
-  "avoidWhen": [
-   "Do not store per-event business records (orders, payments) as metrics; they belong in a database or logs.",
-   "Do not use unbounded labels such as user id, request id or full URL."
-  ],
-  "tradeoffs": {
-   "columns": [
-    "Choice",
-    "Effect"
-   ],
-   "rows": [
-    [
-     "Scrape interval 15 s versus 60 s",
-     "4× more samples at 15 s"
-    ],
-    [
-     "Raw retention 15 days, rollups after",
-     "Bounded disk, long history at low resolution"
-    ],
-    [
-     "Label 'status' (about 5 values)",
-     "Small, useful cardinality"
-    ],
-    [
-     "Label 'user_id' (millions)",
-     "Millions of series; memory blow-up"
-    ]
-   ]
-  },
-  "numbers": {
-   "title": "Cardinality and storage",
-   "assumptions": [
-    "Metric with labels service (20), endpoint (25), status (5), instance (10)",
-    "Scrape every 15 s, about 1.5 bytes per compressed sample"
-   ],
-   "steps": [
-    "Series = 20 × 25 = 500, then 500 × 5 = 2,500, then 2,500 × 10 = 25,000.",
-    "Samples per series per day = 86,400 ÷ 15 = 5,760.",
-    "Samples per day = 25,000 × 5,760 = 144,000,000, so about 216 MB per day compressed.",
-    "Adding a user_id label with 1,000,000 values would multiply series by up to a million, which no monitoring setup can hold."
-   ],
-   "result": "Labels multiply series counts; a few bounded labels are cheap, one unbounded label is fatal."
-  },
-  "india": {
-   "title": "Monitoring a payments switch on festival days",
-   "label": "Illustrative estimate",
-   "body": "During peak days such as Diwali, UPI volumes are publicly reported to hit records. A bank's payment team watches success rate, latency and error codes per partner bank and per API in Prometheus and Grafana, with labels kept to bounded sets such as partner bank, API and response code. Raw 15-second data shows exactly when a partner bank started timing out; hourly rollups kept for two years let the team compare this Diwali with the last two. Investigating one customer's failed payment uses logs and traces keyed by transaction id, not a metric label."
-  },
-  "pitfalls": [
-   {
-    "trap": "Alerting on raw per-instance metrics with no aggregation.",
-    "say": "'I alert on aggregated SLO signals such as checkout error rate across instances, and use per-instance series only to drill down.'"
-   },
-   {
-    "trap": "Adding user_id as a metric label to debug one customer.",
-    "say": "'Per-user detail goes in logs and traces; metric labels stay bounded, such as service, endpoint and status.'"
-   },
-   {
-    "trap": "Keeping raw samples forever.",
-    "say": "'Raw data for 15 days, then 5-minute and hourly rollups, so storage stays bounded.'"
-   }
-  ],
-  "takeaways": [
-   "Time-series stores append, compress and query by time range.",
-   "Cardinality, not sample count, is the usual scaling limit.",
-   "Retention plus rollups keep long history affordable.",
-   "Per-entity detail belongs in logs and traces, not labels."
-  ],
-  "extraQuestions": [
-   {
-    "id": "t68-d1",
-    "type": "multiple_choice",
-    "concept": "cardinality",
-    "prompt": "Labels have 20, 25, 5 and 10 possible values. How many series can the metric create?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "25,000"
-     },
-     {
-      "id": "b",
-      "label": "60"
-     },
-     {
-      "id": "c",
-      "label": "2,500"
-     },
-     {
-      "id": "d",
-      "label": "1,000,000"
-     }
-    ],
-    "correctChoiceIds": [
-     "a"
-    ],
-    "explanation": "Series multiply across labels: 20 × 25 = 500, 500 × 5 = 2,500 and 2,500 × 10 = 25,000."
-   }
-  ],
-  "diagram": "series = name + labels  -> [t1,v1][t2,v2]... (delta-of-delta + XOR, ~1.5 bytes/sample)\nraw 15 s (15 d) -> 5 min rollup (90 d) -> 1 h rollup (2 y)"
- },
- "71": {
-  "teaches": [
-   "offset",
-   "cursor",
-   "sort-key"
-  ],
-  "mechanism": {
-   "title": "How offset and cursor pagination execute",
-   "steps": [
-    "Offset: SELECT ... ORDER BY created_at DESC LIMIT 20 OFFSET 10000. The database must walk and discard 10,000 rows before returning 20, so later pages get slower.",
-    "Offset is also unstable: if new rows are inserted while the user scrolls, items shift between pages, causing duplicates or gaps.",
-    "Cursor (keyset): return the sort key of the last item as an opaque cursor. The next query asks for rows strictly after it: WHERE (created_at, id) < (:last_created, :last_id) ORDER BY created_at DESC, id DESC LIMIT 20.",
-    "With an index on (created_at, id), the database seeks directly to the cursor position and reads 20 entries, so every page costs about the same.",
-    "The sort key must be unique and stable; add the id as a tie-breaker because many rows can share a timestamp.",
-    "Encode the cursor (for example base64 of the values) so clients treat it as opaque and you can change its format later."
-   ]
-  },
-  "useWhen": [
-   "Cursor pagination for infinite scroll, feeds, chat history, API list endpoints and large tables.",
-   "Offset pagination for small admin tables where users jump to page 7 and data rarely changes."
-  ],
-  "avoidWhen": [
-   "Do not use deep offsets on large tables; page 5,000 scans 100,000 rows to show 20.",
-   "Do not build a cursor on a non-unique column alone; ties cause skipped or repeated rows."
-  ],
-  "tradeoffs": {
-   "columns": [
-    "Aspect",
-    "Offset",
-    "Cursor (keyset)"
-   ],
-   "rows": [
-    [
-     "Cost of page n",
-     "Grows with n",
-     "Constant with an index"
-    ],
-    [
-     "Jump to page 50",
-     "Easy",
-     "Not directly"
-    ],
-    [
-     "Stable under inserts",
-     "No: shifts and duplicates",
-     "Yes"
-    ],
-    [
-     "Needs",
-     "LIMIT/OFFSET",
-     "Unique sort key and matching index"
-    ]
-   ]
-  },
-  "numbers": {
-   "title": "Rows touched by deep pages",
-   "assumptions": [
-    "Page size 20",
-    "User at page 5,000"
-   ],
-   "steps": [
-    "Offset skips (5,000 − 1) × 20 = 99,980 rows, then reads 20, so about 100,000 rows touched.",
-    "Cursor seeks once in the index (a few page reads for a B-tree) and reads 20 rows.",
-    "At 200 such requests per second, offset touches about 200 × 100,000 = 20,000,000 rows per second; the cursor touches about 4,000.",
-    "That gap is the difference between a struggling database and an idle one."
-   ],
-   "result": "Offset cost grows linearly with page depth; cursor cost stays at one index seek plus the page."
-  },
-  "india": {
-   "title": "Scrolling a long transaction history",
-   "label": "Illustrative estimate",
-   "body": "A user of a UPI app scrolls back through two years of payments, perhaps thousands of entries. With offset pagination, each 'load more' asks the database to skip more and more rows, and if a new payment arrives mid-scroll, one entry shifts and appears twice. With a cursor of (transaction_time, transaction_id), each request seeks directly to where the last page ended using the index and returns the next 20, and a new payment at the top does not disturb older pages. The app sends the opaque cursor string it received; it never computes page numbers."
-  },
-  "pitfalls": [
-   {
-    "trap": "Exposing raw database ids and timestamps as the cursor format.",
-    "say": "'The cursor is an opaque, encoded string, so clients cannot tamper with its meaning and I can change the sort key later without breaking them.'"
-   },
-   {
-    "trap": "Using OFFSET for an infinite feed.",
-    "say": "'I'd use keyset pagination on (created_at, id) with a matching index, so every page costs one seek.'"
-   },
-   {
-    "trap": "Cursor on timestamp only.",
-    "say": "'Timestamps collide, so the cursor includes the id as a tie-breaker.'"
-   }
-  ],
-  "takeaways": [
-   "Offset cost grows with page depth; cursor cost is constant.",
-   "Cursors are stable when rows are inserted.",
-   "Use a unique sort key with a tie-breaker and a matching index.",
-   "Offset is fine for small admin tables with page jumps."
-  ],
-  "extraQuestions": [
-   {
-    "id": "t71-d1",
-    "type": "multiple_choice",
-    "concept": "cursor",
-    "prompt": "Why is (created_at, id) used as the cursor instead of created_at alone?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "Many rows can share a timestamp, so the id breaks ties and prevents skipped or repeated rows"
-     },
-     {
-      "id": "b",
-      "label": "Ids are shorter than timestamps"
-     },
-     {
-      "id": "c",
-      "label": "Because OFFSET requires it"
-     },
-     {
-      "id": "d",
-      "label": "To make the cursor human-readable"
-     }
-    ],
-    "correctChoiceIds": [
-     "a"
-    ],
-    "explanation": "The sort key must be unique; adding the id makes the order total."
-   }
-  ],
-  "diagram": "offset: [skip skip skip ... 99,980 rows][read 20]\ncursor: index seek -> (ts, id) < cursor -> [read 20]"
- },
- "72": {
-  "teaches": [
-   "optimistic",
-   "contention",
-   "lock-scope"
-  ],
-  "mechanism": {
-   "title": "Optimistic versus pessimistic locking in practice",
-   "steps": [
-    "Pessimistic: read the row with SELECT ... FOR UPDATE inside a transaction. Other writers (and other FOR UPDATE readers) wait until you commit, so your read-modify-write is safe.",
-    "Optimistic: read the row and its version number without locking. When writing, run UPDATE ... SET ..., version = version + 1 WHERE id = ? AND version = ?.",
-    "If the update affects 1 row, you won. If it affects 0 rows, someone else changed it first: re-read, reapply the change, and retry or report a conflict.",
-    "Under low contention, optimistic locking avoids holding locks while users think or while the app does other work.",
-    "Under high contention, optimistic locking wastes work on retries, while pessimistic locks queue writers in order.",
-    "Keep lock scope small either way: lock one row, not a table; hold locks for milliseconds, never across a user's think time or an external API call."
-   ]
-  },
-  "useWhen": [
-   "Optimistic for edits that rarely collide: profile updates, document metadata, admin forms (and HTTP ETag with If-Match).",
-   "Pessimistic (or a single conditional update) for hot rows such as inventory counts or seat holds during a flash sale."
-  ],
-  "avoidWhen": [
-   "Optimistic retries on a hot counter where most attempts conflict; throughput collapses.",
-   "Pessimistic locks held across user interaction, such as while a checkout form is open."
-  ],
-  "tradeoffs": {
-   "columns": [
-    "Aspect",
-    "Optimistic",
-    "Pessimistic"
-   ],
-   "rows": [
-    [
-     "Conflicts detected",
-     "At write time (version check)",
-     "Prevented by waiting"
-    ],
-    [
-     "Best when",
-     "Conflicts are rare",
-     "Conflicts are frequent"
-    ],
-    [
-     "Cost under contention",
-     "Retries and wasted work",
-     "Waiting in a queue"
-    ],
-    [
-     "Deadlock risk",
-     "None",
-     "Yes, if lock order varies"
-    ]
-   ]
-  },
-  "numbers": {
-   "title": "Retries under contention",
-   "assumptions": [
-    "Each attempt succeeds with probability p (no one else wrote in between)",
-    "Case A: p = 0.95; case B: p = 0.2"
-   ],
-   "steps": [
-    "Expected attempts = 1 ÷ p.",
-    "Case A: 1 ÷ 0.95 ≈ 1.05 attempts, so retries are almost free.",
-    "Case B: 1 ÷ 0.2 = 5 attempts on average, each doing the read and computation again.",
-    "At case B contention, a pessimistic lock or one atomic conditional UPDATE is cheaper."
-   ],
-   "result": "Optimistic locking costs 1 ÷ p attempts; it shines when conflicts are rare and hurts on hot rows."
-  },
-  "india": {
-   "title": "Editing a restaurant menu versus selling the last biryani",
-   "label": "Illustrative estimate",
-   "body": "Two managers of a restaurant on a delivery platform edit the same menu item from different laptops. Conflicts are rare, so the item carries a version number; if the second save finds the version changed, the app shows 'this item was updated by someone else, review changes'. Meanwhile, during dinner rush, the 'portions left' counter for a popular biryani is updated by many orders at once. Here the platform avoids read-modify-write entirely with UPDATE items SET left = left − 1 WHERE id = ? AND left > 0, which the database serialises on that row and which never oversells."
-  },
-  "pitfalls": [
-   {
-    "trap": "Forgetting deadlocks with pessimistic locks.",
-    "say": "'Every transaction locks rows in the same order, such as by ascending id, and has a lock timeout, so two transactions cannot wait on each other forever.'"
-   },
-   {
-    "trap": "Using optimistic locking for a flash-sale counter.",
-    "say": "'At high contention most optimistic attempts fail; I'd use an atomic conditional decrement or a short row lock.'"
-   },
-   {
-    "trap": "Holding a lock while waiting for the payment gateway.",
-    "say": "'I reserve stock with a short transaction, call the gateway outside it, then confirm or release.'"
-   }
-  ],
-  "takeaways": [
-   "Optimistic checks a version at write time; pessimistic blocks others.",
-   "Expected optimistic attempts are 1 ÷ p.",
-   "Use atomic conditional updates for hot counters.",
-   "Never hold locks across user think time or external calls."
-  ],
-  "extraQuestions": [
-   {
-    "id": "t72-d1",
-    "type": "multiple_choice",
-    "concept": "contention",
-    "prompt": "An optimistic update succeeds only 20% of the time because of contention. How many attempts does it take on average?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "5"
-     },
-     {
-      "id": "b",
-      "label": "1.25"
-     },
-     {
-      "id": "c",
-      "label": "20"
-     },
-     {
-      "id": "d",
-      "label": "2"
-     }
-    ],
-    "correctChoiceIds": [
-     "a"
-    ],
-    "explanation": "Expected attempts are 1 ÷ 0.2 = 5, which is why hot rows suit pessimistic or atomic updates."
-   }
-  ],
-  "diagram": "optimistic: read (v=7) -> compute -> UPDATE ... WHERE version=7 -> 1 row: ok | 0 rows: retry\npessimistic: SELECT ... FOR UPDATE (others wait) -> compute -> UPDATE -> COMMIT (release)"
- },
- "73": {
-  "teaches": [
-   "ot",
-   "crdt",
-   "lww-docs"
-  ],
-  "mechanism": {
-   "title": "How OT and CRDTs merge concurrent edits",
-   "steps": [
-    "Problem: two users edit the same document at once. Alice inserts 'X' at position 0 while Bob deletes the character at position 3. Applying each other's operations naively shifts positions and corrupts the text.",
-    "Operational transformation (OT): operations go through a central server that orders them. When Bob's delete arrives after Alice's insert, the server transforms it (position 3 becomes 4) so it still deletes the intended character.",
-    "OT needs carefully proven transformation functions for every pair of operation types and is easiest with a central server, which is the approach Google Docs is publicly known to use.",
-    "CRDTs (conflict-free replicated data types) give every character a unique, ordered id (for example based on site id and counter), so inserts and deletes refer to ids, not positions, and replicas can apply operations in any order and still converge.",
-    "CRDTs work peer-to-peer and offline, at the cost of metadata per character and tombstones for deletions, which need compaction.",
-    "Last-writer-wins on the whole document is not collaborative editing: one user's changes silently disappear."
-   ]
-  },
-  "useWhen": [
-   "OT for server-centred real-time editors where a central service orders all operations.",
-   "CRDTs for offline-first and peer-to-peer apps, and for structured data such as counters, sets and maps (libraries such as Yjs and Automerge)."
-  ],
-  "avoidWhen": [
-   "Do not use last-writer-wins for documents edited concurrently.",
-   "Do not implement OT transformation functions from scratch unless you must; they are notoriously easy to get wrong."
-  ],
-  "tradeoffs": {
-   "columns": [
-    "Aspect",
-    "OT",
-    "CRDT",
-    "Last-writer-wins"
-   ],
-   "rows": [
-    [
-     "Needs central server",
-     "Usually",
-     "No",
-     "No"
-    ],
-    [
-     "Offline editing",
-     "Hard",
-     "Natural",
-     "Loses edits"
-    ],
-    [
-     "Metadata overhead",
-     "Low",
-     "Ids and tombstones per element",
-     "Minimal"
-    ],
-    [
-     "Correctness risk",
-     "Complex transform functions",
-     "Memory growth",
-     "Silent data loss"
-    ]
-   ]
-  },
-  "numbers": {
-   "title": "Metadata cost of a text CRDT",
-   "assumptions": [
-    "Document of 50,000 characters",
-    "About 16 bytes of id and ordering metadata per character (illustrative)",
-    "Another 20,000 deleted characters kept as tombstones"
-   ],
-   "steps": [
-    "Live characters: 50,000 × 16 bytes = 800,000 bytes, about 0.8 MB of metadata.",
-    "Tombstones: 20,000 × 16 bytes = 320,000 bytes.",
-    "Total metadata is about 1.12 MB for 50 KB of text, more than 20 times the text itself.",
-    "Libraries reduce this with run-length encoding of consecutive inserts and periodic garbage collection."
-   ],
-   "result": "CRDT convergence is paid for in metadata, so production libraries compress runs and collect tombstones."
-  },
-  "india": {
-   "title": "Co-editing a project report",
-   "label": "Illustrative estimate",
-   "body": "Three engineering students in Pune edit a project report together: two online in a browser editor, one on a train with patchy network. In a server-centred editor using OT, each keystroke travels to the server, which orders and transforms it, so the offline student cannot edit meaningfully until reconnected. In a CRDT-based editor, the offline student keeps typing, and when the train reaches a station with signal, their changes merge with the others' without conflicts or lost paragraphs. Whole-file last-writer-wins, the behaviour of naive file sync, would keep only the last person's save."
-  },
-  "pitfalls": [
-   {
-    "trap": "Ignoring tombstone growth in a CRDT.",
-    "say": "'Deleted elements stay as tombstones, so I'd rely on a library that compacts them and snapshot documents periodically.'"
-   },
-   {
-    "trap": "'We'll lock the document while someone edits.'",
-    "say": "'Real-time editors merge concurrent edits; I'd use OT with a central server or a CRDT library such as Yjs if offline editing matters.'"
-   },
-   {
-    "trap": "Proposing last-writer-wins for documents.",
-    "say": "'LWW drops a user's edits silently; text needs OT or a sequence CRDT.'"
-   }
-  ],
-  "takeaways": [
-   "Positions shift under concurrent edits; merging needs OT or CRDTs.",
-   "OT transforms operations through a central server.",
-   "CRDTs use unique ids so replicas converge in any order, even offline.",
-   "Last-writer-wins on documents loses work."
-  ],
-  "extraQuestions": [
-   {
-    "id": "t73-d1",
-    "type": "multiple_choice",
-    "concept": "ot",
-    "prompt": "Alice inserts one character at position 0 while Bob deletes position 3. Under OT, how is Bob's delete applied after Alice's insert?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "Transformed to position 4"
-     },
-     {
-      "id": "b",
-      "label": "Applied at position 3 unchanged"
-     },
-     {
-      "id": "c",
-      "label": "Discarded"
-     },
-     {
-      "id": "d",
-      "label": "Applied at position 0"
-     }
-    ],
-    "correctChoiceIds": [
-     "a"
-    ],
-    "explanation": "Alice's insert shifts later characters right by one, so the delete is transformed to position 4."
-   }
-  ],
-  "diagram": "text 'abcd'\nAlice: insert X at 0 -> 'Xabcd'      Bob: delete pos 3 ('d') -> 'abc'\nOT: Bob's delete transformed to pos 4 -> 'Xabc'   CRDT: delete id(d) -> 'Xabc'"
- }
+    "diagram": "text 'abcd'\nAlice: insert X at 0 -> 'Xabcd'      Bob: delete pos 3 ('d') -> 'abc'\nOT: Bob's delete transformed to pos 4 -> 'Xabc'   CRDT: delete id(d) -> 'Xabc'"
+  }
 }

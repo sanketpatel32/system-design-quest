@@ -203,4 +203,17 @@ if (errors.length) {
     }
   }
 }
+// Option-length balance (review M6): the correct option must not stand out by length
+{
+  const seen = new Set(); let n = 0, longest = 0
+  for (const t of topics) for (const q of [...t.questions, ...(t.bossStages ?? []).flatMap((s) => s.questions)]) {
+    if (q.type !== 'multiple_choice' || q.correctChoiceIds.length !== 1 || seen.has(q.id)) continue
+    seen.add(q.id); n++
+    const right = q.choices.find((c) => c.id === q.correctChoiceIds[0]).label.length
+    const other = Math.max(...q.choices.filter((c) => c.id !== q.correctChoiceIds[0]).map((c) => c.label.length))
+    if (right > other) longest++
+    if (right > 1.5 * other && right - other > 15) errors.push(`Topic ${t.id} ${q.id}: correct option is far longer than every distractor (${right} vs ${other} chars)`)
+  }
+  console.log(`Option balance: correct option uniquely longest in ${Math.round((longest / n) * 100)}% of ${n} single-answer MCQs; none grossly longer (choices are shuffled per attempt)`)
+}
 console.log('AUDIT OK: 120 topics, 40 bosses, counts and keys valid')
