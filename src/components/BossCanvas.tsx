@@ -80,6 +80,7 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
         source: e.source,
         target: e.target,
         label: e.label,
+        animated: true,
       })),
     [initial],
   )
@@ -119,7 +120,7 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      setEdges((eds) => addEdge({ ...connection, id: `e${Date.now().toString(36)}` }, eds))
+      setEdges((eds) => addEdge({ ...connection, animated: true, id: `e${Date.now().toString(36)}` }, eds))
     },
     [setEdges],
   )
@@ -137,7 +138,7 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
 
   const connectViaForm = (sourceId: string, targetId: string) => {
     if (!sourceId || !targetId || sourceId === targetId) return
-    setEdges((eds) => addEdge({ id: `e${Date.now().toString(36)}`, source: sourceId, target: targetId }, eds))
+    setEdges((eds) => addEdge({ animated: true, id: `e${Date.now().toString(36)}`, source: sourceId, target: targetId }, eds))
   }
 
   return (
@@ -217,7 +218,7 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
           colorMode="light"
           fitView
           fitViewOptions={{ maxZoom: 1.1, padding: 0.3 }}
-          defaultEdgeOptions={{ style: { stroke: '#8AA0B8', strokeWidth: 3 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#8AA0B8' } }}
+          defaultEdgeOptions={{ animated: true, style: { stroke: '#8AA0B8', strokeWidth: 3 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#8AA0B8' } }}
         >
           <Background color="#DED7CA" gap={24} size={2} />
           <MiniMap pannable zoomable nodeColor="#BFD7EA" maskColor="rgba(255,249,240,0.7)" style={{ background: '#FFFFFF' }} />

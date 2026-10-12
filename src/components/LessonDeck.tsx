@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { motion } from 'motion/react'
+import { spring, useCalm } from '../lib/motion'
 import type { ReactNode } from 'react'
 import type { LessonCard } from '../content/types'
 import { MascotSays } from './art/Mascot'
@@ -29,6 +31,12 @@ export function LessonDeck({
 }) {
   const [index, setIndex] = useState(0)
   const card = cards[index]
+  const calm = useCalm()
+  const last = useRef(index)
+  const dir = index >= last.current ? 1 : -1
+  useEffect(() => {
+    last.current = index
+  }, [index])
 
   const next = useCallback(() => setIndex((i) => Math.min(cards.length - 1, i + 1)), [cards.length])
   const prev = useCallback(() => setIndex((i) => Math.max(0, i - 1)), [])
@@ -72,20 +80,34 @@ export function LessonDeck({
             />
           ))}
         </div>
+        <motion.div
+          key={index}
+          style={{ transformPerspective: 900 }}
+          initial={calm ? false : { opacity: 0, x: 70 * dir, rotateY: 14 * dir }}
+          animate={{ opacity: 1, x: 0, rotateY: 0 }}
+          transition={spring.gentle}
+        >
         {hasRealTitle(card) && <h3 className="font-display text-2xl sm:text-3xl text-chalk mb-3">{card.title}</h3>}
         <p className="text-chalk leading-relaxed text-[18px] font-semibold max-w-[62ch]">{card.body}</p>
         {card.steps && card.steps.length > 0 && (
           <ol className="flow mt-5" aria-label="Request flow">
             {card.steps.map((step, i) => (
-              <li key={step} className="flow-step">
+              <motion.li
+                key={step}
+                className="flow-step"
+                style={{ ['--i' as string]: i, ['--n' as string]: card.steps!.length }}
+                initial={calm ? false : { opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ ...spring.pop, delay: 0.15 + i * 0.12 }}
+              >
                 <span className="flow-dot tabular-nums" style={{ borderColor: accent }} aria-hidden>{i + 1}</span>
                 <span className="text-chalk font-bold">{step}</span>
-              </li>
+              </motion.li>
             ))}
           </ol>
         )}
         {card.diagram && (
-          <div className="mt-4 rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 overflow-x-auto" dangerouslySetInnerHTML={{ __html: lightDiagram(card.diagram) }} />
+          <div className="diagram-flow mt-4 rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 overflow-x-auto" dangerouslySetInnerHTML={{ __html: lightDiagram(card.diagram) }} />
         )}
         {card.kind === 'animation' && (
           <div className="mt-4 h-1 bg-[var(--color-rail)] rounded-full overflow-hidden" aria-hidden>
@@ -97,6 +119,7 @@ export function LessonDeck({
             <MascotSays mood="happy" size={72}>You’ve got this! 3 hearts, and you need 70% to clear.</MascotSays>
           </div>
         )}
+        </motion.div>
         <div className="flex gap-3 mt-6 border-t-2 border-[var(--color-rail)] pt-5">
           <button type="button" onClick={prev} disabled={index === 0} className="btn-quiet">
             Prev
