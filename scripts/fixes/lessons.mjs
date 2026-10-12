@@ -280,3 +280,15 @@ export const CARDS_ONLY = {
     flashcards: [['OAuth 2.0 vs OIDC?', 'OAuth grants delegated access; OIDC adds identity via an ID token.'], ['What does PKCE prevent?', 'An intercepted authorization code being redeemed by another app.'], ['Which token proves who logged in?', 'The OIDC ID token.']],
   },
 }
+
+// Extra cards appended to existing lessons (worked examples)
+export const EXTRA_CARDS = {
+  1: [
+    ['Worked example: the first five minutes', 'Interviewer: “Design a URL shortener.” Good clarifying questions: Who creates links, and roughly how many per day? Do links expire? Custom aliases? Is click analytics in scope? A strong opening answer: “I’ll assume 100M new links a month, about 100 reads per write, redirects under 50 ms, links never expire, analytics out of scope. Let me size that before drawing anything.”'],
+  ],
+}
+
+// Wording fixes inside existing lesson text
+export const TEXT_FIXES = [
+  ['Always spend the first 5 minutes on requirements.', 'Spend roughly the first five minutes on requirements; the interviewer may steer you sooner.'],
+]
