@@ -93,7 +93,7 @@ export function RevisionPage() {
       {!current ? (
         <div className="panel p-6 text-center">
           <p className="font-display text-xl font-bold text-chalk">Queue empty</p>
-          <p className="text-sm text-dim mt-1">Nothing is due on this line. Clear more stations to add cards, or come back tomorrow.</p>
+          <p className="text-sm text-dim mt-1">Nothing is due on this line right now. Cards you rated come back on their scheduled day.</p>
           <Link to="/" className="btn-quiet mt-4">Back to map</Link>
         </div>
       ) : (
