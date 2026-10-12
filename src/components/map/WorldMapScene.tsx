@@ -55,6 +55,13 @@ function connector(i: number) {
 
 type Status = ReturnType<typeof topicStatus>
 
+const STATUS_WORD: Record<Status, string> = {
+  locked: 'locked',
+  available: 'open',
+  in_progress: 'in progress',
+  completed: 'cleared',
+}
+
 function StationDot({
   stop,
   status,
@@ -77,7 +84,9 @@ function StationDot({
       tabIndex={0}
       data-testid={`station-${stop.id}`}
       data-status={status}
-      className="cursor-pointer outline-none"
+      aria-label={`Topic ${stop.id}: ${topicsById.get(stop.id)?.title ?? ''}, ${STATUS_WORD[status]}`}
+      aria-pressed={selected}
+      className="station cursor-pointer"
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -86,6 +95,7 @@ function StationDot({
         }
       }}
     >
+      <circle className="station-focus" cx={x} cy={y} r={19} fill="none" stroke="#F2B33D" strokeWidth={3} />
       {pulse && (
         <circle
           cx={x}
