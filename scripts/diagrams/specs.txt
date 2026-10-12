@@ -147,13 +147,14 @@ Client > API gateway|TLS, auth, rate limit > BFF > Profile service
 BFF > Offers service
 BFF > Orders service
 
-@52 Service discovery in Kubernetes: ready pods are registered as endpoints; a caller resolves payments.svc by DNS, and kube-proxy forwards to a ready pod.
-Pod [registers when ready]> Endpoints registry
-Caller > payments.svc|DNS / VIP > kube-proxy > Ready pod
-Endpoints registry > kube-proxy
+@52 Service discovery in Kubernetes: once a pod's readiness probe passes, the EndpointSlice controller adds it to the Service's endpoints (pods do not register themselves); a caller resolves payments.svc by DNS, and kube-proxy forwards to a ready pod.
+Pod|readiness probe passes {svc} [selector match]> EndpointSlice controller > Endpoints {store}
+Caller > payments.svc|DNS / VIP > kube-proxy > Ready pod {svc}
+Endpoints {store} > kube-proxy
 
-@53 Circuit breaker states: closed until errors exceed 50 percent, then open (fail fast); after a cool-down it goes half-open, and if trial calls succeed it closes again.
-CLOSED [errors over 50%]> OPEN|fail fast / fallback [cool-down]> HALF-OPEN [trial calls succeed]> CLOSED
+@53 Circuit breaker states: closed until errors exceed 50 percent, then open (fail fast); after a cool-down it goes half-open, and if trial calls succeed it closes again, while a failed trial reopens it.
+CLOSED [errors over 50%]> OPEN|fail fast / fallback [cool-down]> HALF-OPEN
+HALF-OPEN [trial calls succeed]> CLOSED
 HALF-OPEN [trial fails]> OPEN|fail fast / fallback
 
 @54 A distributed trace: the gateway starts trace 7f3a, orders takes 120 ms and payments takes 3.2 s because of a bank API timeout and retry; a p99 alert leads to the trace and then to logs filtered by trace_id.
@@ -169,9 +170,9 @@ Login|password + OTP > Session cookie / JWT
 Request > Authenticate|credential > Authorise|role, owner, scope [ok]> Allow
 Authorise|role, owner, scope [no]> 403
 
-@58 OAuth authorisation code with PKCE: the app sends the challenge to the auth server, the user logs in and consents, the app gets a code and swaps it with the verifier for tokens.
-App [challenge, scopes, state]> Auth server [login + consent]> Redirect|?code&state
-Redirect|?code&state [code + verifier]> Token endpoint > Access, refresh|and ID tokens
+@58 OAuth authorisation code with PKCE: the app sends the challenge to the auth server, the user logs in and consents, the auth server redirects back with a code, and the app swaps the code plus its verifier for tokens.
+App {client} [1. challenge, scopes]> Auth server|login + consent [2. redirect ?code]> App callback {client}
+App callback {client} [3. code + verifier]> Token endpoint > Access, refresh|and ID tokens {store}
 
 @59 JWT verification order: check the algorithm is allowed, pick the key by kid from JWKS, verify the signature, check exp, iss and aud, then trust sub and scopes.
 JWT > Alg allow-listed? > Key by kid|from JWKS > Signature OK? > exp, iss, aud OK? > Trust sub|and scopes
@@ -185,15 +186,16 @@ App|metadata pending {svc} [2. presigned URL]> Client
 Client [3. PUT bytes]> Object storage
 Object storage [4. event]~> Worker|scan, thumbnail > Metadata ready {store}
 
-@62 HDFS write pipeline: the NameNode maps file blocks to DataNodes; the client streams a block to DN1 on rack A, which forwards to DN4 and DN5 on rack B.
-Client [where to write?]> NameNode|block map
+@62 HDFS write pipeline: the NameNode maps file blocks to DataNodes; the client streams a block to DN1 on rack A, which forwards to DN4 and DN5 on rack B, and acks flow back along the pipeline.
+Client [ask where to write]> NameNode|block map
 Client [block b1]> DN1|rack A > DN4|rack B > DN5|rack B
+DN1|rack A [pipeline ack]~> Client
 
 @63 Inverted index search: a query is analysed and fuzzy-matched ('panner' to 'paneer'), looked up in the postings list, scored with BM25 and the top 10 returned.
 Query panner > Analyse +|fuzzy match > Postings|paneer: 3, 7, 19 > Score BM25 > Top 10
 
-@64 MapReduce: input splits are mapped to (merchant, amount), shuffled by key, reduced to a sum per merchant and written out; a hot key is salted into sub-keys and combined.
-Input splits > Map|(merchant, amt) > Shuffle by key > Reduce|sum per merchant > Output
+@64 MapReduce: input splits are mapped to (merchant, amount), a hot merchant key is salted into sub-keys, shuffled by key, reduced to partial sums, then the salted partials are combined into one sum per merchant.
+Input splits > Map|(merchant, amt) > Salt hot key|merchant#0..7 > Shuffle by key > Reduce|partial sums > Combine salts|sum per merchant > Output
 
 @65 Stream processing: keyed Kafka events go to a stateful operator with checkpoints; a one-minute window closes when the watermark passes, and late events go to a side output.
 Kafka|keyed > Operator|state per key, checkpoints > Window 12:00-12:01|closes on watermark > Sink
@@ -205,20 +207,20 @@ OLTP Postgres [CDC]~> Lake|Parquet [transform, dbt]> Warehouse|facts + dims > Da
 @69 Progressive delivery: deploy v2 dark, then turn the flag on for staff, 1, 5, 25 and 100 percent, then delete the flag; a guardrail breach at any step turns it off.
 Deploy v2 dark > Staff > 1% > 5% > 25% > 100% > Delete flag
 
-@70 Kubernetes reconcile loop: a Deployment owns a ReplicaSet that owns pods; the controller compares desired with actual replicas and creates or removes pods to match.
-Deployment|replicas 14, image v2 > ReplicaSet > Pods
-Controller loop|desired 14 vs actual 13 [create 1]> Pods
+@70 Kubernetes reconcile loop: a Deployment owns a ReplicaSet; the Deployment controller keeps the ReplicaSet's desired count right, and the ReplicaSet controller compares desired with actual pods and creates or removes pods to match.
+Deployment|replicas 14, image v2 [Deployment controller]> ReplicaSet|desired 14, actual 13 [ReplicaSet controller: create 1]> Pods
 
 # ---------- Boss reference architectures ----------
-@75 URL shortener: redirects go client to CDN edge to redirect service to Redis to the KV store of code-to-URL; creates use a base62 ID generator; redirects emit click events to a queue for analytics workers.
+@75 URL shortener: redirects go client to CDN edge to redirect service to Redis to the KV store of code-to-URL; creates use a base62 ID generator in their own path; redirects emit click events to a queue for analytics workers.
+Create API [new link]> ID generator|base62 [write]> KV store|code to url
 Client > CDN / edge > Redirect service > Redis cache > KV store|code to url
-Create API > ID generator|base62 > KV store|code to url
 Redirect service [click event]~> Queue > Analytics workers
 
-@76 Pastebin: the paste service keeps metadata in Redis and SQL and the paste content in object storage; a cron job deletes expired pastes.
+@76 Pastebin: the paste service keeps metadata in Redis and SQL and the paste content in object storage; a cron job deletes expired metadata rows and the matching objects (or an object-storage lifecycle rule expires them).
 Client > CDN > Paste service > Redis|metadata cache > SQL|metadata
 Paste service > Object storage|content
-Cron job [delete expired]> SQL|metadata
+Cron job [delete expired rows]> SQL|metadata
+Cron job [delete objects]> Object storage|content
 
 @77 Rate limiter: the gateway asks a limiter running a Lua token bucket in Redis, keyed by user, phone or IP; allowed requests reach the service, denied ones get 429 with Retry-After; a config service pushes rules to gateways.
 Client > Gateway > Limiter|Lua token bucket in Redis
@@ -229,12 +231,12 @@ Config service [rules]~> Gateway
 @78 Unique ID generator: each service embeds a library that builds 64-bit IDs from timestamp, worker ID and sequence; the worker ID is leased from etcd or ZooKeeper so it is unique per process.
 etcd / ZooKeeper [worker id lease]> ID library|in each service > timestamp | worker | sequence > 64-bit id
 
-@79 Distributed KV store: any node can coordinate; it hashes the key onto the ring and writes to replicas A, B and C, succeeding with W=2 acks and reading with R=2 plus read repair; gossip, hinted handoff and Merkle anti-entropy keep replicas healthy.
-Client > Any node|coordinator > hash(key) on ring > Replica A
+@79 Distributed KV store: any node can coordinate; it hashes the key onto the ring and writes to replicas A, B and C, succeeding once W=2 acknowledge and reading with R=2 plus read repair; gossip, hinted handoff and Merkle anti-entropy run between all replicas.
+Client > Any node|coordinator: W=2, R=2 > hash(key) on ring > Replica A
 hash(key) on ring > Replica B
 hash(key) on ring > Replica C
-Any node|coordinator > W=2 acks / R=2|newest wins + read repair
-Gossip, hinted handoff,|Merkle anti-entropy ~> Replica C
+Replica A [gossip, Merkle sync]~> Replica B
+Replica B [gossip, Merkle sync]~> Replica C
 
 @80 Distributed cache: the client library hashes keys on a ring to primary nodes A and B, each replicated to a standby; on a miss the app reads the database and sets the value with TTL plus jitter.
 App|client lib + hash ring > Node A|primary ~> Replica A
@@ -266,9 +268,10 @@ User A > Gateway 1 > Chat service|sequence + store > Gateway 7 > User B
 Chat service|sequence + store > Registry|B on gateway 7
 Chat service|sequence + store [B offline]> Push notification
 
-@85 Instagram: the app uploads photos with a presigned PUT to object storage, whose event triggers resize workers that publish to the CDN; feeds come from a feed service with a cache of IDs and a metadata DB.
-App [presigned PUT]> Object storage [event]~> Resize workers > CDN
-App > Feed service > Feed cache|ids > Metadata DB
+@85 Instagram: the app asks the post service for a presigned URL, uploads the photo to object storage, and commits the post to the metadata DB; storage events trigger resize workers that publish to the CDN, and fan-out workers push the post into followers' feed caches.
+App [1. request upload]> Post service > Metadata DB
+App [2. presigned PUT]> Object storage [event]~> Resize workers > CDN
+Post service [3. new post]~> Fan-out workers > Feed cache|ids
 CDN [images]> Viewers
 
 @86 YouTube: chunked uploads land in object storage, transcode workers produce renditions in parallel and the CDN serves them; the player fetches a manifest and then adaptive-bitrate segments.
@@ -286,11 +289,12 @@ Rider > Dispatch > Geo index|city shard, cells
 Dispatch > Rank by ETA > Offer > Accept|conditional write
 Trip events ~> Kafka > Billing, analytics
 
-@89 Zomato/Swiggy: search and menus come from Elasticsearch and Redis; orders go to an idempotent SQL order service that runs a saga of payment, restaurant acceptance and rider assignment; rider pings update a geo index and status is pushed to the app.
+@89 Zomato/Swiggy: search and menus come from Elasticsearch and Redis; orders go to an idempotent SQL order service that runs a saga of payment, restaurant acceptance and rider assignment from a geo index; if the restaurant rejects, the payment is refunded; status is pushed to the app.
 App > Search / menu|Elasticsearch + Redis
 App > Order service|SQL, idempotency > Payment > Restaurant accepts > Rider assigned
-Rider pings > Geo index
-Order service|SQL, idempotency [status push]~> App
+Restaurant accepts [rejects]> Refund {ext}
+Rider pings > Geo index [nearest riders]> Rider assigned
+Order service|SQL, idempotency [status push]~> Push to app
 
 @90 Google Docs: clients connect over WebSocket to the session server that owns the document; it orders and transforms operations, appends them to an op log and broadcasts them; snapshots go to object storage.
 Clients [WebSocket]> Doc session server|owner of doc 42 > Order / transform ops > Op log
@@ -299,7 +303,7 @@ Op log ~> Snapshots|object storage
 
 @91 Dropbox/Drive: the client chunks and hashes files, asks the metadata service which chunks are missing, uploads only those to object storage, then commits a version; a change event tells other devices to sync missing chunks.
 Client|chunk + hash > Metadata service|which missing? > Upload missing chunks > Object storage
-Metadata service|which missing? > Commit version|SQL [change event]~> Other devices > Object storage
+Upload missing chunks > Commit version|SQL [change event]~> Other devices
 
 @92 UPI-style payments: the app calls the PSP transaction service, which records a unique transaction reference in a SQL ledger and calls NPCI, which debits the payer bank and credits the payee bank; timeouts trigger status checks and daily reconciliation.
 App > PSP txn service|unique ref, SQL ledger > NPCI > Payer bank|debit
@@ -333,9 +337,9 @@ Client|debounced [GET /suggest]> Suggest servers|in memory
 @98 Web crawler: seeds feed a per-host frontier; fetchers obey robots.txt and politeness and store pages in object storage; a parser extracts links, which are deduplicated with a Bloom filter or seen-set before returning to the frontier.
 Seeds > Frontier|queues by host > Fetchers|robots.txt, politeness > Object storage > Parser > Dedup|Bloom / seen set [new links]> Frontier|queues by host
 
-@99 Product search: the SQL catalogue streams changes by CDC into Kafka, and indexers write to sharded, replicated Elasticsearch; a query is analysed, searched with filters and facets, ranked, cached and returned.
+@99 Product search: the SQL catalogue streams changes by CDC into Kafka, and indexers write to sharded, replicated Elasticsearch; a query checks the cache first, and on a miss it is analysed, searched with filters and facets, ranked and cached.
 Catalogue SQL [CDC]~> Kafka > Indexers > Elasticsearch|shards x replicas
-Query > Analyse > Search + filters|+ facets > Rank > Cache > Results
+Query > Query cache [miss]> Analyse > Search + filters|+ facets > Rank > Results
 Search + filters|+ facets > Elasticsearch|shards x replicas
 
 @100 Metrics monitoring: agents send to Kafka, ingest workers write raw points to a partitioned TSDB, rollup jobs build 1-minute and 1-hour aggregates, dashboards query through a cache, and an alert engine evaluates rules every 15 to 30 s and notifies with dedup and silencing.
@@ -348,10 +352,12 @@ Dashboards > Query cache [reads rollups]> Aggregates|1 min / 1 h {store}
 App > Local file > Agent|batch, disk buffer, masking > Kafka > Indexers > Search cluster|daily indices
 Search cluster|daily indices > Hot 7 d > Warm 30 d > Archive|object storage
 
-@102 Distributed message queue: producers append to the partition leader's segment and followers in the ISR replicate it; consumer groups read assigned partitions from an offset and commit it; a Raft controller holds metadata and old segments are deleted by retention.
+@102 Distributed message queue: producers append to the partition leader's segment and followers in the ISR replicate it; consumers in a group read their assigned partition from the leader at an offset and commit it; a Raft controller holds metadata; old segments are deleted by retention.
 Producer > Partition leader|append segment > Followers|ISR
-Consumer group > Assigned partitions > Read from offset > Commit offset
+Consumer group|assigned partitions [read from offset]> Partition leader|append segment
+Consumer group|assigned partitions [commit offset]> Offsets topic {store}
 Controller|Raft metadata > Partition leader|append segment
+Partition leader|append segment [retention]~> Delete old segments
 
 @103 Distributed job scheduler: jobs live in SQL indexed by next_run_time; schedulers poll and claim due jobs with SKIP LOCKED and enqueue them; workers run them and record results in run history, retrying failures with backoff.
 Schedulers [poll + claim, SKIP LOCKED]> Jobs table|SQL, idx next_run_time
@@ -364,7 +370,7 @@ Query|lat, lng, r > Search servers|in-memory, replicated > Cell + neighbours > F
 
 @105 Flash sale: static pages come from the CDN, a waiting room issues tokens and rate-limits, reservations atomically decrement stock buckets, then the order and payment follow; expired reservations return stock.
 Users > CDN|static > Waiting room|tokens, rate limit > Reserve|atomic decrement > Order > Pay
-Pay [expired, stock back]> Reserve|atomic decrement
+Pay [expired: stock back]> Reserve|atomic decrement
 
 @106 Hotel booking: search uses Elasticsearch with filters and geo plus an availability cache; booking runs a SQL transaction that decrements every night where availability is positive, holds, takes payment and confirms with the supplier; events drive email, invoices and sync.
 Search > Elasticsearch|filters, geo
@@ -396,11 +402,11 @@ Submit > API|store > Queue|per contest > Workers > Sandbox|no network, limits {s
 Verdict [push]> User
 Verdict ~> Leaderboard
 
-@112 Email service: inbound SMTP is checked for SPF, DKIM and DMARC, queued for spam and malware workers, and stored with bodies in object storage and per-user metadata indexed for search; clients read the inbox by cursor; outbound mail is queued with retries.
+@112 Email service: inbound SMTP is checked for SPF, DKIM and DMARC, queued for spam and malware workers, and stored with bodies in object storage and per-user metadata indexed for search; clients read the inbox by cursor; outbound mail is queued and sent by an SMTP sender that DKIM-signs and retries.
 SMTP in > SPF / DKIM / DMARC > Queue > Spam + malware|workers > Object storage|bodies
 Spam + malware|workers > Metadata|per user {store} > Search index
-Client > Inbox|cursor > Metadata|per user
-Client [send]> Outbound queue|retries
+Client [list inbox by cursor]> Metadata|per user {store}
+Client [send]> Outbound queue > SMTP sender|DKIM sign, retries
 
 @113 S3-like object storage: the front end authenticates; on PUT, data is erasure-coded 8+4 across storage nodes in different racks or zones before the metadata service commits bucket/key to fragments; GET reads 8 of 12 fragments and verifies; scrubbers repair.
 Client > Front end|auth > Metadata service|bucket/key to fragments

@@ -283,7 +283,7 @@ function renderSvg(spec, g) {
       parts.push(`<path d="${textPath(t, n.x + n.w / 2, n.y + PADY + (i + 1) * LINE - 6, FS)}" fill="#1e1e1e"/>`)
     })
   }
-  let maxY = g.H - MARGIN - 18
+  let maxY = g.H - MARGIN - 18, maxX = 0
   for (const e of g.edges) {
     const { pts, curve, poly } = edgeGeom(e, g)
     for (const q of pts) maxY = Math.max(maxY, q[1] + 16)
@@ -305,6 +305,7 @@ function renderSvg(spec, g) {
       for (const t of cands) { const x = A[0] + (Bp[0] - A[0]) * t, y = A[1] + (Bp[1] - A[1]) * t + dy; if (free(x, y)) { mx = x; my = y; found = true; break } }
       if (!found) for (const t of cands) for (const oy of [-14, 14, -26, 26]) { const x = A[0] + (Bp[0] - A[0]) * t, y = A[1] + (Bp[1] - A[1]) * t + dy + oy; if (!found && free(x, y)) { mx = x; my = y; found = true } }
       placed.push([mx - w / 2, my - 13, mx + w / 2, my + 4])
+      maxX = Math.max(maxX, mx + w / 2)
       parts.push(`<rect x="${(mx - w / 2).toFixed(1)}" y="${(my - 13).toFixed(1)}" width="${w.toFixed(1)}" height="17" rx="4" fill="#ffffff" opacity="0.9"/>`)
       parts.push(`<path d="${textPath(e.label, mx, my, EFS)}" fill="#495057"/>`)
     }
@@ -328,7 +329,7 @@ function renderSvg(spec, g) {
     }
     g.legendW = x + MARGIN
   }
-  const W = Math.max(g.W, Math.ceil(g.legendW)), H = Math.ceil(g.legendY + 22)
+  const W = Math.max(g.W, Math.ceil(g.legendW), Math.ceil(maxX + MARGIN)), H = Math.ceil(g.legendY + 22)
   g.outW = W; g.outH = H
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img"><title>${spec.alt.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</title><rect width="100%" height="100%" fill="#ffffff"/>${parts.join('')}</svg>\n`
 }
