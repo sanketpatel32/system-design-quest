@@ -16,6 +16,8 @@ interface Props {
   reveal?: { correct: boolean }
   /** Duolingo-style mode: a fixed bottom bar holds Submit, and feedback slides up as a coloured sheet */
   sheet?: { onContinue: () => void; continueLabel: string; extra?: React.ReactNode }
+  /** Mixed into the drag-order scramble so each attempt gets a new order */
+  scrambleSeed?: string
 }
 
 const TYPE_LABEL: Record<Question['type'], string> = {
@@ -259,26 +261,19 @@ function hasStructuredTradeoff(q: TradeoffQuestion) {
   return Boolean(q.rationaleOptions?.length && q.correctRationaleIds?.length)
 }
 
-export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, hotkeys = true, number, total, reveal, sheet }: Props) {
+export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, hotkeys = true, number, total, reveal, sheet, scrambleSeed = '' }: Props) {
   const [answer, setAnswer] = useState<unknown>(initialAnswer)
   const [result, setResult] = useState<ReturnType<typeof gradeQuestion> | null>(null)
   const submitted = locked || result !== null
   const shown: { correct: boolean; feedback: string } | null =
     result ?? (reveal ? { correct: reveal.correct, feedback: reveal.correct ? 'You answered this one correctly.' : 'You missed this one; the right answer is marked.' } : null)
-  const pending = incompleteReason(
-    question,
-    question.type === 'drag_order' && !(Array.isArray(answer) && answer.length === question.items.length)
-      ? scrambled(question.items.map((i) => i.id), question.id)
-      : answer,
-  )
+  const orderUntouched = question.type === 'drag_order' && !(Array.isArray(answer) && answer.length === question.items.length)
+  // An untouched reorder list is a blank answer: Submit stays disabled, so it can never cost a heart
+  const pending = orderUntouched ? 'Move at least one step to set your order.' : incompleteReason(question, answer)
 
   const submit = () => {
-    if (submitted) return
-    // A reorder list always has an order on screen; submit that one even if untouched
-    const final =
-      question.type === 'drag_order' && !(Array.isArray(answer) && answer.length === question.items.length)
-        ? scrambled(question.items.map((i) => i.id), question.id)
-        : answer
+    if (submitted || orderUntouched) return
+    const final = answer
     if (incompleteReason(question, final)) return
     const r = gradeQuestion(question, final)
     setResult(r)
@@ -297,7 +292,10 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
         e.preventDefault()
         setAnswer([choice.id])
       }
-      if (e.key === 'Enter') submit()
+      if (e.key === 'Enter' && !e.repeat) {
+        e.preventDefault()
+        submit()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -352,7 +350,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
       {question.type === 'drag_order' && (
         <OrderList
           items={question.items}
-          order={Array.isArray(answer) && (answer as string[]).length === question.items.length ? (answer as string[]) : scrambled(question.items.map((i) => i.id), question.id)}
+          order={Array.isArray(answer) && (answer as string[]).length === question.items.length ? (answer as string[]) : scrambled(question.items.map((i) => i.id), question.id + scrambleSeed)}
           disabled={submitted}
           onChange={setAnswer}
         />
@@ -532,6 +530,8 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
                 <button
                   type="button"
                   autoFocus
+                  // A held-down Enter (auto-repeat) must not skip straight past the feedback
+                  onKeyDown={(e) => { if (e.repeat && e.key === 'Enter') e.preventDefault() }}
                   className={`${shown.correct ? 'btn-cta' : 'btn-danger'} min-w-[180px]`}
                   onClick={sheet.onContinue}
                 >

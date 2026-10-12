@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { allTopics, orderedTopicsInRegion } from '../content/catalog'
 import { QuestionRenderer } from '../components/QuestionRenderer'
@@ -32,10 +32,21 @@ export function QuizPage() {
   const [index, setIndex] = useState<number | null>(null)
   const [practice, setPractice] = useState(0)
   const [claim, setClaim] = useState<Claim>(null)
+  /** Order questions get a fresh scramble on every attempt (stable within the attempt) */
+  const [attemptSeed, setAttemptSeed] = useState(() => Math.random().toString(36).slice(2))
+  const claimedRef = useRef(false)
+  const [skipLessonHint, setSkipLessonHint] = useState(false)
 
   useEffect(() => {
     if (topicId) startQuizAttempt(topicId)
   }, [topicId, startQuizAttempt])
+
+  // Save a pass automatically as soon as the result is reached (also after a reload)
+  const autoClaim = useRef<() => void>(() => {})
+  const readyToClaim = useRef(false)
+  useEffect(() => {
+    if (readyToClaim.current) autoClaim.current()
+  })
 
   if (!topic)
     return (
@@ -55,7 +66,8 @@ export function QuizPage() {
   const heartsOut = attempt.hearts <= 0
   const allDone = answeredCount === total
   const firstOpen = topic.questions.findIndex((q) => !(q.id in results))
-  const current = index ?? (firstOpen === -1 ? total - 1 : firstOpen)
+  // index === total means "show the result"; never use it to look up a question
+  const current = Math.min(index ?? (firstOpen === -1 ? total - 1 : firstOpen), total - 1)
   const q = topic.questions[current]!
   const answered = q.id in results
   const finished = allDone || heartsOut
@@ -66,6 +78,8 @@ export function QuizPage() {
   const next = line[line.findIndex((t) => t.id === topic.id) + 1]
 
   const claimProgress = () => {
+    if (claimedRef.current) return
+    claimedRef.current = true
     const res = finishQuizIfReady(topic.id)
     if (res.cleared) {
       setClaim({ xpGained: res.xpGained, newBadges: res.newBadges })
@@ -77,8 +91,13 @@ export function QuizPage() {
   const retry = () => {
     resetQuizAttempt(topic.id)
     setIndex(0)
+    setPractice(0)
     setClaim(null)
+    setAttemptSeed(Math.random().toString(36).slice(2))
   }
+
+  readyToClaim.current = showResult && passed && !alreadyCleared && !claim
+  autoClaim.current = claimProgress
 
   const missed = topic.questions.filter((x) => x.id in results && !results[x.id])
   const goNext = () => {
@@ -138,7 +157,7 @@ export function QuizPage() {
             </h1>
             <p className="mt-1 text-lg font-bold text-dim">{correctCount}/{total} correct</p>
             <div className="mx-auto mt-6 grid max-w-md grid-cols-3 gap-3">
-              <StatTile label="Total XP" color="#FFC800" deep="#8A5A00" value={claim ? `+${claim.xpGained}` : alreadyCleared ? '0' : '—'} icon={<IconGem size={28} />} />
+              <StatTile label="Total XP" color="#FFC800" deep="#8A5A00" value={claim ? `+${claim.xpGained}` : 'Saved'} icon={<IconGem size={28} />} />
               <StatTile label="Accuracy" color="#58CC02" deep="#2F7D00" value={`${Math.round((correctCount / total) * 100)}%`} icon={<Target />} />
               <StatTile label="Streak" color="#FF9600" deep="#A35F00" value={`${streak}`} icon={<IconFlame size={28} />} />
             </div>
@@ -155,18 +174,18 @@ export function QuizPage() {
                 )}
                 <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
                   {next && <Link to={`/topic/${next.slug}`} className="btn-cta min-w-[220px]">Continue</Link>}
+                  <button type="button" className="btn-quiet min-w-[220px]" onClick={retry} data-testid="practice-again">Practice again</button>
                   <Link to="/" className="btn-quiet min-w-[220px]">Back to map</Link>
                 </div>
               </div>
-            ) : alreadyCleared ? (
-              <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-                {next && <Link to={`/topic/${next.slug}`} className="btn-cta min-w-[220px]">Next: {next.title}</Link>}
-                <Link to="/" className="btn-quiet min-w-[220px]">Back to map</Link>
-              </div>
             ) : (
               <div className="mt-6 space-y-3">
-                <p className="font-bold text-dim">Claim it to save the clear, earn xp and open the next lesson.</p>
-                <button type="button" onClick={claimProgress} className="btn-cta min-w-[240px]">Claim progress</button>
+                <p className="font-bold text-dim">Progress saved. You can retake this quiz for practice at any time; it won’t change your xp.</p>
+                <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+                  {next && <Link to={`/topic/${next.slug}`} className="btn-cta min-w-[220px]">Next: {next.title}</Link>}
+                  <button type="button" className="btn-quiet min-w-[220px]" onClick={retry} data-testid="practice-again">Practice again</button>
+                  <Link to="/" className="btn-quiet min-w-[220px]">Back to map</Link>
+                </div>
               </div>
             )}
           </section>
@@ -201,8 +220,16 @@ export function QuizPage() {
         )
       ) : (
         <>
+          {answeredCount === 0 && !alreadyCleared && !skipLessonHint && (
+            <div className="panel mb-5 flex flex-wrap items-center gap-3 p-3 text-sm" data-testid="lesson-first">
+              <span className="flex-1 font-bold text-chalk">New to this topic? The short lesson comes first and makes this quiz much easier.</span>
+              <Link to={`/topic/${topic.slug}`} className="btn-cta !min-h-[40px]">Read the lesson</Link>
+              <button type="button" className="text-sm font-extrabold uppercase text-dim" onClick={() => setSkipLessonHint(true)}>Skip</button>
+            </div>
+          )}
           <QuestionRenderer
-            key={`${q.id}-${practice}`}
+            key={`${q.id}-${practice}-${attemptSeed}`}
+            scrambleSeed={attemptSeed}
             question={q}
             number={current + 1}
             total={total}
@@ -228,9 +255,11 @@ export function QuizPage() {
                 ) : undefined,
             }}
           />
-          <p className="mt-8 hidden text-sm text-dim sm:block">
+          {q.type === 'multiple_choice' && !answered && (
+          <p className="mt-8 hidden text-sm text-dim sm:block" data-testid="shortcut-hint">
             Shortcuts: <kbd className="kbd">1</kbd>–<kbd className="kbd">4</kbd> pick an option, <kbd className="kbd">Enter</kbd> submits.
           </p>
+          )}
         </>
       )}
     </div>
