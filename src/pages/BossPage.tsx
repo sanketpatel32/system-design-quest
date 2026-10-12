@@ -6,6 +6,7 @@ import { QuestionRenderer } from '../components/QuestionRenderer'
 import { gradeBossSubmission } from '../lib/scoring/boss'
 import type { UserGraph } from '../lib/scoring/graph'
 import { INITIAL_HEARTS } from '../lib/scoring/quiz'
+import { HeartsHud } from '../components/ui/Hud'
 import { useGameStore } from '../stores/gameStore'
 
 export function BossPage() {
@@ -50,19 +51,26 @@ export function BossPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl text-red-200">Boss: {topic.title}</h1>
-          <p className="text-slate-400">{topic.boss.estimationScenario}</p>
+    <div className="space-y-6 max-w-[960px]">
+      <header className="flex justify-between items-start gap-4 flex-wrap border-b border-[var(--color-rail)] pb-4">
+        <div className="max-w-2xl">
+          <p className="text-sm font-semibold text-[var(--color-fault)]">Boss · topic {topic.id}</p>
+          <h1 className="font-display text-4xl font-extrabold text-chalk mt-1 leading-tight">{topic.title}</h1>
+          <p className="text-[15px] text-dim mt-2">{topic.boss.estimationScenario}</p>
         </div>
-        <div className="text-rose-300">{'❤️'.repeat(hearts)}</div>
+        <HeartsHud hearts={hearts} />
       </header>
 
-      {topic.bossStages.map((stage) => (
-        <section key={stage.id} className="rounded-xl border border-slate-700 p-4">
-          <h2 className="text-lg font-semibold text-violet-200">{stage.title}</h2>
-          <p className="text-sm text-slate-400 mb-3">{stage.prompt}</p>
+      {topic.bossStages.map((stage, si) => (
+        <section key={stage.id} className="boss-stage" aria-labelledby={`stage-${stage.id}`}>
+          <div className="flex items-baseline gap-3 mb-3">
+            <span className="boss-stage-num" aria-hidden>{si + 1}</span>
+            <div>
+              <h2 id={`stage-${stage.id}`} className="font-display text-xl font-bold text-chalk">{stage.title}</h2>
+              <p className="text-sm text-dim">{stage.prompt}</p>
+            </div>
+          </div>
+          <div className="space-y-4">
           {stage.kind === 'architecture' ? (
             <BossCanvas
               initial={canvas}
@@ -82,6 +90,7 @@ export function BossPage() {
               />
             ))
           )}
+          </div>
         </section>
       ))}
 
@@ -90,7 +99,7 @@ export function BossPage() {
           type="button"
           disabled={hearts <= 0}
           onClick={submitBoss}
-          className="px-4 py-2 rounded-lg bg-red-500/30 border border-red-400/60 disabled:opacity-40"
+          className="btn-cta disabled:opacity-40"
         >
           Submit boss attempt
         </button>
