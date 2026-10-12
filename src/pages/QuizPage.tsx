@@ -79,7 +79,7 @@ export function QuizPage() {
   const missed = topic.questions.filter((x) => x.id in results && !results[x.id])
 
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="mx-auto max-w-4xl space-y-5">
       <header className="flex justify-between items-start gap-4 border-b border-[var(--color-rail)] pb-4">
         <div>
           <p className="text-sm font-semibold" style={{ color: accent }}>Quiz · {topic.title}</p>
