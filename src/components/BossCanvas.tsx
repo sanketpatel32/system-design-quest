@@ -138,12 +138,12 @@ export function BossCanvas({ initial, onChange }: Props) {
         ))}
         <div className="pt-2 mt-2 border-t border-[var(--color-line)]">
           <p className="text-[10px] uppercase tracking-widest text-[var(--color-muted)] mb-1 px-1">Wire</p>
-          <select id="src" className="w-full mb-1 bg-[#0a0e13] text-xs border border-[var(--color-line)] text-[var(--color-ink)]">
+          <select id="src" className="w-full mb-1 field text-xs">
             {nodes.map((n) => (
               <option key={n.id} value={n.id}>{String((n.data as { label?: string }).label)} ({n.id})</option>
             ))}
           </select>
-          <select id="tgt" className="w-full mb-1 bg-[#0a0e13] text-xs border border-[var(--color-line)] text-[var(--color-ink)]">
+          <select id="tgt" className="w-full mb-1 field text-xs">
             {nodes.map((n) => (
               <option key={n.id} value={n.id}>{String((n.data as { label?: string }).label)} ({n.id})</option>
             ))}
