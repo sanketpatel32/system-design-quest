@@ -108,7 +108,8 @@ test('boss canvas submit shows score breakdown', async ({ page }) => {
 
 test('revision rating schedules next due date', async ({ page }) => {
   await page.goto('/revision')
-  await page.getByRole('button', { name: 'good' }).click()
+  await page.getByRole('button', { name: 'Show answer' }).click()
+  await page.getByRole('button', { name: /^Good/ }).click()
   await expect(page.getByText(/Next due|Queue empty|Topic/i).first()).toBeVisible()
 })
 
