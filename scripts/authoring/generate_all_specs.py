@@ -78,7 +78,7 @@ def default_sources(tid: int) -> list[dict[str, str]]:
     sources = [
         {
             "title": "Google SRE Book — Designing Distributed Systems",
-            "url": "https://sre.google/sre-book/designing-distributed-systems/",
+            "url": "https://sre.google/sre-book/table-of-contents/",
         },
         {
             "title": "AWS Well-Architected Framework",
@@ -105,7 +105,7 @@ def default_sources(tid: int) -> list[dict[str, str]]:
         26: [{"title": "PostgreSQL Isolation", "url": "https://www.postgresql.org/docs/current/transaction-iso.html"}],
         29: [{"title": "Dynamo paper", "url": "https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf"}],
         32: [{"title": "Brewer CAP FAQ", "url": "https://brewer.cs.berkeley.edu/CAP-FAQ.html"}],
-        33: [{"title": "PACELC post", "url": "https://www.datastax.com/blog/2012/12/please-read-pat-helland-paper-life-beyond-transactions"}],
+        33: [{"title": "Abadi, PACELC, IEEE Computer 2012", "url": "https://www.cs.umd.edu/~abadi/papers/abadi-pacelc.pdf"}],
         37: [{"title": "Kafka Documentation", "url": "https://kafka.apache.org/documentation/"}],
         39: [{"title": "RFC 7231 — HTTP methods (safe/idempotent)", "url": "https://www.rfc-editor.org/rfc/rfc7231"}],
         45: [{"title": "Raft paper", "url": "https://raft.github.io/raft.pdf"}],

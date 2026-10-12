@@ -216,4 +216,6 @@ if (errors.length) {
   }
   console.log(`Option balance: correct option uniquely longest in ${Math.round((longest / n) * 100)}% of ${n} single-answer MCQs; none grossly longer (choices are shuffled per attempt)`)
 }
+// Dead or off-topic sources must not return (review M5)
+for (const t of topics) for (const s of t.sources ?? []) if (/designing-distributed-systems|datastax\.com\/blog/.test(s.url)) errors.push(`Topic ${t.id}: dead source ${s.url}`)
 console.log('AUDIT OK: 120 topics, 40 bosses, counts and keys valid')
