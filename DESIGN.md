@@ -1,28 +1,109 @@
-# Design plan
+# Design plan: bright, playful, game-like
 
-Concept: system design as a city transit network. Each learning region is a metro line with its own colour, topics are stations, and the Boss Arena is the terminal interchange. The map is the one bold element; everything else stays quiet.
+DesignQuest should feel like a friendly learning game: a warm light page, saturated cheerful colour, chunky tactile controls, and a mascot who reacts to how you're doing. The dark "transit ink" theme is retired.
 
-Palette
-- Night ink `#0D1B2A`: base background, a blue ink rather than black
-- Platform `#14283D`: raised surfaces
-- Chalk `#EDE6D6`: primary text, station fills
-- Signal amber `#F2B33D`: the single action colour (buttons, current station)
-- Fault red `#FF5A4E`: hearts, errors, the Boss line
-- Clear green `#6FD38B`: correct answers
-- Line colours, one per region (see `src/content/index.ts`)
+## Colour
+- **Page** `#FFF9F0` (soft warm white). **Cards** `#FFFFFF` with a 2px `#E6E0D6` outline and a 4px solid "floor" shadow in the same colour.
+- **Text** `#29303D`; secondary `#5B6472` (5.7:1 on the page).
+- **Hero green** for every primary action: button fill `#2F7D00` (white text 5.4:1), floor `#1F5600`. Bright `#58CC02` is used only for fills that carry no text (progress bars, the mascot, correct-answer accents).
+- **Feedback.** Correct uses `#D7FFB8` with `#235C00` text. Wrong uses `#FFDFE0` with `#8E1F26` text. Hearts are `#FF4B4B`, gems `#1CB0F6`, the streak flame `#FF9600`, gold/boss `#FFC800`.
+- **One cheerful colour per region** (`src/lib/design/transitTheme.ts`):
+  - `bright` is for path nodes and illustrations.
+  - `deep` is for banners and text; it passes 4.5:1 against white.
+  - `soft` is for tints; `shadow` is for button floors.
+- **The Colosseum and boss pages use a gold banner.** It carries dark ink `#3D2A00`, because white on gold fails contrast.
+- **Contrast check.** Every page is checked with axe-core (WCAG 2 A/AA) at 1366px and 390px.
 
-Type: Bricolage Grotesque for display (station names, headings, big numbers), Atkinson Hyperlegible for body text, chosen because it was designed for legibility. Sentence case everywhere. No all-caps eyebrows, no monospace labels.
+## Type
+- **Nunito** (600–900) everywhere, loaded through `@fontsource/nunito`. Headings and buttons use weight 900. Body text is 600 at 16–18px.
+- Buttons, chips and eyebrows are uppercase with letter-spacing of 0.04–0.05em.
 
-Layout: asymmetric. The map takes the wide left column and a narrow right rail works as the departure board (HUD, selected station, next stop). Lessons use one tall card with a coloured line running down its left edge, like a route strip.
+## Shape and controls
+- **Corners.** 16px on buttons and tiles, 20px on cards and banners, and pills for chips.
+- **Chunky 3D buttons** (`.btn-cta`, `.btn-quiet`, `.btn-sky`, `.btn-danger`):
+  - A solid 4px bottom floor. On `:active` the button moves down 4px and the floor disappears, so it looks pressed.
+  - Minimum height 48px, generous padding.
+- **Answer tiles** (`.choice-row`):
+  - The whole tile is the hit target (a transparent radio covers it), at least 56px tall, with a numbered key chip.
+  - Selected is sky blue, correct is green, wrong is red. Each state has a matching floor.
+- **Focus.** A 3px `#1CB0F6` ring on everything, including tiles (`:has(input:focus-visible)`) and path nodes.
 
-Motion: only the next available station pulses. Other motion responds to what the learner does: hearts shake when lost, the route segment fills on clear, cards slide when you page through. `prefers-reduced-motion` is respected.
+## Map
+- **A vertical winding path** of 72px round nodes, offset in a sine-like pattern (`WIND`).
+- **Node states:**
+  - Done shows a check.
+  - Open shows a star, or a book on a unit's first lesson.
+  - Locked is a grey lock.
+  - The current node has a soft halo and a bouncing **Start** bubble.
+- **Clicking a node** opens a region-coloured popover with the title, status, time and a chunky Start button. Locked nodes show the unlock hint instead.
+- **Node titles** sit beside every node, so the path stays readable.
+- **Each region is a unit** with a banner showing the unit number, region name, progress bar and its illustration.
+- **The Colosseum is the final unit.** Bosses are larger gold castle nodes.
+- **Other controls:** Continue card on top, search, and a Path/List toggle (the list view is the full curriculum).
 
-Rejected defaults: purple gradients, glass-card grids, emoji icons, Inter, identical rounded cards, arrows appended to buttons.
+## Mascot: "Byte"
+- An original server-bot drawn in SVG (`src/components/art/Mascot.tsx`): a green body, a face screen, server slots on the belly and an antenna LED.
+- **Moods:** `idle`, `happy` (arms up, closed-eye smile), `sad` (drooping antenna, frown, tear) and `think`.
+- **Where Byte appears:**
+  - Onboarding.
+  - Quiz feedback sheets (happy or sad) and the celebration screen.
+  - The pep talk before a quiz.
+  - Empty states: review queue, boss canvas, 404, loading.
+  - The boss score card.
 
-Content audit (`npm run audit:strict`): exact duplicate card bodies or prompts always fail; `tok*` fingerprint tokens are rejected. Near-duplicate Jaccard (≥ 0.82) applies to **lesson card bodies** only (with fingerprint tokens stripped). Quiz prompts may reuse the same question shape across topics when the stem names the topic; strict mode does not near-match prompts.
+## Illustrations and icons
+- **One scene per region** (`src/components/art/RegionArt.tsx`), drawn in white and pastel shapes with the region's bright colour and a touch of gold, to sit on the deep banner:
+  - Launchpad: rocket.
+  - Neon Network City: skyline with signal.
+  - Traffic Control: traffic light.
+  - Frost Cache Caverns: ice crystal cave.
+  - Data Citadel: castle with database towers.
+  - Queue Railways: train.
+  - Consensus Peaks: flagged peaks.
+  - Operations Spaceport: dish and planet.
+  - Vault & Archive: vault door and coins.
+  - Interview Summit: trophy summit.
+  - Colosseum: arches.
+- **Icons are filled custom SVG** (`HudIcons.tsx`): heart, flame, gem, badge, lock, star, check, book, chest, castle and the nav icons. No emoji are used as icons, and there is no stock art.
+- **Small line motifs** (`RegionMotif.tsx`) remain available for compact spots.
+
+## Quiz
+- **Top bar.** A close X, a thick green progress bar, and heart icons that shake when you lose one.
+- **The question takes the full width**, with a large prompt and big answer tiles.
+- **A fixed white bottom bar holds Submit.**
+- **After you submit, a feedback sheet slides up from the bottom.** It is green or red, with Byte, the result, a "Why" explanation and a chunky Continue button (red when you were wrong). It also offers a practice retry.
+- **Celebration screen.** Happy Byte pops in, three stat tiles (Total XP, Accuracy, Streak) appear, and colourful confetti fires, followed by Continue and Back to map buttons.
+
+## Layout
+- **Desktop (≥1024px):** a fixed left sidebar with the logo and big labelled nav icons. The top bar holds the HUD chips (streak flame, XP gem, badges) and the help button.
+- **Mobile:** a bottom tab bar with 5 icon tabs, 60px tall. It is hidden during a quiz so the Submit bar and feedback sheet own the bottom of the screen.
+- **No nested scroll areas.** Only the page scrolls; diagrams can scroll sideways.
+
+## Boss canvas
+- Nodes are soft pastel pills coloured by role, each with a glyph:
+  - Edge (client, DNS, CDN): sky.
+  - Traffic (load balancer, gateway): lilac.
+  - Compute (service, worker): green.
+  - Cache: teal.
+  - Data (SQL, NoSQL, blob, search): peach.
+  - Queue: pink.
+- A light dotted grid, thick grey edges, and the same glyphs in the palette.
+
+## Motion
+- **Springy, and used only where it carries meaning:**
+  - Pop-in for results and popovers.
+  - Bob for the Start bubble and the loading Byte.
+  - Wiggle for sad Byte.
+  - The sheet slides up.
+  - Progress bars fill with a spring.
+  - Buttons press down.
+- **Reduced motion.** `prefers-reduced-motion` and the in-app "Reduce motion" switch both cut animations to ~0ms, and confetti is skipped.
 
 ## Region motifs
-Each region has one line-drawn landmark (src/components/map/RegionMotif.tsx): rocket gantry, skyline, signal head, ice crystal, keep, locomotive, summits, dish, vault door, flagged peak, arena arches. 24px grid, 1.6 stroke, round caps, stroked in the region's line colour only: no fills, gradients or emoji. Shown beside the line label on the map, in the curriculum list and in lesson headers.
+Each region still has a line-drawn landmark (`RegionMotif.tsx`) for compact uses: 24px grid, 1.6 stroke, round caps, stroked in the region colour.
 
 ## Question checklist
-Every topic has 5–8 questions, at least 3 types where they fit, and each question has a `concept` taught by a card (`teaches`) in the topic or its prerequisites. Distractors must be misconceptions a learner might actually hold: no joke options, "none of the above", irrelevant tech or answers that repeat the correct one. `npm run audit` enforces this (scripts/audit/quiz-quality.mjs).
+- Every topic has 5–8 questions, with at least 3 types where they fit.
+- Each question has a `concept` that a card teaches (`teaches`), either in the topic itself or in its prerequisites.
+- Distractors must be misconceptions a learner might actually hold. Not allowed: joke options, "none of the above", irrelevant tech, or answers that repeat the correct one.
+- `npm run audit` enforces these rules (`scripts/audit/quiz-quality.mjs`).
