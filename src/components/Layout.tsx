@@ -65,7 +65,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="hud-block min-w-[150px]">
               <div className="flex justify-between items-baseline gap-3">
                 <span className="font-display font-semibold text-chalk">Level {level}</span>
-                <span className="tabular-nums text-dim">{xp % 500}/500 xp</span>
+                <span className="tabular-nums text-dim">{xp} xp</span>
               </div>
               <div className="xp-track mt-1.5">
                 <div
