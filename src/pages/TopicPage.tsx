@@ -75,8 +75,8 @@ export function TopicPage() {
           <RegionArt regionId={topic.region} width={170} className="hidden shrink-0 sm:block" />
         </header>
         <LessonDeck cards={topic.cards} accent={accent} finalAction={finalAction} />
-        {topic.deep && <DeepLessonView deep={topic.deep} accent={accent} />}
-        {topic.bossDeep && <BossDeepView brief={topic.bossDeep} accent={accent} />}
+        {topic.deep && <DeepLessonView deep={topic.deep} accent={accent} topicId={topic.id} />}
+        {topic.bossDeep && <BossDeepView brief={topic.bossDeep} accent={accent} topicId={topic.id} />}
         <div className="flex flex-wrap gap-2">
           {topic.kind === 'boss' ? (
             <Link to={`/boss/${topic.slug}`} className="btn-quiet">

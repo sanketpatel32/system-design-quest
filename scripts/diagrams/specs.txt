@@ -1,0 +1,416 @@
+# Diagram specs. "@<topicId> alt text" starts a diagram; each line is a chain.
+# a > b (sync), a ~> b (async, dashed), a [label]> b, a [label]~> b. "|" breaks a label line.
+
+# ---------- Core lessons ----------
+@1 The five interview phases in order: clarify (about 5 min), scale (about 5 min), high-level design (about 12 min), deep dive (about 13 min), wrap-up (about 5 min).
+Clarify|~5 min > Scale|~5 min > High-level design|~12 min > Deep dive|~13 min > Wrap-up|~5 min
+
+@3 Clients reach a load balancer that spreads requests over stateless app servers; sessions live in Redis and data in a primary database with read replicas.
+Clients > Load balancer > App server 1 > Redis|sessions
+Load balancer > App server 2 > DB primary
+Load balancer > App server N > DB primary
+App server 1 > DB primary
+App server 2 > Redis|sessions
+App server N > Redis|sessions
+DB primary [replicate]~> Read replicas
+
+@6 DNS resolution: the app asks the stub resolver, which asks a recursive resolver; the resolver walks root, then TLD, then authoritative servers, and caches the answer for its TTL.
+App > Stub resolver > Recursive resolver|caches for TTL
+Recursive resolver [1. ask .in?]> Root servers
+Recursive resolver [2. ask domain]> .in TLD servers
+Recursive resolver [3. A record]> Authoritative|A 203.0.113.10, TTL 60
+
+@10 Live order tracking: the rider app sends location to a location service that publishes to pub/sub; the customer's WebSocket gateway, found via a registry, subscribes and pushes updates.
+Rider app [location]> Location service [publish order:42]> Pub/sub
+Gateway 7 [subscribe order:42]> Pub/sub
+Gateway 7 [WebSocket push]> Customer app
+Registry|user 9 is on gateway 7 > Gateway 7
+
+@12 Two-tier load balancing: an L4 load balancer spreads TCP connections over L7 load balancers that route by path to the UPI pool, bills pool, or CDN origin.
+Clients > L4 LB|TCP, fast > L7 LB 1 [/api/upi]> UPI pool
+L4 LB|TCP, fast > L7 LB 2 [/api/bills]> Bills pool
+L7 LB 2 [/static]> CDN / origin
+
+@13 A forward proxy sits in front of clients (employees going out to the internet); a reverse proxy sits in front of servers (internet users coming in to app servers).
+Employee PCs > Forward proxy > Internet sites
+Internet users > Reverse proxy / CDN > App servers 1..N
+
+@14 Stateless web servers behind a load balancer keep session state in Redis and uploads in object storage, so any server can serve any request.
+Load balancer > Web 1 > Redis|session:abc
+Load balancer > Web 2 > Redis|session:abc
+Load balancer > Web 3 > Redis|session:abc
+Web 1 > Object storage|uploads
+Web 2 > Object storage|uploads
+Web 3 > Object storage|uploads
+
+@15 Cache layers from fastest and least shared to slowest and authoritative: app cache, CDN edge, gateway cache, in-process cache, Redis, database buffer pool, disk.
+App cache > CDN edge > Gateway cache > In-process cache > Redis > DB buffer pool > Disk|source of truth
+
+@16 Cache-aside: the app checks the cache; on a hit it returns, on a miss it reads the database and sets the cache with a TTL. Writes go to the database and then delete the cache key.
+App [1. get]> Cache
+App [2. on miss, read]> Database
+App [3. set with TTL]~> Cache
+Writer [update row]> Database
+Writer [then delete key]> Cache
+
+@18 Stampede protection: when a hot key expires, 50K requests per second miss and hit a single-flight guard; one request rebuilds from the database while others are served stale or wait briefly.
+50K req/s on|expired key [miss]> Single-flight guard
+Single-flight guard [1 request]> Rebuild > Database
+Single-flight guard [the rest]> Serve stale|or wait 50 ms
+
+@19 CDN: viewers hit a nearby edge; edge misses go to an origin shield, and shield misses go to the origin, so the origin sees only a trickle.
+Viewers in Mumbai > Edge PoP Mumbai [miss]> Origin shield [miss]> Origin / packager
+Viewers in Delhi > Edge PoP Delhi [miss]> Origin shield
+
+@20 Redis Cluster: the client hashes the key with CRC16 mod 16384 to a slot; slot ranges are owned by primaries A, B and C, each with a replica.
+Client > CRC16(key) mod 16384 [0-5460]> Primary A ~> Replica A
+CRC16(key) mod 16384 [5461-10922]> Primary B ~> Replica B
+CRC16(key) mod 16384 [10923-16383]> Primary C ~> Replica C
+
+@21 Choosing a database: if you need multi-row ACID or joins, choose SQL; otherwise pick by access pattern: key-value, document, wide-column or graph.
+Access patterns > Need multi-row|ACID or joins? [yes]> SQL|+ replicas, cache
+Need multi-row|ACID or joins? [no, lookup by key]> Key-value store
+Need multi-row|ACID or joins? [no, nested record]> Document store
+Need multi-row|ACID or joins? [no, huge writes]> Wide-column store
+Need multi-row|ACID or joins? [no, many hops]> Graph database
+
+@23 B-tree versus LSM: a B-tree walks root to internal to leaf pages; an LSM tree writes to a WAL and memtable, flushes to SSTables and compacts them into deeper levels.
+B-tree root > Internal page > Leaf page|keys + row pointers
+Write > WAL + memtable [flush]> SSTable L0 [compaction]> L1, L2 ...
+
+@25 Commit path: begin, write changes in memory and WAL records, check constraints, write the commit record, fsync the WAL, then acknowledge the client.
+BEGIN > Writes in memory|+ WAL records > Constraints OK? > COMMIT record > fsync WAL > Ack client
+
+@27 Eventual consistency: a write is acknowledged by replica A and copied asynchronously to replicas B and C; a read from C before the copy arrives sees the old value.
+Client [write]> Replica A|acks
+Replica A|acks [async]~> Replica B
+Replica A|acks [async]~> Replica C
+Reader [may be stale]> Replica C
+
+@28 Leader-follower replication: writes go to the leader, which ships its log to a synchronous follower and an asynchronous follower; reads can go to followers, but your own recent writes are read from the leader.
+Client [write]> Leader [log, sync ack]> Follower 1
+Leader [log, async]~> Follower 2
+Reader [reads, may lag]> Follower 2
+Reader [own recent writes]> Leader
+
+@29 Quorum with N=3, W=2, R=2: a write is acknowledged by r1 and r2; a read asks r2 and r3, returns r2's newer value and repairs r3.
+Writer [W=2]> r1
+Writer [W=2]> r2
+Reader [R=2, newest wins]> r2
+Reader [R=2]> r3
+Reader [read repair]~> r3
+
+@30 Sharding: a key is hashed to one of 64 logical shards, and a routing map assigns those shards to 12 physical nodes; user 42 maps to shard 17 on node 5.
+Key|user 42 > hash(key) mod 64 > Logical shard 17 > Routing map > Physical node 5|of 12
+
+@36 A work queue: producers enqueue messages, workers process and acknowledge them, and after 5 failures a message moves to a dead-letter queue for alerting, inspection and replay.
+Producer > Queue > Worker|acks on success
+Queue [after 5 failures]> Dead-letter queue > Alert, inspect, replay
+
+@37 Kafka: a producer writes to topic partitions keyed by order_id; the notify group splits partitions between consumers, while the analytics group reads the same partitions with its own offsets.
+Producer [key = order_id]> Partition P0 > Consumer A|group notify
+Producer [key = order_id]> Partition P1 > Consumer B|group notify
+Partition P0 > Analytics group|own offsets
+Partition P1 > Analytics group|own offsets
+
+@38 Hybrid fan-out: posts by normal users are pushed by fan-out workers into follower timelines; celebrity posts are stored once and merged at read time.
+Normal user post > Fan-out workers > Follower timelines
+Celebrity post > Posts store|stored once
+Feed open > Follower timelines
+Feed open > Posts store|stored once
+Feed open > Merge by time
+
+@40 Idempotency key: the first request inserts key K, does the work and saves the response; a retry with the same key finds it and returns the saved response without charging again.
+Client [request, key K]> Server > Insert key K|unique > Do work > Save response
+Client retry [same key K]> Key exists > Return saved|response
+
+@43 Saga: create order, reserve stock, charge, assign rider; if charging fails, compensations run in reverse: release stock, then cancel the order.
+Create order > Reserve stock > Charge > Assign rider
+Charge [fails]> Release stock > Cancel order
+
+@44 Outbox: one transaction updates the order and inserts an outbox event; a relay or CDC reader publishes to Kafka, and consumers deduplicate by event_id.
+Transaction > UPDATE orders|+ INSERT outbox > Relay / CDC > Kafka > Warehouse
+Kafka > Notifications|dedupe by event_id
+
+@45 Raft: the client sends a write to the leader, which replicates with AppendEntries; once a majority (leader plus F1) has it, the entry commits, is applied and the client gets a reply.
+Client > Leader|term 7 [AppendEntries]> Follower F1|acks
+Leader|term 7 [AppendEntries]~> Follower F2|slow
+Follower F1|acks > Majority stored > Commit, apply|and reply
+
+@46 Fencing tokens: A holds the lock with token 33 but pauses; the lease expires and B gets token 34; when A wakes and writes with 33, storage rejects it because 34 was already seen.
+Client A|token 33 [GC pause]> Lease expires > Client B|token 34 [write 34]> Storage|highest token 34
+Client A|token 33 [late write 33]> Storage|highest token 34
+Storage|highest token 34 > Rejects 33
+
+@51 An API gateway handles TLS, auth, rate limits, routing and tracing, then forwards to a backend-for-frontend that calls profile, offers and orders services in parallel.
+Client > API gateway|TLS, auth, rate limit > BFF > Profile service
+BFF > Offers service
+BFF > Orders service
+
+@52 Service discovery in Kubernetes: ready pods are registered as endpoints; a caller resolves payments.svc by DNS, and kube-proxy forwards to a ready pod.
+Pod [registers when ready]> Endpoints registry
+Caller > payments.svc|DNS / VIP > kube-proxy > Ready pod
+Endpoints registry > kube-proxy
+
+@53 Circuit breaker states: closed until errors exceed 50 percent, then open (fail fast); after a cool-down it goes half-open, and if trial calls succeed it closes again.
+CLOSED [errors over 50%]> OPEN|fail fast / fallback [cool-down]> HALF-OPEN [trial calls succeed]> CLOSED
+HALF-OPEN [trial fails]> OPEN|fail fast / fallback
+
+@54 A distributed trace: the gateway starts trace 7f3a, orders takes 120 ms and payments takes 3.2 s because of a bank API timeout and retry; a p99 alert leads to the trace and then to logs filtered by trace_id.
+Gateway|trace 7f3a > Orders|120 ms > Payments|3.2 s > Bank API|timeout, retry
+p99 alert > Open trace 7f3a > Logs where|trace_id = 7f3a
+
+@56 Disaster recovery: region A replicates asynchronously (about 5 s of lag) to a warm standby in region B; failover means detect, decide, promote, shift traffic, verify and reconcile.
+Region A|primary [async, ~5 s lag]~> Region B|warm standby
+Detect > Decide > Promote DB in B > Shift DNS / GSLB > Verify > Reconcile
+
+@57 Authentication then authorisation: login issues a session or JWT; each request is authenticated, then checked for role, ownership or scope, and is either allowed or rejected with 403.
+Login|password + OTP > Session cookie / JWT
+Request > Authenticate|credential > Authorise|role, owner, scope [ok]> Allow
+Authorise|role, owner, scope [no]> 403
+
+@58 OAuth authorisation code with PKCE: the app sends the challenge to the auth server, the user logs in and consents, the app gets a code and swaps it with the verifier for tokens.
+App [challenge, scopes, state]> Auth server [login + consent]> Redirect|?code&state
+Redirect|?code&state [code + verifier]> Token endpoint > Access, refresh|and ID tokens
+
+@59 JWT verification order: check the algorithm is allowed, pick the key by kid from JWKS, verify the signature, check exp, iss and aud, then trust sub and scopes.
+JWT > Alg allow-listed? > Key by kid|from JWKS > Signature OK? > exp, iss, aud OK? > Trust sub|and scopes
+
+@60 Defence in depth: internet traffic passes a WAF and rate limiter, a gateway with TLS and authentication, a service that validates and authorises, and a least-privilege database user.
+Internet > WAF +|rate limit > Gateway|TLS, authn > Service|validate, authz > DB user|least privilege
+
+@61 Direct upload: the app records metadata as pending and returns a presigned URL; the client PUTs bytes straight to object storage, whose event triggers a worker that scans, makes thumbnails and marks the file ready.
+Client [1. request upload]> App|metadata pending
+App|metadata pending [2. presigned URL]> Client
+Client [3. PUT bytes]> Object storage [4. event]~> Worker|scan, thumbnail > Metadata ready
+
+@62 HDFS write pipeline: the NameNode maps file blocks to DataNodes; the client streams a block to DN1 on rack A, which forwards to DN4 and DN5 on rack B.
+Client [where to write?]> NameNode|block map
+Client [block b1]> DN1|rack A > DN4|rack B > DN5|rack B
+
+@63 Inverted index search: a query is analysed and fuzzy-matched ('panner' to 'paneer'), looked up in the postings list, scored with BM25 and the top 10 returned.
+Query panner > Analyse +|fuzzy match > Postings|paneer: 3, 7, 19 > Score BM25 > Top 10
+
+@64 MapReduce: input splits are mapped to (merchant, amount), shuffled by key, reduced to a sum per merchant and written out; a hot key is salted into sub-keys and combined.
+Input splits > Map|(merchant, amt) > Shuffle by key > Reduce|sum per merchant > Output
+
+@65 Stream processing: keyed Kafka events go to a stateful operator with checkpoints; a one-minute window closes when the watermark passes, and late events go to a side output.
+Kafka|keyed > Operator|state per key, checkpoints > Window 12:00-12:01|closes on watermark > Sink
+Operator|state per key, checkpoints [late event]> Side output
+
+@66 Analytics separation: the OLTP Postgres database feeds a Parquet lake through CDC; dbt transforms it into a warehouse of facts and dimensions that powers dashboards.
+OLTP Postgres [CDC]~> Lake|Parquet [transform, dbt]> Warehouse|facts + dims > Dashboards
+
+@69 Progressive delivery: deploy v2 dark, then turn the flag on for staff, 1, 5, 25 and 100 percent, then delete the flag; a guardrail breach at any step turns it off.
+Deploy v2 dark > Staff > 1% > 5% > 25% > 100% > Delete flag
+
+@70 Kubernetes reconcile loop: a Deployment owns a ReplicaSet that owns pods; the controller compares desired with actual replicas and creates or removes pods to match.
+Deployment|replicas 14, image v2 > ReplicaSet > Pods
+Controller loop|desired 14 vs actual 13 [create 1]> Pods
+
+# ---------- Boss reference architectures ----------
+@75 URL shortener: redirects go client to CDN edge to redirect service to Redis to the KV store of code-to-URL; creates use a base62 ID generator; redirects emit click events to a queue for analytics workers.
+Client > CDN / edge > Redirect service > Redis cache > KV store|code to url
+Create API > ID generator|base62 > KV store|code to url
+Redirect service [click event]~> Queue > Analytics workers
+
+@76 Pastebin: the paste service keeps metadata in Redis and SQL and the paste content in object storage; a cron job deletes expired pastes.
+Client > CDN > Paste service > Redis|metadata cache > SQL|metadata
+Paste service > Object storage|content
+Cron job [delete expired]> SQL|metadata
+
+@77 Rate limiter: the gateway asks a limiter running a Lua token bucket in Redis, keyed by user, phone or IP; allowed requests reach the service, denied ones get 429 with Retry-After; a config service pushes rules to gateways.
+Client > Gateway > Limiter|Lua token bucket in Redis
+Gateway [allowed]> Service
+Gateway [denied]> 429 +|Retry-After
+Config service [rules]~> Gateway
+
+@78 Unique ID generator: each service embeds a library that builds 64-bit IDs from timestamp, worker ID and sequence; the worker ID is leased from etcd or ZooKeeper so it is unique per process.
+etcd / ZooKeeper [worker id lease]> ID library|in each service > timestamp | worker | sequence > 64-bit id
+
+@79 Distributed KV store: any node can coordinate; it hashes the key onto the ring and writes to replicas A, B and C, succeeding with W=2 acks and reading with R=2 plus read repair; gossip, hinted handoff and Merkle anti-entropy keep replicas healthy.
+Client > Any node|coordinator > hash(key) on ring > Replica A
+hash(key) on ring > Replica B
+hash(key) on ring > Replica C
+Any node|coordinator > W=2 acks / R=2|newest wins + read repair
+Gossip, hinted handoff,|Merkle anti-entropy ~> Replica C
+
+@80 Distributed cache: the client library hashes keys on a ring to primary nodes A and B, each replicated to a standby; on a miss the app reads the database and sets the value with TTL plus jitter.
+App|client lib + hash ring > Node A|primary ~> Replica A
+App|client lib + hash ring > Node B|primary ~> Replica B
+App|client lib + hash ring [on miss]> Database
+App|client lib + hash ring [set with TTL + jitter]~> Node B|primary
+
+@81 Notification system: services publish events to a queue; the notification service applies preferences, caps and templates and routes to push, SMS and email queues, each drained by workers, with failures retried or sent to a DLQ.
+Services > Event queue > Notification service|prefs, caps, templates > Push queue > FCM / APNs workers
+Notification service|prefs, caps, templates > SMS queue > SMS provider workers|rate-limited
+Notification service|prefs, caps, templates > Email queue > Email workers
+SMS provider workers|rate-limited [failures]> Retry / DLQ
+
+@82 News feed: a post is saved and an event drives fan-out workers to write follower feed lists in Redis; reading the feed merges the Redis list with celebrity posts, ranks and pages by cursor.
+Post > Posts DB [event]~> Fan-out workers > Feed lists|Redis
+Read feed > Feed service > Feed lists|Redis
+Feed service > Celebrity posts
+Feed service > Rank + page|cursor
+
+@83 Twitter/X: tweets get a Snowflake ID and are stored, then go to Kafka for fan-out to timeline caches, search indexing and trends; reads merge the cached timeline with celebrity tweets and hydrate them.
+Tweet > Tweet store|Snowflake id ~> Kafka > Fan-out > Timeline caches
+Kafka > Search indexer
+Kafka > Trends
+Read > Timeline service > Timeline caches
+Timeline service > Celebrity merge|+ hydrate
+
+@84 WhatsApp: A's message goes via gateway 1 to the chat service, which sequences and stores it, looks up B's gateway in the registry and delivers via gateway 7; if B is offline it stays stored and a push notification is sent.
+User A > Gateway 1 > Chat service|sequence + store > Gateway 7 > User B
+Chat service|sequence + store > Registry|B on gateway 7
+Chat service|sequence + store [B offline]> Push notification
+
+@85 Instagram: the app uploads photos with a presigned PUT to object storage, whose event triggers resize workers that publish to the CDN; feeds come from a feed service with a cache of IDs and a metadata DB.
+App [presigned PUT]> Object storage [event]~> Resize workers > CDN
+App > Feed service > Feed cache|ids > Metadata DB
+CDN [images]> Viewers
+
+@86 YouTube: chunked uploads land in object storage, transcode workers produce renditions in parallel and the CDN serves them; the player fetches a manifest and then adaptive-bitrate segments.
+Upload|chunks > Object storage ~> Transcode workers|parallel segments > Renditions > CDN
+Player > Manifest > Segments from CDN|adaptive bitrate
+
+@87 Netflix: the control plane (catalogue and personalisation) runs multi-region; playback fetches a manifest and then segments from ISP or edge caches; progress is stored by user and title for resume.
+App > Control plane|catalogue, personalisation
+Play > Manifest > Segments from|ISP / edge cache
+Progress > KV store|user, title > Resume
+
+@88 Uber/Ola: driver apps send locations through a gateway into a city-sharded geo index; dispatch searches nearby cells, ranks by ETA, makes an offer and records acceptance with a conditional write; trip events go to Kafka for billing and analytics.
+Driver app > Location gateway > Geo index|city shard, cells
+Rider > Dispatch > Geo index|city shard, cells
+Dispatch > Rank by ETA > Offer > Accept|conditional write
+Trip events ~> Kafka > Billing, analytics
+
+@89 Zomato/Swiggy: search and menus come from Elasticsearch and Redis; orders go to an idempotent SQL order service that runs a saga of payment, restaurant acceptance and rider assignment; rider pings update a geo index and status is pushed to the app.
+App > Search / menu|Elasticsearch + Redis
+App > Order service|SQL, idempotency > Payment > Restaurant accepts > Rider assigned
+Rider pings > Geo index
+Order service|SQL, idempotency [status push]~> App
+
+@90 Google Docs: clients connect over WebSocket to the session server that owns the document; it orders and transforms operations, appends them to an op log and broadcasts them; snapshots go to object storage.
+Clients [WebSocket]> Doc session server|owner of doc 42 > Order / transform ops > Op log
+Order / transform ops [broadcast]> Other clients
+Op log ~> Snapshots|object storage
+
+@91 Dropbox/Drive: the client chunks and hashes files, asks the metadata service which chunks are missing, uploads only those to object storage, then commits a version; a change event tells other devices to sync missing chunks.
+Client|chunk + hash > Metadata service|which missing? > Upload missing chunks > Object storage
+Metadata service|which missing? > Commit version|SQL [change event]~> Other devices > Object storage
+
+@92 UPI-style payments: the app calls the PSP transaction service, which records a unique transaction reference in a SQL ledger and calls NPCI, which debits the payer bank and credits the payee bank; timeouts trigger status checks and daily reconciliation.
+App > PSP txn service|unique ref, SQL ledger > NPCI > Payer bank|debit
+NPCI > Payee bank|credit
+PSP txn service|unique ref, SQL ledger [timeout]> Status check
+Daily recon files > PSP txn service|unique ref, SQL ledger
+
+@93 Digital wallet: a transfer locks both wallets in a fixed order, checks the balance, debits and credits through the ledger and commits; top-up webhooks are deduplicated and a nightly job checks ledger sums against balances.
+Transfer > Wallet service > Lock A, B|ordered > Check A >= amt > Debit A, credit B|ledger > COMMIT
+Top-up webhook > Dedup > Wallet service
+Nightly job|sum(ledger) = balances > Wallet service
+
+@94 BookMyShow: big launches go through a waiting room; the seat map comes from cache; a hold is a conditional update from FREE to HELD for 10 minutes, then payment moves it to BOOKED; a sweeper releases expired holds.
+Users > Waiting room > Seat map|cache
+Waiting room > Hold|FREE to HELD, 10 min > Pay > BOOKED
+Sweeper [expired HELD to FREE]> Hold|FREE to HELD, 10 min
+
+@95 IRCTC Tatkal: users pass a CDN and a token waiting room before the booking service conditionally decrements inventory per train, class and quota, issues a PNR and takes payment; a timeout releases the seat.
+Users > CDN > Waiting room|tokens > Booking service > Inventory|conditional decrement > PNR > Payment
+Payment [timeout, release seat]> Inventory|conditional decrement
+
+@96 Fantasy leaderboard: the scoring feed goes through Kafka to a points service that updates team totals in a Redis sorted set per contest; the rank service reads ZREVRANK and ZREVRANGE with a few seconds of caching; at match end a batch recomputes for prizes.
+Scoring feed > Kafka > Points service > Redis ZADD|per contest
+App > Rank service|cached seconds > Redis ZADD|per contest
+Match end > Batch recompute > Prizes
+
+@97 Typeahead: search logs stream into an aggregator with decayed counts; a builder computes the top-k per prefix and publishes a snapshot loaded by in-memory suggest servers; the client debounces calls to GET /suggest.
+Search logs > Stream aggregate|counts, decay > Builder|prefix to top-k > Snapshot > Suggest servers|in memory
+Client|debounced [GET /suggest]> Suggest servers|in memory
+
+@98 Web crawler: seeds feed a per-host frontier; fetchers obey robots.txt and politeness and store pages in object storage; a parser extracts links, which are deduplicated with a Bloom filter or seen-set before returning to the frontier.
+Seeds > Frontier|queues by host > Fetchers|robots.txt, politeness > Object storage > Parser > Dedup|Bloom / seen set [new links]> Frontier|queues by host
+
+@99 Product search: the SQL catalogue streams changes by CDC into Kafka, and indexers write to sharded, replicated Elasticsearch; a query is analysed, searched with filters and facets, ranked, cached and returned.
+Catalogue SQL [CDC]~> Kafka > Indexers > Elasticsearch|shards x replicas
+Query > Analyse > Search + filters|+ facets > Rank > Cache > Results
+Search + filters|+ facets > Elasticsearch|shards x replicas
+
+@100 Metrics monitoring: agents send to Kafka, ingest workers write raw points to a partitioned TSDB, rollup jobs build 1-minute and 1-hour aggregates, dashboards query through a cache, and an alert engine evaluates rules every 15 to 30 s and notifies with dedup and silencing.
+Agents > Kafka > Ingest workers > TSDB|raw, partitioned
+Rollup job > Aggregates|1 min / 1 h
+TSDB|raw, partitioned > Rollup job
+Dashboards > Query cache > Aggregates|1 min / 1 h
+Alert engine|every 15-30 s > Notify|dedup, silence
+TSDB|raw, partitioned > Alert engine|every 15-30 s
+
+@101 Distributed logging: apps write to a local file; an agent batches with a disk buffer and masks secrets, ships to Kafka, indexers write daily indices to a search cluster, and data ages from hot (7 days) to warm (30 days) to an object storage archive.
+App > Local file > Agent|batch, disk buffer, masking > Kafka > Indexers > Search cluster|daily indices
+Search cluster|daily indices > Hot 7 d > Warm 30 d > Archive|object storage
+
+@102 Distributed message queue: producers append to the partition leader's segment and followers in the ISR replicate it; consumer groups read assigned partitions from an offset and commit it; a Raft controller holds metadata and old segments are deleted by retention.
+Producer > Partition leader|append segment > Followers|ISR
+Consumer group > Assigned partitions > Read from offset > Commit offset
+Controller|Raft metadata > Partition leader|append segment
+
+@103 Distributed job scheduler: jobs live in SQL indexed by next_run_time; schedulers poll and claim due jobs with SKIP LOCKED and enqueue them; workers run them and record results in run history, retrying failures with backoff.
+Schedulers [poll + claim, SKIP LOCKED]> Jobs table|SQL, idx next_run_time
+Schedulers > Queue > Workers > Run history
+Workers [failure, retry with backoff]> Queue
+
+@104 Proximity service: an index builder turns the places DB into geohash or quadtree cells loaded by replicated in-memory search servers; a query looks up its cell and neighbours, filters by exact distance, ranks and hydrates details from a cache.
+Places DB > Index builder|geohash / quadtree > Search servers|in-memory, replicated
+Query|lat, lng, r > Search servers|in-memory, replicated > Cell + neighbours > Filter by distance > Rank > Details cache
+
+@105 Flash sale: static pages come from the CDN, a waiting room issues tokens and rate-limits, reservations atomically decrement stock buckets, then the order and payment follow; expired reservations return stock.
+Users > CDN|static > Waiting room|tokens, rate limit > Reserve|atomic decrement > Order > Pay
+Pay [expired, stock back]> Reserve|atomic decrement
+
+@106 Hotel booking: search uses Elasticsearch with filters and geo plus an availability cache; booking runs a SQL transaction that decrements every night where availability is positive, holds, takes payment and confirms with the supplier; events drive email, invoices and sync.
+Search > Elasticsearch|filters, geo
+Search > Availability cache
+Book > SQL txn|decrement each night > Hold > Pay > Confirm|supplier API
+Confirm|supplier API ~> Events|email, invoice, sync
+
+@107 Ad click aggregator: click servers assign a click ID and write to Kafka keyed by ad_id; Flink deduplicates and counts per minute of event time into an OLAP store; raw clicks also go to object storage for a daily batch recompute and reconciliation.
+Click servers|click id > Kafka|key ad_id > Flink|dedup, 1-min windows > OLAP store
+Kafka|key ad_id ~> Raw clicks|object storage > Daily batch|recompute > Reconcile
+Reconcile > OLAP store
+
+@108 Stock exchange: traders go through gateways that validate and check risk to a sequencer that numbers orders into a replicated log, then to an in-memory matching engine per symbol that emits trades to clearing and book updates to market data; a standby replays the log.
+Traders > Gateways|validate, risk > Sequencer|replicated log > Matching engine|per symbol, in memory > Trades to clearing
+Matching engine|per symbol, in memory > Market data
+Sequencer|replicated log ~> Standby|replays log
+
+@109 Zoom/Meet: clients signal over WebSocket to a room service that assigns a regional SFU; media goes over WebRTC UDP to the SFU, which forwards the best layer to other participants; if UDP is blocked, a TURN relay is used.
+Client [signalling, WS]> Room service > Regional SFU
+Client [WebRTC, UDP]> Regional SFU [best layer]> Other clients
+Client [UDP blocked]> TURN relay > Regional SFU
+
+@110 Hotstar IPL live: camera feeds go to encoders that build an ABR ladder, a packager cuts segments, an origin with a shield feeds several CDNs, and players pull segments from edges; login, entitlement and ads are pre-scaled.
+Camera feed > Encoders|ABR ladder > Packager|segments > Origin + shield > Multi-CDN edges > Players
+Players > Login, entitlement,|ads (pre-scaled)
+
+@111 Online judge: submissions are stored by the API and queued per contest; workers run code in a sandbox with no network and strict limits, store the verdict, push it to the user and emit events to the leaderboard.
+Submit > API|store > Queue|per contest > Workers > Sandbox|no network, limits > Verdict > DB
+Verdict [push]> User
+Verdict ~> Leaderboard
+
+@112 Email service: inbound SMTP is checked for SPF, DKIM and DMARC, queued for spam and malware workers, and stored with bodies in object storage and per-user metadata indexed for search; clients read the inbox by cursor; outbound mail is queued with retries.
+SMTP in > SPF / DKIM / DMARC > Queue > Spam + malware|workers > Object storage|bodies
+Spam + malware|workers > Metadata|per user > Search index
+Client > Inbox|cursor > Metadata|per user
+Client [send]> Outbound queue|retries
+
+@113 S3-like object storage: the front end authenticates; on PUT, data is erasure-coded 8+4 across storage nodes in different racks or zones before the metadata service commits bucket/key to fragments; GET reads 8 of 12 fragments and verifies; scrubbers repair.
+Client > Front end|auth > Metadata service|bucket/key to fragments
+Front end|auth [PUT]> Erasure code 8+4 > Storage nodes|racks / AZs
+Erasure code 8+4 [commit]> Metadata service|bucket/key to fragments
+Front end|auth [GET: 8 of 12]> Storage nodes|racks / AZs
+Scrubbers [repair]> Storage nodes|racks / AZs
+
+@114 Distributed counter: a like first inserts a unique (user, post) row, then the counter service increments one of 32 sub-keys; reads sum the 32 sub-keys with a 1-second cache; increments are also logged to Kafka for a durable store.
+Like > Unique insert|(user, post) > Counter service > INCR counter:post:7#r|r = 0..31
+Read > Sum 32 sub-keys|cache 1 s > INCR counter:post:7#r|r = 0..31
+Counter service ~> Kafka > Durable store

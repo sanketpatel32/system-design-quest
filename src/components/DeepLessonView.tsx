@@ -1,7 +1,8 @@
 import type { DeepLesson } from '../content/types'
+import { DiagramFigure } from './DiagramFigure'
 
 /** "Go deeper" material under the card deck: collapsible cards, callouts and a comparison table. */
-export function DeepLessonView({ deep, accent }: { deep: DeepLesson; accent: string }) {
+export function DeepLessonView({ deep, accent, topicId }: { deep: DeepLesson; accent: string; topicId: number }) {
   return (
     <section aria-labelledby="deep-title" className="space-y-3" style={{ ['--accent' as string]: accent }}>
       <h2 id="deep-title" className="font-display text-2xl text-chalk">Go deeper</h2>
@@ -18,9 +19,7 @@ export function DeepLessonView({ deep, accent }: { deep: DeepLesson; accent: str
               </li>
             ))}
           </ol>
-          {deep.diagram && (
-            <pre className="deep-diagram" aria-label="Diagram">{deep.diagram}</pre>
-          )}
+          <DiagramFigure topicId={topicId} ascii={deep.diagram} label="Diagram" />
         </div>
       </details>
 
