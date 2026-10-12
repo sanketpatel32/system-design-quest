@@ -8,6 +8,8 @@ import type { UserGraph } from '../lib/scoring/graph'
 import { INITIAL_HEARTS } from '../lib/scoring/quiz'
 import { HeartsHud } from '../components/ui/Hud'
 import { useGameStore } from '../stores/gameStore'
+import { Mascot } from '../components/art/Mascot'
+import { IconCastle } from '../components/icons/HudIcons'
 
 const RUBRIC: { key: keyof BossBreakdown; label: string; max: number }[] = [
   { key: 'requirements', label: 'Requirements', max: 15 },
@@ -65,14 +67,19 @@ export function BossPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-[960px]">
-      <header className="flex justify-between items-start gap-4 flex-wrap border-b border-[var(--color-rail)] pb-4">
-        <div className="max-w-2xl">
-          <p className="text-sm font-semibold text-[var(--color-fault)]">Boss · topic {topic.id}</p>
-          <h1 className="font-display text-4xl font-extrabold text-chalk mt-1 leading-tight">{topic.title}</h1>
-          <p className="text-[15px] text-dim mt-2">{topic.boss.estimationScenario}</p>
+    <div className="space-y-8 max-w-[960px] mx-auto">
+      <header className="unit-banner flex items-center gap-4 p-5 sm:p-6" style={{ background: '#8A5A00', ['--banner-shadow' as string]: '#5C3C00' }}>
+        <div className="hidden sm:grid h-24 w-24 shrink-0 place-items-center rounded-full bg-[#FFC800] shadow-[0_6px_0_#E0A800]">
+          <IconCastle size={64} />
         </div>
-        <HeartsHud hearts={hearts} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-extrabold uppercase tracking-wider text-white/90">Boss fight · topic {topic.id}</p>
+          <h1 className="font-display text-3xl sm:text-4xl text-white mt-1 leading-tight">{topic.title}</h1>
+          <p className="font-bold text-white/95 mt-2 max-w-2xl">{topic.boss.estimationScenario}</p>
+        </div>
+        <div className="self-start rounded-2xl bg-white px-2 py-1.5">
+          <HeartsHud hearts={hearts} />
+        </div>
       </header>
 
       {topic.bossStages.map((stage, si) => (
@@ -80,8 +87,8 @@ export function BossPage() {
           <div className="flex items-baseline gap-3 mb-3">
             <span className="boss-stage-num" aria-hidden>{si + 1}</span>
             <div>
-              <h2 id={`stage-${stage.id}`} className="font-display text-xl font-bold text-chalk">{stage.title}</h2>
-              <p className="text-sm text-dim">{stage.prompt}</p>
+              <h2 id={`stage-${stage.id}`} className="font-display text-2xl text-chalk">{stage.title}</h2>
+              <p className="font-bold text-dim">{stage.prompt}</p>
             </div>
           </div>
           <div className="space-y-4">
@@ -113,27 +120,28 @@ export function BossPage() {
           type="button"
           disabled={hearts <= 0}
           onClick={submitBoss}
-          className="btn-cta disabled:opacity-40"
+          className="btn-cta w-full sm:w-auto sm:min-w-[280px]"
         >
           Submit boss attempt
         </button>
       )}
 
       {grade && (
-        <section className="panel p-5 space-y-5" aria-labelledby="boss-score" role="status">
-          <div className="flex flex-wrap items-end justify-between gap-4">
+        <section className="panel anim-pop p-5 sm:p-6 space-y-5" aria-labelledby="boss-score" role="status">
+          <div className="flex flex-wrap items-center gap-4">
+            <Mascot mood={grade.passed ? 'happy' : 'sad'} size={96} />
             <div>
-              <p className={`text-sm font-semibold ${grade.passed ? 'text-[var(--color-clear)]' : 'text-[var(--color-amber)]'}`}>
+              <p className={`text-sm font-extrabold uppercase tracking-wide ${grade.passed ? 'text-[var(--color-clear)]' : 'text-[var(--color-fault)]'}`}>
                 {grade.passed ? 'Boss cleared · 70 needed to pass' : 'Not cleared yet · 70 needed to pass'}
               </p>
-              <h2 id="boss-score" className="font-display text-3xl font-extrabold text-chalk mt-1">
+              <h2 id="boss-score" className="font-display text-4xl text-chalk mt-1">
                 Score: <span className="tabular-nums">{grade.total}</span>
                 <span className="text-dim text-xl font-semibold">/100</span>
               </h2>
             </div>
           </div>
           <div className="score-track" aria-hidden>
-            <div className="score-fill" style={{ width: `${grade.total}%`, background: grade.passed ? 'var(--color-clear)' : 'var(--color-amber)' }} />
+            <div className="score-fill" style={{ width: `${grade.total}%`, background: grade.passed ? 'var(--color-hero)' : '#FF9600' }} />
             <div className="score-pass" />
           </div>
           <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-3">
