@@ -1,0 +1,1895 @@
+{
+ "21": {
+  "teaches": [
+   "sql",
+   "nosql-families",
+   "nosql-trap",
+   "choose",
+   "nosql"
+  ],
+  "mechanism": {
+   "title": "How to choose a database from access patterns, step by step",
+   "steps": [
+    "Write down the entities and the five to ten queries the product must serve, with rough rates: 'get order by id, 2,000/s', 'list a user's orders newest first, 500/s', 'monthly revenue by city, once a day'.",
+    "Mark which operations must change several rows atomically (move money, reserve a seat and create a booking). These want ACID transactions across rows or tables, which relational databases give you by default.",
+    "Mark which queries need joins or ad hoc filters you cannot predict yet. SQL handles unknown future queries well because the schema is normalised and the planner can combine tables.",
+    "Estimate data size and write rate. A single well-tuned Postgres or MySQL primary on modern hardware comfortably serves a few terabytes and thousands of writes per second; most products never outgrow that.",
+    "Only if one machine clearly cannot hold the data or absorb the writes, or the access pattern is a pure key lookup at huge scale, consider a NoSQL family: key-value for lookups by id, document for self-contained nested records, wide-column for very high write rates partitioned by key, graph for many-hop relationship queries.",
+    "Validate the choice against the hardest query, not the easiest one, and say what you give up (joins, multi-row transactions, flexible queries) if you pick NoSQL."
+   ]
+  },
+  "useWhen": [
+   "Money, inventory, bookings and anything with multi-row invariants: use a relational database with transactions.",
+   "Huge write-heavy streams read by a known key (sensor readings, chat messages by conversation, activity feeds): a wide-column or key-value store partitioned by that key fits."
+  ],
+  "avoidWhen": [
+   "Do not pick NoSQL 'because it scales' when the data is a few hundred gigabytes and relational; you lose joins and transactions for capacity you do not need.",
+   "Do not force a relational schema onto highly variable records that are always read whole, such as product attribute bags that differ by category; a document model or a JSONB column is simpler."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Family",
+    "Example",
+    "Best at",
+    "Weak at"
+   ],
+   "rows": [
+    [
+     "Relational (SQL)",
+     "Postgres, MySQL",
+     "Joins, transactions, ad hoc queries",
+     "Horizontal write scaling needs sharding work"
+    ],
+    [
+     "Key-value",
+     "DynamoDB, Redis",
+     "Single-key get/put at very high rates",
+     "Queries by anything except the key"
+    ],
+    [
+     "Document",
+     "MongoDB",
+     "Nested records read and written whole",
+     "Cross-document joins and invariants"
+    ],
+    [
+     "Wide-column",
+     "Cassandra, HBase",
+     "Massive write throughput, partitioned scans",
+     "Ad hoc queries, multi-partition transactions"
+    ],
+    [
+     "Graph",
+     "Neo4j",
+     "Multi-hop relationship traversal",
+     "Bulk aggregation over everything"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Does one SQL primary fit?",
+   "assumptions": [
+    "10 million users, 20 orders each per year, 2 KB per order row with indexes",
+    "Peak 3,000 order writes per second during a sale"
+   ],
+   "steps": [
+    "Orders per year = 10,000,000 × 20 = 200,000,000.",
+    "Storage per year = 200,000,000 × 2 KB = 400,000,000 KB, which is about 400 GB.",
+    "Five years of orders is about 2 TB: large, but within what one primary with replicas can hold on modern SSDs.",
+    "3,000 writes per second is within reach of one tuned primary with batching and good indexes; reads go to replicas and caches."
+   ],
+   "result": "A single relational primary plus read replicas fits this workload for years. Shard or move a specific table to NoSQL only when measured growth says one machine will not cope."
+  },
+  "india": {
+   "title": "A kirana-ordering app's catalogue and orders",
+   "label": "Illustrative estimate",
+   "body": "Imagine a quick-commerce app in Bengaluru. Orders, payments and stock reservations live in Postgres, because confirming an order must atomically decrement stock in one dark store and create the order; a partial write would sell items that are not on the shelf. Product details, though, vary wildly by category: atta has weight and brand, a phone charger has wattage and connector type. Those attribute bags are stored as a JSON document per product, either in a document store or in a JSONB column, and served through a cache. The live delivery-partner location stream, many small writes per second keyed by rider id, goes to a key-value or wide-column store with a short retention. Three stores, each chosen by its access pattern, not by fashion."
+  },
+  "pitfalls": [
+   {
+    "trap": "'I'll use MongoDB because it scales better.'",
+    "say": "'Orders need multi-row transactions and joins, and two terabytes fits one Postgres primary with replicas, so I'd start relational and move only the location stream to a key-value store.'"
+   },
+   {
+    "trap": "Naming a database before listing the queries.",
+    "say": "'Let me list the access patterns and rates first, then pick a store per pattern.'"
+   }
+  ],
+  "takeaways": [
+   "Choose by access pattern, invariants and size, not by brand.",
+   "One relational primary with replicas covers far more scale than most designs need.",
+   "NoSQL trades joins and multi-row transactions for partitioned scale; say that trade out loud.",
+   "Mixed workloads often deserve two or three stores, each with a clear job."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t21-d1",
+    "type": "multiple_choice",
+    "concept": "choose",
+    "prompt": "An app stores 400 GB per year of orders that need multi-row transactions at 3,000 writes/s. What is the best starting choice?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A relational primary with read replicas"
+     },
+     {
+      "id": "b",
+      "label": "A wide-column store, because NoSQL always scales better"
+     },
+     {
+      "id": "c",
+      "label": "A graph database"
+     },
+     {
+      "id": "d",
+      "label": "A cache as the only store"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "The data is relational, needs transactions, and fits a single tuned primary for years; replicas handle reads."
+   }
+  ],
+  "diagram": "access patterns --> need multi-row ACID or joins? --yes--> SQL (+ replicas, cache)\n                         |\n                         no --> lookup by key? -> key-value\n                                nested record? -> document\n                                huge writes by key? -> wide-column\n                                many hops? -> graph"
+ },
+ "22": {
+  "teaches": [
+   "sort-key",
+   "families",
+   "modelling",
+   "denormalise",
+   "partition-key"
+  ],
+  "mechanism": {
+   "title": "Query-first modelling in a partitioned NoSQL store",
+   "steps": [
+    "List every query with its filter and sort, for example 'messages in conversation C, newest first, 50 at a time'.",
+    "Choose the partition key from the equality filter of the main query (conversation_id). All rows with the same partition key live together on one node, so the query reads one partition.",
+    "Choose the sort (clustering) key from the ordering you need (message timestamp or a time-ordered id). Inside the partition rows are stored sorted, so 'newest 50' is a contiguous range read.",
+    "For each extra query with a different filter, create another table or a secondary index keyed for that query, and write to both. Duplicating data is normal; joins at read time are not available or are expensive.",
+    "Check partition size and heat: a single partition should stay well below the store's comfortable limit (tens to low hundreds of megabytes in Cassandra guidance) and should not take a large share of all traffic.",
+    "If one key is too big or too hot, add a bucket to the key, such as (conversation_id, month) or (item_id, shard 0–9), and read the buckets you need."
+   ]
+  },
+  "useWhen": [
+   "The queries are known and stable, and each can be answered by one partition.",
+   "Write volume or data size is beyond a single machine and you can live without joins."
+  ],
+  "avoidWhen": [
+   "Queries are ad hoc or change weekly (analytics, admin search): put that data in SQL, a warehouse or a search index instead.",
+   "You need invariants across many partitions, such as a uniqueness check across all users, without a separate coordination step."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Choice",
+    "Example",
+    "Upside",
+    "Downside"
+   ],
+   "rows": [
+    [
+     "High-cardinality partition key",
+     "user_id",
+     "Even spread, one-partition reads per user",
+     "Queries across users need another table"
+    ],
+    [
+     "Low-cardinality partition key",
+     "country",
+     "Simple",
+     "Hot partitions; India alone could swamp one node"
+    ],
+    [
+     "Time-bucketed key",
+     "(sensor_id, day)",
+     "Bounded partition size",
+     "Range queries span several buckets"
+    ],
+    [
+     "Denormalised copy per query",
+     "messages_by_conversation and messages_by_user",
+     "Each read is one partition",
+     "Writes fan out; copies can drift"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Sizing a chat partition",
+   "assumptions": [
+    "Average message row 300 bytes",
+    "A busy group sends 2,000 messages a day",
+    "Target partition under 100 MB"
+   ],
+   "steps": [
+    "Bytes per day = 2,000 × 300 = 600,000 bytes, about 0.6 MB.",
+    "Days to reach 100 MB = 100 ÷ 0.6 ≈ 167 days.",
+    "A conversation-only partition key would cross the target in under six months for busy groups and keep growing.",
+    "Bucketing by month, (conversation_id, month), caps a busy partition at about 0.6 × 31 ≈ 18.6 MB."
+   ],
+   "result": "Partition by conversation and month: newest-first reads touch one or two buckets, and no partition grows without bound."
+  },
+  "india": {
+   "title": "Modelling a payments-history screen",
+   "label": "Illustrative estimate",
+   "body": "Suppose a UPI app shows 'your transactions, newest first' and also lets support staff look up a transaction by its reference number. A NoSQL design would keep two tables: transactions_by_user with partition key user_id plus month and sort key timestamp descending, and transactions_by_ref with partition key reference_number. Each payment writes both rows. A user scrolling history reads one or two partitions; a support lookup reads exactly one row. Monthly buckets matter because a heavy merchant account can receive thousands of payments a day, which would make a single user_id partition grow without limit. The ledger of record still lives in a transactional store; this table is the read model."
+  },
+  "pitfalls": [
+   {
+    "trap": "Modelling normalised tables and joining them in application code.",
+    "say": "'I design one table per query: messages_by_conversation keyed by (conversation_id, month) with a time-ordered sort key.'"
+   },
+   {
+    "trap": "Picking a low-cardinality partition key like country or status.",
+    "say": "'I'd use a high-cardinality key such as user_id and add a bucket if one key gets hot.'"
+   }
+  ],
+  "takeaways": [
+   "List queries first; the schema follows the queries.",
+   "Partition key spreads data and decides which node answers; sort key orders rows inside it.",
+   "Duplicate data per query instead of joining at read time.",
+   "Bucket keys that grow without limit or get hot."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t22-d1",
+    "type": "multiple_choice",
+    "concept": "partition-key",
+    "prompt": "A busy chat group writes 0.6 MB per day into a partition keyed only by conversation_id. What is the standard fix?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Add a time bucket to the key, e.g. (conversation_id, month)"
+     },
+     {
+      "id": "b",
+      "label": "Use country as the partition key"
+     },
+     {
+      "id": "c",
+      "label": "Add more secondary indexes"
+     },
+     {
+      "id": "d",
+      "label": "Increase the replication factor"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Bucketing by month caps partition size (about 18.6 MB per month here) while newest-first reads still touch only one or two partitions."
+   }
+  ],
+  "diagram": "partition key (conversation_id, month) -> one node\n  sort key: message_ts DESC\n  [m_500][m_499][m_498] ... read newest 50 = one contiguous slice"
+ },
+ "23": {
+  "teaches": [
+   "composite",
+   "write-cost",
+   "lsm",
+   "btree"
+  ],
+  "mechanism": {
+   "title": "What a B-tree lookup and an LSM write actually do",
+   "steps": [
+    "B-tree read: start at the root page, compare the key with the separators, follow one child pointer per level, and land on the leaf page holding the key or a pointer to the row.",
+    "With pages holding a few hundred keys each, three or four levels cover hundreds of millions of rows, and the top levels stay in RAM, so a lookup costs about one or two disk reads.",
+    "B-tree write: find the leaf, update it in place, and split the page if it is full; every extra index on the table repeats this work for the same insert.",
+    "LSM write: append to a write-ahead log for durability, insert into an in-memory sorted table (memtable), and acknowledge. When the memtable fills, flush it as an immutable sorted file (SSTable).",
+    "LSM read: check the memtable, then SSTables newest first; Bloom filters skip files that cannot contain the key, but a miss may still touch several files.",
+    "LSM compaction runs in the background, merging SSTables and dropping overwritten or deleted values; it costs extra disk I/O (write amplification) and can cause latency spikes if it falls behind."
+   ]
+  },
+  "useWhen": [
+   "B-tree: read-heavy OLTP with point lookups and range scans, which is the default in Postgres and MySQL InnoDB.",
+   "LSM: write-heavy workloads such as event logs, metrics and messaging, as in Cassandra, RocksDB and ScyllaDB."
+  ],
+  "avoidWhen": [
+   "Do not add an index for every column 'just in case'; each one slows every insert and update and uses storage and memory.",
+   "Do not choose an LSM store for a read-mostly workload with many point reads of cold keys unless you have measured read amplification."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Aspect",
+    "B-tree",
+    "LSM tree"
+   ],
+   "rows": [
+    [
+     "Write path",
+     "Random in-place page updates",
+     "Sequential appends, then background merges"
+    ],
+    [
+     "Read path",
+     "One path from root to leaf",
+     "Memtable plus several SSTables, helped by Bloom filters"
+    ],
+    [
+     "Space",
+     "Pages partly empty after splits",
+     "Old versions until compaction"
+    ],
+    [
+     "Typical systems",
+     "Postgres, MySQL InnoDB",
+     "Cassandra, RocksDB, LevelDB"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "How few levels a B-tree needs",
+   "assumptions": [
+    "Fan-out of 200 keys per page",
+    "500 million rows"
+   ],
+   "steps": [
+    "One level covers 200 keys; two levels cover 200 × 200 = 40,000.",
+    "Three levels cover 40,000 × 200 = 8,000,000.",
+    "Four levels cover 8,000,000 × 200 = 1,600,000,000, which is more than 500 million.",
+    "So any row is at most four page reads away, and with the root and second level cached, about two reads from disk."
+   ],
+   "result": "A B-tree over half a billion rows is only four levels deep, which is why an indexed lookup takes milliseconds while a full scan of 500 million rows takes minutes."
+  },
+  "india": {
+   "title": "Searching orders by phone number",
+   "label": "Illustrative estimate",
+   "body": "A food-delivery support tool lets agents find orders by customer phone number and date. Without an index, Postgres scans the whole orders table, perhaps hundreds of millions of rows, for each lookup. A composite index on (phone, created_at) lets the planner jump to that phone's entries and read them already sorted by date. The leftmost-prefix rule matters: the same index helps 'phone = X' and 'phone = X and created_at > Y' but not 'created_at > Y' alone. The cost is that every new order now writes one more index entry, so the team adds this index and drops two unused ones rather than piling on more."
+  },
+  "pitfalls": [
+   {
+    "trap": "'Indexes make everything faster.'",
+    "say": "'Indexes speed the reads they match and slow every write; I'd add a composite index on (user_id, created_at) for the feed query and nothing else until I see slow queries.'"
+   },
+   {
+    "trap": "Expecting an index on (a, b) to help a query filtering only on b.",
+    "say": "'Composite indexes follow the leftmost prefix, so a filter on b alone needs its own index or a different column order.'"
+   }
+  ],
+  "takeaways": [
+   "B-trees give a few-level lookup path and are the default for OLTP.",
+   "LSM trees turn writes into sequential appends and pay later in compaction and read amplification.",
+   "Composite indexes follow the leftmost-prefix rule.",
+   "Every index is a tax on writes; index for the queries you actually run."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t23-d1",
+    "type": "multiple_choice",
+    "concept": "btree",
+    "prompt": "With 200 keys per page, how many B-tree levels are needed to index 500 million rows?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "4"
+     },
+     {
+      "id": "b",
+      "label": "2"
+     },
+     {
+      "id": "c",
+      "label": "9"
+     },
+     {
+      "id": "d",
+      "label": "About 500"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Three levels cover 8 million keys; four cover 1.6 billion, which exceeds 500 million."
+   }
+  ],
+  "diagram": "B-tree:  [root] -> [internal] -> [leaf: keys + row pointers]   (3-4 levels)\nLSM:     write -> WAL + memtable -> flush -> SSTable L0 -> compaction -> L1, L2 ..."
+ },
+ "24": {
+  "teaches": [
+   "normalise",
+   "denormalise",
+   "denormalise-process"
+  ],
+  "mechanism": {
+   "title": "From normalised tables to a denormalised read model",
+   "steps": [
+    "Normalise first: each fact lives in one place. Orders reference customers by customer_id; the customer's name lives only in the customers table.",
+    "Reads assemble data with joins. This keeps writes simple and consistent: changing a name is one update.",
+    "Measure: if a hot read joins five tables thousands of times per second and is slow even with indexes, consider denormalising that one read path.",
+    "Denormalise by copying the fields the read needs onto the row it reads, or by building a separate read table, for example an order_summary row that includes the customer name and the restaurant name.",
+    "Decide how copies are kept in step: in the same transaction, by an event or change-data-capture consumer, or by accepting that historical copies are deliberately frozen (the address at the time of the order).",
+    "Document which copy is the source of truth, and add a repair job or check for drift."
+   ]
+  },
+  "useWhen": [
+   "Normalise the transactional core: users, orders, payments, inventory.",
+   "Denormalise hot, read-mostly views such as feeds, order history lists, search documents and dashboards."
+  ],
+  "avoidWhen": [
+   "Do not denormalise fields that change often and must be correct everywhere immediately, such as a price used for billing.",
+   "Do not denormalise before measuring; joins on indexed keys are cheap at moderate scale."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Approach",
+    "Reads",
+    "Writes",
+    "Risk"
+   ],
+   "rows": [
+    [
+     "Normalised",
+     "Joins at read time",
+     "One place to update",
+     "Slow hot reads at very high scale"
+    ],
+    [
+     "Denormalised copy",
+     "One-row reads",
+     "Update every copy",
+     "Copies drift if a sync fails"
+    ],
+    [
+     "Snapshot (frozen copy)",
+     "One-row reads",
+     "Written once",
+     "Correct by design for historical facts"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "What a copied field costs to update",
+   "assumptions": [
+    "A restaurant name is copied onto order_summary rows",
+    "The restaurant has 2,000,000 historical orders",
+    "Updates run at 5,000 rows per second"
+   ],
+   "steps": [
+    "Rows to rewrite on a rename = 2,000,000.",
+    "Time = 2,000,000 ÷ 5,000 = 400 seconds, nearly seven minutes of background writes.",
+    "If the order summary should show the name at order time, it is a snapshot and needs no rewrite at all.",
+    "If it should show the current name, read it by restaurant_id from a cache instead of copying it."
+   ],
+   "result": "Copy fields that are snapshots or rarely change; look up fields that change and must be current."
+  },
+  "india": {
+   "title": "Delivery address on an order",
+   "label": "Illustrative estimate",
+   "body": "When someone in Pune orders food, the app copies the delivery address, item names and prices onto the order. This is deliberate denormalisation: if the customer later edits their saved address or the restaurant changes a price, the old order must still show what was actually delivered and charged, which also matters for GST invoices. Meanwhile the customer profile itself stays normalised, so editing the saved address is a single update. The order-history screen reads one denormalised row per order instead of joining orders, items, restaurants and addresses for every scroll."
+  },
+  "pitfalls": [
+   {
+    "trap": "'Denormalisation is always faster, so I'll denormalise everything.'",
+    "say": "'I'll keep the core normalised and add a denormalised order-history read model fed by events, because that list is read hundreds of times per order written.'"
+   },
+   {
+    "trap": "Forgetting how copies stay in sync.",
+    "say": "'The read model is updated by a CDC consumer; if it lags, the source of truth is still the orders table.'"
+   }
+  ],
+  "takeaways": [
+   "Normalise for correct writes; denormalise specific hot reads.",
+   "Snapshots of historical facts are the safest denormalisation.",
+   "Every copied field needs a sync plan and a source of truth.",
+   "Measure before denormalising."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t24-d1",
+    "type": "multiple_choice",
+    "concept": "denormalise",
+    "prompt": "Why is copying the delivery address onto each order a sensible denormalisation?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The order must keep the address it was delivered to, even if the profile changes later"
+     },
+     {
+      "id": "b",
+      "label": "Because joins are not allowed in SQL"
+     },
+     {
+      "id": "c",
+      "label": "Because it makes address edits faster"
+     },
+     {
+      "id": "d",
+      "label": "Because it removes the need for a customers table"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "It is a snapshot of a historical fact, so it never needs to be kept in sync with the profile."
+   }
+  ],
+  "diagram": "normalised:   orders(customer_id) --join--> customers(name)\ndenormalised: order_summary(customer_name_at_order, restaurant_name, total)"
+ },
+ "25": {
+  "teaches": [
+   "atomicity",
+   "durability",
+   "consistency",
+   "transaction-flow"
+  ],
+  "mechanism": {
+   "title": "What happens inside a transaction from BEGIN to COMMIT",
+   "steps": [
+    "BEGIN: the database gives the transaction a snapshot or start point and starts tracking its changes.",
+    "Each statement takes the locks or version checks it needs and writes its changes to pages in memory, recording them in the write-ahead log (WAL).",
+    "Constraints (foreign keys, unique, check) are verified; a violation aborts the statement or the whole transaction.",
+    "COMMIT: the database writes a commit record to the WAL and flushes the log to durable storage (fsync) before telling the client 'committed'. That flush is what durability means.",
+    "If the process crashes before the commit record is durable, recovery replays the log and discards the incomplete transaction, so none of its changes survive. That is atomicity.",
+    "Data pages are written to disk later by checkpoints; the log is enough to rebuild them after a crash."
+   ]
+  },
+  "useWhen": [
+   "Any change that must update several rows together: debit one account and credit another, reserve stock and create an order.",
+   "Any rule that must never be broken, enforced by constraints inside the database."
+  ],
+  "avoidWhen": [
+   "Do not hold a transaction open while calling a slow external service such as a payment gateway; locks are held the whole time.",
+   "Do not expect a local transaction to cover writes to other services or a message broker; that needs an outbox or a saga."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Property",
+    "Guarantee",
+    "Mechanism"
+   ],
+   "rows": [
+    [
+     "Atomicity",
+     "All changes or none",
+     "WAL plus rollback on abort or crash"
+    ],
+    [
+     "Consistency",
+     "Constraints and invariants hold after commit",
+     "Constraints, triggers, application rules"
+    ],
+    [
+     "Isolation",
+     "Concurrent transactions do not see each other's partial work",
+     "Locks or MVCC snapshots"
+    ],
+    [
+     "Durability",
+     "Committed data survives a crash",
+     "WAL flushed before acknowledging"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Why commit latency is about the log flush",
+   "assumptions": [
+    "SSD fsync takes about 0.1–1 ms",
+    "Group commit batches 50 transactions per flush",
+    "Flush time 1 ms"
+   ],
+   "steps": [
+    "Without batching, one flush per commit at 1 ms allows about 1,000 commits per second per log.",
+    "With group commit, 50 transactions share each flush, so throughput rises to about 50 × 1,000 = 50,000 commits per second at the same flush rate.",
+    "Each transaction still waits about 1 ms for its flush, so latency stays similar while throughput rises."
+   ],
+   "result": "Durability is paid for at commit time with a log flush; databases batch commits to keep throughput high."
+  },
+  "india": {
+   "title": "A UPI transfer between two bank accounts",
+   "label": "Illustrative estimate",
+   "body": "Inside one bank, moving ₹500 from savings to a recurring deposit is a classic local transaction: debit one row, credit another, insert a ledger entry, commit. If the server crashes in the middle, the WAL ensures that either all three changes survive or none do, so money is never created or lost. A UPI payment between two different banks is different: no single database transaction spans both banks. NPCI's switch coordinates request and response messages, each bank commits its own side locally, and reversals and reconciliation handle failures. Knowing where a local ACID transaction ends is the key interview point."
+  },
+  "pitfalls": [
+   {
+    "trap": "Saying ACID 'C' means the same as CAP 'C'.",
+    "say": "'ACID consistency means invariants hold after each transaction; CAP consistency means every read sees the latest write across replicas.'"
+   },
+   {
+    "trap": "Calling a payment gateway inside an open transaction.",
+    "say": "'I commit a pending payment row, call the gateway outside the transaction, then update the row with the result.'"
+   }
+  ],
+  "takeaways": [
+   "Atomicity and durability both come from the write-ahead log.",
+   "The client is told 'committed' only after the log is durable.",
+   "ACID consistency is about invariants, not replicas.",
+   "Keep transactions short and local; use sagas or outboxes across services."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t25-d1",
+    "type": "multiple_choice",
+    "concept": "durability",
+    "prompt": "When may a database safely tell a client that a transaction is committed?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "After the commit record is flushed to durable storage"
+     },
+     {
+      "id": "b",
+      "label": "As soon as the first statement succeeds"
+     },
+     {
+      "id": "c",
+      "label": "After the data pages are written by a checkpoint"
+     },
+     {
+      "id": "d",
+      "label": "After a replica in another region confirms"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Durability means the commit record is on disk before acknowledging; data pages can be rebuilt from the log."
+   }
+  ],
+  "diagram": "BEGIN -> writes in memory + WAL records -> constraints ok? -> COMMIT record -> fsync WAL -> ack client\n crash before fsync: replay log, discard   |   crash after fsync: replay log, keep"
+ },
+ "26": {
+  "teaches": [
+   "levels",
+   "write-skew",
+   "default-level"
+  ],
+  "mechanism": {
+   "title": "The anomalies each isolation level allows",
+   "steps": [
+    "Dirty read: transaction B reads a row that A has changed but not committed. Read Committed prevents this by only showing committed data.",
+    "Non-repeatable read: A reads a row twice and sees two different committed values because B updated it in between. Repeatable Read (or Snapshot Isolation) gives A one consistent snapshot for the whole transaction.",
+    "Phantom: A runs 'count bookings for room 7 tonight' twice and sees a new row the second time. Serializable prevents phantoms; snapshot isolation hides them from reads but does not prevent the conflicting write.",
+    "Write skew: two transactions each read the same set, each decide a change is safe, and write different rows. Both commit and together break an invariant. Snapshot isolation allows this; Serializable (in Postgres, Serializable Snapshot Isolation) detects it and aborts one.",
+    "Defaults differ: Postgres and Oracle default to Read Committed; MySQL InnoDB defaults to Repeatable Read.",
+    "Fixes without full Serializable: lock the rows you read with SELECT ... FOR UPDATE, add a unique constraint that encodes the invariant, or materialise the conflict as a row both transactions must update."
+   ]
+  },
+  "useWhen": [
+   "Serializable or explicit locks for invariants spanning several rows: at least one doctor on call, no double booking of a seat.",
+   "Read Committed for most simple single-row updates and reads where a fresh value per statement is enough."
+  ],
+  "avoidWhen": [
+   "Do not switch the whole database to Serializable without testing; conflicts cause aborts that the application must retry.",
+   "Do not rely on the default level to protect a check-then-insert invariant; it usually does not."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Level",
+    "Dirty read",
+    "Non-repeatable read",
+    "Phantom / write skew"
+   ],
+   "rows": [
+    [
+     "Read Uncommitted",
+     "Possible",
+     "Possible",
+     "Possible"
+    ],
+    [
+     "Read Committed",
+     "Prevented",
+     "Possible",
+     "Possible"
+    ],
+    [
+     "Repeatable Read / Snapshot",
+     "Prevented",
+     "Prevented",
+     "Write skew possible"
+    ],
+    [
+     "Serializable",
+     "Prevented",
+     "Prevented",
+     "Prevented"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "How often a check-then-insert race bites",
+   "assumptions": [
+    "A popular slot gets 20 booking attempts per second",
+    "Each check-then-insert takes 50 ms between the read and the commit"
+   ],
+   "steps": [
+    "In any 50 ms window, the expected number of attempts is 20 × 0.05 = 1.",
+    "So overlapping attempts on the same slot are routine rather than rare: under an expected one arrival per window, the chance of at least one other attempt is about 63% (1 minus e to the power −1).",
+    "Under Read Committed both see 'slot free' and both insert, creating a double booking.",
+    "A unique constraint on (slot_id) makes the second insert fail cleanly, at almost no cost."
+   ],
+   "result": "At realistic contention the race is not theoretical; encode the invariant in a constraint or lock, not in a read followed by a write."
+  },
+  "india": {
+   "title": "Tatkal train booking",
+   "label": "Illustrative estimate",
+   "body": "When Tatkal booking opens on IRCTC at 10:00, very many people try to book the same berths within seconds. A naive design reads 'berths available = 3', then inserts a booking, and with Read Committed two sessions can both see 3 available and both book the last berth. Any correct design must make the decrement and the booking atomic: for example, UPDATE inventory SET available = available − 1 WHERE train_id = ? AND available > 0, then check that exactly one row changed before creating the booking. This is a conditional write rather than a read followed by a write, so concurrent attempts serialise on that one row. We are describing the general technique, not IRCTC's internal implementation."
+  },
+  "pitfalls": [
+   {
+    "trap": "'Transactions prevent all race conditions.'",
+    "say": "'Under the default Read Committed a check-then-insert can double-book; I'd use a conditional update or a unique constraint, or Serializable with retries.'"
+   },
+   {
+    "trap": "Not knowing write skew.",
+    "say": "'Write skew is two transactions reading the same rows and writing different ones, together breaking an invariant; snapshot isolation allows it.'"
+   }
+  ],
+  "takeaways": [
+   "Know the four anomalies and which level prevents each.",
+   "Postgres defaults to Read Committed, MySQL InnoDB to Repeatable Read.",
+   "Write skew survives snapshot isolation; use Serializable, locks or constraints.",
+   "Prefer conditional writes and unique constraints for booking invariants."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t26-d1",
+    "type": "multiple_choice",
+    "concept": "write-skew",
+    "prompt": "Two doctors each check 'at least one other doctor is on call' and both go off call. Which anomaly is this?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Write skew"
+     },
+     {
+      "id": "b",
+      "label": "Dirty read"
+     },
+     {
+      "id": "c",
+      "label": "Lost durability"
+     },
+     {
+      "id": "d",
+      "label": "Replication lag"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Both read the same set and wrote different rows; snapshot isolation allows it, Serializable or locking prevents it."
+   }
+  ],
+  "diagram": "T1: read on_call=2 ----- set Alice off ----- commit\nT2:   read on_call=2 ----- set Bob off ----- commit\nresult: on_call=0  (write skew under snapshot isolation)"
+ },
+ "27": {
+  "teaches": [
+   "eventual",
+   "base",
+   "conflicts",
+   "base-flow"
+  ],
+  "mechanism": {
+   "title": "How an eventually consistent write spreads and conflicts are settled",
+   "steps": [
+    "The client writes to one replica (or a few), which accepts the write and acknowledges without waiting for every other replica.",
+    "The change is shipped to the other replicas asynchronously through a replication log, hinted handoff or gossip.",
+    "Until it arrives, readers of other replicas see the old value. With no new writes, all replicas converge to the same value: that is eventual consistency.",
+    "If two replicas accept different writes to the same key concurrently, the system must resolve the conflict: last-writer-wins by timestamp, keep both versions (siblings) for the app to merge, or use a data type that merges automatically (a CRDT such as a counter or set).",
+    "Background repair (read repair and anti-entropy with Merkle trees) finds replicas that missed updates and fixes them.",
+    "The application designs around the window: show the user their own write from local state, make actions idempotent, and avoid invariants that need a global view at write time."
+   ]
+  },
+  "useWhen": [
+   "Likes, view counts, feeds, presence, recommendations and other data where a few seconds of staleness is harmless.",
+   "Systems that must keep accepting writes during a network partition or across regions."
+  ],
+  "avoidWhen": [
+   "Balances, stock reservations and unique usernames, where two replicas accepting conflicting writes causes real harm.",
+   "Any case where last-writer-wins would silently drop a meaningful update, such as two edits to a shared document."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Conflict strategy",
+    "How it works",
+    "Cost"
+   ],
+   "rows": [
+    [
+     "Last-writer-wins",
+     "Keep the write with the highest timestamp",
+     "Silently loses concurrent updates; clock skew matters"
+    ],
+    [
+     "Siblings / app merge",
+     "Store both versions, let the app merge on read",
+     "More application code"
+    ],
+    [
+     "CRDTs",
+     "Data types whose merges commute (counters, sets)",
+     "Only some data fits; metadata overhead"
+    ],
+    [
+     "Avoid conflicts",
+     "Route all writes for a key to one leader",
+     "Less availability for that key during failures"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "How stale can a read be?",
+   "assumptions": [
+    "Replication lag averages 200 ms, and peaks at 2 s",
+    "A key is read 1,000 times per second just after a write"
+   ],
+   "steps": [
+    "Reads that might be stale right after one write at average lag = 1,000 × 0.2 = 200.",
+    "At peak lag the window is 2 s, so up to 1,000 × 2 = 2,000 reads could see the old value.",
+    "For a like count, 2,000 slightly old counts are harmless; for a seat count they could oversell."
+   ],
+   "result": "Quantify the staleness window and the number of reads inside it, then decide per feature whether that is acceptable."
+  },
+  "india": {
+   "title": "View counts on a cricket highlight",
+   "label": "Illustrative estimate",
+   "body": "When a highlight clip is uploaded during an India match, views pour in from across the country. Counting every view through a single strongly consistent row would make that row a bottleneck. Instead, regional servers count locally and merge their counts periodically; the number shown in the app may lag by a few seconds and differ slightly between two phones in the same room. Nobody is harmed, and the system keeps accepting views even if one region is cut off. The same company would never count wallet balances this way."
+  },
+  "pitfalls": [
+   {
+    "trap": "'Eventual consistency means data might be lost.'",
+    "say": "'Eventual consistency means replicas converge once writes stop; loss only happens with a lossy conflict rule like last-writer-wins.'"
+   },
+   {
+    "trap": "Using BASE for everything to sound scalable.",
+    "say": "'Counts and feeds can be eventual; payments and inventory stay strongly consistent.'"
+   }
+  ],
+  "takeaways": [
+   "Eventual consistency trades read freshness for availability and latency.",
+   "Conflicts need an explicit rule: LWW, siblings or CRDTs.",
+   "Quantify the staleness window per feature.",
+   "Keep money and inventory off eventually consistent paths."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t27-d1",
+    "type": "multiple_choice",
+    "concept": "conflicts",
+    "prompt": "Two replicas accept different values for the same key concurrently and the system uses last-writer-wins. What is the risk?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "One of the concurrent updates is silently discarded"
+     },
+     {
+      "id": "b",
+      "label": "Both writes are rejected"
+     },
+     {
+      "id": "c",
+      "label": "Replicas never converge"
+     },
+     {
+      "id": "d",
+      "label": "Reads become strongly consistent"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "LWW keeps the write with the highest timestamp and drops the other, even if it mattered."
+   }
+  ],
+  "diagram": "client -> replica A (ack) --async--> replica B, replica C\nread from C before arrival -> old value; after -> converged"
+ },
+ "28": {
+  "teaches": [
+   "leader-follower",
+   "sync-async",
+   "read-your-writes",
+   "multi-leader"
+  ],
+  "mechanism": {
+   "title": "How leader-follower replication moves a write",
+   "steps": [
+    "All writes go to the leader, which applies them and appends them to its replication log (in Postgres, the WAL; in MySQL, the binlog).",
+    "Followers stream the log and apply changes in the same order, so each follower is a copy of the leader at some recent point.",
+    "Synchronous: the leader waits for at least one follower to confirm before acknowledging the client. No acknowledged write is lost if the leader dies, but each write pays a network round trip and stalls if that follower is down.",
+    "Asynchronous: the leader acknowledges immediately. Writes are fast, but if the leader dies, the last few hundred milliseconds of writes may never have reached a follower and are lost on failover.",
+    "Reads can go to followers to scale, but a follower may lag, so a user can write and then read an older value. Read-your-writes fixes this by routing that user's reads to the leader for a short time, or by waiting until the follower has reached the write's log position.",
+    "Failover: detect the dead leader, promote the most up-to-date follower, repoint clients, and fence the old leader so it cannot accept writes if it comes back."
+   ]
+  },
+  "useWhen": [
+   "Read-heavy workloads: scale reads with followers while one leader keeps writes simple and ordered.",
+   "High availability: a follower ready to be promoted, with semi-synchronous replication if losing acknowledged writes is unacceptable."
+  ],
+  "avoidWhen": [
+   "Do not send read-after-write paths such as 'show my just-edited profile' to a lagging follower without a read-your-writes rule.",
+   "Do not choose multi-leader replication casually; concurrent writes in two places need conflict resolution."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Mode",
+    "Write latency",
+    "Data loss on leader failure",
+    "Availability of writes"
+   ],
+   "rows": [
+    [
+     "Synchronous (all followers)",
+     "Slowest replica's round trip",
+     "None",
+     "Stalls if any follower is down"
+    ],
+    [
+     "Semi-synchronous (one follower)",
+     "One round trip",
+     "None if that follower is promoted",
+     "Good"
+    ],
+    [
+     "Asynchronous",
+     "Local only",
+     "The unreplicated tail",
+     "Best"
+    ],
+    [
+     "Multi-leader",
+     "Local per region",
+     "Conflicts instead of loss",
+     "Writes continue in each region"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "How much data asynchronous failover can lose",
+   "assumptions": [
+    "Leader takes 2,000 writes per second",
+    "Replication lag 300 ms at the moment of failure"
+   ],
+   "steps": [
+    "Unreplicated writes = 2,000 × 0.3 = 600 writes.",
+    "Those 600 writes were acknowledged to clients but exist only on the dead leader.",
+    "With semi-synchronous replication to one follower, the lag for acknowledged writes on that follower is zero, at the cost of about one network round trip per commit (often under 1 ms in the same zone)."
+   ],
+   "result": "Asynchronous replication can lose roughly 'write rate × lag' acknowledged writes on failover; size that number before choosing."
+  },
+  "india": {
+   "title": "Profile edits on a jobs portal",
+   "label": "Illustrative estimate",
+   "body": "A user on a job portal in Hyderabad updates their résumé headline and is immediately taken to their profile page. If that page reads from a follower lagging by a second, they see the old headline and think the save failed, and may edit again. The portal routes a user's own profile reads to the leader for, say, 10 seconds after any edit, using a timestamp in their session, while recruiters browsing thousands of profiles read from followers. Writes stay on one leader; read load is spread out; and the one user who would notice lag never sees it."
+  },
+  "pitfalls": [
+   {
+    "trap": "'Replicas are always in sync.'",
+    "say": "'With asynchronous replication followers lag; I'd route read-after-write traffic to the leader and accept seconds of staleness for everyone else.'"
+   },
+   {
+    "trap": "Promoting a follower without fencing the old leader.",
+    "say": "'On failover I'd fence the old leader with an epoch number so it cannot accept writes if it returns.'"
+   }
+  ],
+  "takeaways": [
+   "One leader orders all writes; followers replay the log.",
+   "Synchronous costs latency, asynchronous risks losing the unreplicated tail.",
+   "Read-your-writes needs explicit routing or waiting for log position.",
+   "Failover must promote the freshest follower and fence the old leader."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t28-d1",
+    "type": "multiple_choice",
+    "concept": "sync-async",
+    "prompt": "A leader handles 2,000 writes/s with asynchronous replication and 300 ms lag when it crashes. About how many acknowledged writes can be lost?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "About 600"
+     },
+     {
+      "id": "b",
+      "label": "None"
+     },
+     {
+      "id": "c",
+      "label": "About 6"
+     },
+     {
+      "id": "d",
+      "label": "About 2,000,000"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Writes acknowledged but not yet replicated: 2,000 × 0.3 = 600."
+   }
+  ],
+  "diagram": "client --write--> LEADER --log--> follower 1 (sync ack)\n                        \\--log--> follower 2 (async)\nreads --> followers (may lag) | own recent writes --> leader"
+ },
+ "29": {
+  "teaches": [
+   "quorum-overlap",
+   "quorum-tuning",
+   "read-repair",
+   "quorum-limits"
+  ],
+  "mechanism": {
+   "title": "How a quorum read and write work in a leaderless store",
+   "steps": [
+    "Each key is stored on N replicas (often N = 3), chosen by the partitioner.",
+    "A write is sent to all N replicas and succeeds once W of them acknowledge.",
+    "A read is sent to replicas and returns once R of them respond; the coordinator returns the value with the newest version (timestamp or version vector).",
+    "If R + W > N, every read set overlaps every write set in at least one replica, so a read normally includes at least one copy of the latest successful write.",
+    "When the read sees replicas with older values, the coordinator writes the newest value back to them: read repair. A background anti-entropy process compares replicas using Merkle trees to fix keys that are rarely read.",
+    "If too few replicas are reachable, a sloppy quorum may store the write on a stand-in node with a hint and hand it back later (hinted handoff). This keeps writes available but temporarily breaks the overlap guarantee."
+   ]
+  },
+  "useWhen": [
+   "Leaderless stores such as Cassandra or Dynamo-style systems, where you tune consistency per query.",
+   "Workloads that need to survive one replica being down without stopping reads or writes (N = 3, R = 2, W = 2)."
+  ],
+  "avoidWhen": [
+   "Do not treat R + W > N as linearizability: concurrent writes, sloppy quorums, clock-based last-writer-wins and partial failures can still return stale or lost data.",
+   "Do not use W = N for availability-critical writes; one slow or dead replica blocks every write."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Setting (N = 3)",
+    "Read cost",
+    "Write cost",
+    "Behaviour"
+   ],
+   "rows": [
+    [
+     "R = 1, W = 3",
+     "Fast reads",
+     "Every replica must ack",
+     "Reads fresh, writes fail if any node down"
+    ],
+    [
+     "R = 2, W = 2",
+     "Two replies",
+     "Two acks",
+     "Overlap; tolerates one node down for both"
+    ],
+    [
+     "R = 3, W = 1",
+     "Every replica must reply",
+     "Fast writes",
+     "Reads fail if any node down"
+    ],
+    [
+     "R = 1, W = 1",
+     "Fast",
+     "Fast",
+     "No overlap: stale reads possible"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Checking overlap and fault tolerance",
+   "assumptions": [
+    "N = 3 replicas",
+    "Option A: R = 2, W = 2; option B: R = 1, W = 1"
+   ],
+   "steps": [
+    "Option A: R + W = 4, which is greater than 3, so read and write sets share at least one replica.",
+    "Option A tolerates one replica down: two of three still answer reads and acknowledge writes.",
+    "Option B: R + W = 2, which is not greater than 3, so a read can hit a replica that missed the latest write.",
+    "With N = 5, R = 3, W = 3 gives 6 > 5 and tolerates two replicas down."
+   ],
+   "result": "Pick R and W so R + W > N when you need fresh reads, and so that N − W and N − R cover the failures you expect."
+  },
+  "india": {
+   "title": "Seat-map reads for a cinema chain",
+   "label": "Illustrative estimate",
+   "body": "Consider a ticketing service storing seat-hold metadata in a Cassandra-style cluster with N = 3 replicas per key across three availability zones in Mumbai. Writes use QUORUM (W = 2) and reads use QUORUM (R = 2), so a hold written in one zone is seen by a read in another, and the service survives losing a whole zone. Analytics reads of how many seats were viewed use ONE for speed, because staleness there is harmless. The final payment-and-confirm step does not rely on quorum reads at all; it uses a conditional write (lightweight transaction) so two people cannot confirm the same seat."
+  },
+  "pitfalls": [
+   {
+    "trap": "'R + W > N means it's strongly consistent.'",
+    "say": "'R + W > N gives overlap, so reads usually see the latest acknowledged write, but sloppy quorums and concurrent writes still allow anomalies; for strict cases I'd use a conditional write or consensus.'"
+   },
+   {
+    "trap": "Choosing W = N to be safe.",
+    "say": "'W = N makes every write depend on every replica; QUORUM on both sides gives overlap and tolerates one failure.'"
+   }
+  ],
+  "takeaways": [
+   "R + W > N makes read and write sets overlap.",
+   "N − W and N − R decide how many failures writes and reads tolerate.",
+   "Read repair and anti-entropy fix stale replicas.",
+   "Quorums are not linearizability; use conditional writes for invariants."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t29-d1",
+    "type": "multiple_choice",
+    "concept": "quorum-overlap",
+    "prompt": "With N = 5, which setting guarantees read and write sets overlap while tolerating two replicas down?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "R = 3, W = 3"
+     },
+     {
+      "id": "b",
+      "label": "R = 1, W = 1"
+     },
+     {
+      "id": "c",
+      "label": "R = 5, W = 5"
+     },
+     {
+      "id": "d",
+      "label": "R = 2, W = 2"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "3 + 3 = 6 > 5, so sets overlap, and 5 − 3 = 2 replicas can be down for reads or writes."
+   }
+  ],
+  "diagram": "N=3:  [r1][r2][r3]\nwrite W=2 -> r1, r2 ack\nread  R=2 -> r2, r3 reply -> r2 has newest -> return it, repair r3"
+ },
+ "30": {
+  "teaches": [
+   "sharding",
+   "shard-key",
+   "hash-vs-range",
+   "cross-shard"
+  ],
+  "mechanism": {
+   "title": "Sharding a table, step by step",
+   "steps": [
+    "Pick a shard key that appears in almost every query and spreads load: user_id for user data, tenant_id for B2B SaaS, conversation_id for chat.",
+    "Choose how keys map to shards: hash partitioning (hash the key, then map the hash to a shard) for even spread, or range partitioning (key ranges per shard) when you need efficient range scans.",
+    "Keep a routing map from key or hash range to shard, held by a router, a config service or the client library.",
+    "Queries with the shard key go to one shard. Queries without it must scatter to every shard and gather results, which gets slower as shards are added.",
+    "Avoid cross-shard transactions by keeping data that changes together on the same shard (co-locate a user's orders with the user). If unavoidable, use a saga or two-phase commit.",
+    "Plan resharding: split hot or full shards and move data online, ideally with many small logical shards mapped onto fewer machines so moves are cheap."
+   ]
+  },
+  "useWhen": [
+   "Data or write volume beyond a single primary even after replicas, caching and vertical scaling.",
+   "Multi-tenant systems where each tenant's data naturally stays together."
+  ],
+  "avoidWhen": [
+   "Do not shard early; it adds routing, resharding and cross-shard query pain. Exhaust indexes, caches, replicas and bigger machines first.",
+   "Do not shard on a key most queries do not use; every query becomes scatter-gather."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Strategy",
+    "Spread",
+    "Range scans",
+    "Hotspot risk"
+   ],
+   "rows": [
+    [
+     "Hash of key",
+     "Even",
+     "Need scatter-gather",
+     "Low, unless one key is hot"
+    ],
+    [
+     "Range of key",
+     "Depends on distribution",
+     "Efficient within a range",
+     "High for sequential keys such as timestamps"
+    ],
+    [
+     "Directory / lookup table",
+     "Flexible",
+     "Depends",
+     "Lookup service becomes critical"
+    ],
+    [
+     "Geo / tenant",
+     "Follows the business",
+     "Within tenant",
+     "Big tenants or cities dominate"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "How many shards?",
+   "assumptions": [
+    "8 TB of data, growing 2 TB per year",
+    "Each shard comfortably holds 1 TB with headroom",
+    "Peak writes 40,000 per second; one shard handles 5,000"
+   ],
+   "steps": [
+    "Shards for today's storage = 8 ÷ 1 = 8.",
+    "Shards for writes = 40,000 ÷ 5,000 = 8.",
+    "Shards for storage in 2 years = (8 plus 4) ÷ 1 = 12.",
+    "Start with, say, 64 logical shards placed on 12 machines, so later growth moves logical shards instead of re-splitting data."
+   ],
+   "result": "Size shards by the larger of storage and write needs, add growth headroom, and use many logical shards so rebalancing is a move, not a rewrite."
+  },
+  "india": {
+   "title": "Merchant data in a payments platform",
+   "label": "Illustrative estimate",
+   "body": "A payments company serving lakhs of merchants might shard its transactions by merchant_id: a merchant's dashboard, settlements and refunds then hit one shard. The trouble is skew: a large e-commerce merchant during a sale can produce far more transactions than thousands of small kirana merchants combined, so one shard runs hot. Common fixes are to give very large merchants their own dedicated shard via a directory lookup, or to add a sub-key such as (merchant_id, day) for the transaction log while keeping merchant settings on the home shard. Queries such as 'all transactions above ₹1 lakh across all merchants' go to a separate analytics store, not a scatter-gather over production shards."
+  },
+  "pitfalls": [
+   {
+    "trap": "'We'll shard by created_at.'",
+    "say": "'Timestamps send all new writes to the last range shard; I'd hash user_id instead and use a separate store for time-range analytics.'"
+   },
+   {
+    "trap": "Ignoring cross-shard queries.",
+    "say": "'Most queries include user_id, so they hit one shard; the admin search goes to an indexed copy in Elasticsearch rather than scattering.'"
+   }
+  ],
+  "takeaways": [
+   "Choose a shard key used by most queries and with high cardinality.",
+   "Hash for even spread, range for scans; watch sequential keys.",
+   "Co-locate data that changes together to avoid cross-shard transactions.",
+   "Pre-split into many logical shards to make resharding cheap."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t30-d1",
+    "type": "multiple_choice",
+    "concept": "hash-vs-range",
+    "prompt": "Why is range-sharding on created_at risky for a write-heavy table?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "All new writes land on the shard holding the latest range"
+     },
+     {
+      "id": "b",
+      "label": "Range sharding cannot store timestamps"
+     },
+     {
+      "id": "c",
+      "label": "It makes reads by id impossible"
+     },
+     {
+      "id": "d",
+      "label": "It requires two-phase commit for every write"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Sequential keys concentrate all inserts on the newest range, creating a hot shard."
+   }
+  ],
+  "diagram": "key -> hash(key) mod 64 logical shards -> routing map -> 12 physical nodes\n user 42 -> shard 17 -> node 5  (orders co-located with user)"
+ },
+ "31": {
+  "teaches": [
+   "mod-n",
+   "ring",
+   "vnodes"
+  ],
+  "mechanism": {
+   "title": "How consistent hashing places and moves keys",
+   "steps": [
+    "Hash every node identifier onto a large circular space, for example 0 to 2 to the power 32 minus 1.",
+    "Hash each key onto the same circle and walk clockwise to the first node: that node owns the key. Replicas are the next distinct nodes clockwise.",
+    "Adding a node places it at one point; it takes over only the keys between its predecessor and itself. Every other key stays put.",
+    "Removing a node hands its keys to the next node clockwise; again, nothing else moves.",
+    "With few nodes, the arcs are uneven. Virtual nodes fix this: each physical node is hashed to many points (say 100–256), so its share is the sum of many small arcs and evens out.",
+    "Virtual nodes also let a bigger machine own more points, and they spread the work of a failed node across many survivors instead of one neighbour."
+   ]
+  },
+  "useWhen": [
+   "Distributed caches and key-value stores where nodes join and leave and you want minimal data movement (Cassandra, DynamoDB-style systems, Memcached client libraries).",
+   "Load balancers that need sticky placement of keys to servers, such as routing a user to the same cache node."
+  ],
+  "avoidWhen": [
+   "Small fixed clusters where a static mapping or a lookup table is simpler.",
+   "Workloads with one extremely hot key: consistent hashing spreads keys, not the load of a single key."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Scheme",
+    "Keys moved when going from n to n + 1 nodes",
+    "Balance"
+   ],
+   "rows": [
+    [
+     "hash mod n",
+     "About n ÷ (n + 1) of all keys",
+     "Even, but reshuffles almost everything"
+    ],
+    [
+     "Consistent hashing, one point per node",
+     "About 1 ÷ (n + 1) of keys",
+     "Uneven arcs"
+    ],
+    [
+     "Consistent hashing with virtual nodes",
+     "About 1 ÷ (n + 1) of keys",
+     "Even, spread across all nodes"
+    ],
+    [
+     "Rendezvous (highest random weight)",
+     "About 1 ÷ (n + 1) of keys",
+     "Even; more CPU per lookup"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Keys moved when a cache cluster grows",
+   "assumptions": [
+    "100 million cached keys",
+    "Cluster grows from 10 to 11 nodes"
+   ],
+   "steps": [
+    "With hash mod n, a key stays only if hash mod 10 equals hash mod 11, which happens for about 1 in 11 keys.",
+    "So about 10 ÷ 11 of keys move: 100,000,000 × 10 ÷ 11 ≈ 91 million cache misses.",
+    "With consistent hashing, about 1 ÷ 11 of keys move: roughly 9.1 million.",
+    "Consistent hashing moves about one tenth as many keys as mod-n in this case."
+   ],
+   "result": "Adding one node to a mod-n cache empties almost the whole cache and can stampede the database; consistent hashing moves only the new node's fair share."
+  },
+  "india": {
+   "title": "Scaling a session cache before a festival sale",
+   "label": "Illustrative estimate",
+   "body": "Ahead of a Diwali sale, an e-commerce team adds cache nodes to absorb traffic. If their client used hash(key) mod n, going from 10 to 11 nodes would remap about 91% of keys at the worst possible moment, sending a flood of misses to the database. With a consistent hashing ring and around 200 virtual nodes per server, the new node takes only about 9% of keys, gathered from all existing nodes in small slices, so the extra misses are spread thin and the warm cache survives. Doing the scale-up a day before the sale, not during it, avoids even that dip."
+  },
+  "pitfalls": [
+   {
+    "trap": "Explaining the ring but not why mod-n fails.",
+    "say": "'With mod n, changing n remaps almost every key; the ring moves only about 1 ÷ (n + 1) of keys.'"
+   },
+   {
+    "trap": "Forgetting virtual nodes.",
+    "say": "'With few nodes, arcs are uneven, so each server gets about 200 virtual nodes to even out load and spread failover.'"
+   }
+  ],
+  "takeaways": [
+   "mod-n remaps almost every key when n changes.",
+   "The ring moves only about 1 ÷ (n + 1) of keys on a change.",
+   "Virtual nodes balance load and spread failover.",
+   "Hot single keys need replication or splitting, not just hashing."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t31-d1",
+    "type": "multiple_choice",
+    "concept": "mod-n",
+    "prompt": "A cache using hash mod n grows from 10 to 11 nodes. Roughly what share of keys remap?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "About 91%"
+     },
+     {
+      "id": "b",
+      "label": "About 9%"
+     },
+     {
+      "id": "c",
+      "label": "None"
+     },
+     {
+      "id": "d",
+      "label": "Exactly 50%"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "A key stays only when hash mod 10 equals hash mod 11, about 1 in 11, so about 10 ÷ 11 ≈ 91% move."
+   }
+  ],
+  "diagram": "        n1\n   k3 /    \\ k1 -> n2\n    n4      n2\n      \\    /\n        n3  <- k2\nadd n5 between n2 and n3: only keys in that arc move"
+ },
+ "32": {
+  "teaches": [
+   "cap",
+   "cp-ap",
+   "cap-flow"
+  ],
+  "mechanism": {
+   "title": "What CAP actually forces during a partition",
+   "steps": [
+    "Model: data is replicated on nodes in two places, and the network link between them fails (a partition). Clients can still reach nodes on both sides.",
+    "A write arrives on side A. Side B cannot learn about it until the link heals.",
+    "A read arrives on side B. B has two choices: refuse or wait (choosing consistency, CP) or answer with what it has, which may be stale (choosing availability, AP).",
+    "Without a partition, a well-designed system can be both consistent and available; CAP only forces the choice while partitioned.",
+    "CP systems (ZooKeeper, etcd, a single-leader database with synchronous failover) keep one truth; the minority side stops accepting writes.",
+    "AP systems (Cassandra or DynamoDB at low consistency levels, DNS) keep answering everywhere and reconcile later. The choice can differ per operation in the same product."
+   ]
+  },
+  "useWhen": [
+   "CP for operations where a wrong answer is worse than no answer: payments, seat confirmation, leader election, configuration.",
+   "AP for operations where a stale answer is better than an error: product browsing, likes, feeds, presence."
+  ],
+  "avoidWhen": [
+   "Do not describe a whole product as 'CA'; partitions happen in any distributed system, so P is not optional.",
+   "Do not use CAP alone to explain latency choices when there is no partition; that is PACELC's job."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Choice",
+    "During a partition",
+    "Example",
+    "User sees"
+   ],
+   "rows": [
+    [
+     "CP",
+     "Minority side rejects or waits",
+     "etcd, ZooKeeper, bank ledger",
+     "Errors or timeouts on one side"
+    ],
+    [
+     "AP",
+     "Both sides answer",
+     "Cassandra at ONE, DNS, shopping cart",
+     "Possibly stale or conflicting data"
+    ],
+    [
+     "Per-operation mix",
+     "Browse AP, checkout CP",
+     "Most e-commerce",
+     "Fast browsing, careful payments"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "How much a partition costs each choice",
+   "assumptions": [
+    "Partition lasts 2 minutes",
+    "Side B serves 30% of 10,000 requests per second"
+   ],
+   "steps": [
+    "Requests on side B during the partition = 10,000 × 0.3 = 3,000 per second.",
+    "Over 120 seconds that is 3,000 × 120 = 360,000 requests.",
+    "CP: up to 360,000 requests fail or wait on side B, but no one sees inconsistent data.",
+    "AP: those 360,000 requests succeed, and some may read stale data or create conflicts to resolve later."
+   ],
+   "result": "CAP is a per-operation business choice: count who is affected and what a wrong answer costs."
+  },
+  "india": {
+   "title": "Wallet balance versus offers carousel",
+   "label": "Illustrative estimate",
+   "body": "In a payments app, imagine the link between two data centres breaks for a few minutes. The 'pay ₹2,000 to a merchant' operation must not run against a balance that might be stale, or a user could spend the same money twice, so that path is CP: if the authoritative ledger cannot be reached, the app shows 'please try again' rather than guessing. The offers carousel and cashback banners on the same home screen are AP: showing yesterday's offers is fine. One app, two choices, decided by what an incorrect answer costs."
+  },
+  "pitfalls": [
+   {
+    "trap": "'My system is CA.'",
+    "say": "'Partitions will happen, so the real question is what each operation does during one: checkout is CP, browsing is AP.'"
+   },
+   {
+    "trap": "Claiming an AP system 'loses data' during a partition.",
+    "say": "'AP keeps accepting writes on both sides; nothing is lost by default, but conflicting writes must be merged when the link heals, by a rule I would state.'"
+   },
+   {
+    "trap": "Treating CAP as permanent labels for whole databases.",
+    "say": "'Many databases let you pick consistency per query, so I'd choose per operation.'"
+   }
+  ],
+  "takeaways": [
+   "CAP only forces a choice during a network partition.",
+   "CP refuses or waits on the minority side; AP answers and reconciles later.",
+   "Choose per operation, by the cost of a wrong answer.",
+   "'CA' is not a real option for a distributed system."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t32-d1",
+    "type": "multiple_choice",
+    "concept": "cp-ap",
+    "prompt": "During a partition, a node cannot reach the ledger leader and receives a payment request. What does a CP design do?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Reject or delay the payment rather than risk a stale balance"
+     },
+     {
+      "id": "b",
+      "label": "Approve using its cached balance"
+     },
+     {
+      "id": "c",
+      "label": "Approve and reconcile next week"
+     },
+     {
+      "id": "d",
+      "label": "Silently drop the request"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "CP gives up availability on the cut-off side to avoid an inconsistent answer."
+   }
+  ],
+  "diagram": "  side A  ==X== side B\nwrite x=2 at A | read x at B -> CP: error/wait  |  AP: return x=1 (stale)"
+ },
+ "33": {
+  "teaches": [
+   "pacelc",
+   "el-ec",
+   "labels"
+  ],
+  "mechanism": {
+   "title": "Reading a PACELC label, step by step",
+   "steps": [
+    "PACELC says: if there is a Partition (P), choose Availability or Consistency (A or C); Else (E), when the network is healthy, choose Latency or Consistency (L or C).",
+    "The 'else' half matters more day to day, because partitions are rare but every request pays latency.",
+    "Consistency without a partition costs latency because a write (or read) must wait for other replicas, possibly in other zones or regions, before answering.",
+    "PA/EL systems (Cassandra and DynamoDB at default settings) answer fast from nearby replicas and accept staleness.",
+    "PC/EC systems (Spanner, etcd, a synchronously replicated database) wait for agreement and pay the round trip on every write.",
+    "Many systems are tunable per request, so the label describes defaults; state the setting you would use for each operation."
+   ]
+  },
+  "useWhen": [
+   "Use PACELC when explaining why a strongly consistent write is slower even when nothing is broken.",
+   "Use it to compare geo-replicated designs: synchronous cross-region writes are EC and pay inter-region latency."
+  ],
+  "avoidWhen": [
+   "Do not quote PACELC labels as fixed facts about a product; consistency levels are often configurable.",
+   "Do not ignore it for single-region systems; even cross-zone synchronous replication adds about a millisecond per write."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "System (default)",
+    "P: A or C",
+    "E: L or C",
+    "Practical meaning"
+   ],
+   "rows": [
+    [
+     "Cassandra, DynamoDB default",
+     "A",
+     "L",
+     "Fast local reads and writes, eventual by default"
+    ],
+    [
+     "Spanner, etcd",
+     "C",
+     "C",
+     "Every write waits for a majority"
+    ],
+    [
+     "MongoDB (majority writes)",
+     "C",
+     "C",
+     "Writes wait for a replica-set majority"
+    ],
+    [
+     "Single-leader with async replicas",
+     "C on leader",
+     "L for replica reads",
+     "Replica reads fast but stale"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Latency of consistency in the 'else' case",
+   "assumptions": [
+    "Same-zone round trip 0.5 ms",
+    "Mumbai to Hyderabad round trip about 20 ms (illustrative)",
+    "Mumbai to Singapore about 60 ms (illustrative)"
+   ],
+   "steps": [
+    "Local write acknowledged by one node: about 0.5 ms network.",
+    "Majority across three zones in one region: wait for the second-fastest reply, about 1–2 ms.",
+    "Majority across Mumbai, Hyderabad and Singapore with the leader in Mumbai: wait for Hyderabad, so at least about 20 ms per write.",
+    "At 50 sequential writes in one checkout flow, 20 ms each adds 50 × 20 = 1,000 ms of waiting."
+   ],
+   "result": "Strong consistency costs a round trip to a quorum on every write; across regions that is tens of milliseconds, so EC is reserved for data that needs it."
+  },
+  "india": {
+   "title": "Multi-region carts versus orders",
+   "label": "Illustrative estimate",
+   "body": "Suppose an Indian retailer runs in Mumbai and Hyderabad regions. Shopping carts are PA/EL: each region writes locally, replicates asynchronously, and merges carts if a user somehow hits both. Adding an item feels instant. Order placement and payment status are PC/EC: they go to the order's home region and wait for a synchronous replica before confirming, adding roughly the inter-region round trip, here estimated at about 20 ms. The team pays that latency only where a stale or lost write would cost real money."
+  },
+  "pitfalls": [
+   {
+    "trap": "Only discussing CAP.",
+    "say": "'CAP covers partitions; PACELC adds that in normal operation I'm trading latency for consistency, which is the cost users feel every day.'"
+   },
+   {
+    "trap": "Stating a product's label as fixed.",
+    "say": "'Cassandra defaults to PA/EL, but with QUORUM reads and writes it behaves closer to EC for that query.'"
+   }
+  ],
+  "takeaways": [
+   "PACELC adds the everyday latency versus consistency trade.",
+   "Strong consistency means waiting for a quorum on every write.",
+   "Cross-region quorums cost tens of milliseconds per write.",
+   "Labels are defaults; choose per operation."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t33-d1",
+    "type": "multiple_choice",
+    "concept": "el-ec",
+    "prompt": "A database waits for a cross-region majority on every write even when the network is healthy. In PACELC terms it is:",
+    "choices": [
+     {
+      "id": "a",
+      "label": "EC: it chooses consistency over latency in the else case"
+     },
+     {
+      "id": "b",
+      "label": "EL: it chooses latency"
+     },
+     {
+      "id": "c",
+      "label": "PA: it chooses availability during partitions"
+     },
+     {
+      "id": "d",
+      "label": "Not a distributed database"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Waiting for a quorum when there is no partition trades latency for consistency, which is EC."
+   }
+  ],
+  "diagram": "Partition?  yes -> choose A or C\n            no  -> choose L (answer locally) or C (wait for quorum)"
+ },
+ "34": {
+  "teaches": [
+   "read-your-writes",
+   "monotonic",
+   "per-feature",
+   "strong-cost"
+  ],
+  "mechanism": {
+   "title": "The ladder of consistency models, weakest to strongest",
+   "steps": [
+    "Eventual: replicas converge if writes stop; a read may return any recent value.",
+    "Monotonic reads: a user never sees time go backwards; once they have seen version 5, they never see version 4. Achieved by pinning a user to one replica or tracking the version they have seen.",
+    "Read-your-writes: a user always sees their own writes. Achieved by reading from the leader after a write, or waiting for a replica to reach the write's position.",
+    "Causal: if B saw A's message and replied, everyone sees A's message before B's reply. Achieved with version vectors or dependency tracking.",
+    "Linearizable (strong): every read sees the latest completed write, as if there were one copy. Needs consensus or a single leader with synchronous replication, and costs a quorum round trip.",
+    "Pick the weakest model each feature can tolerate, because each rung up costs latency or availability."
+   ]
+  },
+  "useWhen": [
+   "Read-your-writes for profiles, settings and posts a user just made.",
+   "Linearizable for locks, leader election, unique usernames, balances and seat confirmation."
+  ],
+  "avoidWhen": [
+   "Do not pay for linearizable reads on feeds, counts or recommendations.",
+   "Do not leave a chat app on plain eventual consistency; replies appearing before the messages they answer confuse users. Use causal ordering per conversation."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Model",
+    "Guarantee",
+    "Typical mechanism",
+    "Cost"
+   ],
+   "rows": [
+    [
+     "Eventual",
+     "Converges eventually",
+     "Async replication",
+     "Cheapest"
+    ],
+    [
+     "Monotonic reads",
+     "No going back in time",
+     "Sticky replica or version token",
+     "Low"
+    ],
+    [
+     "Read-your-writes",
+     "See own writes",
+     "Leader read or wait for log position",
+     "Low to medium"
+    ],
+    [
+     "Causal",
+     "Cause before effect",
+     "Version vectors",
+     "Medium"
+    ],
+    [
+     "Linearizable",
+     "One up-to-date copy",
+     "Consensus or synchronous leader",
+     "Highest latency, less availability"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Cost of leader reads for read-your-writes",
+   "assumptions": [
+    "A profile service gets 10,000 reads per second",
+    "200 profile edits per second across all users",
+    "Leader-read window: 10 seconds after an edit; such a user makes about 5 reads in that window"
+   ],
+   "steps": [
+    "Each edit opens a 10-second leader-read window for that user.",
+    "Reads routed to the leader = 200 × 5 = 1,000 per second.",
+    "Share of reads on the leader = 1,000 ÷ 10,000 = 10%.",
+    "The other 90% stay on followers, so read-your-writes adds modest leader load instead of sending everything to the leader."
+   ],
+   "result": "Targeted read-your-writes costs a small fraction of reads; full linearizable reads would send all 10,000 per second through the leader or a quorum."
+  },
+  "india": {
+   "title": "Posting a status in a social app",
+   "label": "Illustrative estimate",
+   "body": "When a user in Kochi posts a photo and immediately opens their profile, they must see it: that is read-your-writes, handled by reading their own profile from the leader for a few seconds. Their friends in Delhi can see it a second or two later, which is eventual and fine. Comments on the post need causal order so a reply never appears above the comment it answers. Only the username claimed at sign-up needs linearizability, because two people must not get the same handle. Four features, four models, each as weak as it can safely be."
+  },
+  "pitfalls": [
+   {
+    "trap": "'I'll make everything strongly consistent to be safe.'",
+    "say": "'Linearizability costs a quorum round trip and availability; I'd give read-your-writes to profiles, causal order to comments, and keep it for usernames and balances.'"
+   },
+   {
+    "trap": "Confusing read-your-writes with strong consistency.",
+    "say": "'Read-your-writes only guarantees the writer sees their own write; other users may still see stale data briefly.'"
+   }
+  ],
+  "takeaways": [
+   "Consistency is a ladder, not a switch.",
+   "Pick the weakest model each feature tolerates.",
+   "Read-your-writes and monotonic reads fix most user-visible confusion cheaply.",
+   "Reserve linearizability for invariants like uniqueness and balances."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t34-d1",
+    "type": "multiple_choice",
+    "concept": "monotonic",
+    "prompt": "A user sees a comment count of 12, refreshes, and sees 10. Which guarantee was violated?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Monotonic reads"
+     },
+     {
+      "id": "b",
+      "label": "Durability"
+     },
+     {
+      "id": "c",
+      "label": "Atomicity"
+     },
+     {
+      "id": "d",
+      "label": "Partition tolerance"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Monotonic reads promise a user never sees an older state after a newer one, usually by sticking to one replica."
+   }
+  ],
+  "diagram": "eventual < monotonic reads < read-your-writes < causal < linearizable\ncheap, fast, available  ---------------------------->  costly, slower"
+ },
+ "35": {
+  "teaches": [
+   "choose-store",
+   "scale-steps",
+   "when-shard"
+  ],
+  "mechanism": {
+   "title": "A scaling ladder for the data layer",
+   "steps": [
+    "Start with one relational primary, good schema and indexes. Fix slow queries with EXPLAIN before anything else.",
+    "Add a cache (Redis) for hot reads and a CDN for static content.",
+    "Add read replicas for read-heavy traffic, with read-your-writes routing where needed.",
+    "Scale the primary vertically (more CPU, RAM, faster disks), and move heavy analytics off it to a warehouse.",
+    "Move specialised workloads to purpose-built stores: search to Elasticsearch, files to object storage, metrics to a time-series database, events to Kafka.",
+    "Only when one primary cannot take the writes or hold the data, shard the hottest tables by a key used in most queries, or move them to a distributed database."
+   ]
+  },
+  "useWhen": [
+   "Use the ladder to justify each component in an interview: say which numbers made you climb a rung.",
+   "Use purpose-built stores when a workload has a distinct access pattern: full-text search, blobs, time series, graphs."
+  ],
+  "avoidWhen": [
+   "Do not jump to sharding or a distributed database before replicas and caching; you take on lasting complexity for unproven needs.",
+   "Do not add a new datastore for each feature; every store needs backups, monitoring, on-call expertise and data sync."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Need",
+    "Good fit",
+    "Why"
+   ],
+   "rows": [
+    [
+     "Transactions and joins",
+     "Postgres, MySQL",
+     "ACID, flexible queries"
+    ],
+    [
+     "Hot key lookups",
+     "Redis, DynamoDB",
+     "Sub-millisecond to single-digit ms by key"
+    ],
+    [
+     "Full-text and faceted search",
+     "Elasticsearch, OpenSearch",
+     "Inverted index, relevance scoring"
+    ],
+    [
+     "Files, images, video",
+     "S3-style object storage",
+     "Cheap, durable, huge scale"
+    ],
+    [
+     "Metrics over time",
+     "Prometheus, InfluxDB, TimescaleDB",
+     "Compression and rollups for time series"
+    ],
+    [
+     "Analytics",
+     "BigQuery, Snowflake, ClickHouse",
+     "Columnar scans over billions of rows"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "When does a single primary run out?",
+   "assumptions": [
+    "Primary handles about 10,000 simple writes per second",
+    "Product grows writes 2× per year from 1,500 per second today"
+   ],
+   "steps": [
+    "Year 1: 1,500 × 2 = 3,000 per second.",
+    "Year 2: 3,000 × 2 = 6,000 per second.",
+    "Year 3: 6,000 × 2 = 12,000 per second, which exceeds about 10,000.",
+    "So there are roughly two to three years before writes force sharding, plenty of time to plan rather than shard on day one."
+   ],
+   "result": "Project growth against measured capacity to decide when to shard, and say that timeline out loud in an interview."
+  },
+  "india": {
+   "title": "Stores behind a food-delivery app",
+   "label": "Illustrative estimate",
+   "body": "A food-delivery platform in India might use Postgres for orders and payments, Redis for menus and sessions, Elasticsearch for 'biryani near me' search with typo tolerance in English and Hinglish, object storage plus a CDN for dish photos, Kafka for order events, a time-series store for rider-location metrics and a warehouse for city-level analytics. Each was added because one access pattern outgrew the previous setup, not on day one. A new team building a similar app for one city would start with Postgres, Redis and object storage, and add the rest as numbers demand."
+  },
+  "pitfalls": [
+   {
+    "trap": "Listing many databases without reasons.",
+    "say": "'I'd start with Postgres and Redis; search moves to Elasticsearch once LIKE queries over millions of menu items get slow, and I'd shard orders only when writes approach one primary's limit.'"
+   },
+   {
+    "trap": "Sharding on day one.",
+    "say": "'At 1,500 writes per second and doubling yearly, one primary lasts about two to three years; I'd design the shard key now but shard later.'"
+   }
+  ],
+  "takeaways": [
+   "Climb the scaling ladder one measured rung at a time.",
+   "Match each specialised store to a distinct access pattern.",
+   "Every extra store has an operational cost.",
+   "Project growth to decide when to shard."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t35-d1",
+    "type": "multiple_choice",
+    "concept": "when-shard",
+    "prompt": "Writes are 1,500/s today, doubling yearly, and a primary handles about 10,000/s. When does sharding become necessary?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "In about three years, when writes pass 10,000/s"
+     },
+     {
+      "id": "b",
+      "label": "Immediately"
+     },
+     {
+      "id": "c",
+      "label": "Never"
+     },
+     {
+      "id": "d",
+      "label": "Next month"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "3,000 then 6,000 then 12,000 per second: the third year crosses the limit."
+   }
+  ],
+  "diagram": "1 primary -> + cache/CDN -> + read replicas -> + bigger box -> + specialised stores -> shard\n(climb a rung only when a measured number forces it)"
+ }
+}
