@@ -514,7 +514,7 @@
         ],
         "formula": "50M × 40 ÷ 86,400 s",
         "workedAnswer": "50M × 40 = 2B/day; 2B ÷ 86,400 ≈ 23,148/s ≈ 23K/s.",
-        "explanation": "50M × 40 = 2B/day; 2B ÷ 86,400 ≈ 23,148/s ≈ 23K/s."
+        "explanation": "Sanity check: 23K/s is roughly ten times what one well-tuned app server handles for simple writes, so even the average needs a small fleet, and the peak you assume sets the real size."
       },
       {
         "id": "t2-a3",
@@ -529,7 +529,7 @@
         ],
         "formula": "2M × 500 KB per day, then × 365 days",
         "workedAnswer": "2M × 500 KB = 1 TB a day; 1 TB × 365 = 365 TB a year.",
-        "explanation": "2M × 500 KB = 1 TB a day; 1 TB × 365 = 365 TB a year."
+        "explanation": "Design implication: 365 TB a year, before replicas and thumbnails, rules out keeping photos on app servers or in the database. Store the bytes in object storage and keep only metadata in the database."
       },
       {
         "id": "t2-a4",
@@ -1344,7 +1344,7 @@
         ],
         "formula": "(TCP 1 RTT + TLS 1.3 1 RTT) × 200 ms",
         "workedAnswer": "TCP 1 RTT + TLS 1.3 1 RTT = 2 × 200 ms = 400 ms.",
-        "explanation": "TCP 1 RTT + TLS 1.3 1 RTT = 2 × 200 ms = 400 ms."
+        "explanation": "Design implication: 400 ms of handshakes before the first byte is why you terminate TLS close to users (a CDN or edge PoP) and reuse connections instead of opening a new one per request."
       },
       {
         "id": "t4-d1",
@@ -2477,7 +2477,7 @@
         ],
         "formula": "TCP 60 + TLS 60 + request 60",
         "workedAnswer": "TCP 60 + TLS 60 + request 60 = 180 ms.",
-        "explanation": "TCP 60 + TLS 60 + request 60 = 180 ms."
+        "explanation": "Sanity check: three round trips, each one 60 ms. TLS 1.3 resumption (0-RTT) or a nearer edge removes most of that cost on repeat visits."
       },
       {
         "id": "t7-a5",
@@ -5496,7 +5496,7 @@
         "assumptions": [],
         "formula": "20,000 × (1 − 0.9)",
         "workedAnswer": "20,000 × (1 − 0.9) = 2,000 reads/s.",
-        "explanation": "20,000 × (1 − 0.9) = 2,000 reads/s."
+        "explanation": "Design implication: hit rate matters more than it looks. At 95% the database would see 1,000 reads/s, half as many, so a few percent of hit rate can decide whether you need read replicas."
       },
       {
         "id": "t15-a3",
@@ -7014,7 +7014,7 @@
         "assumptions": [],
         "formula": "20M × 2 Mbps",
         "workedAnswer": "20M × 2 Mbps = 40M Mbps = 40 Tbps.",
-        "explanation": "20M × 2 Mbps = 40M Mbps = 40 Tbps."
+        "explanation": "Sanity check: 40 Tbps is far more than any single origin or data centre uplink, so live video at this scale is only deliverable from many CDN edges, often across several CDNs."
       },
       {
         "id": "t19-a3",
@@ -8634,7 +8634,7 @@
         "assumptions": [],
         "formula": "100⁴",
         "workedAnswer": "100⁴ = 100M rows, so about 4 levels.",
-        "explanation": "100⁴ = 100M rows, so about 4 levels."
+        "explanation": "Design implication: four levels means a lookup touches about four pages, and the top levels usually stay cached in memory, so an indexed lookup in 100M rows costs about one disk read."
       },
       {
         "id": "t23-d1",
@@ -10776,7 +10776,7 @@
         "assumptions": [],
         "formula": "R + W > N, so R > 5 − 3",
         "workedAnswer": "R + W > N, so R > 5 − 3 = 2; R = 3.",
-        "explanation": "R + W > N, so R > 5 − 3 = 2; R = 3."
+        "explanation": "Sanity check: with R = 3 and W = 3 out of N = 5, any read set and write set share at least one replica (3 + 3 > 5). Lower R makes reads faster but can miss the latest write."
       },
       {
         "id": "t29-a3",
@@ -11531,7 +11531,7 @@
         "assumptions": [],
         "formula": "1/5",
         "workedAnswer": "1/5 = 20% of keys move to the new node.",
-        "explanation": "1/5 = 20% of keys move to the new node."
+        "explanation": "Design implication: only about a fifth of keys move, compared with roughly 80% under hash mod N, which is why caches use consistent hashing: adding a node doesn't wipe most of the cache."
       },
       {
         "id": "t31-a3",
@@ -12313,7 +12313,7 @@
         "assumptions": [],
         "formula": "60 − 2",
         "workedAnswer": "60 − 2 = 58 ms.",
-        "explanation": "60 − 2 = 58 ms."
+        "explanation": "Design implication: 58 ms extra on every strong read adds up across a page, so pay it only where staleness matters (checkout, balances) and serve the rest from the local replica."
       },
       {
         "id": "t33-a5",
@@ -13507,7 +13507,7 @@
         "assumptions": [],
         "formula": "(6,000 − 4,000) × 15",
         "workedAnswer": "(6,000 − 4,000) × 15 = 30,000 jobs.",
-        "explanation": "(6,000 − 4,000) × 15 = 30,000 jobs."
+        "explanation": "Sanity check: the backlog only drains once arrivals drop below 4,000/min. At 2,000/min below capacity, clearing 30,000 jobs takes another 15 minutes, so add workers or shed load."
       },
       {
         "id": "t36-d1",
@@ -14523,7 +14523,7 @@
         "assumptions": [],
         "formula": "1,000 × 5",
         "workedAnswer": "1,000 × 5 = 5,000 messages.",
-        "explanation": "1,000 × 5 = 5,000 messages."
+        "explanation": "Design implication: up to 5,000 messages will be processed twice after the crash, so the consumer's writes must be idempotent. Committing more often shrinks the replay but adds overhead."
       },
       {
         "id": "t39-a3",
@@ -14978,7 +14978,7 @@
         "assumptions": [],
         "formula": "2,000,000 keys × 100 bytes",
         "workedAnswer": "2,000,000 keys × 100 bytes = 200,000,000 bytes ≈ 200 MB.",
-        "explanation": "2,000,000 keys × 100 bytes = 200,000,000 bytes ≈ 200 MB."
+        "explanation": "Sanity check: 200 MB fits comfortably in memory or a small table, so keeping idempotency keys for a full day is cheap. Retention is a correctness choice, not a storage problem."
       },
       {
         "id": "t40-d1",
@@ -15236,7 +15236,7 @@
         "assumptions": [],
         "formula": "4 s × 5 tokens/s + 20 already in the bucket",
         "workedAnswer": "Refill over 4 s: 4 × 5 = 20 tokens. Add the 20 already in the bucket: 40 requests.",
-        "explanation": "Refill over 4 s: 4 × 5 = 20 tokens. Add the 20 already in the bucket: 40 requests."
+        "explanation": "Design implication: capacity sets the allowed burst (20 at once) and the refill rate sets the sustained limit (5/s). Pick both from the traffic you want to allow."
       },
       {
         "id": "t41-a3",
@@ -15600,7 +15600,7 @@
         "assumptions": [],
         "formula": "2¹² per ms, then × 1,000 ms",
         "workedAnswer": "2¹² = 4,096 per ms; 4,096 × 1,000 = 4,096,000 per second.",
-        "explanation": "2¹² = 4,096 per ms; 4,096 × 1,000 = 4,096,000 per second."
+        "explanation": "Sanity check: about 4 million IDs per second per worker is far beyond most systems' needs, so the worker-ID bits, not the sequence, usually set the limit (how many generators you can run)."
       },
       {
         "id": "t42-a3",
@@ -16745,7 +16745,7 @@
         "assumptions": [],
         "formula": "2 × 3 + 1",
         "workedAnswer": "2 × 3 + 1 = 7 nodes.",
-        "explanation": "2 × 3 + 1 = 7 nodes."
+        "explanation": "Design implication: every extra tolerated failure costs two more nodes and a larger majority on each write, so most clusters run 3 or 5 nodes."
       },
       {
         "id": "t45-a3",
@@ -17120,7 +17120,7 @@
         "assumptions": [],
         "formula": "A pause longer than the lease lets a second node acquire the lock: 1 + 1",
         "workedAnswer": "The pause outlasts the lease, so a second node acquires the lock while the first still thinks it owns it: 2.",
-        "explanation": "The pause outlasts the lease, so a second node acquires the lock while the first still thinks it owns it: 2."
+        "explanation": "Design implication: two holders at once means the lock alone cannot protect the data. The storage layer must reject stale writers using fencing tokens."
       },
       {
         "id": "t46-a3",
@@ -17857,7 +17857,7 @@
         "assumptions": [],
         "formula": "2¹⁰",
         "workedAnswer": "2¹⁰ = 1,024, so about 10 rounds.",
-        "explanation": "2¹⁰ = 1,024, so about 10 rounds."
+        "explanation": "Sanity check: gossip spreads in about log₂(N) rounds, so going from 1,000 to 1,000,000 nodes only doubles the rounds, from about 10 to about 20."
       },
       {
         "id": "t48-a3",
@@ -19728,7 +19728,7 @@
         "assumptions": [],
         "formula": "Each attempt above triggers up to 3 below: 3³",
         "workedAnswer": "Each attempt above triggers up to 3 below: 3³ = 27 calls.",
-        "explanation": "Each attempt above triggers up to 3 below: 3³ = 27 calls."
+        "explanation": "Design implication: retries multiply across layers, so retry at one layer only (usually the edge), with backoff and a retry budget, or one slow service can be flooded during an outage."
       },
       {
         "id": "t53-a3",
@@ -20468,7 +20468,7 @@
         "assumptions": [],
         "formula": "0.1% × 8,760 h",
         "workedAnswer": "0.1% × 8,760 h = 8.76 h.",
-        "explanation": "0.1% × 8,760 h = 8.76 h."
+        "explanation": "Sanity check: 8.76 hours a year is about 43 minutes a month, which is less than one long deploy gone wrong, so three nines already needs automated rollback."
       },
       {
         "id": "t55-a3",
@@ -22718,7 +22718,7 @@
         ],
         "formula": "1M × 2 MB per day, then × 365 days",
         "workedAnswer": "1M × 2 MB = 2 TB a day; 2 TB × 365 = 730 TB.",
-        "explanation": "1M × 2 MB = 2 TB a day; 2 TB × 365 = 730 TB."
+        "explanation": "Design implication: 730 TB a year (more with replicas) is an object-storage problem. Lifecycle rules that move old files to colder tiers are what keep the cost in check."
       },
       {
         "id": "t61-a3",
@@ -23150,7 +23150,7 @@
         "assumptions": [],
         "formula": "1,024 MB ÷ 128 MB, then × 3 replicas",
         "workedAnswer": "1,024 MB ÷ 128 MB = 8 blocks; 8 × 3 = 24 replicas.",
-        "explanation": "1,024 MB ÷ 128 MB = 8 blocks; 8 × 3 = 24 replicas."
+        "explanation": "Sanity check: 24 replicas means 3 GB of raw disk for a 1 GB file. That threefold cost is why cold HDFS data often moves to erasure coding."
       },
       {
         "id": "t62-d1",
@@ -25373,7 +25373,7 @@
         "assumptions": [],
         "formula": "5,000 × 50 series, then ÷ 10 s",
         "workedAnswer": "5,000 × 50 = 250,000 series; one point per 10 s gives 25,000 points/s.",
-        "explanation": "5,000 × 50 = 250,000 series; one point per 10 s gives 25,000 points/s."
+        "explanation": "Design implication: 25,000 points/s is easy to ingest; the real limit is the 250,000 series. Each new label value multiplies the series count, so cardinality is what to cap."
       },
       {
         "id": "t68-d1",
@@ -27835,7 +27835,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "50M × 2 = 100M redirects/day ÷ 86,400 s ≈ 1,200/s on average; × 5 peak ≈ 5,800/s.",
-        "explanation": "Average first, then apply the peak factor. 50M × 2 = 100M redirects/day ÷ 86,400 s ≈ 1,200/s on average; × 5 peak ≈ 5,800/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 5× the average of about 1,200/s, so capacity sized for the average would run short at the busy hour. What it means for the design: the problem is read latency and caching, not storage.",
         "concept": "estimation"
       },
       {
@@ -28321,7 +28321,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "50M × 2 = 100M redirects/day ÷ 86,400 s ≈ 1,200/s on average; × 5 peak ≈ 5,800/s.",
-            "explanation": "Average first, then apply the peak factor. 50M × 2 = 100M redirects/day ÷ 86,400 s ≈ 1,200/s on average; × 5 peak ≈ 5,800/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 5× the average of about 1,200/s, so capacity sized for the average would run short at the busy hour. What it means for the design: the problem is read latency and caching, not storage.",
             "concept": "estimation"
           }
         ]
@@ -28718,7 +28718,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "5M × 3 = 15M reads/day ÷ 86,400 s ≈ 170/s on average; × 3 peak ≈ 520/s.",
-        "explanation": "Average first, then apply the peak factor. 5M × 3 = 15M reads/day ÷ 86,400 s ≈ 170/s on average; × 3 peak ≈ 520/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 170/s, so capacity sized for the average would run short at the busy hour. What it means for the design: a modest system where object storage plus a cache is plenty.",
         "concept": "estimation"
       },
       {
@@ -29196,7 +29196,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "5M × 3 = 15M reads/day ÷ 86,400 s ≈ 170/s on average; × 3 peak ≈ 520/s.",
-            "explanation": "Average first, then apply the peak factor. 5M × 3 = 15M reads/day ÷ 86,400 s ≈ 170/s on average; × 3 peak ≈ 520/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 170/s, so capacity sized for the average would run short at the busy hour. What it means for the design: a modest system where object storage plus a cache is plenty.",
             "concept": "estimation"
           }
         ]
@@ -29593,7 +29593,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "20M × 20 = 400M API calls/day ÷ 86,400 s ≈ 4,600/s on average; × 5 peak ≈ 23,000/s.",
-        "explanation": "Average first, then apply the peak factor. 20M × 20 = 400M API calls/day ÷ 86,400 s ≈ 4,600/s on average; × 5 peak ≈ 23,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 5× the average of about 4,600/s, so capacity sized for the average would run short at the busy hour. What it means for the design: about 23,000 checks per second fit a small Redis cluster; the design challenge is atomicity, fairness of keys and failure behaviour.",
         "concept": "estimation"
       },
       {
@@ -30070,7 +30070,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "20M × 20 = 400M API calls/day ÷ 86,400 s ≈ 4,600/s on average; × 5 peak ≈ 23,000/s.",
-            "explanation": "Average first, then apply the peak factor. 20M × 20 = 400M API calls/day ÷ 86,400 s ≈ 4,600/s on average; × 5 peak ≈ 23,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 5× the average of about 4,600/s, so capacity sized for the average would run short at the busy hour. What it means for the design: about 23,000 checks per second fit a small Redis cluster; the design challenge is atomicity, fairness of keys and failure behaviour.",
             "concept": "estimation"
           }
         ]
@@ -30466,7 +30466,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "1B IDs/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s.",
-        "explanation": "Average first, then apply the peak factor. 1B IDs/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 12,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: about 35,000 ids per second at peak is tiny compared with one Snowflake worker's 4 million per second; the real requirements are uniqueness and no single point of failure.",
         "concept": "estimation"
       },
       {
@@ -30934,7 +30934,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "1B IDs/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s.",
-            "explanation": "Average first, then apply the peak factor. 1B IDs/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 12,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: about 35,000 ids per second at peak is tiny compared with one Snowflake worker's 4 million per second; the real requirements are uniqueness and no single point of failure.",
             "concept": "estimation"
           }
         ]
@@ -31330,7 +31330,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "10M × 50 = 500M operations/day ÷ 86,400 s ≈ 5,800/s on average; × 3 peak ≈ 17,000/s.",
-        "explanation": "Average first, then apply the peak factor. 10M × 50 = 500M operations/day ÷ 86,400 s ≈ 5,800/s on average; × 3 peak ≈ 17,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 5,800/s, so capacity sized for the average would run short at the busy hour. What it means for the design: a dozen nodes, with the design effort in partitioning, replication and repair.",
         "concept": "estimation"
       },
       {
@@ -31805,7 +31805,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "10M × 50 = 500M operations/day ÷ 86,400 s ≈ 5,800/s on average; × 3 peak ≈ 17,000/s.",
-            "explanation": "Average first, then apply the peak factor. 10M × 50 = 500M operations/day ÷ 86,400 s ≈ 5,800/s on average; × 3 peak ≈ 17,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 5,800/s, so capacity sized for the average would run short at the busy hour. What it means for the design: a dozen nodes, with the design effort in partitioning, replication and repair.",
             "concept": "estimation"
           }
         ]
@@ -32202,7 +32202,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "10M × 100 = 1B cache ops/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s.",
-        "explanation": "Average first, then apply the peak factor. 10M × 100 = 1B cache ops/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 12,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: about 35,000 cache operations per second fits easily; the cluster is sized by memory (about 200 GB), giving 4 primaries plus replicas.",
         "concept": "estimation"
       },
       {
@@ -32676,7 +32676,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "10M × 100 = 1B cache ops/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s.",
-            "explanation": "Average first, then apply the peak factor. 10M × 100 = 1B cache ops/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 12,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: about 35,000 cache operations per second fits easily; the cluster is sized by memory (about 200 GB), giving 4 primaries plus replicas.",
             "concept": "estimation"
           }
         ]
@@ -33073,7 +33073,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "100M × 3 = 300M notifications/day ÷ 86,400 s ≈ 3,500/s on average; × 10 peak ≈ 35,000/s.",
-        "explanation": "Average first, then apply the peak factor. 100M × 3 = 300M notifications/day ÷ 86,400 s ≈ 3,500/s on average; × 10 peak ≈ 35,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 10× the average of about 3,500/s, so capacity sized for the average would run short at the busy hour. What it means for the design: the design must buffer, rate-limit per channel and deduplicate.",
         "concept": "estimation"
       },
       {
@@ -33559,7 +33559,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "100M × 3 = 300M notifications/day ÷ 86,400 s ≈ 3,500/s on average; × 10 peak ≈ 35,000/s.",
-            "explanation": "Average first, then apply the peak factor. 100M × 3 = 300M notifications/day ÷ 86,400 s ≈ 3,500/s on average; × 10 peak ≈ 35,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 10× the average of about 3,500/s, so capacity sized for the average would run short at the busy hour. What it means for the design: the design must buffer, rate-limit per channel and deduplicate.",
             "concept": "estimation"
           }
         ]
@@ -33956,7 +33956,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "200M × 20 = 4B feed reads/day ÷ 86,400 s ≈ 46,000/s on average; × 3 peak ≈ 140,000/s.",
-        "explanation": "Average first, then apply the peak factor. 200M × 20 = 4B feed reads/day ÷ 86,400 s ≈ 46,000/s on average; × 3 peak ≈ 140,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 46,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: precompute feeds in a cache and treat celebrities separately.",
         "concept": "estimation"
       },
       {
@@ -34454,7 +34454,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "200M × 20 = 4B feed reads/day ÷ 86,400 s ≈ 46,000/s on average; × 3 peak ≈ 140,000/s.",
-            "explanation": "Average first, then apply the peak factor. 200M × 20 = 4B feed reads/day ÷ 86,400 s ≈ 46,000/s on average; × 3 peak ≈ 140,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 46,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: precompute feeds in a cache and treat celebrities separately.",
             "concept": "estimation"
           }
         ]
@@ -34851,7 +34851,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "200M × 50 = 10B timeline reads/day ÷ 86,400 s ≈ 120,000/s on average; × 3 peak ≈ 350,000/s.",
-        "explanation": "Average first, then apply the peak factor. 200M × 50 = 10B timeline reads/day ÷ 86,400 s ≈ 120,000/s on average; × 3 peak ≈ 350,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 120,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: a hybrid timeline is the usual answer.",
         "concept": "estimation"
       },
       {
@@ -35337,7 +35337,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "200M × 50 = 10B timeline reads/day ÷ 86,400 s ≈ 120,000/s on average; × 3 peak ≈ 350,000/s.",
-            "explanation": "Average first, then apply the peak factor. 200M × 50 = 10B timeline reads/day ÷ 86,400 s ≈ 120,000/s on average; × 3 peak ≈ 350,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 120,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: a hybrid timeline is the usual answer.",
             "concept": "estimation"
           }
         ]
@@ -35734,7 +35734,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "500M × 40 = 20B messages/day ÷ 86,400 s ≈ 230,000/s on average; × 3 peak ≈ 690,000/s.",
-        "explanation": "Average first, then apply the peak factor. 500M × 40 = 20B messages/day ÷ 86,400 s ≈ 230,000/s on average; × 3 peak ≈ 690,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 230,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: persistent connections, partitioned storage and per-conversation ordering.",
         "concept": "estimation"
       },
       {
@@ -36219,7 +36219,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "500M × 40 = 20B messages/day ÷ 86,400 s ≈ 230,000/s on average; × 3 peak ≈ 690,000/s.",
-            "explanation": "Average first, then apply the peak factor. 500M × 40 = 20B messages/day ÷ 86,400 s ≈ 230,000/s on average; × 3 peak ≈ 690,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 230,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: persistent connections, partitioned storage and per-conversation ordering.",
             "concept": "estimation"
           }
         ]
@@ -36616,7 +36616,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "100M × 15 = 1.5B photo views/day ÷ 86,400 s ≈ 17,000/s on average; × 3 peak ≈ 52,000/s.",
-        "explanation": "Average first, then apply the peak factor. 100M × 15 = 1.5B photo views/day ÷ 86,400 s ≈ 17,000/s on average; × 3 peak ≈ 52,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 17,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: object storage plus CDN for bytes, a feed cache for ids.",
         "concept": "estimation"
       },
       {
@@ -37122,7 +37122,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "100M × 15 = 1.5B photo views/day ÷ 86,400 s ≈ 17,000/s on average; × 3 peak ≈ 52,000/s.",
-            "explanation": "Average first, then apply the peak factor. 100M × 15 = 1.5B photo views/day ÷ 86,400 s ≈ 17,000/s on average; × 3 peak ≈ 52,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 17,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: object storage plus CDN for bytes, a feed cache for ids.",
             "concept": "estimation"
           }
         ]
@@ -37519,7 +37519,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "100M × 50 = 5B video views/day ÷ 86,400 s ≈ 58,000/s on average; × 3 peak ≈ 170,000/s.",
-        "explanation": "Average first, then apply the peak factor. 100M × 50 = 5B video views/day ÷ 86,400 s ≈ 58,000/s on average; × 3 peak ≈ 170,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 58,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: async transcoding plus CDN delivery is the core.",
         "concept": "estimation"
       },
       {
@@ -38025,7 +38025,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "100M × 50 = 5B video views/day ÷ 86,400 s ≈ 58,000/s on average; × 3 peak ≈ 170,000/s.",
-            "explanation": "Average first, then apply the peak factor. 100M × 50 = 5B video views/day ÷ 86,400 s ≈ 58,000/s on average; × 3 peak ≈ 170,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 58,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: async transcoding plus CDN delivery is the core.",
             "concept": "estimation"
           }
         ]
@@ -38422,7 +38422,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "50M × 20 = 1B video segment requests/day ÷ 86,400 s ≈ 12,000/s on average; × 4 peak ≈ 46,000/s.",
-        "explanation": "Average first, then apply the peak factor. 50M × 20 = 1B video segment requests/day ÷ 86,400 s ≈ 12,000/s on average; × 4 peak ≈ 46,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 4× the average of about 12,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: delivery is a CDN problem, the control plane is ordinary services.",
         "concept": "estimation"
       },
       {
@@ -38914,7 +38914,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "50M × 20 = 1B video segment requests/day ÷ 86,400 s ≈ 12,000/s on average; × 4 peak ≈ 46,000/s.",
-            "explanation": "Average first, then apply the peak factor. 50M × 20 = 1B video segment requests/day ÷ 86,400 s ≈ 12,000/s on average; × 4 peak ≈ 46,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 4× the average of about 12,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: delivery is a CDN problem, the control plane is ordinary services.",
             "concept": "estimation"
           }
         ]
@@ -39311,7 +39311,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "20M × 4 = 80M ride requests/day ÷ 86,400 s ≈ 930/s on average; × 4 peak ≈ 3,700/s.",
-        "explanation": "Average first, then apply the peak factor. 20M × 4 = 80M ride requests/day ÷ 86,400 s ≈ 930/s on average; × 4 peak ≈ 3,700/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 4× the average of about 930/s, so capacity sized for the average would run short at the busy hour. What it means for the design: the geo index is the hot path.",
         "concept": "estimation"
       },
       {
@@ -39798,7 +39798,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "20M × 4 = 80M ride requests/day ÷ 86,400 s ≈ 930/s on average; × 4 peak ≈ 3,700/s.",
-            "explanation": "Average first, then apply the peak factor. 20M × 4 = 80M ride requests/day ÷ 86,400 s ≈ 930/s on average; × 4 peak ≈ 3,700/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 4× the average of about 930/s, so capacity sized for the average would run short at the busy hour. What it means for the design: the geo index is the hot path.",
             "concept": "estimation"
           }
         ]
@@ -40194,7 +40194,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "30M × 1 = 30M orders/day ÷ 86,400 s ≈ 350/s on average; × 6 peak ≈ 2,100/s.",
-        "explanation": "Average first, then apply the peak factor. 30M × 1 = 30M orders/day ÷ 86,400 s ≈ 350/s on average; × 6 peak ≈ 2,100/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 6× the average of about 350/s, so capacity sized for the average would run short at the busy hour. What it means for the design: cache the catalogue, keep orders transactional.",
         "concept": "estimation"
       },
       {
@@ -40691,7 +40691,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "30M × 1 = 30M orders/day ÷ 86,400 s ≈ 350/s on average; × 6 peak ≈ 2,100/s.",
-            "explanation": "Average first, then apply the peak factor. 30M × 1 = 30M orders/day ÷ 86,400 s ≈ 350/s on average; × 6 peak ≈ 2,100/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 6× the average of about 350/s, so capacity sized for the average would run short at the busy hour. What it means for the design: cache the catalogue, keep orders transactional.",
             "concept": "estimation"
           }
         ]
@@ -41087,7 +41087,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "10M × 200 = 2B edit ops/day ÷ 86,400 s ≈ 23,000/s on average; × 3 peak ≈ 69,000/s.",
-        "explanation": "Average first, then apply the peak factor. 10M × 200 = 2B edit ops/day ÷ 86,400 s ≈ 23,000/s on average; × 3 peak ≈ 69,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 23,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: route each document to one session server and keep its log.",
         "concept": "estimation"
       },
       {
@@ -41581,7 +41581,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "10M × 200 = 2B edit ops/day ÷ 86,400 s ≈ 23,000/s on average; × 3 peak ≈ 69,000/s.",
-            "explanation": "Average first, then apply the peak factor. 10M × 200 = 2B edit ops/day ÷ 86,400 s ≈ 23,000/s on average; × 3 peak ≈ 69,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 23,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: route each document to one session server and keep its log.",
             "concept": "estimation"
           }
         ]
@@ -41977,7 +41977,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "50M × 10 = 500M file ops/day ÷ 86,400 s ≈ 5,800/s on average; × 3 peak ≈ 17,000/s.",
-        "explanation": "Average first, then apply the peak factor. 50M × 10 = 500M file ops/day ÷ 86,400 s ≈ 5,800/s on average; × 3 peak ≈ 17,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 5,800/s, so capacity sized for the average would run short at the busy hour. What it means for the design: chunking, dedup and a consistent metadata service.",
         "concept": "estimation"
       },
       {
@@ -42482,7 +42482,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "50M × 10 = 500M file ops/day ÷ 86,400 s ≈ 5,800/s on average; × 3 peak ≈ 17,000/s.",
-            "explanation": "Average first, then apply the peak factor. 50M × 10 = 500M file ops/day ÷ 86,400 s ≈ 5,800/s on average; × 3 peak ≈ 17,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 5,800/s, so capacity sized for the average would run short at the busy hour. What it means for the design: chunking, dedup and a consistent metadata service.",
             "concept": "estimation"
           }
         ]
@@ -42879,7 +42879,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "150M × 3 = 450M transactions/day ÷ 86,400 s ≈ 5,200/s on average; × 5 peak ≈ 26,000/s.",
-        "explanation": "Average first, then apply the peak factor. 150M × 3 = 450M transactions/day ÷ 86,400 s ≈ 5,200/s on average; × 5 peak ≈ 26,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 5× the average of about 5,200/s, so capacity sized for the average would run short at the busy hour. What it means for the design: idempotency, a clear state machine and reconciliation matter more than raw speed.",
         "concept": "estimation"
       },
       {
@@ -43388,7 +43388,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "150M × 3 = 450M transactions/day ÷ 86,400 s ≈ 5,200/s on average; × 5 peak ≈ 26,000/s.",
-            "explanation": "Average first, then apply the peak factor. 150M × 3 = 450M transactions/day ÷ 86,400 s ≈ 5,200/s on average; × 5 peak ≈ 26,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 5× the average of about 5,200/s, so capacity sized for the average would run short at the busy hour. What it means for the design: idempotency, a clear state machine and reconciliation matter more than raw speed.",
             "concept": "estimation"
           }
         ]
@@ -43785,7 +43785,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "50M × 2 = 100M wallet transactions/day ÷ 86,400 s ≈ 1,200/s on average; × 5 peak ≈ 5,800/s.",
-        "explanation": "Average first, then apply the peak factor. 50M × 2 = 100M wallet transactions/day ÷ 86,400 s ≈ 1,200/s on average; × 5 peak ≈ 5,800/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 5× the average of about 1,200/s, so capacity sized for the average would run short at the busy hour. What it means for the design: strong consistency per account with a double-entry ledger is the heart of the design.",
         "concept": "estimation"
       },
       {
@@ -44279,7 +44279,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "50M × 2 = 100M wallet transactions/day ÷ 86,400 s ≈ 1,200/s on average; × 5 peak ≈ 5,800/s.",
-            "explanation": "Average first, then apply the peak factor. 50M × 2 = 100M wallet transactions/day ÷ 86,400 s ≈ 1,200/s on average; × 5 peak ≈ 5,800/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 5× the average of about 1,200/s, so capacity sized for the average would run short at the busy hour. What it means for the design: strong consistency per account with a double-entry ledger is the heart of the design.",
             "concept": "estimation"
           }
         ]
@@ -44675,7 +44675,7 @@
         ],
         "formula": "peak/s = views in the window ÷ window length in seconds",
         "workedAnswer": "3M × 4 = 12M seat views ÷ 600 s = 20,000 seat views/s during the opening burst.",
-        "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 3M × 4 = 12M seat views ÷ 600 s = 20,000 seat views/s during the opening burst. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: spread over a whole day the same requests would be only about 140/s, which hides the burst you actually have to survive. What it means for the design: serve seat maps from cache and make holds atomic.",
         "concept": "estimation"
       },
       {
@@ -45171,7 +45171,7 @@
             ],
             "formula": "peak/s = views in the window ÷ window length in seconds",
             "workedAnswer": "3M × 4 = 12M seat views ÷ 600 s = 20,000 seat views/s during the opening burst.",
-            "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 3M × 4 = 12M seat views ÷ 600 s = 20,000 seat views/s during the opening burst. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: spread over a whole day the same requests would be only about 140/s, which hides the burst you actually have to survive. What it means for the design: serve seat maps from cache and make holds atomic.",
             "concept": "estimation"
           }
         ]
@@ -45567,7 +45567,7 @@
         ],
         "formula": "peak/s = attempts in the window ÷ window length in seconds",
         "workedAnswer": "1,000,000 attempts ÷ 60 s ≈ 16,700 booking attempts/s at the opening.",
-        "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 1,000,000 attempts ÷ 60 s ≈ 16,700 booking attempts/s at the opening. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: spread over a whole day the same requests would be only about 12/s, which hides the burst you actually have to survive. What it means for the design: admit users at a safe rate, take payment, then allocate atomically.",
         "concept": "estimation"
       },
       {
@@ -46080,7 +46080,7 @@
             ],
             "formula": "peak/s = attempts in the window ÷ window length in seconds",
             "workedAnswer": "1,000,000 attempts ÷ 60 s ≈ 16,700 booking attempts/s at the opening.",
-            "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 1,000,000 attempts ÷ 60 s ≈ 16,700 booking attempts/s at the opening. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: spread over a whole day the same requests would be only about 12/s, which hides the burst you actually have to survive. What it means for the design: admit users at a safe rate, take payment, then allocate atomically.",
             "concept": "estimation"
           }
         ]
@@ -46479,7 +46479,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "20M × 20 = 400M score reads/day ÷ 86,400 s ≈ 4,600/s on average; × 8 peak ≈ 37,000/s.",
-        "explanation": "Average first, then apply the peak factor. 20M × 20 = 400M score reads/day ÷ 86,400 s ≈ 4,600/s on average; × 8 peak ≈ 37,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 8× the average of about 4,600/s, so capacity sized for the average would run short at the busy hour. What it means for the design: sorted sets per contest plus batched score updates.",
         "concept": "estimation"
       },
       {
@@ -46974,7 +46974,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "20M × 20 = 400M score reads/day ÷ 86,400 s ≈ 4,600/s on average; × 8 peak ≈ 37,000/s.",
-            "explanation": "Average first, then apply the peak factor. 20M × 20 = 400M score reads/day ÷ 86,400 s ≈ 4,600/s on average; × 8 peak ≈ 37,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 8× the average of about 4,600/s, so capacity sized for the average would run short at the busy hour. What it means for the design: sorted sets per contest plus batched score updates.",
             "concept": "estimation"
           }
         ]
@@ -47370,7 +47370,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "50M × 20 = 1B keystrokes/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s.",
-        "explanation": "Average first, then apply the peak factor. 50M × 20 = 1B keystrokes/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 12,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: the hard parts are freshness and language handling.",
         "concept": "estimation"
       },
       {
@@ -47865,7 +47865,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "50M × 20 = 1B keystrokes/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s.",
-            "explanation": "Average first, then apply the peak factor. 50M × 20 = 1B keystrokes/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 12,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: the hard parts are freshness and language handling.",
             "concept": "estimation"
           }
         ]
@@ -48262,7 +48262,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "1B pages fetched/day ÷ 86,400 s ≈ 12,000/s on average; × 1 peak ≈ 12,000/s.",
-        "explanation": "Average first, then apply the peak factor. 1B pages fetched/day ÷ 86,400 s ≈ 12,000/s on average; × 1 peak ≈ 12,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: this workload is steady, so the average is also the rate to size for. What it means for the design: a partitioned frontier, politeness per host and dedup.",
         "concept": "estimation"
       },
       {
@@ -48748,7 +48748,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "1B pages fetched/day ÷ 86,400 s ≈ 12,000/s on average; × 1 peak ≈ 12,000/s.",
-            "explanation": "Average first, then apply the peak factor. 1B pages fetched/day ÷ 86,400 s ≈ 12,000/s on average; × 1 peak ≈ 12,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: this workload is steady, so the average is also the rate to size for. What it means for the design: a partitioned frontier, politeness per host and dedup.",
             "concept": "estimation"
           }
         ]
@@ -49144,7 +49144,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "80M × 10 = 800M searches/day ÷ 86,400 s ≈ 9,300/s on average; × 6 peak ≈ 56,000/s.",
-        "explanation": "Average first, then apply the peak factor. 80M × 10 = 800M searches/day ÷ 86,400 s ≈ 9,300/s on average; × 6 peak ≈ 56,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 6× the average of about 9,300/s, so capacity sized for the average would run short at the busy hour. What it means for the design: shard for size, replicate for throughput, sync from the catalogue by CDC.",
         "concept": "estimation"
       },
       {
@@ -49640,7 +49640,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "80M × 10 = 800M searches/day ÷ 86,400 s ≈ 9,300/s on average; × 6 peak ≈ 56,000/s.",
-            "explanation": "Average first, then apply the peak factor. 80M × 10 = 800M searches/day ÷ 86,400 s ≈ 9,300/s on average; × 6 peak ≈ 56,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 6× the average of about 9,300/s, so capacity sized for the average would run short at the busy hour. What it means for the design: shard for size, replicate for throughput, sync from the catalogue by CDC.",
             "concept": "estimation"
           }
         ]
@@ -50036,7 +50036,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "5B data points/day ÷ 86,400 s ≈ 58,000/s on average; × 2 peak ≈ 120,000/s.",
-        "explanation": "Average first, then apply the peak factor. 5B data points/day ÷ 86,400 s ≈ 58,000/s on average; × 2 peak ≈ 120,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 2× the average of about 58,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: a time-series store with rollups and strict cardinality limits.",
         "concept": "estimation"
       },
       {
@@ -50518,7 +50518,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "5B data points/day ÷ 86,400 s ≈ 58,000/s on average; × 2 peak ≈ 120,000/s.",
-            "explanation": "Average first, then apply the peak factor. 5B data points/day ÷ 86,400 s ≈ 58,000/s on average; × 2 peak ≈ 120,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 2× the average of about 58,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: a time-series store with rollups and strict cardinality limits.",
             "concept": "estimation"
           }
         ]
@@ -50913,7 +50913,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "5B log lines/day ÷ 86,400 s ≈ 58,000/s on average; × 3 peak ≈ 170,000/s.",
-        "explanation": "Average first, then apply the peak factor. 5B log lines/day ÷ 86,400 s ≈ 58,000/s on average; × 3 peak ≈ 170,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 58,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: buffer, index hot data, archive cold data.",
         "concept": "estimation"
       },
       {
@@ -51381,7 +51381,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "5B log lines/day ÷ 86,400 s ≈ 58,000/s on average; × 3 peak ≈ 170,000/s.",
-            "explanation": "Average first, then apply the peak factor. 5B log lines/day ÷ 86,400 s ≈ 58,000/s on average; × 3 peak ≈ 170,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 58,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: buffer, index hot data, archive cold data.",
             "concept": "estimation"
           }
         ]
@@ -51776,7 +51776,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "10B messages/day ÷ 86,400 s ≈ 120,000/s on average; × 2 peak ≈ 230,000/s.",
-        "explanation": "Average first, then apply the peak factor. 10B messages/day ÷ 86,400 s ≈ 120,000/s on average; × 2 peak ≈ 230,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 2× the average of about 120,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: partitioned, replicated append-only logs.",
         "concept": "estimation"
       },
       {
@@ -52260,7 +52260,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "10B messages/day ÷ 86,400 s ≈ 120,000/s on average; × 2 peak ≈ 230,000/s.",
-            "explanation": "Average first, then apply the peak factor. 10B messages/day ÷ 86,400 s ≈ 120,000/s on average; × 2 peak ≈ 230,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 2× the average of about 120,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: partitioned, replicated append-only logs.",
             "concept": "estimation"
           }
         ]
@@ -52655,7 +52655,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "1M × 10 = 10M job runs/day ÷ 86,400 s ≈ 120/s on average; × 3 peak ≈ 350/s.",
-        "explanation": "Average first, then apply the peak factor. 1M × 10 = 10M job runs/day ÷ 86,400 s ≈ 120/s on average; × 3 peak ≈ 350/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 120/s, so capacity sized for the average would run short at the busy hour. What it means for the design: modest load, so correctness (no missed or double runs) dominates.",
         "concept": "estimation"
       },
       {
@@ -53149,7 +53149,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "1M × 10 = 10M job runs/day ÷ 86,400 s ≈ 120/s on average; × 3 peak ≈ 350/s.",
-            "explanation": "Average first, then apply the peak factor. 1M × 10 = 10M job runs/day ÷ 86,400 s ≈ 120/s on average; × 3 peak ≈ 350/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 120/s, so capacity sized for the average would run short at the busy hour. What it means for the design: modest load, so correctness (no missed or double runs) dominates.",
             "concept": "estimation"
           }
         ]
@@ -53544,7 +53544,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "50M × 5 = 250M nearby searches/day ÷ 86,400 s ≈ 2,900/s on average; × 4 peak ≈ 12,000/s.",
-        "explanation": "Average first, then apply the peak factor. 50M × 5 = 250M nearby searches/day ÷ 86,400 s ≈ 2,900/s on average; × 4 peak ≈ 12,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 4× the average of about 2,900/s, so capacity sized for the average would run short at the busy hour. What it means for the design: replicate the index, cache details, update in hours.",
         "concept": "estimation"
       },
       {
@@ -54019,7 +54019,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "50M × 5 = 250M nearby searches/day ÷ 86,400 s ≈ 2,900/s on average; × 4 peak ≈ 12,000/s.",
-            "explanation": "Average first, then apply the peak factor. 50M × 5 = 250M nearby searches/day ÷ 86,400 s ≈ 2,900/s on average; × 4 peak ≈ 12,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 4× the average of about 2,900/s, so capacity sized for the average would run short at the busy hour. What it means for the design: replicate the index, cache details, update in hours.",
             "concept": "estimation"
           }
         ]
@@ -54416,7 +54416,7 @@
         ],
         "formula": "peak/s = attempts in the window ÷ window length in seconds",
         "workedAnswer": "10M × 3 = 30M attempts ÷ 300 s = 100,000 buy attempts/s.",
-        "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 10M × 3 = 30M attempts ÷ 300 s = 100,000 buy attempts/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: spread over a whole day the same requests would be only about 350/s, which hides the burst you actually have to survive. What it means for the design: absorb the spike at the edge and allocate stock atomically.",
         "concept": "estimation"
       },
       {
@@ -54913,7 +54913,7 @@
             ],
             "formula": "peak/s = attempts in the window ÷ window length in seconds",
             "workedAnswer": "10M × 3 = 30M attempts ÷ 300 s = 100,000 buy attempts/s.",
-            "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 10M × 3 = 30M attempts ÷ 300 s = 100,000 buy attempts/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: spread over a whole day the same requests would be only about 350/s, which hides the burst you actually have to survive. What it means for the design: absorb the spike at the edge and allocate stock atomically.",
             "concept": "estimation"
           }
         ]
@@ -55308,7 +55308,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "10M × 8 = 80M searches/day ÷ 86,400 s ≈ 930/s on average; × 4 peak ≈ 3,700/s.",
-        "explanation": "Average first, then apply the peak factor. 10M × 8 = 80M searches/day ÷ 86,400 s ≈ 930/s on average; × 4 peak ≈ 3,700/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 4× the average of about 930/s, so capacity sized for the average would run short at the busy hour. What it means for the design: search from an index and cache, book with atomic per-date updates.",
         "concept": "estimation"
       },
       {
@@ -55804,7 +55804,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "10M × 8 = 80M searches/day ÷ 86,400 s ≈ 930/s on average; × 4 peak ≈ 3,700/s.",
-            "explanation": "Average first, then apply the peak factor. 10M × 8 = 80M searches/day ÷ 86,400 s ≈ 930/s on average; × 4 peak ≈ 3,700/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 4× the average of about 930/s, so capacity sized for the average would run short at the busy hour. What it means for the design: search from an index and cache, book with atomic per-date updates.",
             "concept": "estimation"
           }
         ]
@@ -56199,7 +56199,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "100M × 10 = 1B click events/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s.",
-        "explanation": "Average first, then apply the peak factor. 100M × 10 = 1B click events/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 12,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: stream aggregation with exactly-once effects, plus raw storage for reconciliation.",
         "concept": "estimation"
       },
       {
@@ -56682,7 +56682,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "100M × 10 = 1B click events/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s.",
-            "explanation": "Average first, then apply the peak factor. 100M × 10 = 1B click events/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 12,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: stream aggregation with exactly-once effects, plus raw storage for reconciliation.",
             "concept": "estimation"
           }
         ]
@@ -57079,7 +57079,7 @@
         ],
         "formula": "peak/s = daily orders ÷ session seconds × peak factor",
         "workedAnswer": "500M orders ÷ 22,500 s ≈ 22,200/s on average; × 10 peak ≈ 222,000/s.",
-        "explanation": "Divide by the trading session, not 86,400 s, then apply the peak factor. 500M orders ÷ 22,500 s ≈ 22,200/s on average; × 10 peak ≈ 222,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: spread over a whole day the same requests would be only about 58,000/s, which hides the burst you actually have to survive. What it means for the design: deterministic in-memory matching per symbol, with a durable sequenced log for recovery and audit.",
         "concept": "estimation"
       },
       {
@@ -57562,7 +57562,7 @@
             ],
             "formula": "peak/s = daily orders ÷ session seconds × peak factor",
             "workedAnswer": "500M orders ÷ 22,500 s ≈ 22,200/s on average; × 10 peak ≈ 222,000/s.",
-            "explanation": "Divide by the trading session, not 86,400 s, then apply the peak factor. 500M orders ÷ 22,500 s ≈ 22,200/s on average; × 10 peak ≈ 222,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: spread over a whole day the same requests would be only about 58,000/s, which hides the burst you actually have to survive. What it means for the design: deterministic in-memory matching per symbol, with a durable sequenced log for recovery and audit.",
             "concept": "estimation"
           }
         ]
@@ -57958,7 +57958,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "10M × 2 = 20M joins/day ÷ 86,400 s ≈ 230/s on average; × 4 peak ≈ 930/s.",
-        "explanation": "Average first, then apply the peak factor. 10M × 2 = 20M joins/day ÷ 86,400 s ≈ 230/s on average; × 4 peak ≈ 930/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 4× the average of about 230/s, so capacity sized for the average would run short at the busy hour. What it means for the design: SFUs in regions near users forward streams and adapt quality.",
         "concept": "estimation"
       },
       {
@@ -58443,7 +58443,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "10M × 2 = 20M joins/day ÷ 86,400 s ≈ 230/s on average; × 4 peak ≈ 930/s.",
-            "explanation": "Average first, then apply the peak factor. 10M × 2 = 20M joins/day ÷ 86,400 s ≈ 230/s on average; × 4 peak ≈ 930/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 4× the average of about 230/s, so capacity sized for the average would run short at the busy hour. What it means for the design: SFUs in regions near users forward streams and adapt quality.",
             "concept": "estimation"
           }
         ]
@@ -58840,7 +58840,7 @@
         ],
         "formula": "peak/s = concurrent viewers ÷ segment length in seconds",
         "workedAnswer": "25,000,000 ÷ 4 s = 6,250,000 segment requests/s.",
-        "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 25,000,000 concurrent viewers ÷ 4 s = 6,250,000 segment requests/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: spread over a whole day the same requests would be only about 290/s, which hides the burst you actually have to survive. What it means for the design: delivery is entirely a multi-CDN problem, with control-plane services pre-scaled for the toss.",
         "concept": "estimation"
       },
       {
@@ -59352,7 +59352,7 @@
             ],
             "formula": "peak/s = concurrent viewers ÷ segment length in seconds",
             "workedAnswer": "25,000,000 ÷ 4 s = 6,250,000 segment requests/s.",
-            "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 25,000,000 concurrent viewers ÷ 4 s = 6,250,000 segment requests/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: spread over a whole day the same requests would be only about 290/s, which hides the burst you actually have to survive. What it means for the design: delivery is entirely a multi-CDN problem, with control-plane services pre-scaled for the toss.",
             "concept": "estimation"
           }
         ]
@@ -59745,7 +59745,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "2M × 10 = 20M submissions/day ÷ 86,400 s ≈ 230/s on average; × 10 peak ≈ 2,300/s.",
-        "explanation": "Average first, then apply the peak factor. 2M × 10 = 20M submissions/day ÷ 86,400 s ≈ 230/s on average; × 10 peak ≈ 2,300/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 10× the average of about 230/s, so capacity sized for the average would run short at the busy hour. What it means for the design: queue, isolate and autoscale.",
         "concept": "estimation"
       },
       {
@@ -60231,7 +60231,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "2M × 10 = 20M submissions/day ÷ 86,400 s ≈ 230/s on average; × 10 peak ≈ 2,300/s.",
-            "explanation": "Average first, then apply the peak factor. 2M × 10 = 20M submissions/day ÷ 86,400 s ≈ 230/s on average; × 10 peak ≈ 2,300/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 10× the average of about 230/s, so capacity sized for the average would run short at the busy hour. What it means for the design: queue, isolate and autoscale.",
             "concept": "estimation"
           }
         ]
@@ -60627,7 +60627,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "100M × 20 = 2B emails/day ÷ 86,400 s ≈ 23,000/s on average; × 3 peak ≈ 69,000/s.",
-        "explanation": "Average first, then apply the peak factor. 100M × 20 = 2B emails/day ÷ 86,400 s ≈ 23,000/s on average; × 3 peak ≈ 69,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 23,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: queue-based ingestion, per-user partitioning and blob storage for bodies.",
         "concept": "estimation"
       },
       {
@@ -61122,7 +61122,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "100M × 20 = 2B emails/day ÷ 86,400 s ≈ 23,000/s on average; × 3 peak ≈ 69,000/s.",
-            "explanation": "Average first, then apply the peak factor. 100M × 20 = 2B emails/day ÷ 86,400 s ≈ 23,000/s on average; × 3 peak ≈ 69,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 23,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: queue-based ingestion, per-user partitioning and blob storage for bodies.",
             "concept": "estimation"
           }
         ]
@@ -61518,7 +61518,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "2B object requests/day ÷ 86,400 s ≈ 23,000/s on average; × 3 peak ≈ 69,000/s.",
-        "explanation": "Average first, then apply the peak factor. 2B object requests/day ÷ 86,400 s ≈ 23,000/s on average; × 3 peak ≈ 69,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 3× the average of about 23,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: separate metadata from data and use erasure coding for durability at lower cost.",
         "concept": "estimation"
       },
       {
@@ -61997,7 +61997,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "2B object requests/day ÷ 86,400 s ≈ 23,000/s on average; × 3 peak ≈ 69,000/s.",
-            "explanation": "Average first, then apply the peak factor. 2B object requests/day ÷ 86,400 s ≈ 23,000/s on average; × 3 peak ≈ 69,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 3× the average of about 23,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: separate metadata from data and use erasure coding for durability at lower cost.",
             "concept": "estimation"
           }
         ]
@@ -62393,7 +62393,7 @@
         ],
         "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
         "workedAnswer": "100M × 20 = 2B increments/day ÷ 86,400 s ≈ 23,000/s on average; × 5 peak ≈ 120,000/s.",
-        "explanation": "Average first, then apply the peak factor. 100M × 20 = 2B increments/day ÷ 86,400 s ≈ 23,000/s on average; × 5 peak ≈ 120,000/s. Anything within about 50% shows the right order of magnitude.",
+        "explanation": "Sanity check: the peak is 5× the average of about 23,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: shard hot counters and sum on read.",
         "concept": "estimation"
       },
       {
@@ -62884,7 +62884,7 @@
             ],
             "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
             "workedAnswer": "100M × 20 = 2B increments/day ÷ 86,400 s ≈ 23,000/s on average; × 5 peak ≈ 120,000/s.",
-            "explanation": "Average first, then apply the peak factor. 100M × 20 = 2B increments/day ÷ 86,400 s ≈ 23,000/s on average; × 5 peak ≈ 120,000/s. Anything within about 50% shows the right order of magnitude.",
+            "explanation": "Sanity check: the peak is 5× the average of about 23,000/s, so capacity sized for the average would run short at the busy hour. What it means for the design: shard hot counters and sum on read.",
             "concept": "estimation"
           }
         ]
@@ -63332,7 +63332,7 @@
         ],
         "formula": "A month is about 2.6M seconds; 15B ÷ 2.6M ≈ 5,800 per second.",
         "workedAnswer": "A month is about 2.6M seconds; 15B ÷ 2.6M ≈ 5,800 per second.",
-        "explanation": "A month is about 2.6M seconds; 15B ÷ 2.6M ≈ 5,800 per second."
+        "explanation": "Sanity check: 5,800/s is only the average. Payments cluster around meals, evenings and salary days, so you would design for a peak several times higher and say the factor you assumed."
       },
       {
         "id": "t115-d1",
@@ -64734,7 +64734,7 @@
         "assumptions": [],
         "formula": "60,000 ÷ 5,000, then × 1.3 headroom",
         "workedAnswer": "60,000 ÷ 5,000 = 12 servers; 12 × 1.3 = 15.6, so 16.",
-        "explanation": "60,000 ÷ 5,000 = 12 servers; 12 × 1.3 = 15.6, so 16."
+        "explanation": "Design implication: the 30% headroom absorbs bursts and slow requests. After that, add at least one more server (N+1) so losing one server does not push the rest past their safe load."
       },
       {
         "id": "t119-a3",

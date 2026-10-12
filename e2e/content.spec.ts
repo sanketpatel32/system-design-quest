@@ -30,3 +30,14 @@ test('lesson cards: specific headings, and card 2 is no longer a repeat of the i
   await expect(page.locator('.panel h3').first()).toHaveText(/^Worked example/)
   await expect(page.getByTestId('card-note')).toContainText('relatively modest under these assumptions')
 })
+
+test('numeric feedback: "Why" gives a sanity check, not the worked answer again', async ({ page }) => {
+  await seed(page, { extra: { unlockedTopicIds: [1, 2] } })
+  await page.goto('/quiz/back-of-envelope-estimation')
+  await page.getByRole('button', { name: /^Question 2/ }).click()
+  await page.getByRole('spinbutton').fill('23')
+  await page.getByRole('button', { name: 'Submit' }).first().click()
+  const sheet = page.getByTestId('feedback-sheet')
+  await expect(sheet).toContainText('Why: Sanity check')
+  await expect(sheet).not.toContainText('2B ÷ 86,400')
+})
