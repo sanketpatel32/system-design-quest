@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { allTopics, orderedTopicsInRegion } from '../content/catalog'
 import { QuestionRenderer } from '../components/QuestionRenderer'
@@ -6,6 +6,8 @@ import { HeartsHud } from '../components/ui/Hud'
 import { Mascot } from '../components/art/Mascot'
 import { IconBadge, IconFlame, IconGem } from '../components/icons/HudIcons'
 import { regionPalette } from '../lib/design/transitTheme'
+import { AnimatePresence, motion } from 'motion/react'
+import { spring, useCalm } from '../lib/motion'
 import { fireConfetti, playCelebrationSound } from '../lib/celebrate'
 import { BADGE_LABELS } from '../lib/progression/badges'
 import { INITIAL_HEARTS, PASS_PERCENT } from '../lib/scoring/quiz'
@@ -28,6 +30,7 @@ export function QuizPage() {
   ) ?? { hearts: INITIAL_HEARTS, answers: {}, results: {} as Record<string, boolean>, completed: false }
   const prefs = useGameStore((s) => s.preferences)
   const streak = useStreak()
+  const calm = useCalm()
 
   const [index, setIndex] = useState<number | null>(null)
   const [practice, setPractice] = useState(0)
@@ -80,6 +83,13 @@ export function QuizPage() {
     setClaim(null)
   }
 
+  // Trailing run of correct answers, in question order, for the combo burst
+  let run = 0
+  for (const x of topic.questions) {
+    if (!(x.id in results)) continue
+    run = results[x.id] ? run + 1 : 0
+  }
+
   const missed = topic.questions.filter((x) => x.id in results && !results[x.id])
   const goNext = () => {
     setPractice(0)
@@ -100,7 +110,14 @@ export function QuizPage() {
           aria-valuemax={total}
           aria-valuenow={answeredCount}
         >
-          <div className="progress-fill" style={{ width: `${Math.max(answeredCount ? 6 : 0, (answeredCount / total) * 100)}%` }} />
+          <motion.div
+            className="progress-fill w-full"
+            initial={false}
+            animate={{ x: `${Math.max(answeredCount ? 6 : 0, (answeredCount / total) * 100) - 100}%` }}
+            transition={spring.bar}
+          >
+            {answeredCount > 0 && <span key={answeredCount} className="bar-shine" aria-hidden />}
+          </motion.div>
         </div>
         <HeartsHud hearts={attempt.hearts} />
       </header>
@@ -200,7 +217,7 @@ export function QuizPage() {
           </section>
         )
       ) : (
-        <>
+        <motion.div key={q.id} initial={calm ? false : { opacity: 0, x: 48 }} animate={{ opacity: 1, x: 0 }} transition={spring.gentle}>
           <QuestionRenderer
             key={`${q.id}-${practice}`}
             question={q}
@@ -231,9 +248,49 @@ export function QuizPage() {
           <p className="mt-8 hidden text-sm text-dim sm:block">
             Shortcuts: <kbd className="kbd">1</kbd>–<kbd className="kbd">4</kbd> pick an option, <kbd className="kbd">Enter</kbd> submits.
           </p>
-        </>
+        </motion.div>
       )}
+      <ComboBurst run={run} tick={answeredCount} />
     </div>
+  )
+}
+
+/** "3 in a row!" burst: decorative, aria-hidden, never takes pointer events */
+function ComboBurst({ run, tick }: { run: number; tick: number }) {
+  const calm = useCalm()
+  const [shown, setShown] = useState<{ n: number; k: number } | null>(null)
+  const last = useRef(tick)
+  useEffect(() => {
+    if (tick > last.current && run >= 3) {
+      setShown({ n: run, k: tick })
+      const t = setTimeout(() => setShown(null), 1400)
+      last.current = tick
+      return () => clearTimeout(t)
+    }
+    last.current = tick
+  }, [tick, run])
+  if (calm) return null
+  return (
+    <AnimatePresence>
+      {shown && (
+        <motion.div
+          key={shown.k}
+          aria-hidden
+          className="pointer-events-none fixed left-1/2 top-[22vh] z-[80] -translate-x-1/2"
+          initial={{ scale: 0.3, opacity: 0, rotate: -12 }}
+          animate={{ scale: 1, opacity: 1, rotate: -4 }}
+          exit={{ scale: 1.3, opacity: 0, y: -30 }}
+          transition={spring.pop}
+        >
+          <div className="combo-burst">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <span key={i} className="combo-ray" style={{ ['--a' as string]: `${i * 45}deg` }} />
+            ))}
+            <span className="relative font-display text-3xl text-white">{shown.n} in a row!</span>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 
