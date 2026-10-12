@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { orderedTopicsInRegion, regions, topicsById } from '../../content/catalog'
 import type { RegionId } from '../../content/types'
 import { transitLineColor } from '../../lib/design/transitTheme'
+import { RegionMotif } from './RegionMotif'
 import { getUnlockHint, topicStatus } from '../../lib/progression/unlocks'
 import { useGameStore } from '../../stores/gameStore'
 
@@ -301,8 +302,9 @@ export function WorldMapScene() {
                     filter="url(#glow)"
                     opacity={0.95}
                   />
+                  <RegionMotif regionId={r.id} color={color} size={24} x={i % 2 === 0 ? L - 10 : R + 10 - 24} y={first.y - 56} />
                   <text
-                    x={i % 2 === 0 ? L - 10 : R + 10}
+                    x={i % 2 === 0 ? L - 10 + 30 : R + 10 - 30}
                     y={first.y - 38}
                     textAnchor={i % 2 === 0 ? 'start' : 'end'}
                     fontSize={15}
@@ -505,7 +507,7 @@ function Curriculum({ statusMap }: { statusMap: Map<number, Status> }) {
           return (
             <div key={r.id} className="panel min-w-0 p-4 border-l-[6px]" style={{ borderLeftColor: color }}>
               <div className="flex items-baseline justify-between gap-2">
-                <h3 className="font-display font-bold" style={{ color }}>{r.subtitle} line</h3>
+                <h3 className="font-display font-bold flex items-center gap-2" style={{ color }}><RegionMotif regionId={r.id} color={color} size={20} />{r.subtitle} line</h3>
                 <span className="text-xs text-dim tabular-nums">{done}/{all.length} cleared · ~{Math.round(mins / 6) / 10} h</span>
               </div>
               <div className="score-track mt-2" aria-hidden>

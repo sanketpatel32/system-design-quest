@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { allTopics, regions, topicsById } from '../content/catalog'
 import { LessonDeck } from '../components/LessonDeck'
 import { transitLineColor } from '../lib/design/transitTheme'
+import { RegionMotif } from '../components/map/RegionMotif'
 import { getUnlockHint, topicStatus } from '../lib/progression/unlocks'
 import { completedTopicIds, useGameStore } from '../stores/gameStore'
 
@@ -51,7 +52,7 @@ export function TopicPage() {
       <div className="space-y-5 min-w-0">
         <header>
           <p className="text-sm font-semibold flex items-center gap-2" style={{ color: accent }}>
-            <span className="inline-block h-2.5 w-2.5 rounded-full border-2" style={{ borderColor: accent }} aria-hidden />
+            <RegionMotif regionId={topic.region} color={accent} size={22} />
             {regionName} · topic {topic.id}
           </p>
           <h1 className="font-display text-4xl font-extrabold text-chalk mt-2 leading-tight" data-testid="topic-title">{topic.title}</h1>
