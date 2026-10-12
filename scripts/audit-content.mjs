@@ -9,6 +9,8 @@ const topics = JSON.parse(
 )
 
 const errors = []
+const warnings = []
+const strict = process.env.AUDIT_STRICT === '1'
 const ids = topics.map((t) => t.id)
 const idSet = new Set(ids)
 
@@ -26,6 +28,31 @@ for (let i = 75; i <= 114; i++) {
 }
 
 const placeholder = /coming soon|lorem|placeholder|todo content/i
+
+function normalizeText(s) {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function tokenSet(s) {
+  return new Set(normalizeText(s).split(' ').filter((w) => w.length > 3))
+}
+
+function jaccard(a, b) {
+  const A = tokenSet(a)
+  const B = tokenSet(b)
+  if (A.size === 0 || B.size === 0) return 0
+  let inter = 0
+  for (const x of A) if (B.has(x)) inter += 1
+  return inter / (A.size + B.size - inter)
+}
+
+const cardBodies = []
+const prompts = []
+const NEAR_DUP_THRESHOLD = 0.82
 
 for (const t of topics) {
   if (t.cards.length < 4 || t.cards.length > 6) {
@@ -49,6 +76,47 @@ for (const t of topics) {
     if (!t.boss?.referenceNodes?.length) errors.push(`Boss ${t.id}: missing reference graph`)
     if (!t.bossStages?.length) errors.push(`Boss ${t.id}: missing stages`)
   }
+  for (const c of t.cards) {
+    const body = c.body ?? ''
+    if (cardBodies.some((x) => x.text === body)) {
+      errors.push(`Topic ${t.id}: exact duplicate card body`)
+    }
+    for (const prev of cardBodies) {
+      const j = jaccard(body, prev.text)
+      if (j >= NEAR_DUP_THRESHOLD) {
+        const msg = `Topic ${t.id} card near-duplicate of topic ${prev.id} (j=${j.toFixed(2)})`
+        if (strict) errors.push(msg)
+        else warnings.push(msg)
+      }
+    }
+    cardBodies.push({ id: t.id, text: body })
+  }
+  for (const q of t.questions) {
+    const p = q.prompt ?? ''
+    if (prompts.some((x) => x.text === p)) {
+      errors.push(`Topic ${t.id}: exact duplicate question prompt`)
+    }
+    for (const prev of prompts) {
+      const j = jaccard(p, prev.text)
+      if (j >= NEAR_DUP_THRESHOLD) {
+        const msg = `Topic ${t.id} prompt near-duplicate of topic ${prev.id} (j=${j.toFixed(2)})`
+        if (strict) errors.push(msg)
+        else warnings.push(msg)
+      }
+    }
+    prompts.push({ id: t.id, text: p })
+    if (q.type === 'tradeoff') {
+      if (q.rationaleKeywords) errors.push(`Topic ${t.id}: tradeoff uses legacy rationaleKeywords`)
+      if (!q.rationaleOptions?.length) errors.push(`Topic ${t.id}: tradeoff missing rationaleOptions`)
+      if (!q.correctRationaleIds?.length) errors.push(`Topic ${t.id}: tradeoff missing correctRationaleIds`)
+    }
+  }
+}
+
+if (warnings.length && !strict) {
+  console.warn(`AUDIT WARN: ${warnings.length} near-duplicate text pairs (run AUDIT_STRICT=1 npm run audit to fail)`)
+  warnings.slice(0, 8).forEach((w) => console.warn(' -', w))
+  if (warnings.length > 8) console.warn(` - … and ${warnings.length - 8} more`)
 }
 
 if (errors.length) {

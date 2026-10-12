@@ -18,15 +18,23 @@ Open `http://127.0.0.1:43123`.
 | `npm run dev` | Vite dev server |
 | `npm run typecheck` | `tsc -b` strict |
 | `npm run test` | Vitest unit tests |
-| `npm run audit` | Content integrity (120 topics, bosses, keys) |
+| `npm run audit` | Assemble shards + integrity (exact dupes fail; near-dupes warn) |
+| `npm run audit:strict` | Fail on near-duplicate card/prompt text (Jaccard ≥ 0.82) |
+| `npm run content:build` | Regenerate `scripts/authored/*.json` from authoring pipeline |
 | `npm run e2e` | Playwright tests |
 | `npm run build` | Production build to `dist/` |
 
-Regenerate topic JSON after editing `scripts/generate-content.py`:
+Regenerate topic JSON from authored shards:
 
 ```bash
-python3 scripts/generate-content.py
+npm run content:build
+# or manually:
+python3 scripts/authoring/build-authored-content.py
+node scripts/assemble-authored.mjs
+npm run audit
 ```
+
+Authoring sources live in `scripts/authoring/`; committed shards in `scripts/authored/`.
 
 ## Architecture
 
