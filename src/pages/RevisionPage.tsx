@@ -114,7 +114,7 @@ export function RevisionPage() {
           </p>
           <p className="font-display text-3xl text-chalk mt-4 leading-snug">{current.flashcard.front}</p>
           {flipped ? (
-            <p className="anim-pop mt-5 rounded-2xl bg-[var(--color-sky)] p-5 text-[18px] font-bold text-chalk leading-relaxed">{current.flashcard.back}</p>
+            <p className="anim-pop mt-5 rounded-2xl bg-[var(--color-sky)] p-5 text-[1.125rem] font-bold text-chalk leading-relaxed">{current.flashcard.back}</p>
           ) : (
             <button type="button" className="btn-sky mt-6 w-full sm:w-auto sm:min-w-[240px]" onClick={() => setFlipped(true)}>
               Show answer

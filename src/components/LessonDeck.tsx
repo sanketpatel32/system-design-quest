@@ -73,7 +73,7 @@ export function LessonDeck({
           ))}
         </div>
         {hasRealTitle(card) && <h3 className="font-display text-2xl sm:text-3xl text-chalk mb-3">{card.title}</h3>}
-        <p className="text-chalk leading-relaxed text-[18px] font-semibold max-w-[62ch]">{card.body}</p>
+        <p className="text-chalk leading-relaxed text-[1.125rem] font-semibold max-w-[62ch]">{card.body}</p>
         {card.steps && card.steps.length > 0 && (
           <ol className="flow mt-5" aria-label="Request flow">
             {card.steps.map((step, i) => (

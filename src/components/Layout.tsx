@@ -30,7 +30,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [reducedMotion])
 
   return (
-    <div className="min-h-full flex flex-col lg:pl-[248px]">
+    <div className="min-h-full flex flex-col lg:pl-[15.5rem]">
       <aside className="sidebar hidden lg:flex">
         <Link to="/" className="flex items-center gap-2 px-3 py-2" aria-label="System Design Quest, back to map">
           <Logo size={44} />
@@ -50,7 +50,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </nav>
       </aside>
       <header className="shell-header sticky top-0 z-50">
-        <div className="max-w-[1180px] mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-3">
+        <div className="max-w-[73.75rem] 2xl:max-w-[80rem] mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-3">
           <Link to="/" className="flex items-center gap-2 shrink-0 lg:invisible" aria-label="System Design Quest, back to map" tabIndex={-1}>
             <LogoMark size={38} />
             <span className="font-display text-2xl leading-none hidden sm:inline"><span className="text-chalk">design</span><span className="text-[#58cc02]">quest</span></span>
@@ -80,7 +80,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               )}
             </button>
             {hudOpen && (
-              <div id="hud-explainer" className="panel anim-pop absolute right-0 top-full mt-2 w-80 p-4 text-[15px] z-50 space-y-3">
+              <div id="hud-explainer" className="panel anim-pop absolute right-0 top-full mt-2 w-80 p-4 text-[0.9375rem] z-50 space-y-3">
                 <div>
                   <div className="flex justify-between font-extrabold"><span>Level {level}</span><span className="text-dim tabular-nums">{xp % 500}/500</span></div>
                   <div className="xp-track mt-1.5">
@@ -107,7 +107,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="flex-1 w-full max-w-[1180px] mx-auto px-4 py-6 pb-28 lg:pb-10">{children}</main>
+      <main className="flex-1 w-full max-w-[73.75rem] 2xl:max-w-[80rem] mx-auto px-4 py-6 pb-28 lg:pb-10">{children}</main>
       <nav className={`tabbar lg:hidden ${inQuiz ? 'hidden' : ''}`} aria-label="Main">
         {nav.map((item) => (
           <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => `tab ${isActive ? 'tab-active' : ''}`}>

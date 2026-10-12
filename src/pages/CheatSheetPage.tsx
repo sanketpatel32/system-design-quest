@@ -34,7 +34,7 @@ function Sheet({ title, children, className = '' }: { title: string; children: R
 
 function Row({ k, v, approx }: { k: ReactNode; v: ReactNode; approx?: boolean }) {
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b-2 border-[#F1EDE6] py-2 last:border-0 text-[15px]">
+    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b-2 border-[#F1EDE6] py-2 last:border-0 text-[0.9375rem]">
       <dt className="min-w-0 text-dim font-bold">{k}</dt>
       <dd className={`ml-auto tabular-nums text-right ${approx ? 'text-[#8350C7] font-extrabold' : 'text-chalk font-semibold'}`}>{v}</dd>
     </div>
@@ -97,7 +97,7 @@ export function CheatSheetPage() {
         </Sheet>
 
         <Sheet title="Pattern → use case" className="md:col-span-2">
-          <table className="block w-full text-[15px] text-left md:table">
+          <table className="block w-full text-[0.9375rem] text-left md:table">
             <thead className="hidden md:table-header-group">
               <tr className="text-dim border-b border-[var(--color-rail)]">
                 <th scope="col" className="py-2 pr-4 font-normal">Pattern</th>

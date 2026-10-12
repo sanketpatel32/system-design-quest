@@ -144,7 +144,7 @@ export function QuizPage() {
             </div>
             {claim ? (
               <div className="mt-6 space-y-3">
-                <p className="text-[17px] font-bold text-chalk">
+                <p className="text-[1.0625rem] font-bold text-chalk">
                   {claim.xpGained > 0 ? `+${claim.xpGained} xp earned. ` : 'Already cleared before, so no new xp. '}
                   {next ? `${next.title} is now open.` : 'Unit complete!'}
                 </p>
