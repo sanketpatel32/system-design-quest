@@ -76,7 +76,7 @@ export function LessonDeck({
           </ol>
         )}
         {card.diagram && (
-          <div className="mt-4 rounded-md border border-[var(--color-rail)] bg-[#0a1624] p-3 overflow-auto" dangerouslySetInnerHTML={{ __html: card.diagram }} />
+          <div className="mt-4 rounded-md border border-[var(--color-rail)] bg-[#0a1624] p-3 overflow-x-auto" dangerouslySetInnerHTML={{ __html: card.diagram }} />
         )}
         {card.kind === 'animation' && (
           <div className="mt-4 h-1 bg-[var(--color-rail)] rounded-full overflow-hidden" aria-hidden>

@@ -20,3 +20,9 @@ Motion: only the next available station pulses. Other motion responds to what th
 Rejected defaults: purple gradients, glass-card grids, emoji icons, Inter, identical rounded cards, arrows appended to buttons.
 
 Content audit (`npm run audit:strict`): exact duplicate card bodies or prompts always fail; `tok*` fingerprint tokens are rejected. Near-duplicate Jaccard (≥ 0.82) applies to **lesson card bodies** only (with fingerprint tokens stripped). Quiz prompts may reuse the same question shape across topics when the stem names the topic; strict mode does not near-match prompts.
+
+## Region motifs
+Each region has one line-drawn landmark (src/components/map/RegionMotif.tsx): rocket gantry, skyline, signal head, ice crystal, keep, locomotive, summits, dish, vault door, flagged peak, arena arches. 24px grid, 1.6 stroke, round caps, stroked in the region's line colour only: no fills, gradients or emoji. Shown beside the line label on the map, in the curriculum list and in lesson headers.
+
+## Question checklist
+Every topic has 5–8 questions, at least 3 types where they fit, and each question has a `concept` taught by a card (`teaches`) in the topic or its prerequisites. Distractors must be misconceptions a learner might actually hold: no joke options, "none of the above", irrelevant tech or answers that repeat the correct one. `npm run audit` enforces this (scripts/audit/quiz-quality.mjs).
