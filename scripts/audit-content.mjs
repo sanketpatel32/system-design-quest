@@ -190,4 +190,17 @@ if (errors.length) {
   errors.forEach((e) => console.error(' -', e))
   process.exit(1)
 }
+// Templated boss questions must not return (review C1/M2)
+{
+  const seen = new Map()
+  for (const t of topics.filter((x) => x.kind === 'boss')) {
+    for (const q of t.questions) {
+      const txt = JSON.stringify(q)
+      if (/A mobile client times out on|Which mechanism does .* need for reliability|while side effects \(notifications, analytics, indexing\)/.test(txt)) errors.push(`Boss ${t.id}: templated ${q.id}`)
+      const k = q.id.split('-')[1]
+      const sig = k + ':' + (q.diagramNodes ? q.diagramNodes.map((n) => n.label).join('|') : (q.choices ?? []).map((c) => c.label).sort().join('|'))
+      if (['api1', 'dd1', 'dd2', 'to1'].includes(k)) { if (seen.has(sig)) errors.push(`Boss ${t.id}: ${k} duplicates boss ${seen.get(sig)}`); seen.set(sig, t.id) }
+    }
+  }
+}
 console.log('AUDIT OK: 120 topics, 40 bosses, counts and keys valid')
