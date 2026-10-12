@@ -72,9 +72,9 @@ describe('content arithmetic', () => {
 
   it('boss estimation targets match their scenario', () => {
     for (const t of allTopics.filter((x) => x.kind === 'boss')) {
-      const s = (t.boss as unknown as { scenario: { dau?: number; actions?: number; daily?: number; peak: number } }).scenario
+      const s = (t.boss as unknown as { scenario: { dau?: number; actions?: number; daily?: number; windowSeconds?: number; peak: number } }).scenario
       const daily = s.daily ?? s.dau! * s.actions!
-      const peak = (daily / 86400) * s.peak
+      const peak = (daily / (s.windowSeconds ?? 86400)) * s.peak
       const q = t.bossStages!.flatMap((st) => st.questions).find((x) => x.type === 'estimation')
       expect(q && q.type === 'estimation' ? Math.abs(q.target - peak) / peak : 1).toBeLessThan(0.06)
     }
