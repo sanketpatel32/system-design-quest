@@ -22,10 +22,10 @@ export function ArchNode({ data }: NodeProps) {
   const label = String((data as { label?: string }).label ?? typeLabels[componentType])
   return (
     <div className="arch-node">
-      <Handle type="target" position={Position.Left} className="!w-2 !h-2 !bg-[#2dd4bf] !border-0" />
+      <Handle type="target" position={Position.Left} className="arch-handle" />
       <div className="arch-node-type">{typeLabels[componentType]}</div>
-      <div>{label}</div>
-      <Handle type="source" position={Position.Right} className="!w-2 !h-2 !bg-[#2dd4bf] !border-0" />
+      {label.toLowerCase() !== typeLabels[componentType].toLowerCase() && <div className="arch-node-label">{label}</div>}
+      <Handle type="source" position={Position.Right} className="arch-handle" />
     </div>
   )
 }

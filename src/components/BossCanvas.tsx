@@ -6,6 +6,7 @@ import {
   Controls,
   MiniMap,
   addEdge,
+  MarkerType,
   useNodesState,
   useEdgesState,
   type Connection,
@@ -161,7 +162,7 @@ export function BossCanvas({ initial, onChange }: Props) {
           </button>
         </div>
       </aside>
-      <div className="h-[420px] border border-[var(--color-line)] overflow-hidden bg-[#06090c] panel-slab">
+      <div className="boss-flow h-[460px] rounded-lg border border-[var(--color-rail)] overflow-hidden bg-[#0a1624]">
         <ReactFlow
           nodeTypes={nodeTypes}
           nodes={nodes}
@@ -175,11 +176,14 @@ export function BossCanvas({ initial, onChange }: Props) {
             emit(nodes, edges)
           }}
           onConnect={onConnect}
+          colorMode="dark"
           fitView
+          fitViewOptions={{ maxZoom: 1.1, padding: 0.3 }}
+          defaultEdgeOptions={{ style: { stroke: '#F2B33D', strokeWidth: 2 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#F2B33D' } }}
         >
-          <Background />
-          <MiniMap />
-          <Controls />
+          <Background color="#1F3854" gap={24} size={1.5} />
+          <MiniMap pannable zoomable nodeColor="#2A4562" maskColor="rgba(13,27,42,0.7)" style={{ background: '#0D1B2A' }} />
+          <Controls showInteractive={false} />
         </ReactFlow>
       </div>
     </div>
