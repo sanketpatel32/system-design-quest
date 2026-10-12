@@ -181,6 +181,23 @@ export interface BossContent {
   prerequisiteTopicIds: number[]
 }
 
+/** Deeper lesson material shown under the card deck (authored in scripts/authored/deep/*.json). */
+export interface DeepLesson {
+  /** Concepts this material teaches, so quiz questions can point at it */
+  teaches: string[]
+  mechanism: { title: string; steps: string[] }
+  useWhen: string[]
+  avoidWhen: string[]
+  tradeoffs: { columns: string[]; rows: string[][] }
+  numbers: { title: string; assumptions: string[]; steps: string[]; result: string }
+  /** Indian-market example. `label` says how sure we are, e.g. "Publicly reported" or "Illustrative estimate". */
+  india: { title: string; body: string; label: string }
+  pitfalls: { trap: string; say: string }[]
+  /** Optional monospace diagram */
+  diagram?: string
+  takeaways: string[]
+}
+
 export interface Topic {
   id: number
   slug: string
@@ -197,6 +214,7 @@ export interface Topic {
   flashcards: Flashcard[]
   sources: SourceRef[]
   boss?: BossContent
+  deep?: DeepLesson
   bossStages?: BossStage[]
 }
 

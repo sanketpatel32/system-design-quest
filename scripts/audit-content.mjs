@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { checkQuiz } from './audit/quiz-quality.mjs'
+import { checkDepth, DEEP_REGIONS } from './audit/depth.mjs'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -139,6 +140,8 @@ for (const t of topics) {
 
 // 5–8 authored questions per topic, concept-aligned with the cards, no silly distractors
 const quiz = checkQuiz(topics)
+errors.push(...checkDepth(topics))
+console.log(`Depth rules enforced for: ${DEEP_REGIONS.join(', ') || 'none yet'}`)
 // While the quiz rewrite lands region by region, failures are reported but only enforced for authored topics
 errors.push(...quiz.errors)
 if (quiz.notes.length) console.log(`AUDIT NOTE: ${quiz.notes.length} quiz notes (two question types, or a long giveaway answer)${process.env.AUDIT_NOTES ? '' : '; set AUDIT_NOTES=1 to list'}`)

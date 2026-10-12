@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { allTopics, regions, topicsById } from '../content/catalog'
 import { LessonDeck } from '../components/LessonDeck'
+import { DeepLessonView } from '../components/DeepLessonView'
 import { regionPalette, transitLineColor } from '../lib/design/transitTheme'
 import { RegionArt } from '../components/art/RegionArt'
 import { Mascot } from '../components/art/Mascot'
@@ -73,6 +74,7 @@ export function TopicPage() {
           <RegionArt regionId={topic.region} width={170} className="hidden shrink-0 sm:block" />
         </header>
         <LessonDeck cards={topic.cards} accent={accent} finalAction={finalAction} />
+        {topic.deep && <DeepLessonView deep={topic.deep} accent={accent} />}
         <div className="flex flex-wrap gap-2">
           {topic.kind === 'boss' ? (
             <Link to={`/boss/${topic.slug}`} className="btn-quiet">

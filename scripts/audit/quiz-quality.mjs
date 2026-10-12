@@ -26,8 +26,11 @@ export function checkQuiz(topics) {
     if (types.size < 2) errors.push(`Topic ${t.id}: only one question type`)
     else if (types.size < 3) notes.push(`Topic ${t.id}: ${types.size} question types`)
 
-    const taught = new Set(t.cards.flatMap((c) => c.teaches ?? []))
-    for (const p of t.prereqIds ?? []) for (const c of byId.get(p)?.cards ?? []) for (const k of c.teaches ?? []) taught.add(k)
+    const taught = new Set([...t.cards.flatMap((c) => c.teaches ?? []), ...(t.deep?.teaches ?? [])])
+    for (const p of t.prereqIds ?? []) {
+      for (const c of byId.get(p)?.cards ?? []) for (const k of c.teaches ?? []) taught.add(k)
+      for (const k of byId.get(p)?.deep?.teaches ?? []) taught.add(k)
+    }
     for (const q of qs) {
       if (!q.concept) errors.push(`Topic ${t.id} ${q.id}: no concept tag`)
       else if (!taught.has(q.concept)) errors.push(`Topic ${t.id} ${q.id}: concept "${q.concept}" is not taught by any card in the topic or its prerequisites`)

@@ -1,0 +1,398 @@
+{
+ "1": {
+  "teaches": [
+   "clarify-first",
+   "phases",
+   "grading",
+   "time-budget"
+  ],
+  "mechanism": {
+   "title": "A 45-minute interview usually runs through five phases. Knowing the clock keeps you from spending 30 minutes on boxes and 0 on depth.",
+   "steps": [
+    "Clarify (about 5 min). Ask what the product does, who uses it, which features are in scope and which are out. Write the agreed functional requirements down where the interviewer can see them.",
+    "Non-functional requirements and scale (about 5 min). Ask for daily active users, read/write mix, latency targets, availability target and data retention. Turn these into rough QPS and storage numbers.",
+    "High-level design (about 10–15 min). Draw the request path end to end: client, load balancer, stateless services, cache, database, queue. Show one read and one write flowing through it.",
+    "Deep dive (about 10–15 min). Pick the hardest part (the hot key, the fan-out, the consistency rule) or let the interviewer pick, and go into data model, algorithms and failure handling.",
+    "Wrap-up (about 5 min). Name the bottlenecks, what breaks first at 10× scale, what you would monitor, and the trade-offs you made on purpose."
+   ]
+  },
+  "useWhen": [
+   "Any open-ended prompt like 'design WhatsApp' or 'design a URL shortener': the phases give you a script so you never freeze.",
+   "When the interviewer is quiet: narrating which phase you are in and why invites them to steer you.",
+   "When you are unsure of scale: asking for numbers is itself a signal of seniority."
+  ],
+  "avoidWhen": [
+   "Do not follow the script rigidly if the interviewer redirects you, for example 'skip the API, go straight to storage'. Follow them; they are telling you what they grade.",
+   "Do not spend the clarify phase asking about things that will not change the design, such as the logo, the programming language or the cloud vendor."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Approach",
+    "What the interviewer sees",
+    "Risk"
+   ],
+   "rows": [
+    [
+     "Breadth first, then one deep dive",
+     "A complete working system plus evidence you can go deep",
+     "Low: the recommended default"
+    ],
+    [
+     "Deep dive immediately",
+     "Strong knowledge of one component",
+     "High: no end-to-end design, scope never agreed"
+    ],
+    [
+     "Breadth only, no depth",
+     "A tidy diagram of boxes",
+     "Medium: reads as memorised, no judgement shown"
+    ],
+    [
+     "Requirements for 15+ minutes",
+     "Caution",
+     "High: runs out of time before any design"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Budget the 45 minutes before you start",
+   "assumptions": [
+    "45-minute slot",
+    "About 5 minutes lost to introductions and your questions at the end"
+   ],
+   "steps": [
+    "Usable design time ≈ 45 − 5 = 40 minutes.",
+    "Clarify + scale ≈ 10 minutes, which is 25% of 40.",
+    "High-level design ≈ 12 minutes, 30% of 40.",
+    "Deep dive ≈ 13 minutes, about 33% of 40, leaving ≈ 5 minutes to wrap up."
+   ],
+   "result": "Roughly a quarter on requirements and numbers, a third on design, a third on depth, and a few minutes to close. If you are still drawing the first box at minute 20, you are behind."
+  },
+  "india": {
+   "title": "Clarifying an 'IRCTC Tatkal' prompt",
+   "label": "Public facts, illustrative interview",
+   "body": "Suppose the prompt is 'design train ticket booking'. The clarifying questions that change the design are Indian-specific. Tatkal booking opens a day before the journey, at 10:00 for AC classes and 11:00 for non-AC classes, so traffic is a cliff, not a curve: almost all demand lands in the first few minutes. Asking 'do we need to support Tatkal?' moves the design from an ordinary web app to one built around a waiting room, per-train seat inventory with strong consistency, and payment timeouts that release held seats. Asking about the logo or the front-end framework changes nothing. Those two kinds of question are exactly what interviewers are separating."
+  },
+  "pitfalls": [
+   {
+    "trap": "Opening with 'we'll use Kafka, Kubernetes and microservices'.",
+    "say": "'Before picking components, can I confirm the core features and roughly how many users and requests we expect?'"
+   },
+   {
+    "trap": "Treating the interviewer as an examiner and going silent while thinking.",
+    "say": "Think aloud: 'I'm choosing between a cache-aside read path and precomputing results. Here's why I lean cache-aside...'"
+   },
+   {
+    "trap": "Claiming the design has no weaknesses.",
+    "say": "'The weakest point is the single primary database for writes. If writes grow 10×, I would shard by user ID.'"
+   }
+  ],
+  "diagram": "[Clarify] -> [Scale] -> [High-level design] -> [Deep dive] -> [Wrap-up]\n  ~5 min     ~5 min        ~12 min             ~13 min       ~5 min",
+  "takeaways": [
+   "Interviewers grade reasoning: scoping, numbers, a working design, depth, and honest trade-offs.",
+   "Spend roughly the first 10 minutes on requirements and scale, not 0 and not 20.",
+   "Ask questions whose answers change the design; skip the ones that don't.",
+   "Always close by naming bottlenecks and what you would do at 10× scale."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t1-d1",
+    "type": "multiple_choice",
+    "concept": "time-budget",
+    "prompt": "You are 20 minutes into a 45-minute design interview and still listing requirements. What is the best move?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Summarise the agreed requirements and move to a high-level design now"
+     },
+     {
+      "id": "b",
+      "label": "Keep asking until every edge case is covered"
+     },
+     {
+      "id": "c",
+      "label": "Skip design and jump to a deep dive on the database"
+     },
+     {
+      "id": "d",
+      "label": "Ask the interviewer to extend the slot"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Requirements and scale should take roughly the first 10 minutes. At minute 20 you need a working design on the board, so summarise and move on."
+   }
+  ]
+ },
+ "2": {
+  "teaches": [
+   "qps",
+   "peak",
+   "storage",
+   "rounding",
+   "bandwidth"
+  ],
+  "mechanism": {
+   "title": "Every estimate is a chain of multiplications. Write the chain down, round each factor, then multiply.",
+   "steps": [
+    "Start from users: daily active users (DAU), and how many times each one does the action per day.",
+    "Average QPS = DAU × actions per user per day ÷ 86,400 seconds. Round 86,400 to 10^5: it makes mental maths easy and errs slightly low, so note that.",
+    "Peak QPS = average × peak factor. A typical daily curve gives 2–3×; event-driven traffic (a sale opening, a match final, Tatkal) can be 10× or more.",
+    "Storage per year = new objects per day × average size × 365 (× replication factor, usually 3).",
+    "Bandwidth = QPS × bytes per request. Do it separately for ingress (writes) and egress (reads); egress is usually far larger.",
+    "Sanity-check the answer against something you know, for example one well-tuned server handling a few thousand simple requests per second."
+   ]
+  },
+  "useWhen": [
+   "To decide whether you need sharding, caching or a CDN at all: one machine is often enough below a few thousand QPS.",
+   "To size storage tiers: hot data in memory, warm on SSD, cold in object storage.",
+   "To justify a design choice out loud: '50,000 peak QPS is too much for one Postgres primary for writes, so...'"
+  ],
+  "avoidWhen": [
+   "Do not chase precision: 3.7 TB versus 4 TB never changes the design. Keep one significant figure.",
+   "Do not estimate things that do not drive a decision, such as the size of an error log line in a payments design."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Shortcut",
+    "Exact value",
+    "Error",
+    "Why it's fine"
+   ],
+   "rows": [
+    [
+     "1 day ≈ 10^5 s",
+     "86,400 s",
+     "+16%",
+     "Order of magnitude is unchanged; QPS comes out ~14% low, so lean on the peak factor"
+    ],
+    [
+     "1 year ≈ 400 days",
+     "365 days",
+     "+10%",
+     "Rounds storage up, a safe direction"
+    ],
+    [
+     "1 KB ≈ 10^3 B",
+     "1,024 B",
+     "+2.4%",
+     "Negligible"
+    ],
+    [
+     "Peak ≈ 2–3× average",
+     "Depends on the curve",
+     "Can be 10×+",
+     "Ask; events like a sale or a final dominate"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "A chat app: QPS, storage and bandwidth",
+   "assumptions": [
+    "50 million DAU",
+    "40 messages sent per user per day",
+    "100 bytes per message body, 200 bytes with metadata",
+    "Messages kept for 1 year, stored 3× for replication",
+    "Peak factor 3×"
+   ],
+   "steps": [
+    "Messages per day = 50,000,000 × 40 = 2,000,000,000 (2 × 10^9).",
+    "Average write QPS = 2 × 10^9 ÷ 86,400 ≈ 23,000 per second (with the 10^5 shortcut: 20,000).",
+    "Peak write QPS ≈ 23,000 × 3 ≈ 70,000 per second.",
+    "Storage per day = 2 × 10^9 × 200 B = 400 GB. Per year = 400 GB × 365 ≈ 146 TB, ×3 replicas ≈ 440 TB.",
+    "Ingress at peak = 70,000 × 200 B = 14 MB/s ≈ 112 Mbit/s: small. The heavy part is delivering each message to recipients, plus media, which is stored separately."
+   ],
+   "result": "About 23K average and 70K peak writes per second, and roughly 150 TB a year of raw messages (about 440 TB with 3× replication). Writes at that rate need a sharded store, but message bandwidth is not the bottleneck."
+  },
+  "india": {
+   "title": "Why UPI peaks matter more than averages",
+   "label": "Publicly reported (NPCI), rounded",
+   "body": "NPCI publishes UPI volumes every month. In 2025 UPI crossed roughly 20 billion transactions a month. Spread evenly, 20 × 10^9 ÷ (30 × 86,400 s) ≈ 7,700 transactions per second. But payments are not spread evenly: they cluster around meal times, evenings, salary days and festival sales, so a system sized for 7,700 TPS would fail at the moments that matter most. A design discussion should size for a peak several times the average (for example 3–5×, so roughly 25,000–40,000 TPS) and say clearly that the multiplier is an assumption to confirm. The method is the point: average from the public monthly figure, then an explicit, labelled peak factor."
+  },
+  "pitfalls": [
+   {
+    "trap": "Giving the average QPS as the design target.",
+    "say": "'Average is about 23K; with a 3× daily peak I'd design for about 70K, and more if there are event spikes.'"
+   },
+   {
+    "trap": "Forgetting replication and indexes when sizing storage.",
+    "say": "'Raw data is about 150 TB a year; with 3× replication and indexes I'd budget roughly half a petabyte.'"
+   },
+   {
+    "trap": "Doing silent arithmetic and announcing a number.",
+    "say": "Write the chain on the board: 50M × 40 ÷ 10^5 = 20K. The interviewer can follow and correct an assumption instead of your maths."
+   }
+  ],
+  "diagram": "DAU 50M  x 40 msgs/day  = 2e9/day\n2e9 / 86,400 s          ~ 23K/s avg\n23K x 3 (peak)          ~ 70K/s\n2e9 x 200 B             = 400 GB/day -> ~146 TB/yr (x3 = ~440 TB)",
+  "takeaways": [
+   "Average QPS = DAU × actions ÷ 86,400; treat 86,400 as 10^5 for speed.",
+   "Design for the peak, not the average: 2–3× for daily curves, 10×+ for events.",
+   "Storage = objects per day × size × retention × replication.",
+   "Keep one significant figure and say your assumptions out loud."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t2-d1",
+    "type": "multiple_choice",
+    "concept": "storage",
+    "prompt": "50M users each send 40 messages a day at 200 bytes each. About how much raw message data is written per day?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "About 400 GB"
+     },
+     {
+      "id": "b",
+      "label": "About 40 GB"
+     },
+     {
+      "id": "c",
+      "label": "About 4 TB"
+     },
+     {
+      "id": "d",
+      "label": "About 4 GB"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "50M × 40 = 2 × 10^9 messages a day. 2 × 10^9 × 200 B = 4 × 10^11 B = 400 GB per day."
+   }
+  ]
+ },
+ "3": {
+  "teaches": [
+   "vertical",
+   "stateless",
+   "availability",
+   "lb",
+   "scale-limits"
+  ],
+  "mechanism": {
+   "title": "Going from one server to many, step by step",
+   "steps": [
+    "Start with one server running the app and the database. It is simple, and the whole site goes down if that server does.",
+    "Scale vertically: move to a bigger machine with more CPU, RAM and faster disks. No code changes, but there is a hardware ceiling, cost grows faster than capacity at the top end, and it is still a single point of failure.",
+    "Split the database onto its own machine so the app tier and the data tier can scale independently.",
+    "Make the app tier stateless: move sessions, uploads and caches out of local memory and disk into shared stores (Redis, object storage, the database).",
+    "Put a load balancer in front and run N identical app servers. The load balancer health-checks them and stops sending traffic to failed ones.",
+    "Scale the data tier last and most carefully: read replicas for reads, then sharding for writes."
+   ]
+  },
+  "useWhen": [
+   "Vertical: early on, or for a stateful component that is hard to split (a primary database). A larger instance buys time cheaply.",
+   "Horizontal: when you need fault tolerance (no single point of failure), when load exceeds the biggest affordable machine, or when traffic is spiky and you want to add and remove capacity automatically."
+  ],
+  "avoidWhen": [
+   "Do not scale out a stateful app server: if sessions live in memory, users get logged out whenever the load balancer sends them to another box.",
+   "Do not shard the database before you need to: replicas, caching and a bigger primary usually come first because sharding makes joins, transactions and resharding hard."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "",
+    "Vertical (scale up)",
+    "Horizontal (scale out)"
+   ],
+   "rows": [
+    [
+     "Effort",
+     "Change the instance size",
+     "Stateless design, load balancer, automation"
+    ],
+    [
+     "Ceiling",
+     "Largest available machine",
+     "Effectively much higher; add nodes"
+    ],
+    [
+     "Failure",
+     "Single point of failure",
+     "Survives losing a node"
+    ],
+    [
+     "Cost curve",
+     "Top-end machines cost more per unit of capacity",
+     "Roughly linear with commodity nodes"
+    ],
+    [
+     "Downtime to grow",
+     "Often a restart",
+     "Add nodes live"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "How many app servers for a peak?",
+   "assumptions": [
+    "Peak 60,000 requests per second",
+    "One app server handles about 2,000 requests per second at a safe 60–70% CPU (measure this in a load test)",
+    "Each server is 99.9% available on its own"
+   ],
+   "steps": [
+    "Servers needed for load = 60,000 ÷ 2,000 = 30.",
+    "Add headroom to survive losing one availability zone of three: 30 ÷ (2/3) = 45 servers.",
+    "Availability of one server = 99.9%: about 8.8 hours of downtime a year (0.001 × 8,760 h).",
+    "With two independent servers behind a load balancer, both are down at once with probability 0.001² = 10^-6, so the app tier is about 99.9999% available, ignoring the load balancer and correlated failures."
+   ],
+   "result": "About 30 servers for raw load and about 45 to stay up through a zone failure. Redundancy, not size, is what moves availability from 'three nines' towards 'six nines'; correlated failures and shared dependencies stop you getting the full benefit."
+  },
+  "india": {
+   "title": "Flipkart Big Billion Days: why scale-out wins",
+   "label": "Illustrative estimate; public event facts",
+   "body": "Flipkart's Big Billion Days sale opens at a fixed time, often with early access for some members, so traffic jumps within minutes rather than ramping over hours. A single huge server cannot absorb that kind of jump, and it would be a single point of failure at the worst moment. The workable pattern is a stateless storefront and API tier behind load balancers, scaled out ahead of the announced start time (pre-warming, because autoscaling reacts in minutes), with sessions and carts in shared stores so any server can take any user. If, purely as an illustration, peak browse traffic were 20× a normal evening, a tier that normally runs 50 servers would need around 1,000 at the same per-server load. That is only practical when every server is identical and disposable."
+  },
+  "pitfalls": [
+   {
+    "trap": "'Just add more servers' while sessions live in server memory.",
+    "say": "'First I'd make the service stateless by moving sessions to Redis, then scale out behind a load balancer.'"
+   },
+   {
+    "trap": "Assuming horizontal scaling also scales the database.",
+    "say": "'The app tier scales out easily. The primary database becomes the bottleneck next, so I'd add read replicas and caching, and shard writes only if needed.'"
+   },
+   {
+    "trap": "Multiplying nines as if failures were independent when everything shares one zone or one database.",
+    "say": "'Redundancy helps only for independent failures, so I'd spread nodes across zones and avoid a shared single point of failure.'"
+   }
+  ],
+  "diagram": "           +-> [app 1] -+\n[clients] -> [LB] -> [app 2] -+-> [Redis sessions]\n           +-> [app N] -+-> [DB primary] -> [read replicas]",
+  "takeaways": [
+   "Vertical scaling is quick but has a ceiling and stays a single point of failure.",
+   "Horizontal scaling needs stateless services and a load balancer with health checks.",
+   "Size servers from measured per-node throughput plus headroom for losing a zone.",
+   "Scale the app tier first; the database is the hard part and comes last."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t3-d1",
+    "type": "multiple_choice",
+    "concept": "lb",
+    "prompt": "Peak load is 60,000 requests/s and one server safely handles 2,000/s. You run in 3 zones and must survive losing one. How many servers?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "About 45"
+     },
+     {
+      "id": "b",
+      "label": "About 30"
+     },
+     {
+      "id": "c",
+      "label": "About 90"
+     },
+     {
+      "id": "d",
+      "label": "About 20"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "60,000 ÷ 2,000 = 30 for load. To survive losing one of three zones, the remaining two-thirds must carry it: 30 ÷ (2/3) = 45."
+   }
+  ]
+ }
+}
