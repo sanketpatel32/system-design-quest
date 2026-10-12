@@ -205,8 +205,9 @@ function BossPip({ status }: { status: Status }) {
 
 function UnitBanner({ regionId, index, done, total, title, subtitle }: { regionId: string; index: number | null; done: number; total: number; title: string; subtitle: string }) {
   const p = regionPalette(regionId)
+  const gold = regionId === 'boss-arena'
   return (
-    <div className="unit-banner flex items-center gap-3 p-5 pr-2 min-h-[120px]" style={{ background: p.deep, ['--banner-shadow' as string]: p.shadow }}>
+    <div className={`unit-banner flex items-center gap-3 p-5 pr-2 min-h-[120px] ${gold ? 'banner-gold' : ''}`} style={{ background: gold ? p.bright : p.deep, ['--banner-shadow' as string]: p.shadow }}>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-extrabold uppercase tracking-wider text-white/90">{index === null ? 'Final unit' : `Unit ${index + 1}`}</p>
         <h2 className="font-display text-2xl leading-tight text-white">{subtitle}</h2>
@@ -309,7 +310,7 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
         data-status={status}
         aria-label={`${boss ? 'Boss' : `Station ${n}`}: ${topic.title}, ${STATUS_WORD[status]}`}
         aria-expanded={open}
-        className="station path-node"
+        className={`station path-node ${boss ? 'path-node-boss' : ''}`}
         style={{ background: fill, boxShadow: `0 7px 0 ${shadow}${current ? `, 0 0 0 8px ${p.soft}` : ''}` }}
         onClick={() => setOpen(true)}
       >
