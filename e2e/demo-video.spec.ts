@@ -23,7 +23,7 @@ test('record product demo', async ({ page }) => {
   await page.waitForTimeout(3000)
   await page.goto('/cheat-sheet')
   await page.waitForTimeout(3000)
-  await page.getByRole('link', { name: 'Mock' }).click()
+  await page.getByRole('link', { name: 'Interview' }).click()
   await page.getByRole('button', { name: 'Start mock' }).click()
   await page.waitForTimeout(6000)
   await page.goto('/')
