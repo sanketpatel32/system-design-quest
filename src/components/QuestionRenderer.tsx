@@ -156,6 +156,8 @@ function OrderList({
   onChange: (next: string[]) => void
 }) {
   const label = (id: string) => items.find((i) => i.id === id)?.label ?? id
+  const [dragFrom, setDragFrom] = useState<number | null>(null)
+  const [dragOver, setDragOver] = useState<number | null>(null)
   const move = (from: number, to: number) => {
     if (to < 0 || to >= order.length) return
     const next = [...order]
@@ -164,9 +166,39 @@ function OrderList({
     onChange(next)
   }
   return (
-    <ol className="space-y-1.5" aria-label="Order the steps">
+    <ol className="space-y-1.5" aria-label="Order the steps. Drag a card, or use the up and down buttons.">
       {order.map((id, idx) => (
-        <li key={id} className="order-row">
+        <li
+          key={id}
+          className={`order-row ${disabled ? '' : 'cursor-grab'} ${dragOver === idx && dragFrom !== idx ? 'order-row-over' : ''} ${dragFrom === idx ? 'opacity-50' : ''}`}
+          draggable={!disabled}
+          onDragStart={(e) => {
+            setDragFrom(idx)
+            e.dataTransfer.effectAllowed = 'move'
+          }}
+          onDragOver={(e) => {
+            if (dragFrom === null) return
+            e.preventDefault()
+            setDragOver(idx)
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            if (dragFrom !== null) move(dragFrom, idx)
+            setDragFrom(null)
+            setDragOver(null)
+          }}
+          onDragEnd={() => {
+            setDragFrom(null)
+            setDragOver(null)
+          }}
+        >
+          {!disabled && (
+            <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden className="shrink-0 text-dim">
+              {[3, 8, 13].map((y) => (
+                <g key={y} fill="currentColor"><circle cx="2.5" cy={y} r="1.3" /><circle cx="7.5" cy={y} r="1.3" /></g>
+              ))}
+            </svg>
+          )}
           <span className="order-num tabular-nums" aria-hidden>{idx + 1}</span>
           <span className="flex-1 text-sm text-chalk">{label(id)}</span>
           <span className="flex gap-1">
