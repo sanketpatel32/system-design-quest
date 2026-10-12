@@ -1,6 +1,6 @@
 export function IconHeart({ filled }: { filled: boolean }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden className={filled ? 'text-rose-400' : 'text-slate-600'}>
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden className={filled ? 'text-[var(--color-fault)]' : 'text-[#3A5470]'}>
       <path
         d="M12 21s-7-4.5-9-8.5C1.5 9.5 3.5 6 7 6c2 0 3.2 1.2 5 3.2C13.8 7.2 15 6 17 6c3.5 0 5.5 3.5 4 6.5-2 4-9 8.5-9 8.5z"
         fill={filled ? 'currentColor' : 'none'}
