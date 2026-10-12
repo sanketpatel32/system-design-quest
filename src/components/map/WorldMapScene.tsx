@@ -298,7 +298,7 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
   const labelSide = offset > 0 ? 'right-[calc(100%+14px)] text-right' : 'left-[calc(100%+14px)] text-left'
 
   return (
-    <li ref={ref} className="relative" style={{ transform: `translateX(${offset}px)` }}>
+    <li ref={ref} className={`relative ${current ? 'mt-7' : ''}`} style={{ transform: `translateX(${offset}px)` }}>
       {current && !open && (
         <span className="pointer-events-none absolute bottom-[calc(100%+14px)] left-1/2 -translate-x-1/2" aria-hidden>
           <span className="bubble-bob block">
