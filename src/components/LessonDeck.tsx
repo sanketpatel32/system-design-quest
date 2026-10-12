@@ -84,7 +84,7 @@ export function LessonDeck({
         {hasRealTitle(card) && <h3 className="font-display text-2xl sm:text-3xl text-chalk mb-3">{card.title}</h3>}
         <p className="text-chalk leading-relaxed text-[1.125rem] font-semibold">{card.body}</p>
         {card.steps && card.steps.length > 0 && (
-          <ol className="flow mt-5" aria-label="Request flow">
+          <ol className="flow mt-5" aria-label="Steps">
             {card.steps.map((step, i) => (
               <li key={step} className="flow-step">
                 <span className="flow-dot tabular-nums" style={{ borderColor: accent }} aria-hidden>{i + 1}</span>

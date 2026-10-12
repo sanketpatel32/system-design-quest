@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { checkQuiz } from './audit/quiz-quality.mjs'
+import { checkR3 } from './audit/r3.mjs'
 import { checkDepth, checkBossDepth, DEEP_REGIONS } from './audit/depth.mjs'
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -185,11 +186,6 @@ if (warnings.length && !strict) {
   if (warnings.length > 8) console.warn(` - … and ${warnings.length - 8} more`)
 }
 
-if (errors.length) {
-  console.error('AUDIT FAILED')
-  errors.forEach((e) => console.error(' -', e))
-  process.exit(1)
-}
 // Templated boss questions must not return (review C1/M2)
 {
   const seen = new Map()
@@ -218,4 +214,16 @@ if (errors.length) {
 }
 // Dead or off-topic sources must not return (review M5)
 for (const t of topics) for (const s of t.sources ?? []) if (/designing-distributed-systems|datastax\.com\/blog/.test(s.url)) errors.push(`Topic ${t.id}: dead source ${s.url}`)
+// Re-review rules (one framework, specific headings, no intro repeats, numeric 'Why', hedged claims, interactives)
+{
+  const r3 = checkR3(topics, root)
+  errors.push(...r3.errors)
+  r3.info.forEach((m) => console.log(m))
+}
+// All checks above push into `errors`; fail only after every check has run
+if (errors.length) {
+  console.error('AUDIT FAILED')
+  errors.forEach((e) => console.error(' -', e))
+  process.exit(1)
+}
 console.log('AUDIT OK: 120 topics, 40 bosses, counts and keys valid')
