@@ -50,10 +50,13 @@ export function QuizPage() {
 
   return (
     <div className="space-y-4 max-w-2xl">
-      <div className="flex justify-between items-start gap-4 border-b border-[var(--color-line)] pb-3">
+      <div className="flex justify-between items-start gap-4 border-b border-[var(--color-rail)] pb-4">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--color-muted)]">Quiz</p>
-          <h1 className="font-display text-2xl font-bold" style={{ color: accent }}>{topic.title}</h1>
+          <p className="text-sm font-semibold" style={{ color: accent }}>Quiz · topic {topic.id}</p>
+          <h1 className="font-display text-3xl font-extrabold text-chalk mt-1 leading-tight">{topic.title}</h1>
+          <p className="text-sm text-dim mt-1">
+            {answered.length} of {topic.questions.length} answered · clear 70% with at least one heart left
+          </p>
         </div>
         <HeartsHud hearts={attempt.hearts} />
       </div>
@@ -69,9 +72,11 @@ export function QuizPage() {
         </div>
       )}
       <div className="space-y-5">
-        {topic.questions.map((q) => (
+        {topic.questions.map((q, i) => (
           <QuestionRenderer
             key={q.id}
+            number={i + 1}
+            total={topic.questions.length}
             question={q}
             locked={q.id in attempt.results}
             hotkeys={!heartsOut && q.id === activeId}
@@ -85,8 +90,8 @@ export function QuizPage() {
           Claim progress
         </button>
       )}
-      <p className="text-[10px] text-[var(--color-muted)] uppercase tracking-wider">
-        {answered.length}/{topic.questions.length} answered · need ≥70% · keys 1–4 on MCQ
+      <p className="text-xs text-dim">
+        Shortcuts: <kbd className="kbd">1</kbd>–<kbd className="kbd">4</kbd> pick an option, <kbd className="kbd">Enter</kbd> submits the current question.
       </p>
     </div>
   )
