@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { LessonCard } from '../content/types'
 
 /** Some imported cards carry their kind ('text', 'diagram') as a placeholder title; don't render those. */
@@ -7,7 +8,16 @@ function hasRealTitle(card: LessonCard) {
   return t.length > 0 && t !== card.kind && t !== 'text' && t !== 'diagram' && t !== 'animation'
 }
 
-export function LessonDeck({ cards, accent = 'var(--color-amber)' }: { cards: LessonCard[]; accent?: string }) {
+export function LessonDeck({
+  cards,
+  accent = 'var(--color-amber)',
+  finalAction,
+}: {
+  cards: LessonCard[]
+  accent?: string
+  /** Rendered instead of the Next button on the last card */
+  finalAction?: ReactNode
+}) {
   const [index, setIndex] = useState(0)
   const card = cards[index]
 
@@ -67,9 +77,13 @@ export function LessonDeck({ cards, accent = 'var(--color-amber)' }: { cards: Le
           <button type="button" onClick={prev} disabled={index === 0} className="btn-quiet disabled:opacity-30">
             Prev
           </button>
-          <button type="button" onClick={next} disabled={index === cards.length - 1} className="btn-cta disabled:opacity-30">
-            Next card
-          </button>
+          {index === cards.length - 1 && finalAction ? (
+            finalAction
+          ) : (
+            <button type="button" onClick={next} disabled={index === cards.length - 1} className="btn-cta disabled:opacity-30">
+              Next card
+            </button>
+          )}
         </div>
         <p className="text-xs text-dim mt-3">Tip: use the arrow keys to move between cards.</p>
       </div>
