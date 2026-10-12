@@ -131,7 +131,7 @@ export function WorldMapScene() {
           />
         </label>
         {view === 'path' ? (
-          <div className="space-y-10">
+          <div className="space-y-10 overflow-x-clip pb-4">
             {learningRegions.map((r, i) => (
               <Unit key={r.id} index={i} regionId={r.id} statusMap={statusMap} completed={completed} nextId={nextId} />
             ))}
@@ -318,17 +318,17 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
       >
         {icon}
       </button>
-      <span className={`pointer-events-none absolute top-1/2 w-[132px] -translate-y-1/2 text-[13px] font-extrabold leading-tight ${labelSide} ${locked ? 'text-dim' : 'text-chalk'}`}>
+      <span className={`pointer-events-none absolute top-1/2 w-[112px] sm:w-[132px] -translate-y-1/2 text-[13px] font-extrabold leading-tight ${labelSide} ${locked ? 'text-dim' : 'text-chalk'}`}>
         {topic.title}
       </span>
       {open && (
         <div
-          className="anim-pop absolute left-1/2 top-[calc(100%+16px)] z-30 w-[min(290px,86vw)] -translate-x-1/2 rounded-2xl p-4 text-white"
-          style={{ background: locked ? '#5B6472' : boss ? '#8A5A00' : p.deep, boxShadow: `0 5px 0 ${locked ? '#3f4652' : boss ? '#5c3c00' : p.shadow}` }}
+          className="anim-pop absolute top-[calc(100%+16px)] z-30 w-[min(290px,86vw)] -translate-x-1/2 rounded-2xl p-4 text-white"
+          style={{ left: `calc(50% - ${offset}px)`, background: locked ? '#5B6472' : boss ? '#8A5A00' : p.deep, boxShadow: `0 5px 0 ${locked ? '#3f4652' : boss ? '#5c3c00' : p.shadow}` }}
           role="dialog"
           aria-label={topic.title}
         >
-          <span aria-hidden className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45" style={{ background: locked ? '#5B6472' : boss ? '#8A5A00' : p.deep }} />
+          <span aria-hidden className="absolute -top-2 h-4 w-4 -translate-x-1/2 rotate-45" style={{ left: `calc(50% + ${offset}px)`, background: locked ? '#5B6472' : boss ? '#8A5A00' : p.deep }} />
           <p className="font-display text-lg leading-snug">{topic.title}</p>
           <p className="text-sm font-bold text-white">
             {boss ? 'Boss fight' : `Station ${n}`} · {STATUS_WORD[status]} · about {topicMinutes(topic.id)} min

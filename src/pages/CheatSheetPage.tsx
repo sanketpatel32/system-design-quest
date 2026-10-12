@@ -25,8 +25,8 @@ const SOURCES: [string, string][] = [
 
 function Sheet({ title, children, className = '' }: { title: string; children: ReactNode; className?: string }) {
   return (
-    <section className={`panel p-5 ${className}`} aria-labelledby={`cs-${title}`}>
-      <h2 id={`cs-${title}`} className="font-display text-lg font-bold text-chalk mb-3">{title}</h2>
+    <section className={`panel min-w-0 p-5 ${className}`} aria-labelledby={`cs-${title}`}>
+      <h2 id={`cs-${title}`} className="font-display text-xl text-chalk mb-3">{title}</h2>
       {children}
     </section>
   )
@@ -34,9 +34,9 @@ function Sheet({ title, children, className = '' }: { title: string; children: R
 
 function Row({ k, v, approx }: { k: ReactNode; v: ReactNode; approx?: boolean }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-[var(--color-rail)] py-2 last:border-0 text-sm">
-      <dt className="text-dim">{k}</dt>
-      <dd className={`tabular-nums text-right ${approx ? 'text-[#8350C7] font-extrabold' : 'text-chalk font-semibold'}`}>{v}</dd>
+    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b-2 border-[#F1EDE6] py-2 last:border-0 text-[15px]">
+      <dt className="min-w-0 text-dim font-bold">{k}</dt>
+      <dd className={`ml-auto tabular-nums text-right ${approx ? 'text-[#8350C7] font-extrabold' : 'text-chalk font-semibold'}`}>{v}</dd>
     </div>
   )
 }
@@ -97,8 +97,8 @@ export function CheatSheetPage() {
         </Sheet>
 
         <Sheet title="Pattern → use case" className="md:col-span-2">
-          <table className="w-full text-sm text-left">
-            <thead>
+          <table className="block w-full text-[15px] text-left md:table">
+            <thead className="hidden md:table-header-group">
               <tr className="text-dim border-b border-[var(--color-rail)]">
                 <th scope="col" className="py-2 pr-4 font-normal">Pattern</th>
                 <th scope="col" className="py-2 pr-4 font-normal">Reach for it when</th>
@@ -106,15 +106,15 @@ export function CheatSheetPage() {
                 <th scope="col" className="py-2 font-normal">Lesson</th>
               </tr>
             </thead>
-            <tbody className="text-chalk align-top">
+            <tbody className="block text-chalk align-top md:table-row-group">
               {PATTERNS.map(([p, u, w, id]) => {
                 const topic = topicsById.get(id)
                 return (
-                  <tr key={p} className="border-b border-[var(--color-rail)] last:border-0">
-                    <th scope="row" className="py-2 pr-4 font-display font-semibold">{p}</th>
-                    <td className="py-2 pr-4 text-chalk">{u}</td>
-                    <td className="py-2 pr-4 text-dim">{w}</td>
-                    <td className="py-2">
+                  <tr key={p} className="block border-b-2 border-[#F1EDE6] py-2 last:border-0 md:table-row md:py-0">
+                    <th scope="row" className="block py-0.5 pr-4 font-display md:table-cell md:py-2">{p}</th>
+                    <td className="block py-0.5 pr-4 font-bold text-chalk md:table-cell md:py-2">{u}</td>
+                    <td className="block py-0.5 pr-4 text-dim md:table-cell md:py-2">{w}</td>
+                    <td className="block py-0.5 md:table-cell md:py-2">
                       {topic && (
                         <Link className="font-bold text-[#12749f] underline-offset-2 hover:underline" to={`/topic/${topic.slug}`}>
                           {topic.title}
@@ -132,7 +132,7 @@ export function CheatSheetPage() {
           <ul className="text-sm space-y-1.5">
             {SOURCES.map(([title, url]) => (
               <li key={url}>
-                <a className="text-chalk underline underline-offset-2 hover:text-[var(--color-amber)]" href={url} target="_blank" rel="noreferrer">{title}</a>
+                <a className="text-chalk underline underline-offset-2 hover:text-[#12749f] font-bold" href={url} target="_blank" rel="noreferrer">{title}</a>
               </li>
             ))}
           </ul>
