@@ -337,7 +337,7 @@ export function WorldMapScene() {
           <p className="text-sm text-dim mt-1">
             {arenaOpen ? 'Bosses unlock one after another. Start with the playbook.' : 'Clear the Launchpad line to open the arena.'}
           </p>
-          <ol className="mt-3 max-h-[320px] overflow-y-auto pr-1 space-y-0.5 boss-list">
+          <ol className="relative mt-3 max-h-[320px] overflow-y-auto pr-1 space-y-0.5">
             {arenaTopics.map((t) => {
               const bst = topicStatus(t, unlocked, completed, false)
               const open = bst !== 'locked'
