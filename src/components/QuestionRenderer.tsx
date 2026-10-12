@@ -484,7 +484,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
       )}
       {!submitted && sheet && (
         <div className="quizbar">
-          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-4">
             <span className="text-sm font-bold text-dim">{pending ?? 'Ready when you are.'}</span>
             <button type="button" onClick={submit} className="btn-cta min-w-[160px]" disabled={pending !== null}>
               Submit
@@ -511,7 +511,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
         <>
           <div aria-hidden className="h-72" />
           <div className={`sheet ${shown.correct ? 'sheet-ok' : 'sheet-miss'}`} role="status" data-testid="feedback-sheet">
-            <div className="mx-auto flex max-w-4xl flex-col gap-4 px-4 py-5 sm:flex-row sm:items-end">
+            <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-5 sm:flex-row sm:items-end">
               <div className="flex min-w-0 flex-1 gap-3">
                 <Mascot mood={shown.correct ? 'happy' : 'sad'} size={76} className={`shrink-0 ${shown.correct ? 'anim-pop' : 'anim-wiggle'}`} />
                 <div className="min-w-0">

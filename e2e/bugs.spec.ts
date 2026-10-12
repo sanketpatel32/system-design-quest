@@ -121,3 +121,25 @@ test('interview: brief stays visible, canvas reachable, no badge for an empty fi
   const badges = await page.evaluate(() => JSON.parse(localStorage.getItem('sdq-progress-v3') || '{}').badges ?? [])
   expect(badges).toEqual([])
 })
+
+test('visual: on a 2560px screen the Submit bar is centred on the question column', async ({ page }) => {
+  await page.setViewportSize({ width: 2560, height: 1400 })
+  await seed(page)
+  await page.goto(QUIZ)
+  const col = await page.getByText(/Question 1 of 6/).boundingBox()
+  const bar = await page.locator('.quizbar > div').boundingBox()
+  const prompt = await page.locator('main .max-w-3xl').first().boundingBox()
+  expect(col && bar && prompt).toBeTruthy()
+  expect(Math.abs(bar!.x + bar!.width / 2 - (prompt!.x + prompt!.width / 2))).toBeLessThan(24)
+  // UI scales up on very wide screens
+  expect(await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))).toBeGreaterThan(16)
+})
+
+test('visual: phone lesson has no sideways scrolling and powers render as superscripts', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/topic/back-of-envelope-estimation?unlockAll=1')
+  await page.evaluate(() => document.querySelectorAll('details').forEach((d) => ((d as HTMLDetailsElement).open = true)))
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  await expect(page.getByText(/10⁵/).first()).toBeAttached()
+  await expect(page.getByText(/10\^5/)).toHaveCount(0)
+})
