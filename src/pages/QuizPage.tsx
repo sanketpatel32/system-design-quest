@@ -38,6 +38,7 @@ export function QuizPage() {
   const answered = Object.keys(attempt.results)
   const allDone = topic.questions.every((q) => q.id in attempt.results)
   const heartsOut = attempt.hearts <= 0
+  const activeId = topic.questions.find((q) => !(q.id in attempt.results))?.id
 
   const tryFinish = () => {
     const res = finishQuizIfReady(topic.id)
@@ -73,6 +74,7 @@ export function QuizPage() {
             key={q.id}
             question={q}
             locked={q.id in attempt.results}
+            hotkeys={!heartsOut && q.id === activeId}
             initialAnswer={attempt.answers[q.id]}
             onSubmit={(answer) => recordQuizAnswer(topic.id, q, answer)}
           />

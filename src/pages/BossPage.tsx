@@ -29,6 +29,8 @@ export function BossPage() {
     [canvas],
   )
 
+  const activeId = topic?.bossStages?.flatMap((st) => (st.kind === 'architecture' ? [] : st.questions)).find((q) => !(q.id in stageResults))?.id
+
   if (!topic || !topic.boss || !topic.bossStages) {
     return <p>Boss not found</p>
   }
@@ -75,6 +77,7 @@ export function BossPage() {
                 key={q.id}
                 question={q}
                 locked={q.id in stageResults}
+                hotkeys={q.id === activeId}
                 onSubmit={(_answer, result) => onAnswer(q.id, result.correct)}
               />
             ))
