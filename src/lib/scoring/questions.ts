@@ -28,8 +28,8 @@ export function gradeMultipleChoice(
   return {
     correct,
     feedback: correct
-      ? 'Correct — that matches how senior engineers frame this in interviews.'
-      : 'Not quite — revisit the trade-off in the explanation, then try the review deck.',
+      ? 'Correct.'
+      : `Not quite. The answer is “${q.choices.filter((c) => q.correctChoiceIds.includes(c.id)).map((c) => c.label).join('” and “')}”.`,
   }
 }
 
@@ -44,7 +44,7 @@ export function gradeSpotBottleneck(
     correct,
     feedback: correct
       ? 'Right node — that is where latency or saturation shows up first.'
-      : 'That component is not the primary bottleneck for this flow.',
+      : `That one scales more easily. The first to saturate is “${q.diagramNodes.filter((n) => q.correctNodeIds.includes(n.id)).map((n) => n.label).join(', ')}”.`,
   }
 }
 
@@ -55,8 +55,8 @@ export function gradeDragOrder(q: DragOrderQuestion, order: string[]): GradeResu
   return {
     correct,
     feedback: correct
-      ? 'Order matches the real request path.'
-      : 'One or more steps are out of order for this scenario.',
+      ? 'Right order.'
+      : `${order.filter((id, i) => id !== q.correctOrder[i]).length} of ${q.correctOrder.length} steps are out of place. The correct sequence is shown below.`,
   }
 }
 
