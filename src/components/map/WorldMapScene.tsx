@@ -7,6 +7,7 @@ import { getUnlockHint, topicStatus } from '../../lib/progression/unlocks'
 import { useGameStore } from '../../stores/gameStore'
 
 const learningRegions = regions.filter((r) => r.id !== 'boss-arena')
+const arenaTopics = orderedTopicsInRegion('boss-arena')
 const W = 1000
 const TOP = 120
 const GAP = 104
@@ -326,7 +327,63 @@ export function WorldMapScene() {
             )}
           </div>
         </div>
+        <section className="panel p-4" aria-labelledby="arena-title">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 id="arena-title" className="font-display text-lg font-bold text-chalk">Architecture Colosseum</h2>
+            <span className="text-xs text-dim tabular-nums">
+              {arenaTopics.filter((t) => completed.has(t.id)).length} / {arenaTopics.length}
+            </span>
+          </div>
+          <p className="text-sm text-dim mt-1">
+            {arenaOpen ? 'Bosses unlock one after another. Start with the playbook.' : 'Clear the Launchpad line to open the arena.'}
+          </p>
+          <ol className="mt-3 max-h-[320px] overflow-y-auto pr-1 space-y-0.5 boss-list">
+            {arenaTopics.map((t) => {
+              const bst = topicStatus(t, unlocked, completed, false)
+              const open = bst !== 'locked'
+              return (
+                <li key={t.id}>
+                  {open ? (
+                    <Link
+                      to={`/topic/${t.slug}`}
+                      className="flex items-center gap-2.5 rounded px-2 py-1.5 text-sm hover:bg-[var(--color-ink)]"
+                      data-testid={`boss-row-${t.id}`}
+                    >
+                      <BossDot status={bst} />
+                      <span className="text-dim tabular-nums w-7">{t.id}</span>
+                      <span className="text-chalk truncate">{t.title}</span>
+                    </Link>
+                  ) : (
+                    <div className="flex items-center gap-2.5 px-2 py-1.5 text-sm" title="Clear the previous boss to unlock">
+                      <BossDot status={bst} />
+                      <span className="tabular-nums w-7 text-[#5F7790]">{t.id}</span>
+                      <span className="truncate text-[#7A8DA2]">{t.title}</span>
+                      <span className="sr-only">(locked)</span>
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+        </section>
       </aside>
     </div>
+  )
+}
+
+function BossDot({ status }: { status: Status }) {
+  const done = status === 'completed'
+  const locked = status === 'locked'
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden className="shrink-0">
+      <circle
+        cx="6"
+        cy="6"
+        r="4.5"
+        fill={done ? '#FF5A4E' : '#0D1B2A'}
+        stroke={locked ? '#2A4562' : '#FF5A4E'}
+        strokeWidth="2"
+      />
+    </svg>
   )
 }
