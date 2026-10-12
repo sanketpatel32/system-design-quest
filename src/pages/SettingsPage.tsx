@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Mascot } from '../components/art/Mascot'
 import { PageHero } from '../components/ui/PageHero'
 import { useGameStore } from '../stores/gameStore'
 
@@ -131,17 +132,18 @@ export function SettingsPage() {
       <section className="panel p-5 space-y-2 border-[#ffb2b2]" aria-labelledby="danger">
         <h2 id="danger" className="font-display text-lg font-bold text-[var(--color-fault)]">Danger zone</h2>
         <p className="text-sm text-dim">Clears XP, badges, unlocks, review history and drafts. This cannot be undone.</p>
-        <button type="button" className="btn-quiet !border-[var(--color-fault)] !text-[var(--color-fault)]" onClick={() => dialogRef.current?.showModal()}>
+        <button type="button" className="btn-danger" onClick={() => dialogRef.current?.showModal()}>
           Reset all progress
         </button>
         <dialog ref={dialogRef} className="confirm-dialog" aria-labelledby="reset-title">
-          <h3 id="reset-title" className="font-display text-xl font-bold text-chalk">Reset all progress?</h3>
-          <p className="text-sm text-dim mt-2">XP, badges, cleared stations, review history and drafts will be deleted. Download a backup first if you might want them back.</p>
-          <div className="mt-4 flex flex-wrap justify-end gap-2">
-            <button type="button" className="btn-quiet" autoFocus onClick={() => dialogRef.current?.close()}>Keep my progress</button>
+          <Mascot mood="sad" size={90} className="mx-auto" />
+          <h3 id="reset-title" className="font-display text-2xl text-chalk text-center mt-1">Reset all progress?</h3>
+          <p className="font-bold text-dim mt-2 text-center">XP, badges, cleared stations, review history and drafts will be deleted. Download a backup first if you might want them back.</p>
+          <div className="mt-5 flex flex-col gap-3">
+            <button type="button" className="btn-cta" autoFocus onClick={() => dialogRef.current?.close()}>Keep my progress</button>
             <button
               type="button"
-              className="btn-quiet !bg-[var(--color-fault)] !text-[var(--color-ink)] !border-[var(--color-fault)] font-semibold"
+              className="btn-quiet !text-[var(--color-fault)]"
               onClick={async () => {
                 await resetProgress()
                 dialogRef.current?.close()
