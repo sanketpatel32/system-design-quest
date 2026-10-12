@@ -339,7 +339,7 @@
   "india": {
    "title": "A video catalogue during a festival release",
    "label": "Illustrative estimate",
-   "body": "Take a video streaming catalogue in India. On a normal day the popular shows stay popular for weeks, which suits LFU with decay: an occasional one-off visit to an old title should not evict a show watched by millions. On a festival weekend, though, a big new release appears and is watched heavily within hours. Pure LFU would be slow to keep it, because its count starts at zero; LRU would keep it at once. Redis offers both (allkeys-lru and allkeys-lfu), and LFU's counters decay so new hits catch up quickly. Many teams measure hit rate under both policies on a replay of real traffic before choosing."
+   "body": "Take a video streaming catalogue in India. On a normal day the popular shows stay popular for weeks, which suits LFU with decay: an occasional one-off visit to an old title should not evict a show watched by millions. On a festival weekend, though, a big new release appears and is watched heavily within hours. Pure LFU would be slower to keep it: Redis gives a new key a small starting counter (LFU_INIT_VAL, 5) so it is not evicted at once, but long-popular titles still outrank it until it gathers hits; LRU would keep it at once. Redis offers both (allkeys-lru and allkeys-lfu), and LFU's counters decay so new hits catch up quickly. Many teams measure hit rate under both policies on a replay of real traffic before choosing."
   },
   "pitfalls": [
    {
@@ -582,7 +582,7 @@
   "india": {
    "title": "Live cricket at record concurrency",
    "label": "Publicly reported concurrency; bandwidth is an illustrative estimate",
-   "body": "Indian streaming services have publicly reported record live audiences for cricket: Disney+ Hotstar reported about 25.3 million concurrent viewers during the 2019 World Cup semi-final between India and New Zealand, and later reported higher peaks for subsequent tournaments. At an illustrative average of 2 Mbit/s per viewer, 25 million viewers need about 50 Tbit/s of delivery capacity, far beyond any single origin. That load is spread across CDN PoPs, including caches placed inside Indian internet providers' networks, while the origin produces each 6-second segment once per quality level. Capacity is planned and pre-provisioned with CDN partners well before a big match, because autoscaling cannot add terabits in minutes."
+   "body": "Indian streaming services have publicly reported record live audiences for cricket: Disney+ Hotstar (JioHotstar since its February 2025 merger with JioCinema) reported about 25.3 million concurrent viewers during the 2019 World Cup semi-final between India and New Zealand, and about 35 million (3.5 crore) for India v Pakistan at the 2023 World Cup. At an illustrative average of 2 Mbit/s per viewer, 25 million viewers need about 50 Tbit/s of delivery capacity, far beyond any single origin. That load is spread across CDN PoPs, including caches placed inside Indian internet providers' networks, while the origin produces each 6-second segment once per quality level. Capacity is planned and pre-provisioned with CDN partners well before a big match, because autoscaling cannot add terabits in minutes."
   },
   "pitfalls": [
    {
@@ -697,21 +697,21 @@
    "title": "A live leaderboard for a quiz show",
    "assumptions": [
     "5 million players in one sorted set",
-    "About 64 bytes per entry including member ID and overhead (an estimate; check with MEMORY USAGE)",
+    "About 100 bytes per entry including member ID and skiplist plus hash overhead (an estimate; check with MEMORY USAGE)",
     "200,000 score updates per second at peak"
    ],
    "steps": [
-    "Memory = 5,000,000 × 64 bytes = 320,000,000 bytes ≈ 320 MB, which fits easily on one node.",
+    "Memory = 5,000,000 × 100 bytes = 500,000,000 bytes ≈ 500 MB, which fits easily on one node.",
     "ZADD and ZRANK are O(log N); log2 of 5 million is about 22, so each operation is a few dozen steps.",
     "200,000 updates per second is above what one node handles comfortably, so split players into shards (for example 4 sorted sets by player ID), giving 50,000 updates per second per shard.",
     "Global top 10 = take the top 10 from each of the 4 shards (40 entries) and merge them."
    ],
-   "result": "About 320 MB of memory and O(log N) updates: sorted sets make a 5-million-player leaderboard cheap. Shard by player and merge the per-shard top 10s for the global top 10."
+   "result": "About 500 MB of memory and O(log N) updates: sorted sets make a 5-million-player leaderboard cheap. Shard by player and merge the per-shard top 10s for the global top 10."
   },
   "india": {
-   "title": "Fantasy and quiz contests during IPL",
+   "title": "Free-to-play fantasy and quiz contests during IPL",
    "label": "Illustrative estimate",
-   "body": "Fantasy sports and live quiz apps in India see huge, synchronised spikes: when a wicket falls in an IPL match, millions of contest scores change at the same moment and players immediately check their rank. A sorted set per contest gives O(log N) score updates and rank lookups, and the whole leaderboard for a large contest fits in a few hundred megabytes. The heavy part is the write burst, so updates are batched per ball, contests are spread across many Redis primaries by contest ID, and very large contests are sharded internally. Final results and payouts are computed from the durable database, not from Redis, because Redis replication is asynchronous."
+   "body": "Free-to-play fantasy and live quiz apps in India see huge, synchronised spikes: when a wicket falls in an IPL match, millions of contest scores change at the same moment and players immediately check their rank. A sorted set per contest gives O(log N) score updates and rank lookups, and the whole leaderboard for a large contest fits in a few hundred megabytes. The heavy part is the write burst, so updates are batched per ball, contests are spread across many Redis primaries by contest ID, and very large contests are sharded internally. Final results and rewards are computed from the durable database, not from Redis, because Redis replication is asynchronous. (Real-money contests have been banned since the Promotion and Regulation of Online Gaming Act, 2025 received assent on 22 Aug 2025; Dream11 stopped paid contests that day.)"
   },
   "pitfalls": [
    {

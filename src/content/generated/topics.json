@@ -1197,7 +1197,7 @@
         "id": "t4-a1",
         "concept": "tcp-udp",
         "type": "multiple_choice",
-        "prompt": "A live score widget sends a tiny update every second; a lost update does not matter because the next one replaces it. Which transport fits best?",
+        "prompt": "A multiplayer game sends each player’s position 20 times a second; a lost update does not matter because the next one replaces it. Which transport fits best?",
         "choices": [
           {
             "id": "a",
@@ -1215,7 +1215,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Retransmitting stale data only adds delay. TCP works, but it is not the best fit."
+        "explanation": "Retransmitting stale data only adds delay. TCP works, but it is not the best fit. (A browser score widget is different: it usually uses SSE or WebSockets over HTTP, as lesson 10 shows.)"
       },
       {
         "id": "t4-a2",
@@ -1794,8 +1794,8 @@
           "TCP opens a connection with a three-way handshake (SYN, SYN-ACK, ACK), costing one round trip before data flows.",
           "TCP numbers every byte. The receiver acknowledges what arrived; anything not acknowledged within the retransmission timeout, or flagged by duplicate ACKs, is sent again.",
           "TCP delivers bytes strictly in order. If packet 5 is lost, packets 6–20 wait in the receiver's buffer until 5 is retransmitted: this is head-of-line blocking.",
-          "TCP's congestion control (slow start, then additive increase) grows the sending window gradually and halves it on loss, sharing bandwidth fairly but ramping up slowly on new connections.",
-          "UDP just sends datagrams: no handshake, no ordering, no retransmission and no congestion control. Each datagram arrives once, late, out of order or not at all, and the app decides what to do.",
+          "TCP's congestion control (slow start, then additive increase) grows the sending window gradually and shrinks it on loss (Reno halves it; CUBIC, the Linux default, cuts it to about 0.7×), sharing bandwidth fairly but ramping up slowly on new connections.",
+          "UDP just sends datagrams: no handshake, no ordering, no retransmission and no congestion control. Each datagram may arrive late, duplicated, out of order or not at all, and the app decides what to do.",
           "QUIC (the transport under HTTP/3) runs over UDP and rebuilds reliability per stream in user space, so a loss on one stream does not stall the others, and it merges the transport and TLS 1.3 handshakes into one round trip."
         ]
       },
@@ -2396,7 +2396,7 @@
         "id": "t7-a3",
         "concept": "handshake",
         "type": "drag_order",
-        "prompt": "Order the TLS handshake.",
+        "prompt": "Order the TLS 1.3 handshake.",
         "items": [
           {
             "id": "s1",
@@ -2404,19 +2404,19 @@
           },
           {
             "id": "s2",
-            "label": "Server hello + certificate"
+            "label": "Server hello (its key share)"
           },
           {
             "id": "s3",
-            "label": "Client verifies the certificate chain"
+            "label": "Both derive handshake keys"
           },
           {
             "id": "s4",
-            "label": "Both derive session keys"
+            "label": "Server sends certificate; client verifies chain and CertificateVerify"
           },
           {
             "id": "s5",
-            "label": "Encrypted HTTP flows"
+            "label": "Finished; switch to application keys for HTTP"
           }
         ],
         "correctOrder": [
@@ -2426,7 +2426,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Negotiate, authenticate the server, derive keys, then send data."
+        "explanation": "In TLS 1.3 both sides derive handshake keys right after the hellos; the certificate then travels encrypted, the client verifies it, and Finished switches to application keys."
       },
       {
         "id": "t7-a4",
@@ -6385,7 +6385,7 @@
       "india": {
         "title": "A video catalogue during a festival release",
         "label": "Illustrative estimate",
-        "body": "Take a video streaming catalogue in India. On a normal day the popular shows stay popular for weeks, which suits LFU with decay: an occasional one-off visit to an old title should not evict a show watched by millions. On a festival weekend, though, a big new release appears and is watched heavily within hours. Pure LFU would be slow to keep it, because its count starts at zero; LRU would keep it at once. Redis offers both (allkeys-lru and allkeys-lfu), and LFU's counters decay so new hits catch up quickly. Many teams measure hit rate under both policies on a replay of real traffic before choosing."
+        "body": "Take a video streaming catalogue in India. On a normal day the popular shows stay popular for weeks, which suits LFU with decay: an occasional one-off visit to an old title should not evict a show watched by millions. On a festival weekend, though, a big new release appears and is watched heavily within hours. Pure LFU would be slower to keep it: Redis gives a new key a small starting counter (LFU_INIT_VAL, 5) so it is not evicted at once, but long-popular titles still outrank it until it gathers hits; LRU would keep it at once. Redis offers both (allkeys-lru and allkeys-lfu), and LFU's counters decay so new hits catch up quickly. Many teams measure hit rate under both policies on a replay of real traffic before choosing."
       },
       "pitfalls": [
         {
@@ -6927,7 +6927,7 @@
         "id": "t19-a4",
         "concept": "edge",
         "type": "drag_order",
-        "prompt": "Order a CDN request.",
+        "prompt": "Order a CDN request that misses the edge cache.",
         "items": [
           {
             "id": "s1",
@@ -6939,15 +6939,15 @@
           },
           {
             "id": "s3",
-            "label": "Cache hit: serve from the edge"
+            "label": "Edge cache misses"
           },
           {
             "id": "s4",
-            "label": "Miss: fetch from the origin"
+            "label": "Fetch from the origin (via the shield)"
           },
           {
             "id": "s5",
-            "label": "Store the copy at the edge"
+            "label": "Store the copy at the edge and serve the user"
           }
         ],
         "correctOrder": [
@@ -7112,7 +7112,7 @@
       "india": {
         "title": "Live cricket at record concurrency",
         "label": "Publicly reported concurrency; bandwidth is an illustrative estimate",
-        "body": "Indian streaming services have publicly reported record live audiences for cricket: Disney+ Hotstar reported about 25.3 million concurrent viewers during the 2019 World Cup semi-final between India and New Zealand, and later reported higher peaks for subsequent tournaments. At an illustrative average of 2 Mbit/s per viewer, 25 million viewers need about 50 Tbit/s of delivery capacity, far beyond any single origin. That load is spread across CDN PoPs, including caches placed inside Indian internet providers' networks, while the origin produces each 6-second segment once per quality level. Capacity is planned and pre-provisioned with CDN partners well before a big match, because autoscaling cannot add terabits in minutes."
+        "body": "Indian streaming services have publicly reported record live audiences for cricket: Disney+ Hotstar (JioHotstar since its February 2025 merger with JioCinema) reported about 25.3 million concurrent viewers during the 2019 World Cup semi-final between India and New Zealand, and about 35 million (3.5 crore) for India v Pakistan at the 2023 World Cup. At an illustrative average of 2 Mbit/s per viewer, 25 million viewers need about 50 Tbit/s of delivery capacity, far beyond any single origin. That load is spread across CDN PoPs, including caches placed inside Indian internet providers' networks, while the origin produces each 6-second segment once per quality level. Capacity is planned and pre-provisioned with CDN partners well before a big match, because autoscaling cannot add terabits in minutes."
       },
       "pitfalls": [
         {
@@ -7484,21 +7484,21 @@
         "title": "A live leaderboard for a quiz show",
         "assumptions": [
           "5 million players in one sorted set",
-          "About 64 bytes per entry including member ID and overhead (an estimate; check with MEMORY USAGE)",
+          "About 100 bytes per entry including member ID and skiplist plus hash overhead (an estimate; check with MEMORY USAGE)",
           "200,000 score updates per second at peak"
         ],
         "steps": [
-          "Memory = 5,000,000 × 64 bytes = 320,000,000 bytes ≈ 320 MB, which fits easily on one node.",
+          "Memory = 5,000,000 × 100 bytes = 500,000,000 bytes ≈ 500 MB, which fits easily on one node.",
           "ZADD and ZRANK are O(log N); log2 of 5 million is about 22, so each operation is a few dozen steps.",
           "200,000 updates per second is above what one node handles comfortably, so split players into shards (for example 4 sorted sets by player ID), giving 50,000 updates per second per shard.",
           "Global top 10 = take the top 10 from each of the 4 shards (40 entries) and merge them."
         ],
-        "result": "About 320 MB of memory and O(log N) updates: sorted sets make a 5-million-player leaderboard cheap. Shard by player and merge the per-shard top 10s for the global top 10."
+        "result": "About 500 MB of memory and O(log N) updates: sorted sets make a 5-million-player leaderboard cheap. Shard by player and merge the per-shard top 10s for the global top 10."
       },
       "india": {
-        "title": "Fantasy and quiz contests during IPL",
+        "title": "Free-to-play fantasy and quiz contests during IPL",
         "label": "Illustrative estimate",
-        "body": "Fantasy sports and live quiz apps in India see huge, synchronised spikes: when a wicket falls in an IPL match, millions of contest scores change at the same moment and players immediately check their rank. A sorted set per contest gives O(log N) score updates and rank lookups, and the whole leaderboard for a large contest fits in a few hundred megabytes. The heavy part is the write burst, so updates are batched per ball, contests are spread across many Redis primaries by contest ID, and very large contests are sharded internally. Final results and payouts are computed from the durable database, not from Redis, because Redis replication is asynchronous."
+        "body": "Free-to-play fantasy and live quiz apps in India see huge, synchronised spikes: when a wicket falls in an IPL match, millions of contest scores change at the same moment and players immediately check their rank. A sorted set per contest gives O(log N) score updates and rank lookups, and the whole leaderboard for a large contest fits in a few hundred megabytes. The heavy part is the write burst, so updates are batched per ball, contests are spread across many Redis primaries by contest ID, and very large contests are sharded internally. Final results and rewards are computed from the durable database, not from Redis, because Redis replication is asynchronous. (Real-money contests have been banned since the Promotion and Regulation of Online Gaming Act, 2025 received assent on 22 Aug 2025; Dream11 stopped paid contests that day.)"
       },
       "pitfalls": [
         {
@@ -9522,7 +9522,7 @@
         "id": "t26-a4",
         "concept": "write-skew",
         "type": "tradeoff",
-        "prompt": "Isolation for a seat-booking transaction.",
+        "prompt": "Isolation for a booking rule that spans rows (a party of 4 must sit together), which one conditional UPDATE cannot check.",
         "constraints": [
           "Never double-book",
           "Many users race for the same seats",
@@ -9541,7 +9541,7 @@
           },
           {
             "id": "p2",
-            "label": "Read committed (the default)",
+            "label": "Read committed, plain read-then-write",
             "description": "No extra cost"
           }
         ],
@@ -9570,7 +9570,7 @@
         "rationaleConflicts": {
           "r3": "Snapshot gives a stable view but still allows write skew, as in the doctors example."
         },
-        "explanation": "Pay for serializable where an invariant spans rows."
+        "explanation": "Pay for serializable where an invariant spans rows. For a single seat, a conditional UPDATE (or a unique constraint) under read committed is enough, as the lesson shows."
       },
       {
         "id": "t26-a5",
@@ -18012,7 +18012,7 @@
         "id": "t49-a4",
         "concept": "bloom",
         "type": "drag_order",
-        "prompt": "Order crawler deduplication with a Bloom filter.",
+        "prompt": "Order crawler deduplication for a URL the crawler has never seen.",
         "items": [
           {
             "id": "s1",
@@ -18024,11 +18024,11 @@
           },
           {
             "id": "s3",
-            "label": "Probably seen: skip it"
+            "label": "Filter says definitely new"
           },
           {
             "id": "s4",
-            "label": "Definitely new: fetch it and add it to the filter"
+            "label": "Fetch it and add it to the filter"
           }
         ],
         "correctOrder": [
@@ -18037,7 +18037,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "A false positive only skips a page."
+        "explanation": "A new URL is fetched and recorded; a false positive would only skip a page."
       },
       {
         "id": "t49-a5",
@@ -20407,7 +20407,7 @@
         ],
         "steps": [
           "Series: 0.9999 × 0.999 ≈ 0.9989, then 0.9989 × 0.999 ≈ 0.9979, so about 99.8%.",
-          "Two database copies in parallel fail together 0.001 × 0.001 = 0.000001 of the time, so about 99.9999%.",
+          "Two database copies in parallel fail together 0.001 × 0.001 = 0.000001 of the time, so about 99.9999%. That is an upper bound: it assumes independent failures and instant failover, and in practice failover time and correlated failures dominate.",
           "New chain: 0.9999 × 0.999 × 0.999999 ≈ 0.9989, about 99.89%.",
           "The weakest series link (the app tier at 99.9%) now limits the system; adding redundancy there is the next step."
         ],
@@ -27457,22 +27457,26 @@
         "prompt": "Which of these belongs in the first version of URL Shortener?",
         "choices": [
           {
+            "id": "c",
+            "label": "Link-in-bio landing pages"
+          },
+          {
             "id": "a",
             "label": "Create short link from long URL"
           },
           {
-            "id": "c",
-            "label": "Per-link QR code designer"
+            "id": "d",
+            "label": "Branded domains per customer"
           },
           {
             "id": "b",
-            "label": "Link-in-bio landing pages"
+            "label": "Per-link QR code designer"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Create short link from long URL; Redirect short link to original; Optional custom alias & expiry. Out of scope for this interview: Link-in-bio pages and QR design; Full marketing analytics dashboards; Video upload; Friend requests.",
+        "explanation": "In scope: Create short link from long URL; Redirect short link to original; Optional custom alias & expiry. Out of scope for this interview: Link-in-bio pages and QR design; Full marketing analytics dashboards; Per-link QR code designer; Link-in-bio landing pages.",
         "tags": [
           "requirements"
         ],
@@ -27718,8 +27722,8 @@
         "Full marketing analytics dashboards"
       ],
       "requirementDistractors": [
-        "Video upload",
-        "Friend requests"
+        "Per-link QR code designer",
+        "Link-in-bio landing pages"
       ],
       "estimationScenario": "URL Shortener: assume 50M daily users each doing about 2 redirects a day, with traffic peaking at 5× the daily average.",
       "apiPrompt": "The create-link call (POST /v1/links) times out on a phone and the app retries. How do you avoid making two short links?",
@@ -27931,22 +27935,26 @@
             "prompt": "Which of these belongs in the first version of URL Shortener?",
             "choices": [
               {
+                "id": "c",
+                "label": "Link-in-bio landing pages"
+              },
+              {
                 "id": "a",
                 "label": "Create short link from long URL"
               },
               {
-                "id": "c",
-                "label": "Per-link QR code designer"
+                "id": "d",
+                "label": "Branded domains per customer"
               },
               {
                 "id": "b",
-                "label": "Link-in-bio landing pages"
+                "label": "Per-link QR code designer"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Create short link from long URL; Redirect short link to original; Optional custom alias & expiry. Out of scope for this interview: Link-in-bio pages and QR design; Full marketing analytics dashboards; Video upload; Friend requests.",
+            "explanation": "In scope: Create short link from long URL; Redirect short link to original; Optional custom alias & expiry. Out of scope for this interview: Link-in-bio pages and QR design; Full marketing analytics dashboards; Per-link QR code designer; Link-in-bio landing pages.",
             "tags": [
               "requirements"
             ],
@@ -28332,12 +28340,16 @@
         "prompt": "Which of these belongs in the first version of Pastebin?",
         "choices": [
           {
-            "id": "b",
-            "label": "Live video"
+            "id": "c",
+            "label": "Syntax-aware code execution"
           },
           {
-            "id": "c",
-            "label": "Payments"
+            "id": "b",
+            "label": "Real-time collaborative editing"
+          },
+          {
+            "id": "d",
+            "label": "Paste version diffing"
           },
           {
             "id": "a",
@@ -28347,7 +28359,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Create a paste; Read a paste by ID; Expire pastes. Out of scope for this interview: Real-time collaborative editing; Code execution of pastes; Live video; Payments.",
+        "explanation": "In scope: Create a paste; Read a paste by ID; Expire pastes. Out of scope for this interview: Real-time collaborative editing; Code execution of pastes; Real-time collaborative editing; Syntax-aware code execution.",
         "tags": [
           "requirements"
         ],
@@ -28593,8 +28605,8 @@
         "Code execution of pastes"
       ],
       "requirementDistractors": [
-        "Live video",
-        "Payments"
+        "Real-time collaborative editing",
+        "Syntax-aware code execution"
       ],
       "estimationScenario": "Pastebin: assume 5M daily users each doing about 3 reads a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "Creating a paste (POST /v1/pastes) times out and the client retries. How do you avoid two copies?",
@@ -28798,12 +28810,16 @@
             "prompt": "Which of these belongs in the first version of Pastebin?",
             "choices": [
               {
-                "id": "b",
-                "label": "Live video"
+                "id": "c",
+                "label": "Syntax-aware code execution"
               },
               {
-                "id": "c",
-                "label": "Payments"
+                "id": "b",
+                "label": "Real-time collaborative editing"
+              },
+              {
+                "id": "d",
+                "label": "Paste version diffing"
               },
               {
                 "id": "a",
@@ -28813,7 +28829,7 @@
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Create a paste; Read a paste by ID; Expire pastes. Out of scope for this interview: Real-time collaborative editing; Code execution of pastes; Live video; Payments.",
+            "explanation": "In scope: Create a paste; Read a paste by ID; Expire pastes. Out of scope for this interview: Real-time collaborative editing; Code execution of pastes; Real-time collaborative editing; Syntax-aware code execution.",
             "tags": [
               "requirements"
             ],
@@ -29199,22 +29215,26 @@
         "prompt": "Which of these belongs in the first version of Rate Limiter?",
         "choices": [
           {
-            "id": "b",
-            "label": "Per-user billing invoices"
+            "id": "a",
+            "label": "Limit requests per user/IP/key"
+          },
+          {
+            "id": "d",
+            "label": "API key self-service portal"
           },
           {
             "id": "c",
             "label": "Bot detection with ML"
           },
           {
-            "id": "a",
-            "label": "Limit requests per user/IP/key"
+            "id": "b",
+            "label": "Per-user billing invoices"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Limit requests per user/IP/key; Return 429 with retry hint; Configurable rules. Out of scope for this interview: Billing and quota invoicing; Bot detection with ML; Image filters; Chat.",
+        "explanation": "In scope: Limit requests per user/IP/key; Return 429 with retry hint; Configurable rules. Out of scope for this interview: Billing and quota invoicing; Bot detection with ML; Per-user billing invoices; Bot detection with ML.",
         "tags": [
           "requirements"
         ],
@@ -29460,8 +29480,8 @@
         "Bot detection with ML"
       ],
       "requirementDistractors": [
-        "Image filters",
-        "Chat"
+        "Per-user billing invoices",
+        "Bot detection with ML"
       ],
       "estimationScenario": "Rate Limiter: assume 20M daily users each doing about 20 API calls a day, with traffic peaking at 5× the daily average.",
       "apiPrompt": "A client gets 429 and immediately retries in a tight loop. What should the response tell it?",
@@ -29664,22 +29684,26 @@
             "prompt": "Which of these belongs in the first version of Rate Limiter?",
             "choices": [
               {
-                "id": "b",
-                "label": "Per-user billing invoices"
+                "id": "a",
+                "label": "Limit requests per user/IP/key"
+              },
+              {
+                "id": "d",
+                "label": "API key self-service portal"
               },
               {
                 "id": "c",
                 "label": "Bot detection with ML"
               },
               {
-                "id": "a",
-                "label": "Limit requests per user/IP/key"
+                "id": "b",
+                "label": "Per-user billing invoices"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Limit requests per user/IP/key; Return 429 with retry hint; Configurable rules. Out of scope for this interview: Billing and quota invoicing; Bot detection with ML; Image filters; Chat.",
+            "explanation": "In scope: Limit requests per user/IP/key; Return 429 with retry hint; Configurable rules. Out of scope for this interview: Billing and quota invoicing; Bot detection with ML; Per-user billing invoices; Bot detection with ML.",
             "tags": [
               "requirements"
             ],
@@ -30065,25 +30089,25 @@
         "choices": [
           {
             "id": "d",
-            "label": "User profile pages"
+            "label": "Gap-free sequential IDs"
           },
           {
             "id": "b",
             "label": "Human-readable vanity IDs"
           },
           {
-            "id": "a",
-            "label": "Generate unique 64-bit IDs on demand"
-          },
-          {
             "id": "c",
             "label": "Cryptographic secrecy of IDs"
+          },
+          {
+            "id": "a",
+            "label": "Generate unique 64-bit IDs on demand"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Generate unique 64-bit IDs on demand; IDs roughly sortable by time; Work across many data centres. Out of scope for this interview: Human-readable vanity IDs; Cryptographic secrecy of IDs; User profile pages; Payment refunds.",
+        "explanation": "In scope: Generate unique 64-bit IDs on demand; IDs roughly sortable by time; Work across many data centres. Out of scope for this interview: Human-readable vanity IDs; Cryptographic secrecy of IDs; Human-readable vanity IDs; Cryptographic secrecy of IDs.",
         "tags": [
           "requirements"
         ],
@@ -30329,8 +30353,8 @@
         "Cryptographic secrecy of IDs"
       ],
       "requirementDistractors": [
-        "User profile pages",
-        "Payment refunds"
+        "Human-readable vanity IDs",
+        "Cryptographic secrecy of IDs"
       ],
       "estimationScenario": "Unique ID Generator: assume about 1B IDs a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "A service calls nextId() and the call fails halfway. What makes retrying safe?",
@@ -30525,25 +30549,25 @@
             "choices": [
               {
                 "id": "d",
-                "label": "User profile pages"
+                "label": "Gap-free sequential IDs"
               },
               {
                 "id": "b",
                 "label": "Human-readable vanity IDs"
               },
               {
-                "id": "a",
-                "label": "Generate unique 64-bit IDs on demand"
-              },
-              {
                 "id": "c",
                 "label": "Cryptographic secrecy of IDs"
+              },
+              {
+                "id": "a",
+                "label": "Generate unique 64-bit IDs on demand"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Generate unique 64-bit IDs on demand; IDs roughly sortable by time; Work across many data centres. Out of scope for this interview: Human-readable vanity IDs; Cryptographic secrecy of IDs; User profile pages; Payment refunds.",
+            "explanation": "In scope: Generate unique 64-bit IDs on demand; IDs roughly sortable by time; Work across many data centres. Out of scope for this interview: Human-readable vanity IDs; Cryptographic secrecy of IDs; Human-readable vanity IDs; Cryptographic secrecy of IDs.",
             "tags": [
               "requirements"
             ],
@@ -30928,22 +30952,26 @@
         "prompt": "In a Dynamo-style store holding shopping carts and sessions, which capability belongs in version one of Distributed KV Store?",
         "choices": [
           {
-            "id": "a",
-            "label": "put(key, value)"
+            "id": "c",
+            "label": "SQL joins across keys"
+          },
+          {
+            "id": "d",
+            "label": "Multi-key ACID transactions"
           },
           {
             "id": "b",
-            "label": "Video streaming"
+            "label": "Secondary indexes on values"
           },
           {
-            "id": "c",
-            "label": "Search ranking"
+            "id": "a",
+            "label": "put(key, value)"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: put(key, value); get(key); Scale horizontally. Out of scope for this interview: Secondary indexes and range queries; Multi-key transactions; Video streaming; Search ranking.",
+        "explanation": "In scope: put(key, value); get(key); Scale horizontally. Out of scope for this interview: Secondary indexes and range queries; Multi-key transactions; Secondary indexes on values; SQL joins across keys.",
         "tags": [
           "requirements"
         ],
@@ -31189,8 +31217,8 @@
         "Multi-key transactions"
       ],
       "requirementDistractors": [
-        "Video streaming",
-        "Search ranking"
+        "Secondary indexes on values",
+        "SQL joins across keys"
       ],
       "estimationScenario": "Distributed KV Store: assume 10M daily users each doing about 50 operations a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "A put(key, value) times out and the client retries. How does the store avoid a lost or doubled update?",
@@ -31391,22 +31419,26 @@
             "prompt": "In a Dynamo-style store holding shopping carts and sessions, which capability belongs in version one of Distributed KV Store?",
             "choices": [
               {
-                "id": "a",
-                "label": "put(key, value)"
+                "id": "c",
+                "label": "SQL joins across keys"
+              },
+              {
+                "id": "d",
+                "label": "Multi-key ACID transactions"
               },
               {
                 "id": "b",
-                "label": "Video streaming"
+                "label": "Secondary indexes on values"
               },
               {
-                "id": "c",
-                "label": "Search ranking"
+                "id": "a",
+                "label": "put(key, value)"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: put(key, value); get(key); Scale horizontally. Out of scope for this interview: Secondary indexes and range queries; Multi-key transactions; Video streaming; Search ranking.",
+            "explanation": "In scope: put(key, value); get(key); Scale horizontally. Out of scope for this interview: Secondary indexes and range queries; Multi-key transactions; Secondary indexes on values; SQL joins across keys.",
             "tags": [
               "requirements"
             ],
@@ -31796,18 +31828,22 @@
             "label": "get/set with TTL"
           },
           {
+            "id": "d",
+            "label": "Query by value fields"
+          },
+          {
             "id": "b",
-            "label": "PDF export"
+            "label": "Durable storage across restarts"
           },
           {
             "id": "c",
-            "label": "Search ranking"
+            "label": "Cross-region strong consistency"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: get/set with TTL; Eviction; Scale nodes. Out of scope for this interview: Durable storage of record (the database stays the source of truth); Cross-key transactions; PDF export; Search ranking.",
+        "explanation": "In scope: get/set with TTL; Eviction; Scale nodes. Out of scope for this interview: Durable storage of record (the database stays the source of truth); Cross-key transactions; Durable storage across restarts; Cross-region strong consistency.",
         "tags": [
           "requirements"
         ],
@@ -32053,8 +32089,8 @@
         "Cross-key transactions"
       ],
       "requirementDistractors": [
-        "PDF export",
-        "Search ranking"
+        "Durable storage across restarts",
+        "Cross-region strong consistency"
       ],
       "estimationScenario": "Distributed Cache: assume 10M daily users each doing about 100 cache ops a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "An app server sets a key with TTL, times out, and retries. What happens?",
@@ -32258,18 +32294,22 @@
                 "label": "get/set with TTL"
               },
               {
+                "id": "d",
+                "label": "Query by value fields"
+              },
+              {
                 "id": "b",
-                "label": "PDF export"
+                "label": "Durable storage across restarts"
               },
               {
                 "id": "c",
-                "label": "Search ranking"
+                "label": "Cross-region strong consistency"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: get/set with TTL; Eviction; Scale nodes. Out of scope for this interview: Durable storage of record (the database stays the source of truth); Cross-key transactions; PDF export; Search ranking.",
+            "explanation": "In scope: get/set with TTL; Eviction; Scale nodes. Out of scope for this interview: Durable storage of record (the database stays the source of truth); Cross-key transactions; Durable storage across restarts; Cross-region strong consistency.",
             "tags": [
               "requirements"
             ],
@@ -32656,21 +32696,25 @@
         "choices": [
           {
             "id": "b",
-            "label": "Video transcoding"
+            "label": "Marketing campaign designer"
           },
           {
             "id": "a",
             "label": "Send push/SMS/email"
           },
           {
+            "id": "d",
+            "label": "A/B testing of templates"
+          },
+          {
             "id": "c",
-            "label": "Seat booking"
+            "label": "In-app chat between users"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Send push/SMS/email; User preferences & opt-out; Retry failed deliveries. Out of scope for this interview: Marketing campaign builder UI; Writing the SMS/email content itself; Video transcoding; Seat booking.",
+        "explanation": "In scope: Send push/SMS/email; User preferences & opt-out; Retry failed deliveries. Out of scope for this interview: Marketing campaign builder UI; Writing the SMS/email content itself; Marketing campaign designer; In-app chat between users.",
         "tags": [
           "requirements"
         ],
@@ -32916,8 +32960,8 @@
         "Writing the SMS/email content itself"
       ],
       "requirementDistractors": [
-        "Video transcoding",
-        "Seat booking"
+        "Marketing campaign designer",
+        "In-app chat between users"
       ],
       "estimationScenario": "Notification System: assume 100M daily users each doing about 3 notifications a day, with traffic peaking at 10× the daily average.",
       "apiPrompt": "The order service sends 'notify user 7, template ORDER_SHIPPED' twice after a retry. How do you avoid a double push?",
@@ -33130,21 +33174,25 @@
             "choices": [
               {
                 "id": "b",
-                "label": "Video transcoding"
+                "label": "Marketing campaign designer"
               },
               {
                 "id": "a",
                 "label": "Send push/SMS/email"
               },
               {
+                "id": "d",
+                "label": "A/B testing of templates"
+              },
+              {
                 "id": "c",
-                "label": "Seat booking"
+                "label": "In-app chat between users"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Send push/SMS/email; User preferences & opt-out; Retry failed deliveries. Out of scope for this interview: Marketing campaign builder UI; Writing the SMS/email content itself; Video transcoding; Seat booking.",
+            "explanation": "In scope: Send push/SMS/email; User preferences & opt-out; Retry failed deliveries. Out of scope for this interview: Marketing campaign builder UI; Writing the SMS/email content itself; Marketing campaign designer; In-app chat between users.",
             "tags": [
               "requirements"
             ],
@@ -33530,22 +33578,26 @@
         "prompt": "Which of these belongs in the first version of News Feed?",
         "choices": [
           {
-            "id": "a",
-            "label": "Post content"
-          },
-          {
             "id": "c",
-            "label": "Seat lock"
+            "label": "Ads ranking in the feed"
           },
           {
             "id": "b",
-            "label": "Bank transfer"
+            "label": "Stories that expire in 24 h"
+          },
+          {
+            "id": "d",
+            "label": "Direct messages"
+          },
+          {
+            "id": "a",
+            "label": "Post content"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Post content; See ranked feed of followed users; Like and comment. Out of scope for this interview: Ads in the feed; Direct messages; Bank transfer; Seat lock.",
+        "explanation": "In scope: Post content; See ranked feed of followed users; Like and comment. Out of scope for this interview: Ads in the feed; Direct messages; Stories that expire in 24 h; Ads ranking in the feed.",
         "tags": [
           "requirements"
         ],
@@ -33791,8 +33843,8 @@
         "Direct messages"
       ],
       "requirementDistractors": [
-        "Bank transfer",
-        "Seat lock"
+        "Stories that expire in 24 h",
+        "Ads ranking in the feed"
       ],
       "estimationScenario": "News Feed: assume 200M daily users each doing about 20 feed reads a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "A user taps Post, the request times out and the app retries. How do you avoid a double post?",
@@ -34016,22 +34068,26 @@
             "prompt": "Which of these belongs in the first version of News Feed?",
             "choices": [
               {
-                "id": "a",
-                "label": "Post content"
-              },
-              {
                 "id": "c",
-                "label": "Seat lock"
+                "label": "Ads ranking in the feed"
               },
               {
                 "id": "b",
-                "label": "Bank transfer"
+                "label": "Stories that expire in 24 h"
+              },
+              {
+                "id": "d",
+                "label": "Direct messages"
+              },
+              {
+                "id": "a",
+                "label": "Post content"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Post content; See ranked feed of followed users; Like and comment. Out of scope for this interview: Ads in the feed; Direct messages; Bank transfer; Seat lock.",
+            "explanation": "In scope: Post content; See ranked feed of followed users; Like and comment. Out of scope for this interview: Ads in the feed; Direct messages; Stories that expire in 24 h; Ads ranking in the feed.",
             "tags": [
               "requirements"
             ],
@@ -34417,26 +34473,26 @@
         "prompt": "Which of these belongs in the first version of Twitter/X?",
         "choices": [
           {
-            "id": "b",
-            "label": "Ads ranking"
-          },
-          {
-            "id": "a",
-            "label": "Post a short tweet"
+            "id": "d",
+            "label": "Spaces audio rooms"
           },
           {
             "id": "c",
             "label": "Direct messages"
           },
           {
-            "id": "d",
-            "label": "Payroll"
+            "id": "b",
+            "label": "Ads ranking"
+          },
+          {
+            "id": "a",
+            "label": "Post a short tweet"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Post a short tweet; Follow other users; Read a home timeline. Out of scope for this interview: Ads ranking; Direct messages; Payroll; Seat booking.",
+        "explanation": "In scope: Post a short tweet; Follow other users; Read a home timeline. Out of scope for this interview: Ads ranking; Direct messages; Ads ranking; Direct messages.",
         "tags": [
           "requirements"
         ],
@@ -34682,8 +34738,8 @@
         "Direct messages"
       ],
       "requirementDistractors": [
-        "Payroll",
-        "Seat booking"
+        "Ads ranking",
+        "Direct messages"
       ],
       "estimationScenario": "Twitter/X: assume 200M daily users each doing about 50 timeline reads a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "POST /v1/tweets times out and the app retries. How do you avoid a duplicate tweet?",
@@ -34895,26 +34951,26 @@
             "prompt": "Which of these belongs in the first version of Twitter/X?",
             "choices": [
               {
-                "id": "b",
-                "label": "Ads ranking"
-              },
-              {
-                "id": "a",
-                "label": "Post a short tweet"
+                "id": "d",
+                "label": "Spaces audio rooms"
               },
               {
                 "id": "c",
                 "label": "Direct messages"
               },
               {
-                "id": "d",
-                "label": "Payroll"
+                "id": "b",
+                "label": "Ads ranking"
+              },
+              {
+                "id": "a",
+                "label": "Post a short tweet"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Post a short tweet; Follow other users; Read a home timeline. Out of scope for this interview: Ads ranking; Direct messages; Payroll; Seat booking.",
+            "explanation": "In scope: Post a short tweet; Follow other users; Read a home timeline. Out of scope for this interview: Ads ranking; Direct messages; Ads ranking; Direct messages.",
             "tags": [
               "requirements"
             ],
@@ -35301,21 +35357,25 @@
         "choices": [
           {
             "id": "b",
-            "label": "Video editing"
-          },
-          {
-            "id": "c",
-            "label": "Search ads"
+            "label": "Voice and video calls"
           },
           {
             "id": "a",
             "label": "Send 1:1 messages"
+          },
+          {
+            "id": "c",
+            "label": "Status updates"
+          },
+          {
+            "id": "d",
+            "label": "Payments in chat"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Send 1:1 messages; Group chats; Delivery/read receipts. Out of scope for this interview: Voice and video calls; Payments in chat; Video editing; Search ads.",
+        "explanation": "In scope: Send 1:1 messages; Group chats; Delivery/read receipts. Out of scope for this interview: Voice and video calls; Payments in chat; Voice and video calls; Status updates.",
         "tags": [
           "requirements"
         ],
@@ -35561,8 +35621,8 @@
         "Payments in chat"
       ],
       "requirementDistractors": [
-        "Video editing",
-        "Search ads"
+        "Voice and video calls",
+        "Status updates"
       ],
       "estimationScenario": "WhatsApp: assume 500M daily users each doing about 40 messages a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "The app resends a message after a dropped connection. How does the server avoid storing it twice?",
@@ -35774,21 +35834,25 @@
             "choices": [
               {
                 "id": "b",
-                "label": "Video editing"
-              },
-              {
-                "id": "c",
-                "label": "Search ads"
+                "label": "Voice and video calls"
               },
               {
                 "id": "a",
                 "label": "Send 1:1 messages"
+              },
+              {
+                "id": "c",
+                "label": "Status updates"
+              },
+              {
+                "id": "d",
+                "label": "Payments in chat"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Send 1:1 messages; Group chats; Delivery/read receipts. Out of scope for this interview: Voice and video calls; Payments in chat; Video editing; Search ads.",
+            "explanation": "In scope: Send 1:1 messages; Group chats; Delivery/read receipts. Out of scope for this interview: Voice and video calls; Payments in chat; Voice and video calls; Status updates.",
             "tags": [
               "requirements"
             ],
@@ -36055,7 +36119,7 @@
           "500 million daily users, about 40 messages each per day",
           "Peak is 3× the daily average",
           "Average message 100 bytes",
-          "Messages kept on the server until delivered, then for 30 days for multi-device sync"
+          "Undelivered messages kept on the server for up to 30 days, delivered ones deleted (as WhatsApp describes)"
         ],
         "steps": [
           "Daily messages = 500,000,000 × 40 = 20,000,000,000.",
@@ -36174,22 +36238,26 @@
         "prompt": "Which of these belongs in the first version of Instagram?",
         "choices": [
           {
-            "id": "b",
-            "label": "Ledger"
+            "id": "d",
+            "label": "Direct messages"
           },
           {
-            "id": "c",
-            "label": "Train search"
+            "id": "b",
+            "label": "Reels video editing"
           },
           {
             "id": "a",
             "label": "Upload photos"
+          },
+          {
+            "id": "c",
+            "label": "Shopping tags"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Upload photos; Follow users; View feed. Out of scope for this interview: Stories and Reels; Direct messages; Ledger; Train search.",
+        "explanation": "In scope: Upload photos; Follow users; View feed. Out of scope for this interview: Stories and Reels; Direct messages; Reels video editing; Shopping tags.",
         "tags": [
           "requirements"
         ],
@@ -36435,8 +36503,8 @@
         "Direct messages"
       ],
       "requirementDistractors": [
-        "Ledger",
-        "Train search"
+        "Reels video editing",
+        "Shopping tags"
       ],
       "estimationScenario": "Instagram: assume 100M daily users each doing about 15 photo views a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "The photo upload commit (POST /v1/posts) times out and the app retries. How do you avoid two posts?",
@@ -36668,22 +36736,26 @@
             "prompt": "Which of these belongs in the first version of Instagram?",
             "choices": [
               {
-                "id": "b",
-                "label": "Ledger"
+                "id": "d",
+                "label": "Direct messages"
               },
               {
-                "id": "c",
-                "label": "Train search"
+                "id": "b",
+                "label": "Reels video editing"
               },
               {
                 "id": "a",
                 "label": "Upload photos"
+              },
+              {
+                "id": "c",
+                "label": "Shopping tags"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Upload photos; Follow users; View feed. Out of scope for this interview: Stories and Reels; Direct messages; Ledger; Train search.",
+            "explanation": "In scope: Upload photos; Follow users; View feed. Out of scope for this interview: Stories and Reels; Direct messages; Reels video editing; Shopping tags.",
             "tags": [
               "requirements"
             ],
@@ -37013,7 +37085,7 @@
         "id": "t86-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 86 · YouTube: YouTube-style video: upload, transcode, and an infinite feed of videos to watch. In scope: Upload video; Infinite scroll feed; Like & share.",
+        "body": "Boss 86 · YouTube: YouTube-style video: upload, transcode, and adaptive playback for viewers. In scope: Upload video; Watch with adaptive bitrate; Like & share.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -37069,12 +37141,16 @@
         "prompt": "Which of these belongs in the first version of YouTube?",
         "choices": [
           {
-            "id": "b",
-            "label": "Bank KYC"
+            "id": "c",
+            "label": "Creator monetisation"
           },
           {
-            "id": "c",
-            "label": "Seat map"
+            "id": "d",
+            "label": "Comment moderation ML"
+          },
+          {
+            "id": "b",
+            "label": "Live streaming"
           },
           {
             "id": "a",
@@ -37084,7 +37160,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Upload video; Infinite scroll feed; Like & share. Out of scope for this interview: Live streaming; Creator monetisation and payouts; Bank KYC; Seat map.",
+        "explanation": "In scope: Upload video; Watch with adaptive bitrate; Like & share. Out of scope for this interview: Live streaming; Creator monetisation and payouts; Live streaming; Creator monetisation.",
         "tags": [
           "requirements"
         ],
@@ -37105,7 +37181,7 @@
           },
           {
             "id": "b",
-            "label": "Infinite scroll feed"
+            "label": "Watch with adaptive bitrate"
           },
           {
             "id": "d",
@@ -37291,7 +37367,7 @@
       {
         "id": "t86-f1",
         "front": "Core flows of YouTube?",
-        "back": "Upload video; Infinite scroll feed; Like & share"
+        "back": "Upload video; Watch with adaptive bitrate; Like & share"
       },
       {
         "id": "t86-f2",
@@ -37317,7 +37393,7 @@
     "boss": {
       "functionalRequirements": [
         "Upload video",
-        "Infinite scroll feed",
+        "Watch with adaptive bitrate",
         "Like & share"
       ],
       "nonFunctionalRequirements": [
@@ -37330,8 +37406,8 @@
         "Creator monetisation and payouts"
       ],
       "requirementDistractors": [
-        "Bank KYC",
-        "Seat map"
+        "Live streaming",
+        "Creator monetisation"
       ],
       "estimationScenario": "YouTube: assume 100M daily users each doing about 50 video views a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "A large upload drops at 80%. How does the client avoid starting again?",
@@ -37487,7 +37563,7 @@
           "to": "w1"
         }
       ],
-      "referenceNotes": "Core flows: Upload video; Infinite scroll feed; Like & share. Must hold: Fast start on 4G; Massive storage; Personalised. Key mechanisms: Pre-signed uploads to object storage, async transcoding. Recommendation service builds feed cached per user. CDN delivery; prefetch next videos.",
+      "referenceNotes": "Core flows: Upload video; Watch with adaptive bitrate; Like & share. Must hold: Fast start on 4G; Massive storage; Personalised. Key mechanisms: Pre-signed uploads to object storage, async transcoding. Recommendation service builds feed cached per user. CDN delivery; prefetch next videos.",
       "workedEstimate": "100M × 50 = 5B video views/day ÷ 86,400 s ≈ 58,000/s on average; × 3 peak ≈ 170,000/s.",
       "exampleApi": "POST /v1/uploads (resumable, chunked) -> uploadId\nGET /v1/videos/{id}/manifest.m3u8 -> renditions\nGET /v1/feed?cursor=; POST /v1/videos/{id}/likes",
       "deepDiveAnswers": [
@@ -37563,12 +37639,16 @@
             "prompt": "Which of these belongs in the first version of YouTube?",
             "choices": [
               {
-                "id": "b",
-                "label": "Bank KYC"
+                "id": "c",
+                "label": "Creator monetisation"
               },
               {
-                "id": "c",
-                "label": "Seat map"
+                "id": "d",
+                "label": "Comment moderation ML"
+              },
+              {
+                "id": "b",
+                "label": "Live streaming"
               },
               {
                 "id": "a",
@@ -37578,7 +37658,7 @@
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Upload video; Infinite scroll feed; Like & share. Out of scope for this interview: Live streaming; Creator monetisation and payouts; Bank KYC; Seat map.",
+            "explanation": "In scope: Upload video; Watch with adaptive bitrate; Like & share. Out of scope for this interview: Live streaming; Creator monetisation and payouts; Live streaming; Creator monetisation.",
             "tags": [
               "requirements"
             ],
@@ -37599,7 +37679,7 @@
               },
               {
                 "id": "b",
-                "label": "Infinite scroll feed"
+                "label": "Watch with adaptive bitrate"
               },
               {
                 "id": "d",
@@ -37823,11 +37903,11 @@
       }
     ],
     "bossDeep": {
-      "pitch": "YouTube-style video: upload, transcode, and an infinite feed of videos to watch.",
+      "pitch": "YouTube-style video: upload, transcode, and adaptive playback for viewers.",
       "requirements": {
         "functional": [
           "Upload video",
-          "Infinite scroll feed",
+          "Watch with adaptive bitrate",
           "Like & share"
         ],
         "nonFunctional": [
@@ -37965,25 +38045,25 @@
         "choices": [
           {
             "id": "c",
-            "label": "User-uploaded video"
+            "label": "Live sports"
           },
           {
             "id": "b",
-            "label": "Live sports"
+            "label": "User-uploaded video"
+          },
+          {
+            "id": "d",
+            "label": "Offline downloads"
           },
           {
             "id": "a",
             "label": "Browse the catalogue"
-          },
-          {
-            "id": "d",
-            "label": "Food delivery tracking"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Browse the catalogue; Stream a title at adaptive quality; Resume where you left off. Out of scope for this interview: Live sports; User-uploaded video; Food delivery tracking; Stock trading.",
+        "explanation": "In scope: Browse the catalogue; Stream a title at adaptive quality; Resume where you left off. Out of scope for this interview: Live sports; User-uploaded video; User-uploaded video; Live sports.",
         "tags": [
           "requirements"
         ],
@@ -38229,8 +38309,8 @@
         "User-uploaded video"
       ],
       "requirementDistractors": [
-        "Food delivery tracking",
-        "Stock trading"
+        "User-uploaded video",
+        "Live sports"
       ],
       "estimationScenario": "Netflix: assume 50M daily users each doing about 20 video segment requests a day, with traffic peaking at 4× the daily average.",
       "apiPrompt": "The resume-position update (PUT /v1/progress) is retried. What happens?",
@@ -38449,25 +38529,25 @@
             "choices": [
               {
                 "id": "c",
-                "label": "User-uploaded video"
+                "label": "Live sports"
               },
               {
                 "id": "b",
-                "label": "Live sports"
+                "label": "User-uploaded video"
+              },
+              {
+                "id": "d",
+                "label": "Offline downloads"
               },
               {
                 "id": "a",
                 "label": "Browse the catalogue"
-              },
-              {
-                "id": "d",
-                "label": "Food delivery tracking"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Browse the catalogue; Stream a title at adaptive quality; Resume where you left off. Out of scope for this interview: Live sports; User-uploaded video; Food delivery tracking; Stock trading.",
+            "explanation": "In scope: Browse the catalogue; Stream a title at adaptive quality; Resume where you left off. Out of scope for this interview: Live sports; User-uploaded video; User-uploaded video; Live sports.",
             "tags": [
               "requirements"
             ],
@@ -38853,12 +38933,16 @@
         "prompt": "Which of these belongs in the first version of Uber/Ola?",
         "choices": [
           {
-            "id": "c",
-            "label": "Upload PDFs"
+            "id": "b",
+            "label": "Scheduled rides a week ahead"
           },
           {
-            "id": "b",
-            "label": "Write blogs"
+            "id": "d",
+            "label": "Ride-sharing pools"
+          },
+          {
+            "id": "c",
+            "label": "Driver payouts and tax forms"
           },
           {
             "id": "a",
@@ -38868,7 +38952,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Request a ride; Match nearby driver; Live location tracking. Out of scope for this interview: Fare surge pricing model details; Driver onboarding and KYC; Write blogs; Upload PDFs.",
+        "explanation": "In scope: Request a ride; Match nearby driver; Live location tracking. Out of scope for this interview: Fare surge pricing model details; Driver onboarding and KYC; Scheduled rides a week ahead; Driver payouts and tax forms.",
         "tags": [
           "requirements"
         ],
@@ -39114,8 +39198,8 @@
         "Driver onboarding and KYC"
       ],
       "requirementDistractors": [
-        "Write blogs",
-        "Upload PDFs"
+        "Scheduled rides a week ahead",
+        "Driver payouts and tax forms"
       ],
       "estimationScenario": "Uber/Ola: assume 20M daily users each doing about 4 ride requests a day, with traffic peaking at 4× the daily average.",
       "apiPrompt": "The rider's 'request ride' call times out and the app retries. How do you avoid two rides?",
@@ -39328,12 +39412,16 @@
             "prompt": "Which of these belongs in the first version of Uber/Ola?",
             "choices": [
               {
-                "id": "c",
-                "label": "Upload PDFs"
+                "id": "b",
+                "label": "Scheduled rides a week ahead"
               },
               {
-                "id": "b",
-                "label": "Write blogs"
+                "id": "d",
+                "label": "Ride-sharing pools"
+              },
+              {
+                "id": "c",
+                "label": "Driver payouts and tax forms"
               },
               {
                 "id": "a",
@@ -39343,7 +39431,7 @@
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Request a ride; Match nearby driver; Live location tracking. Out of scope for this interview: Fare surge pricing model details; Driver onboarding and KYC; Write blogs; Upload PDFs.",
+            "explanation": "In scope: Request a ride; Match nearby driver; Live location tracking. Out of scope for this interview: Fare surge pricing model details; Driver onboarding and KYC; Scheduled rides a week ahead; Driver payouts and tax forms.",
             "tags": [
               "requirements"
             ],
@@ -39728,8 +39816,8 @@
         "prompt": "Which of these belongs in the first version of Zomato/Swiggy?",
         "choices": [
           {
-            "id": "b",
-            "label": "Grocery delivery in 10 min"
+            "id": "d",
+            "label": "Table reservations"
           },
           {
             "id": "a",
@@ -39738,12 +39826,16 @@
           {
             "id": "c",
             "label": "Restaurant POS software"
+          },
+          {
+            "id": "b",
+            "label": "Grocery delivery in 10 min"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Browse & search restaurants; Place order & pay; Track rider live. Out of scope for this interview: Restaurant POS integration; Grocery delivery; Video calls; Code review.",
+        "explanation": "In scope: Browse & search restaurants; Place order & pay; Track rider live. Out of scope for this interview: Restaurant POS integration; Grocery delivery; Grocery delivery in 10 min; Restaurant POS software.",
         "tags": [
           "requirements"
         ],
@@ -39989,8 +40081,8 @@
         "Grocery delivery"
       ],
       "requirementDistractors": [
-        "Video calls",
-        "Code review"
+        "Grocery delivery in 10 min",
+        "Restaurant POS software"
       ],
       "estimationScenario": "Zomato/Swiggy: assume 30M daily users each doing about 1 orders a day, with traffic peaking at 6× the daily average.",
       "apiPrompt": "The Place order call times out and the app retries. How do you avoid charging twice?",
@@ -40213,8 +40305,8 @@
             "prompt": "Which of these belongs in the first version of Zomato/Swiggy?",
             "choices": [
               {
-                "id": "b",
-                "label": "Grocery delivery in 10 min"
+                "id": "d",
+                "label": "Table reservations"
               },
               {
                 "id": "a",
@@ -40223,12 +40315,16 @@
               {
                 "id": "c",
                 "label": "Restaurant POS software"
+              },
+              {
+                "id": "b",
+                "label": "Grocery delivery in 10 min"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Browse & search restaurants; Place order & pay; Track rider live. Out of scope for this interview: Restaurant POS integration; Grocery delivery; Video calls; Code review.",
+            "explanation": "In scope: Browse & search restaurants; Place order & pay; Track rider live. Out of scope for this interview: Restaurant POS integration; Grocery delivery; Grocery delivery in 10 min; Restaurant POS software.",
             "tags": [
               "requirements"
             ],
@@ -40613,22 +40709,26 @@
         "prompt": "Which of these belongs in the first version of Google Docs?",
         "choices": [
           {
-            "id": "c",
-            "label": "Tatkal"
+            "id": "a",
+            "label": "Edit concurrently"
+          },
+          {
+            "id": "d",
+            "label": "Comment threads with mentions"
           },
           {
             "id": "b",
-            "label": "Ride matching"
+            "label": "Spreadsheet formulas"
           },
           {
-            "id": "a",
-            "label": "Edit concurrently"
+            "id": "c",
+            "label": "Offline editing on mobile"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Edit concurrently; See others’ cursors; Version history. Out of scope for this interview: Offline editing for weeks; Spreadsheets and slides; Ride matching; Tatkal.",
+        "explanation": "In scope: Edit concurrently; See others’ cursors; Version history. Out of scope for this interview: Offline editing for weeks; Spreadsheets and slides; Spreadsheet formulas; Offline editing on mobile.",
         "tags": [
           "requirements"
         ],
@@ -40874,8 +40974,8 @@
         "Spreadsheets and slides"
       ],
       "requirementDistractors": [
-        "Ride matching",
-        "Tatkal"
+        "Spreadsheet formulas",
+        "Offline editing on mobile"
       ],
       "estimationScenario": "Google Docs: assume 10M daily users each doing about 200 edit ops a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "An edit op is resent after a reconnect. How do you avoid applying it twice?",
@@ -41095,22 +41195,26 @@
             "prompt": "Which of these belongs in the first version of Google Docs?",
             "choices": [
               {
-                "id": "c",
-                "label": "Tatkal"
+                "id": "a",
+                "label": "Edit concurrently"
+              },
+              {
+                "id": "d",
+                "label": "Comment threads with mentions"
               },
               {
                 "id": "b",
-                "label": "Ride matching"
+                "label": "Spreadsheet formulas"
               },
               {
-                "id": "a",
-                "label": "Edit concurrently"
+                "id": "c",
+                "label": "Offline editing on mobile"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Edit concurrently; See others’ cursors; Version history. Out of scope for this interview: Offline editing for weeks; Spreadsheets and slides; Ride matching; Tatkal.",
+            "explanation": "In scope: Edit concurrently; See others’ cursors; Version history. Out of scope for this interview: Offline editing for weeks; Spreadsheets and slides; Spreadsheet formulas; Offline editing on mobile.",
             "tags": [
               "requirements"
             ],
@@ -41495,22 +41599,26 @@
         "prompt": "Which of these belongs in the first version of Dropbox/Drive?",
         "choices": [
           {
-            "id": "b",
-            "label": "Live scores"
+            "id": "a",
+            "label": "Upload/download files"
           },
           {
             "id": "c",
-            "label": "Rides"
+            "label": "Photo face search"
           },
           {
-            "id": "a",
-            "label": "Upload/download files"
+            "id": "b",
+            "label": "Real-time co-editing of docs"
+          },
+          {
+            "id": "d",
+            "label": "Office file previews"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Upload/download files; Sync across devices; Share with permissions. Out of scope for this interview: In-browser document editing; Photo editing features; Live scores; Rides.",
+        "explanation": "In scope: Upload/download files; Sync across devices; Share with permissions. Out of scope for this interview: In-browser document editing; Photo editing features; Real-time co-editing of docs; Photo face search.",
         "tags": [
           "requirements"
         ],
@@ -41756,8 +41864,8 @@
         "Photo editing features"
       ],
       "requirementDistractors": [
-        "Live scores",
-        "Rides"
+        "Real-time co-editing of docs",
+        "Photo face search"
       ],
       "estimationScenario": "Dropbox/Drive: assume 50M daily users each doing about 10 file ops a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "The commit call after uploading chunks times out and is retried. What makes it safe?",
@@ -41988,22 +42096,26 @@
             "prompt": "Which of these belongs in the first version of Dropbox/Drive?",
             "choices": [
               {
-                "id": "b",
-                "label": "Live scores"
+                "id": "a",
+                "label": "Upload/download files"
               },
               {
                 "id": "c",
-                "label": "Rides"
+                "label": "Photo face search"
               },
               {
-                "id": "a",
-                "label": "Upload/download files"
+                "id": "b",
+                "label": "Real-time co-editing of docs"
+              },
+              {
+                "id": "d",
+                "label": "Office file previews"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Upload/download files; Sync across devices; Share with permissions. Out of scope for this interview: In-browser document editing; Photo editing features; Live scores; Rides.",
+            "explanation": "In scope: Upload/download files; Sync across devices; Share with permissions. Out of scope for this interview: In-browser document editing; Photo editing features; Real-time co-editing of docs; Photo face search.",
             "tags": [
               "requirements"
             ],
@@ -42389,22 +42501,26 @@
         "prompt": "Which of these belongs in the first version of Payment System UPI-style?",
         "choices": [
           {
-            "id": "a",
-            "label": "Send money via VPA"
+            "id": "c",
+            "label": "International remittances"
           },
           {
             "id": "b",
-            "label": "Music streaming"
+            "label": "Credit lines on UPI"
           },
           {
-            "id": "c",
-            "label": "Memes"
+            "id": "d",
+            "label": "Merchant settlement reports"
+          },
+          {
+            "id": "a",
+            "label": "Send money via VPA"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Send money via VPA; Collect requests; Transaction history. Out of scope for this interview: Merchant settlement and payouts; Credit or lending products; Music streaming; Memes.",
+        "explanation": "In scope: Send money via VPA; Collect requests; Transaction history. Out of scope for this interview: Merchant settlement and payouts; Credit or lending products; Credit lines on UPI; International remittances.",
         "tags": [
           "requirements"
         ],
@@ -42658,8 +42774,8 @@
         "Credit or lending products"
       ],
       "requirementDistractors": [
-        "Music streaming",
-        "Memes"
+        "Credit lines on UPI",
+        "International remittances"
       ],
       "estimationScenario": "Payment System UPI-style: assume 150M daily users each doing about 3 transactions a day, with traffic peaking at 5× the daily average.",
       "apiPrompt": "A payment request times out at the PSP. What should happen next?",
@@ -42886,22 +43002,26 @@
             "prompt": "Which of these belongs in the first version of Payment System UPI-style?",
             "choices": [
               {
-                "id": "a",
-                "label": "Send money via VPA"
+                "id": "c",
+                "label": "International remittances"
               },
               {
                 "id": "b",
-                "label": "Music streaming"
+                "label": "Credit lines on UPI"
               },
               {
-                "id": "c",
-                "label": "Memes"
+                "id": "d",
+                "label": "Merchant settlement reports"
+              },
+              {
+                "id": "a",
+                "label": "Send money via VPA"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Send money via VPA; Collect requests; Transaction history. Out of scope for this interview: Merchant settlement and payouts; Credit or lending products; Music streaming; Memes.",
+            "explanation": "In scope: Send money via VPA; Collect requests; Transaction history. Out of scope for this interview: Merchant settlement and payouts; Credit or lending products; Credit lines on UPI; International remittances.",
             "tags": [
               "requirements"
             ],
@@ -43213,10 +43333,10 @@
     "slug": "digital-wallet-paytm-phonepe",
     "region": "boss-arena",
     "order": 20,
-    "title": "Digital Wallet Paytm/PhonePe",
+    "title": "Digital Wallet (PhonePe-style PPI)",
     "kind": "boss",
     "objectives": [
-      "Scope Digital Wallet Paytm/PhonePe: top-up wallet, transfer to user",
+      "Scope Digital Wallet (PhonePe-style PPI): top-up wallet, transfer to user",
       "Size it: 100M wallet transactions/day, about 5,800/s at peak",
       "Defend the design: double-entry ledger in sql; balance updates in a transaction"
     ],
@@ -43231,7 +43351,7 @@
         "id": "t93-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 93 · Digital Wallet Paytm/PhonePe: A digital wallet like Paytm or PhonePe wallet: top-up, transfer and view balance. In scope: Top-up wallet; Transfer to user; View balance & history.",
+        "body": "Boss 93 · Digital Wallet (PhonePe-style PPI): A prepaid (PPI) wallet such as PhonePe or Amazon Pay (Paytm Payments Bank wallets stopped taking top-ups after 15 Mar 2024 under RBI action): top-up, transfer and view balance. In scope: Top-up wallet; Transfer to user; View balance & history.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -43272,7 +43392,7 @@
         "id": "t93-c5",
         "kind": "animation",
         "title": "Say aloud",
-        "body": "Boss 93 close: peak QPS for Digital Wallet Paytm/PhonePe, required components client, cdn, lb, service, blob, and one mitigation.",
+        "body": "Boss 93 close: peak QPS for Digital Wallet (PhonePe-style PPI), required components client, cdn, lb, service, blob, and one mitigation.",
         "accent": "Say this",
         "teaches": [
           "tradeoffs",
@@ -43284,25 +43404,29 @@
       {
         "id": "b93-req1",
         "type": "multiple_choice",
-        "prompt": "Which of these belongs in the first version of Digital Wallet Paytm/PhonePe?",
+        "prompt": "Which of these belongs in the first version of Digital Wallet (PhonePe-style PPI)?",
         "choices": [
-          {
-            "id": "c",
-            "label": "Video ads"
-          },
-          {
-            "id": "b",
-            "label": "Feed ranking"
-          },
           {
             "id": "a",
             "label": "Top-up wallet"
+          },
+          {
+            "id": "b",
+            "label": "Credit card bill payments"
+          },
+          {
+            "id": "d",
+            "label": "International remittances"
+          },
+          {
+            "id": "c",
+            "label": "Merchant loans"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Top-up wallet; Transfer to user; View balance & history. Out of scope for this interview: Bill payments and recharges; Rewards and cashback engine; Feed ranking; Video ads.",
+        "explanation": "In scope: Top-up wallet; Transfer to user; View balance & history. Out of scope for this interview: Bill payments and recharges; Rewards and cashback engine; Credit card bill payments; Merchant loans.",
         "tags": [
           "requirements"
         ],
@@ -43311,7 +43435,7 @@
       {
         "id": "b93-req2",
         "type": "multiple_choice",
-        "prompt": "Which of these is a non-functional requirement for Digital Wallet Paytm/PhonePe?",
+        "prompt": "Which of these is a non-functional requirement for Digital Wallet (PhonePe-style PPI)?",
         "choices": [
           {
             "id": "a",
@@ -43345,7 +43469,7 @@
         "tags": [
           "estimation"
         ],
-        "prompt": "Digital Wallet Paytm/PhonePe: assume 50M daily users each doing about 2 wallet transactions a day, with traffic peaking at 5× the daily average. Estimate peak wallet transactions per second.",
+        "prompt": "Digital Wallet (PhonePe-style PPI): assume 50M daily users each doing about 2 wallet transactions a day, with traffic peaking at 5× the daily average. Estimate peak wallet transactions per second.",
         "unit": "wallet transactions/s",
         "target": 5800,
         "assumptions": [
@@ -43508,17 +43632,17 @@
     "flashcards": [
       {
         "id": "t93-f1",
-        "front": "Core flows of Digital Wallet Paytm/PhonePe?",
+        "front": "Core flows of Digital Wallet (PhonePe-style PPI)?",
         "back": "Top-up wallet; Transfer to user; View balance & history"
       },
       {
         "id": "t93-f2",
-        "front": "Peak load estimate for Digital Wallet Paytm/PhonePe?",
+        "front": "Peak load estimate for Digital Wallet (PhonePe-style PPI)?",
         "back": "50M × 2 = 100M wallet transactions/day ÷ 86,400 s ≈ 1,200/s on average; × 5 peak ≈ 5,800/s."
       },
       {
         "id": "t93-f3",
-        "front": "Key reliability mechanism in Digital Wallet Paytm/PhonePe?",
+        "front": "Key reliability mechanism in Digital Wallet (PhonePe-style PPI)?",
         "back": "Double-entry ledger in SQL; balance updates in a transaction."
       }
     ],
@@ -43548,10 +43672,10 @@
         "Rewards and cashback engine"
       ],
       "requirementDistractors": [
-        "Feed ranking",
-        "Video ads"
+        "Credit card bill payments",
+        "Merchant loans"
       ],
-      "estimationScenario": "Digital Wallet Paytm/PhonePe: assume 50M daily users each doing about 2 wallet transactions a day, with traffic peaking at 5× the daily average.",
+      "estimationScenario": "Digital Wallet (PhonePe-style PPI): assume 50M daily users each doing about 2 wallet transactions a day, with traffic peaking at 5× the daily average.",
       "apiPrompt": "A transfer request is retried after a timeout. How do you avoid moving money twice?",
       "deepDivePrompts": [
         "10× transfers between the same few merchants. What saturates first?",
@@ -43766,25 +43890,29 @@
           {
             "id": "b93-req1",
             "type": "multiple_choice",
-            "prompt": "Which of these belongs in the first version of Digital Wallet Paytm/PhonePe?",
+            "prompt": "Which of these belongs in the first version of Digital Wallet (PhonePe-style PPI)?",
             "choices": [
-              {
-                "id": "c",
-                "label": "Video ads"
-              },
-              {
-                "id": "b",
-                "label": "Feed ranking"
-              },
               {
                 "id": "a",
                 "label": "Top-up wallet"
+              },
+              {
+                "id": "b",
+                "label": "Credit card bill payments"
+              },
+              {
+                "id": "d",
+                "label": "International remittances"
+              },
+              {
+                "id": "c",
+                "label": "Merchant loans"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Top-up wallet; Transfer to user; View balance & history. Out of scope for this interview: Bill payments and recharges; Rewards and cashback engine; Feed ranking; Video ads.",
+            "explanation": "In scope: Top-up wallet; Transfer to user; View balance & history. Out of scope for this interview: Bill payments and recharges; Rewards and cashback engine; Credit card bill payments; Merchant loans.",
             "tags": [
               "requirements"
             ],
@@ -43793,7 +43921,7 @@
           {
             "id": "b93-req2",
             "type": "multiple_choice",
-            "prompt": "Which of these is a non-functional requirement for Digital Wallet Paytm/PhonePe?",
+            "prompt": "Which of these is a non-functional requirement for Digital Wallet (PhonePe-style PPI)?",
             "choices": [
               {
                 "id": "a",
@@ -43835,7 +43963,7 @@
             "tags": [
               "estimation"
             ],
-            "prompt": "Digital Wallet Paytm/PhonePe: assume 50M daily users each doing about 2 wallet transactions a day, with traffic peaking at 5× the daily average. Estimate peak wallet transactions per second.",
+            "prompt": "Digital Wallet (PhonePe-style PPI): assume 50M daily users each doing about 2 wallet transactions a day, with traffic peaking at 5× the daily average. Estimate peak wallet transactions per second.",
             "unit": "wallet transactions/s",
             "target": 5800,
             "assumptions": [
@@ -44029,7 +44157,7 @@
       }
     ],
     "bossDeep": {
-      "pitch": "A digital wallet like Paytm or PhonePe wallet: top-up, transfer and view balance.",
+      "pitch": "A prepaid (PPI) wallet such as PhonePe or Amazon Pay (Paytm Payments Bank wallets stopped taking top-ups after 15 Mar 2024 under RBI action): top-up, transfer and view balance.",
       "requirements": {
         "functional": [
           "Top-up wallet",
@@ -44169,22 +44297,26 @@
         "prompt": "Which of these belongs in the first version of BookMyShow?",
         "choices": [
           {
+            "id": "a",
+            "label": "View shows & seat map"
+          },
+          {
+            "id": "d",
+            "label": "Dynamic surge pricing"
+          },
+          {
             "id": "b",
-            "label": "Upload reels"
+            "label": "Movie reviews and ratings"
           },
           {
             "id": "c",
-            "label": "DMs"
-          },
-          {
-            "id": "a",
-            "label": "View shows & seat map"
+            "label": "Food pre-ordering"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: View shows & seat map; Hold seats for 10 min; Pay and confirm. Out of scope for this interview: Food and beverage add-ons; Dynamic pricing; Upload reels; DMs.",
+        "explanation": "In scope: View shows & seat map; Hold seats for 10 min; Pay and confirm. Out of scope for this interview: Food and beverage add-ons; Dynamic pricing; Movie reviews and ratings; Food pre-ordering.",
         "tags": [
           "requirements"
         ],
@@ -44430,8 +44562,8 @@
         "Dynamic pricing"
       ],
       "requirementDistractors": [
-        "Upload reels",
-        "DMs"
+        "Movie reviews and ratings",
+        "Food pre-ordering"
       ],
       "estimationScenario": "BookMyShow: a blockbuster opens bookings, and about 3M users each open about 4 seat maps in the first 10 minutes.",
       "apiPrompt": "Fetching the seat map is retried many times. What does it need?",
@@ -44653,22 +44785,26 @@
             "prompt": "Which of these belongs in the first version of BookMyShow?",
             "choices": [
               {
+                "id": "a",
+                "label": "View shows & seat map"
+              },
+              {
+                "id": "d",
+                "label": "Dynamic surge pricing"
+              },
+              {
                 "id": "b",
-                "label": "Upload reels"
+                "label": "Movie reviews and ratings"
               },
               {
                 "id": "c",
-                "label": "DMs"
-              },
-              {
-                "id": "a",
-                "label": "View shows & seat map"
+                "label": "Food pre-ordering"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: View shows & seat map; Hold seats for 10 min; Pay and confirm. Out of scope for this interview: Food and beverage add-ons; Dynamic pricing; Upload reels; DMs.",
+            "explanation": "In scope: View shows & seat map; Hold seats for 10 min; Pay and confirm. Out of scope for this interview: Food and beverage add-ons; Dynamic pricing; Movie reviews and ratings; Food pre-ordering.",
             "tags": [
               "requirements"
             ],
@@ -45053,6 +45189,10 @@
         "prompt": "Which of these belongs in the first version of IRCTC Tatkal Ticketing?",
         "choices": [
           {
+            "id": "d",
+            "label": "Food delivery on board"
+          },
+          {
             "id": "a",
             "label": "Search trains & availability"
           },
@@ -45068,7 +45208,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Search trains & availability; Book tatkal seats; Payment & PNR. Out of scope for this interview: Refund rules engine; Station display boards; Stories; Stickers.",
+        "explanation": "In scope: Search trains & availability; Book tatkal seats; Payment & PNR. Out of scope for this interview: Refund rules engine; Station display boards; Hotel booking at stations; Live train GPS tracking.",
         "tags": [
           "requirements"
         ],
@@ -45322,8 +45462,8 @@
         "Station display boards"
       ],
       "requirementDistractors": [
-        "Stories",
-        "Stickers"
+        "Hotel booking at stations",
+        "Live train GPS tracking"
       ],
       "estimationScenario": "IRCTC Tatkal: when the AC Tatkal window opens at 10:00, about 1M booking attempts arrive in the first minute.",
       "apiPrompt": "Searching trains is retried often. What does it need?",
@@ -45554,6 +45694,10 @@
             "prompt": "Which of these belongs in the first version of IRCTC Tatkal Ticketing?",
             "choices": [
               {
+                "id": "d",
+                "label": "Food delivery on board"
+              },
+              {
                 "id": "a",
                 "label": "Search trains & availability"
               },
@@ -45569,7 +45713,7 @@
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Search trains & availability; Book tatkal seats; Payment & PNR. Out of scope for this interview: Refund rules engine; Station display boards; Stories; Stickers.",
+            "explanation": "In scope: Search trains & availability; Book tatkal seats; Payment & PNR. Out of scope for this interview: Refund rules engine; Station display boards; Hotel booking at stations; Live train GPS tracking.",
             "tags": [
               "requirements"
             ],
@@ -45901,7 +46045,7 @@
         "id": "t96-c1",
         "kind": "text",
         "title": "The brief",
-        "body": "Boss 96 · Leaderboard: Live fantasy-contest leaderboards during IPL matches: update scores, show rank and top N. In scope: Update scores live; Show rank and top-N; Millions per contest.",
+        "body": "Boss 96 · Leaderboard: Live free-to-play fantasy-contest leaderboards during IPL matches: update scores, show rank and top N. In scope: Update scores live; Show rank and top-N; Millions per contest.",
         "accent": "Interview lens",
         "teaches": [
           "requirements"
@@ -45911,7 +46055,7 @@
         "id": "t96-c2",
         "kind": "text",
         "title": "Quality bar",
-        "body": "Boss 96 non-functionals: Updates within seconds. Massive spikes at match time. Accurate final ranks. Out of scope: Prize payout processing; Team creation UI.",
+        "body": "Boss 96 non-functionals: Updates within seconds. Massive spikes at match time. Accurate final ranks. Out of scope: Reward fulfilment; Team creation UI.",
         "teaches": [
           "requirements",
           "estimation"
@@ -45921,7 +46065,7 @@
         "id": "t96-c3",
         "kind": "diagram",
         "title": "Reference sketch",
-        "body": "Boss 96 reference path: Score events streamed; workers update Redis sorted sets per contest. → Sharded sorted sets for huge contests; top-N cached. → Final ranks computed in batch for payouts.",
+        "body": "Boss 96 reference path: Score events streamed; workers update Redis sorted sets per contest. → Sharded sorted sets for huge contests; top-N cached. → Final ranks computed in batch for rewards.",
         "teaches": [
           "api",
           "architecture",
@@ -45932,7 +46076,7 @@
         "id": "t96-c4",
         "kind": "text",
         "title": "Failure modes",
-        "body": "Boss 96 risks: Update fan-out: One wicket changes points for every team containing that bowler, possibly millions of teams; recomputing per team in batches every few seconds is cheaper than per ball per team in real time. Accurate final ranks: Live ranks can be approximate, but prize distribution uses a deterministic batch computation with tie-break rules, audited before payout.",
+        "body": "Boss 96 risks: Update fan-out: One wicket changes points for every team containing that bowler, possibly millions of teams; recomputing per team in batches every few seconds is cheaper than per ball per team in real time. Accurate final ranks: Live ranks can be approximate, but final standings use a deterministic batch computation with tie-break rules, audited before rewards are announced. Real-money contests are banned in India since the Online Gaming Act, 2025, so rewards are non-cash.",
         "teaches": [
           "deep_dive",
           "tradeoffs"
@@ -45957,22 +46101,26 @@
         "prompt": "Which of these belongs in the first version of Leaderboard?",
         "choices": [
           {
-            "id": "a",
-            "label": "Update scores live"
+            "id": "c",
+            "label": "Fraud detection on teams"
+          },
+          {
+            "id": "d",
+            "label": "Social chat in contests"
           },
           {
             "id": "b",
-            "label": "File sync"
+            "label": "Real-money entry fees"
           },
           {
-            "id": "c",
-            "label": "Paste"
+            "id": "a",
+            "label": "Update scores live"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Update scores live; Show rank and top-N; Millions per contest. Out of scope for this interview: Prize payout processing; Team creation UI; File sync; Paste.",
+        "explanation": "In scope: Update scores live; Show rank and top-N; Millions per contest. Out of scope for this interview: Reward fulfilment; Team creation UI; Prize payouts in cash; Fraud detection on teams.",
         "tags": [
           "requirements"
         ],
@@ -46214,12 +46362,12 @@
         "Accurate final ranks"
       ],
       "exclusions": [
-        "Prize payout processing",
+        "Reward fulfilment",
         "Team creation UI"
       ],
       "requirementDistractors": [
-        "File sync",
-        "Paste"
+        "Real-money entry fees",
+        "Fraud detection on teams"
       ],
       "estimationScenario": "Leaderboard: assume 20M daily users each doing about 20 score reads a day, with traffic peaking at 8× the daily average.",
       "apiPrompt": "The scoring feed sends the same event twice. How do points stay correct?",
@@ -46291,7 +46439,7 @@
         "reliabilityChecks": [
           "Score events streamed; workers update Redis sorted sets per contest.",
           "Sharded sorted sets for huge contests; top-N cached.",
-          "Final ranks computed in batch for payouts."
+          "Final ranks computed in batch for rewards."
         ]
       },
       "referenceNodes": [
@@ -46369,7 +46517,7 @@
           "to": "w1"
         }
       ],
-      "referenceNotes": "Core flows: Update scores live; Show rank and top-N; Millions per contest. Must hold: Updates within seconds; Massive spikes at match time; Accurate final ranks. Key mechanisms: Score events streamed; workers update Redis sorted sets per contest. Sharded sorted sets for huge contests; top-N cached. Final ranks computed in batch for payouts.",
+      "referenceNotes": "Core flows: Update scores live; Show rank and top-N; Millions per contest. Must hold: Updates within seconds; Massive spikes at match time; Accurate final ranks. Key mechanisms: Score events streamed; workers update Redis sorted sets per contest. Sharded sorted sets for huge contests; top-N cached. Final ranks computed in batch for rewards.",
       "workedEstimate": "20M × 20 = 400M score reads/day ÷ 86,400 s ≈ 4,600/s on average; × 8 peak ≈ 37,000/s.",
       "exampleApi": "Internal: POST /v1/scores {contestId, teamId, points} (from scoring feed)\nGET /v1/contests/{id}/rank/{teamId} -> rank\nGET /v1/contests/{id}/top?n=100",
       "deepDiveAnswers": [
@@ -46440,22 +46588,26 @@
             "prompt": "Which of these belongs in the first version of Leaderboard?",
             "choices": [
               {
-                "id": "a",
-                "label": "Update scores live"
+                "id": "c",
+                "label": "Fraud detection on teams"
+              },
+              {
+                "id": "d",
+                "label": "Social chat in contests"
               },
               {
                 "id": "b",
-                "label": "File sync"
+                "label": "Real-money entry fees"
               },
               {
-                "id": "c",
-                "label": "Paste"
+                "id": "a",
+                "label": "Update scores live"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Update scores live; Show rank and top-N; Millions per contest. Out of scope for this interview: Prize payout processing; Team creation UI; File sync; Paste.",
+            "explanation": "In scope: Update scores live; Show rank and top-N; Millions per contest. Out of scope for this interview: Reward fulfilment; Team creation UI; Prize payouts in cash; Fraud detection on teams.",
             "tags": [
               "requirements"
             ],
@@ -46700,7 +46852,7 @@
       }
     ],
     "bossDeep": {
-      "pitch": "Live fantasy-contest leaderboards during IPL matches: update scores, show rank and top N.",
+      "pitch": "Live free-to-play fantasy-contest leaderboards during IPL matches: update scores, show rank and top N.",
       "requirements": {
         "functional": [
           "Update scores live",
@@ -46713,7 +46865,7 @@
           "Accurate final ranks"
         ],
         "outOfScope": [
-          "Prize payout processing",
+          "Reward fulfilment",
           "Team creation UI"
         ]
       },
@@ -46740,9 +46892,9 @@
           "Workers compute each team's new total (teams contain 11 players) and update Redis sorted sets per contest in batches with ZADD.",
           "Top-N comes from ZREVRANGE and 'my rank' from ZREVRANK, cached for a few seconds and pushed to clients.",
           "Very large contests can be split into buckets by score range, or ranks approximated during play and computed exactly at the end.",
-          "Final ranks are recomputed from the authoritative scores in batch after the match before prizes are paid."
+          "Final ranks are recomputed from the authoritative scores in batch after the match before rewards are announced."
         ],
-        "diagram": "scoring feed -> Kafka -> points svc -> team totals -> Redis ZADD (per contest)\napp -> rank svc -> ZREVRANK / ZREVRANGE (cached seconds)\nmatch end -> batch recompute -> prizes"
+        "diagram": "scoring feed -> Kafka -> points svc -> team totals -> Redis ZADD (per contest)\napp -> rank svc -> ZREVRANK / ZREVRANGE (cached seconds)\nmatch end -> batch recompute -> final ranks"
       },
       "deepDives": [
         {
@@ -46751,7 +46903,7 @@
         },
         {
           "title": "Accurate final ranks",
-          "body": "Live ranks can be approximate, but prize distribution uses a deterministic batch computation with tie-break rules, audited before payout."
+          "body": "Live ranks can be approximate, but final standings use a deterministic batch computation with tie-break rules, audited before rewards are announced. Real-money contests are banned in India since the Online Gaming Act, 2025, so rewards are non-cash."
         }
       ],
       "rubric": [
@@ -46840,22 +46992,26 @@
         "prompt": "Which of these belongs in the first version of Typeahead?",
         "choices": [
           {
-            "id": "a",
-            "label": "Suggest top queries for prefix"
-          },
-          {
             "id": "b",
             "label": "Spell-correct full queries"
           },
           {
             "id": "c",
             "label": "Personal search history UI"
+          },
+          {
+            "id": "d",
+            "label": "Image suggestions"
+          },
+          {
+            "id": "a",
+            "label": "Suggest top queries for prefix"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Suggest top queries for prefix; Update with trending queries; Handle Hinglish/typos. Out of scope for this interview: Full search results page; Personalised suggestions per user; Payments; Video upload.",
+        "explanation": "In scope: Suggest top queries for prefix; Update with trending queries; Handle Hinglish/typos. Out of scope for this interview: Full search results page; Personalised suggestions per user; Spell-correct full queries; Personal search history UI.",
         "tags": [
           "requirements"
         ],
@@ -47101,8 +47257,8 @@
         "Personalised suggestions per user"
       ],
       "requirementDistractors": [
-        "Payments",
-        "Video upload"
+        "Spell-correct full queries",
+        "Personal search history UI"
       ],
       "estimationScenario": "Typeahead: assume 50M daily users each doing about 20 keystrokes a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "The suggest call fires on every keystroke and may repeat. What makes this safe?",
@@ -47323,22 +47479,26 @@
             "prompt": "Which of these belongs in the first version of Typeahead?",
             "choices": [
               {
-                "id": "a",
-                "label": "Suggest top queries for prefix"
-              },
-              {
                 "id": "b",
                 "label": "Spell-correct full queries"
               },
               {
                 "id": "c",
                 "label": "Personal search history UI"
+              },
+              {
+                "id": "d",
+                "label": "Image suggestions"
+              },
+              {
+                "id": "a",
+                "label": "Suggest top queries for prefix"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Suggest top queries for prefix; Update with trending queries; Handle Hinglish/typos. Out of scope for this interview: Full search results page; Personalised suggestions per user; Payments; Video upload.",
+            "explanation": "In scope: Suggest top queries for prefix; Update with trending queries; Handle Hinglish/typos. Out of scope for this interview: Full search results page; Personalised suggestions per user; Spell-correct full queries; Personal search history UI.",
             "tags": [
               "requirements"
             ],
@@ -47724,12 +47884,16 @@
         "prompt": "Which of these belongs in the first version of Web Crawler?",
         "choices": [
           {
-            "id": "a",
-            "label": "Fetch pages from seed URLs"
-          },
-          {
             "id": "b",
             "label": "Rank pages by relevance"
+          },
+          {
+            "id": "d",
+            "label": "Full-text search UI"
+          },
+          {
+            "id": "a",
+            "label": "Fetch pages from seed URLs"
           },
           {
             "id": "c",
@@ -47739,7 +47903,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Fetch pages from seed URLs; Extract and enqueue links; Respect robots.txt and politeness. Out of scope for this interview: Ranking search results; Executing JavaScript-heavy pages; User login; Payments.",
+        "explanation": "In scope: Fetch pages from seed URLs; Extract and enqueue links; Respect robots.txt and politeness. Out of scope for this interview: Ranking search results; Executing JavaScript-heavy pages; Rank pages by relevance; Render pages for screenshots.",
         "tags": [
           "requirements"
         ],
@@ -47985,8 +48149,8 @@
         "Executing JavaScript-heavy pages"
       ],
       "requirementDistractors": [
-        "User login",
-        "Payments"
+        "Rank pages by relevance",
+        "Render pages for screenshots"
       ],
       "estimationScenario": "Web Crawler: assume about 1B pages fetched a day, with traffic peaking at 1× the daily average.",
       "apiPrompt": "A fetcher crashes mid-page and the URL is retried. What keeps that safe?",
@@ -48198,12 +48362,16 @@
             "prompt": "Which of these belongs in the first version of Web Crawler?",
             "choices": [
               {
-                "id": "a",
-                "label": "Fetch pages from seed URLs"
-              },
-              {
                 "id": "b",
                 "label": "Rank pages by relevance"
+              },
+              {
+                "id": "d",
+                "label": "Full-text search UI"
+              },
+              {
+                "id": "a",
+                "label": "Fetch pages from seed URLs"
               },
               {
                 "id": "c",
@@ -48213,7 +48381,7 @@
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Fetch pages from seed URLs; Extract and enqueue links; Respect robots.txt and politeness. Out of scope for this interview: Ranking search results; Executing JavaScript-heavy pages; User login; Payments.",
+            "explanation": "In scope: Fetch pages from seed URLs; Extract and enqueue links; Respect robots.txt and politeness. Out of scope for this interview: Ranking search results; Executing JavaScript-heavy pages; Rank pages by relevance; Render pages for screenshots.",
             "tags": [
               "requirements"
             ],
@@ -48598,22 +48766,26 @@
         "prompt": "Which of these belongs in the first version of Search Engine?",
         "choices": [
           {
+            "id": "b",
+            "label": "Personalised ranking with ML"
+          },
+          {
             "id": "a",
             "label": "Keyword search"
           },
           {
-            "id": "c",
-            "label": "Rides"
+            "id": "d",
+            "label": "Sponsored listings"
           },
           {
-            "id": "b",
-            "label": "Live chat"
+            "id": "c",
+            "label": "Voice search"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Keyword search; Filters & facets; Ranking. Out of scope for this interview: Ads and sponsored listings; Recommendations; Live chat; Rides.",
+        "explanation": "In scope: Keyword search; Filters & facets; Ranking. Out of scope for this interview: Ads and sponsored listings; Recommendations; Personalised ranking with ML; Voice search.",
         "tags": [
           "requirements"
         ],
@@ -48859,8 +49031,8 @@
         "Recommendations"
       ],
       "requirementDistractors": [
-        "Live chat",
-        "Rides"
+        "Personalised ranking with ML",
+        "Voice search"
       ],
       "estimationScenario": "Search Engine: assume 80M daily users each doing about 10 searches a day, with traffic peaking at 6× the daily average.",
       "apiPrompt": "A search request is retried after a timeout. What does it need?",
@@ -49082,22 +49254,26 @@
             "prompt": "Which of these belongs in the first version of Search Engine?",
             "choices": [
               {
+                "id": "b",
+                "label": "Personalised ranking with ML"
+              },
+              {
                 "id": "a",
                 "label": "Keyword search"
               },
               {
-                "id": "c",
-                "label": "Rides"
+                "id": "d",
+                "label": "Sponsored listings"
               },
               {
-                "id": "b",
-                "label": "Live chat"
+                "id": "c",
+                "label": "Voice search"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Keyword search; Filters & facets; Ranking. Out of scope for this interview: Ads and sponsored listings; Recommendations; Live chat; Rides.",
+            "explanation": "In scope: Keyword search; Filters & facets; Ranking. Out of scope for this interview: Ads and sponsored listings; Recommendations; Personalised ranking with ML; Voice search.",
             "tags": [
               "requirements"
             ],
@@ -49482,22 +49658,26 @@
         "prompt": "Which of these belongs in the first version of Metrics & Monitoring?",
         "choices": [
           {
+            "id": "c",
+            "label": "Log search"
+          },
+          {
+            "id": "d",
+            "label": "Incident on-call rotas"
+          },
+          {
             "id": "b",
-            "label": "Wallet"
+            "label": "Distributed tracing"
           },
           {
             "id": "a",
             "label": "Ingest metrics"
-          },
-          {
-            "id": "c",
-            "label": "Seat booking"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Ingest metrics; Query dashboards; Alert on thresholds. Out of scope for this interview: Distributed tracing; Log search; Wallet; Seat booking.",
+        "explanation": "In scope: Ingest metrics; Query dashboards; Alert on thresholds. Out of scope for this interview: Distributed tracing; Log search; Distributed tracing; Log search.",
         "tags": [
           "requirements"
         ],
@@ -49743,8 +49923,8 @@
         "Log search"
       ],
       "requirementDistractors": [
-        "Wallet",
-        "Seat booking"
+        "Distributed tracing",
+        "Log search"
       ],
       "estimationScenario": "Metrics & Monitoring: assume about 5B data points a day, with traffic peaking at 2× the daily average.",
       "apiPrompt": "An agent resends a batch of samples. How do totals stay right?",
@@ -49952,22 +50132,26 @@
             "prompt": "Which of these belongs in the first version of Metrics & Monitoring?",
             "choices": [
               {
+                "id": "c",
+                "label": "Log search"
+              },
+              {
+                "id": "d",
+                "label": "Incident on-call rotas"
+              },
+              {
                 "id": "b",
-                "label": "Wallet"
+                "label": "Distributed tracing"
               },
               {
                 "id": "a",
                 "label": "Ingest metrics"
-              },
-              {
-                "id": "c",
-                "label": "Seat booking"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Ingest metrics; Query dashboards; Alert on thresholds. Out of scope for this interview: Distributed tracing; Log search; Wallet; Seat booking.",
+            "explanation": "In scope: Ingest metrics; Query dashboards; Alert on thresholds. Out of scope for this interview: Distributed tracing; Log search; Distributed tracing; Log search.",
             "tags": [
               "requirements"
             ],
@@ -50351,6 +50535,10 @@
         "prompt": "In a pipeline shipping application logs from thousands of pods, which capability belongs in version one of Distributed Logging?",
         "choices": [
           {
+            "id": "a",
+            "label": "Collect logs from every service"
+          },
+          {
             "id": "b",
             "label": "Metrics dashboards"
           },
@@ -50360,17 +50548,13 @@
           },
           {
             "id": "d",
-            "label": "Shopping cart"
-          },
-          {
-            "id": "a",
-            "label": "Collect logs from every service"
+            "label": "Alert on-call rotas"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Collect logs from every service; Search logs by time, service and text; Keep logs for 30 days. Out of scope for this interview: Metrics dashboards; Distributed tracing UI; Shopping cart; Video transcoding.",
+        "explanation": "In scope: Collect logs from every service; Search logs by time, service and text; Keep logs for 30 days. Out of scope for this interview: Metrics dashboards; Distributed tracing UI; Metrics dashboards; Distributed tracing UI.",
         "tags": [
           "requirements"
         ],
@@ -50616,8 +50800,8 @@
         "Distributed tracing UI"
       ],
       "requirementDistractors": [
-        "Shopping cart",
-        "Video transcoding"
+        "Metrics dashboards",
+        "Distributed tracing UI"
       ],
       "estimationScenario": "Distributed Logging: assume about 5B log lines a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "An agent resends a batch after a timeout. What prevents duplicate lines?",
@@ -50811,6 +50995,10 @@
             "prompt": "In a pipeline shipping application logs from thousands of pods, which capability belongs in version one of Distributed Logging?",
             "choices": [
               {
+                "id": "a",
+                "label": "Collect logs from every service"
+              },
+              {
                 "id": "b",
                 "label": "Metrics dashboards"
               },
@@ -50820,17 +51008,13 @@
               },
               {
                 "id": "d",
-                "label": "Shopping cart"
-              },
-              {
-                "id": "a",
-                "label": "Collect logs from every service"
+                "label": "Alert on-call rotas"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Collect logs from every service; Search logs by time, service and text; Keep logs for 30 days. Out of scope for this interview: Metrics dashboards; Distributed tracing UI; Shopping cart; Video transcoding.",
+            "explanation": "In scope: Collect logs from every service; Search logs by time, service and text; Keep logs for 30 days. Out of scope for this interview: Metrics dashboards; Distributed tracing UI; Metrics dashboards; Distributed tracing UI.",
             "tags": [
               "requirements"
             ],
@@ -51214,12 +51398,16 @@
         "prompt": "Which of these belongs in the first version of Distributed Message Queue?",
         "choices": [
           {
+            "id": "d",
+            "label": "Delayed delivery per message"
+          },
+          {
             "id": "b",
-            "label": "Thumbnails"
+            "label": "Exactly-once across systems"
           },
           {
             "id": "c",
-            "label": "Seat maps"
+            "label": "Message priorities"
           },
           {
             "id": "a",
@@ -51229,7 +51417,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Produce messages; Consume with offsets; Retention. Out of scope for this interview: Message transformation and routing rules; Exactly-once end to end across external systems; Thumbnails; Seat maps.",
+        "explanation": "In scope: Produce messages; Consume with offsets; Retention. Out of scope for this interview: Message transformation and routing rules; Exactly-once end to end across external systems; Exactly-once across systems; Message priorities.",
         "tags": [
           "requirements"
         ],
@@ -51475,8 +51663,8 @@
         "Exactly-once end to end across external systems"
       ],
       "requirementDistractors": [
-        "Thumbnails",
-        "Seat maps"
+        "Exactly-once across systems",
+        "Message priorities"
       ],
       "estimationScenario": "Distributed Message Queue: assume about 10B messages a day, with traffic peaking at 2× the daily average.",
       "apiPrompt": "A producer retries after a timeout. How do you avoid duplicate records?",
@@ -51686,12 +51874,16 @@
             "prompt": "Which of these belongs in the first version of Distributed Message Queue?",
             "choices": [
               {
+                "id": "d",
+                "label": "Delayed delivery per message"
+              },
+              {
                 "id": "b",
-                "label": "Thumbnails"
+                "label": "Exactly-once across systems"
               },
               {
                 "id": "c",
-                "label": "Seat maps"
+                "label": "Message priorities"
               },
               {
                 "id": "a",
@@ -51701,7 +51893,7 @@
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Produce messages; Consume with offsets; Retention. Out of scope for this interview: Message transformation and routing rules; Exactly-once end to end across external systems; Thumbnails; Seat maps.",
+            "explanation": "In scope: Produce messages; Consume with offsets; Retention. Out of scope for this interview: Message transformation and routing rules; Exactly-once end to end across external systems; Exactly-once across systems; Message priorities.",
             "tags": [
               "requirements"
             ],
@@ -52085,22 +52277,26 @@
         "prompt": "In a cron-like service that triggers billing runs and nightly reports, which capability belongs in version one of Distributed Job Scheduler?",
         "choices": [
           {
-            "id": "a",
-            "label": "Schedule recurring/one-off jobs"
+            "id": "c",
+            "label": "Per-job cost billing"
           },
           {
             "id": "b",
             "label": "Workflow DAG designer UI"
           },
           {
-            "id": "c",
-            "label": "Per-job cost billing"
+            "id": "d",
+            "label": "Cross-job data lineage"
+          },
+          {
+            "id": "a",
+            "label": "Schedule recurring/one-off jobs"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Schedule recurring/one-off jobs; Execute on workers; Retries & history. Out of scope for this interview: Workflow DAG authoring UI; Running arbitrary user containers; Image CDN; Chat.",
+        "explanation": "In scope: Schedule recurring/one-off jobs; Execute on workers; Retries & history. Out of scope for this interview: Workflow DAG authoring UI; Running arbitrary user containers; Workflow DAG designer UI; Per-job cost billing.",
         "tags": [
           "requirements"
         ],
@@ -52346,8 +52542,8 @@
         "Running arbitrary user containers"
       ],
       "requirementDistractors": [
-        "Image CDN",
-        "Chat"
+        "Workflow DAG designer UI",
+        "Per-job cost billing"
       ],
       "estimationScenario": "Distributed Job Scheduler: assume 1M daily users each doing about 10 job runs a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "A job runs twice after a worker crash. What makes that safe?",
@@ -52567,22 +52763,26 @@
             "prompt": "In a cron-like service that triggers billing runs and nightly reports, which capability belongs in version one of Distributed Job Scheduler?",
             "choices": [
               {
-                "id": "a",
-                "label": "Schedule recurring/one-off jobs"
+                "id": "c",
+                "label": "Per-job cost billing"
               },
               {
                 "id": "b",
                 "label": "Workflow DAG designer UI"
               },
               {
-                "id": "c",
-                "label": "Per-job cost billing"
+                "id": "d",
+                "label": "Cross-job data lineage"
+              },
+              {
+                "id": "a",
+                "label": "Schedule recurring/one-off jobs"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Schedule recurring/one-off jobs; Execute on workers; Retries & history. Out of scope for this interview: Workflow DAG authoring UI; Running arbitrary user containers; Image CDN; Chat.",
+            "explanation": "In scope: Schedule recurring/one-off jobs; Execute on workers; Retries & history. Out of scope for this interview: Workflow DAG authoring UI; Running arbitrary user containers; Workflow DAG designer UI; Per-job cost billing.",
             "tags": [
               "requirements"
             ],
@@ -52966,22 +53166,26 @@
         "prompt": "Which of these belongs in the first version of Proximity Service Yelp?",
         "choices": [
           {
+            "id": "d",
+            "label": "User reviews moderation"
+          },
+          {
             "id": "a",
             "label": "Search places nearby"
           },
           {
             "id": "b",
-            "label": "Payments"
+            "label": "Turn-by-turn navigation"
           },
           {
             "id": "c",
-            "label": "Chat"
+            "label": "Table bookings"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Search places nearby; View details; Add/update places. Out of scope for this interview: Reviews and ratings system; Turn-by-turn navigation; Payments; Chat.",
+        "explanation": "In scope: Search places nearby; View details; Add/update places. Out of scope for this interview: Reviews and ratings system; Turn-by-turn navigation; Turn-by-turn navigation; Table bookings.",
         "tags": [
           "requirements"
         ],
@@ -53227,8 +53431,8 @@
         "Turn-by-turn navigation"
       ],
       "requirementDistractors": [
-        "Payments",
-        "Chat"
+        "Turn-by-turn navigation",
+        "Table bookings"
       ],
       "estimationScenario": "Proximity Service Yelp: assume 50M daily users each doing about 5 nearby searches a day, with traffic peaking at 4× the daily average.",
       "apiPrompt": "A nearby search is retried. What does it need?",
@@ -53429,22 +53633,26 @@
             "prompt": "Which of these belongs in the first version of Proximity Service Yelp?",
             "choices": [
               {
+                "id": "d",
+                "label": "User reviews moderation"
+              },
+              {
                 "id": "a",
                 "label": "Search places nearby"
               },
               {
                 "id": "b",
-                "label": "Payments"
+                "label": "Turn-by-turn navigation"
               },
               {
                 "id": "c",
-                "label": "Chat"
+                "label": "Table bookings"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Search places nearby; View details; Add/update places. Out of scope for this interview: Reviews and ratings system; Turn-by-turn navigation; Payments; Chat.",
+            "explanation": "In scope: Search places nearby; View details; Add/update places. Out of scope for this interview: Reviews and ratings system; Turn-by-turn navigation; Turn-by-turn navigation; Table bookings.",
             "tags": [
               "requirements"
             ],
@@ -53830,22 +54038,26 @@
         "prompt": "Which of these belongs in the first version of Flash Sale Big Billion Day?",
         "choices": [
           {
-            "id": "c",
-            "label": "Chat"
+            "id": "b",
+            "label": "Personalised recommendations"
           },
           {
-            "id": "b",
-            "label": "Docs"
+            "id": "c",
+            "label": "Product reviews"
           },
           {
             "id": "a",
             "label": "Show sale item"
+          },
+          {
+            "id": "d",
+            "label": "Price history charts"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Show sale item; Buy within limit; Pay. Out of scope for this interview: Catalogue management; Post-sale returns; Docs; Chat.",
+        "explanation": "In scope: Show sale item; Buy within limit; Pay. Out of scope for this interview: Catalogue management; Post-sale returns; Personalised recommendations; Product reviews.",
         "tags": [
           "requirements"
         ],
@@ -54091,8 +54303,8 @@
         "Post-sale returns"
       ],
       "requirementDistractors": [
-        "Docs",
-        "Chat"
+        "Personalised recommendations",
+        "Product reviews"
       ],
       "estimationScenario": "Flash Sale Big Billion Day: at 12:00 about 10M users each make about 3 buy attempts in the first 5 minutes.",
       "apiPrompt": "Reserve is retried after a timeout. How do you avoid holding two units?",
@@ -54315,22 +54527,26 @@
             "prompt": "Which of these belongs in the first version of Flash Sale Big Billion Day?",
             "choices": [
               {
-                "id": "c",
-                "label": "Chat"
+                "id": "b",
+                "label": "Personalised recommendations"
               },
               {
-                "id": "b",
-                "label": "Docs"
+                "id": "c",
+                "label": "Product reviews"
               },
               {
                 "id": "a",
                 "label": "Show sale item"
+              },
+              {
+                "id": "d",
+                "label": "Price history charts"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Show sale item; Buy within limit; Pay. Out of scope for this interview: Catalogue management; Post-sale returns; Docs; Chat.",
+            "explanation": "In scope: Show sale item; Buy within limit; Pay. Out of scope for this interview: Catalogue management; Post-sale returns; Personalised recommendations; Product reviews.",
             "tags": [
               "requirements"
             ],
@@ -54714,22 +54930,26 @@
         "prompt": "Which of these belongs in the first version of Hotel Booking Airbnb/OYO?",
         "choices": [
           {
+            "id": "b",
+            "label": "Dynamic pricing engine"
+          },
+          {
+            "id": "d",
+            "label": "Loyalty points"
+          },
+          {
             "id": "a",
             "label": "Search hotels"
           },
           {
-            "id": "b",
-            "label": "Reels"
-          },
-          {
             "id": "c",
-            "label": "Ticks"
+            "label": "Host payouts"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Search hotels; Reserve room; Pay & confirm. Out of scope for this interview: Loyalty programme; Reviews and photos moderation; Reels; Ticks.",
+        "explanation": "In scope: Search hotels; Reserve room; Pay & confirm. Out of scope for this interview: Loyalty programme; Reviews and photos moderation; Dynamic pricing engine; Host payouts.",
         "tags": [
           "requirements"
         ],
@@ -54975,8 +55195,8 @@
         "Reviews and photos moderation"
       ],
       "requirementDistractors": [
-        "Reels",
-        "Ticks"
+        "Dynamic pricing engine",
+        "Host payouts"
       ],
       "estimationScenario": "Hotel Booking Airbnb/OYO: assume 10M daily users each doing about 8 searches a day, with traffic peaking at 4× the daily average.",
       "apiPrompt": "Confirm booking is retried. How do you avoid two bookings?",
@@ -55198,22 +55418,26 @@
             "prompt": "Which of these belongs in the first version of Hotel Booking Airbnb/OYO?",
             "choices": [
               {
+                "id": "b",
+                "label": "Dynamic pricing engine"
+              },
+              {
+                "id": "d",
+                "label": "Loyalty points"
+              },
+              {
                 "id": "a",
                 "label": "Search hotels"
               },
               {
-                "id": "b",
-                "label": "Reels"
-              },
-              {
                 "id": "c",
-                "label": "Ticks"
+                "label": "Host payouts"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Search hotels; Reserve room; Pay & confirm. Out of scope for this interview: Loyalty programme; Reviews and photos moderation; Reels; Ticks.",
+            "explanation": "In scope: Search hotels; Reserve room; Pay & confirm. Out of scope for this interview: Loyalty programme; Reviews and photos moderation; Dynamic pricing engine; Host payouts.",
             "tags": [
               "requirements"
             ],
@@ -55597,22 +55821,26 @@
         "prompt": "Which of these belongs in the first version of Ad Click Aggregator?",
         "choices": [
           {
+            "id": "b",
+            "label": "Ad auction and bidding"
+          },
+          {
             "id": "c",
-            "label": "Seats"
+            "label": "Fraud ML scoring"
           },
           {
             "id": "a",
             "label": "Record clicks"
           },
           {
-            "id": "b",
-            "label": "Stories"
+            "id": "d",
+            "label": "Creative uploads"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Record clicks; Aggregate per ad per minute; Query reports. Out of scope for this interview: Bidding and ad ranking; Fraud detection models; Stories; Seats.",
+        "explanation": "In scope: Record clicks; Aggregate per ad per minute; Query reports. Out of scope for this interview: Bidding and ad ranking; Fraud detection models; Ad auction and bidding; Fraud ML scoring.",
         "tags": [
           "requirements"
         ],
@@ -55858,8 +56086,8 @@
         "Fraud detection models"
       ],
       "requirementDistractors": [
-        "Stories",
-        "Seats"
+        "Ad auction and bidding",
+        "Fraud ML scoring"
       ],
       "estimationScenario": "Ad Click Aggregator: assume 100M daily users each doing about 10 click events a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "A click is logged twice after a retry. How do counts stay right?",
@@ -56068,22 +56296,26 @@
             "prompt": "Which of these belongs in the first version of Ad Click Aggregator?",
             "choices": [
               {
+                "id": "b",
+                "label": "Ad auction and bidding"
+              },
+              {
                 "id": "c",
-                "label": "Seats"
+                "label": "Fraud ML scoring"
               },
               {
                 "id": "a",
                 "label": "Record clicks"
               },
               {
-                "id": "b",
-                "label": "Stories"
+                "id": "d",
+                "label": "Creative uploads"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Record clicks; Aggregate per ad per minute; Query reports. Out of scope for this interview: Bidding and ad ranking; Fraud detection models; Stories; Seats.",
+            "explanation": "In scope: Record clicks; Aggregate per ad per minute; Query reports. Out of scope for this interview: Bidding and ad ranking; Fraud detection models; Ad auction and bidding; Fraud ML scoring.",
             "tags": [
               "requirements"
             ],
@@ -56469,26 +56701,26 @@
         "prompt": "Which of these belongs in the first version of Stock Exchange Matching?",
         "choices": [
           {
-            "id": "a",
-            "label": "Place limit and market orders"
+            "id": "c",
+            "label": "KYC onboarding"
           },
           {
             "id": "b",
             "label": "Portfolio analytics"
           },
           {
-            "id": "c",
-            "label": "KYC onboarding"
+            "id": "a",
+            "label": "Place limit and market orders"
           },
           {
             "id": "d",
-            "label": "Photo filters"
+            "label": "Margin lending"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Place limit and market orders; Match buy and sell orders by price-time priority; Publish trades and order book updates. Out of scope for this interview: Portfolio analytics; KYC onboarding; Photo filters; Restaurant reviews.",
+        "explanation": "In scope: Place limit and market orders; Match buy and sell orders by price-time priority; Publish trades and order book updates. Out of scope for this interview: Portfolio analytics; KYC onboarding; Portfolio analytics; KYC onboarding.",
         "tags": [
           "requirements"
         ],
@@ -56738,8 +56970,8 @@
         "KYC onboarding"
       ],
       "requirementDistractors": [
-        "Photo filters",
-        "Restaurant reviews"
+        "Portfolio analytics",
+        "KYC onboarding"
       ],
       "estimationScenario": "Stock Exchange Matching: about 500M orders a day arrive during a 6.25-hour session (9:15 to 15:30), peaking at 10× the session average.",
       "apiPrompt": "An order is resent after a timeout. How do you avoid a double order?",
@@ -56944,26 +57176,26 @@
             "prompt": "Which of these belongs in the first version of Stock Exchange Matching?",
             "choices": [
               {
-                "id": "a",
-                "label": "Place limit and market orders"
+                "id": "c",
+                "label": "KYC onboarding"
               },
               {
                 "id": "b",
                 "label": "Portfolio analytics"
               },
               {
-                "id": "c",
-                "label": "KYC onboarding"
+                "id": "a",
+                "label": "Place limit and market orders"
               },
               {
                 "id": "d",
-                "label": "Photo filters"
+                "label": "Margin lending"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Place limit and market orders; Match buy and sell orders by price-time priority; Publish trades and order book updates. Out of scope for this interview: Portfolio analytics; KYC onboarding; Photo filters; Restaurant reviews.",
+            "explanation": "In scope: Place limit and market orders; Match buy and sell orders by price-time priority; Publish trades and order book updates. Out of scope for this interview: Portfolio analytics; KYC onboarding; Portfolio analytics; KYC onboarding.",
             "tags": [
               "requirements"
             ],
@@ -57348,22 +57580,26 @@
         "prompt": "Which of these belongs in the first version of Zoom/Meet?",
         "choices": [
           {
+            "id": "c",
+            "label": "Live captions"
+          },
+          {
+            "id": "d",
+            "label": "Breakout rooms"
+          },
+          {
             "id": "b",
-            "label": "Ledgers"
+            "label": "Cloud recording"
           },
           {
             "id": "a",
             "label": "Join a room"
-          },
-          {
-            "id": "c",
-            "label": "Coupons"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Join a room; Audio/video; Screen share. Out of scope for this interview: Recording and transcription; Webinar mode for 10,000 viewers; Ledgers; Coupons.",
+        "explanation": "In scope: Join a room; Audio/video; Screen share. Out of scope for this interview: Recording and transcription; Webinar mode for 10,000 viewers; Cloud recording; Live captions.",
         "tags": [
           "requirements"
         ],
@@ -57609,8 +57845,8 @@
         "Webinar mode for 10,000 viewers"
       ],
       "requirementDistractors": [
-        "Ledgers",
-        "Coupons"
+        "Cloud recording",
+        "Live captions"
       ],
       "estimationScenario": "Zoom/Meet: assume 10M daily users each doing about 2 joins a day, with traffic peaking at 4× the daily average.",
       "apiPrompt": "Join is retried after a timeout. What happens?",
@@ -57821,22 +58057,26 @@
             "prompt": "Which of these belongs in the first version of Zoom/Meet?",
             "choices": [
               {
+                "id": "c",
+                "label": "Live captions"
+              },
+              {
+                "id": "d",
+                "label": "Breakout rooms"
+              },
+              {
                 "id": "b",
-                "label": "Ledgers"
+                "label": "Cloud recording"
               },
               {
                 "id": "a",
                 "label": "Join a room"
-              },
-              {
-                "id": "c",
-                "label": "Coupons"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Join a room; Audio/video; Screen share. Out of scope for this interview: Recording and transcription; Webinar mode for 10,000 viewers; Ledgers; Coupons.",
+            "explanation": "In scope: Join a room; Audio/video; Screen share. Out of scope for this interview: Recording and transcription; Webinar mode for 10,000 viewers; Cloud recording; Live captions.",
             "tags": [
               "requirements"
             ],
@@ -58222,22 +58462,26 @@
         "prompt": "Which of these belongs in the first version of Hotstar IPL Live Streaming?",
         "choices": [
           {
+            "id": "a",
+            "label": "Watch live and VOD"
+          },
+          {
             "id": "c",
-            "label": "Seat lock"
+            "label": "Offline downloads"
           },
           {
             "id": "b",
-            "label": "Wallet"
+            "label": "User-generated uploads"
           },
           {
-            "id": "a",
-            "label": "Watch live and VOD"
+            "id": "d",
+            "label": "Watch-party chat"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Watch live and VOD; Adaptive bitrate; Resume playback. Out of scope for this interview: Live chat and polls; Fantasy contest integration; Wallet; Seat lock.",
+        "explanation": "In scope: Watch live and VOD; Adaptive bitrate; Resume playback. Out of scope for this interview: Live chat and polls; Fantasy contest integration; User-generated uploads; Offline downloads.",
         "tags": [
           "requirements"
         ],
@@ -58491,8 +58735,8 @@
         "Fantasy contest integration"
       ],
       "requirementDistractors": [
-        "Wallet",
-        "Seat lock"
+        "User-generated uploads",
+        "Offline downloads"
       ],
       "estimationScenario": "Hotstar IPL Live Streaming: about 25M viewers watch concurrently, and each player fetches one 4-second video segment every 4 seconds.",
       "apiPrompt": "The player re-requests the live manifest every few seconds. What does that need?",
@@ -58722,22 +58966,26 @@
             "prompt": "Which of these belongs in the first version of Hotstar IPL Live Streaming?",
             "choices": [
               {
+                "id": "a",
+                "label": "Watch live and VOD"
+              },
+              {
                 "id": "c",
-                "label": "Seat lock"
+                "label": "Offline downloads"
               },
               {
                 "id": "b",
-                "label": "Wallet"
+                "label": "User-generated uploads"
               },
               {
-                "id": "a",
-                "label": "Watch live and VOD"
+                "id": "d",
+                "label": "Watch-party chat"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Watch live and VOD; Adaptive bitrate; Resume playback. Out of scope for this interview: Live chat and polls; Fantasy contest integration; Wallet; Seat lock.",
+            "explanation": "In scope: Watch live and VOD; Adaptive bitrate; Resume playback. Out of scope for this interview: Live chat and polls; Fantasy contest integration; User-generated uploads; Offline downloads.",
             "tags": [
               "requirements"
             ],
@@ -59120,21 +59368,25 @@
         "choices": [
           {
             "id": "c",
-            "label": "Video"
-          },
-          {
-            "id": "b",
-            "label": "Ads"
+            "label": "Contest rating system"
           },
           {
             "id": "a",
             "label": "Submit code"
+          },
+          {
+            "id": "b",
+            "label": "Discussion forums"
+          },
+          {
+            "id": "d",
+            "label": "Plagiarism detection"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Submit code; Run tests in sandbox; Show verdict. Out of scope for this interview: Plagiarism detection; Interactive debugging; Ads; Video.",
+        "explanation": "In scope: Submit code; Run tests in sandbox; Show verdict. Out of scope for this interview: Plagiarism detection; Interactive debugging; Discussion forums; Contest rating system.",
         "tags": [
           "requirements"
         ],
@@ -59380,8 +59632,8 @@
         "Interactive debugging"
       ],
       "requirementDistractors": [
-        "Ads",
-        "Video"
+        "Discussion forums",
+        "Contest rating system"
       ],
       "estimationScenario": "Online Judge LeetCode: assume 2M daily users each doing about 10 submissions a day, with traffic peaking at 10× the daily average.",
       "apiPrompt": "Submit is retried. How do you avoid judging twice?",
@@ -59594,21 +59846,25 @@
             "choices": [
               {
                 "id": "c",
-                "label": "Video"
-              },
-              {
-                "id": "b",
-                "label": "Ads"
+                "label": "Contest rating system"
               },
               {
                 "id": "a",
                 "label": "Submit code"
+              },
+              {
+                "id": "b",
+                "label": "Discussion forums"
+              },
+              {
+                "id": "d",
+                "label": "Plagiarism detection"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Submit code; Run tests in sandbox; Show verdict. Out of scope for this interview: Plagiarism detection; Interactive debugging; Ads; Video.",
+            "explanation": "In scope: Submit code; Run tests in sandbox; Show verdict. Out of scope for this interview: Plagiarism detection; Interactive debugging; Discussion forums; Contest rating system.",
             "tags": [
               "requirements"
             ],
@@ -59997,18 +60253,22 @@
             "label": "Send/receive mail"
           },
           {
-            "id": "c",
-            "label": "Rides"
+            "id": "b",
+            "label": "Calendar invites"
           },
           {
-            "id": "b",
-            "label": "Seats"
+            "id": "c",
+            "label": "Chat"
+          },
+          {
+            "id": "d",
+            "label": "Ad targeting in inbox"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Send/receive mail; Inbox listing; Full-text search. Out of scope for this interview: Calendar and contacts; Newsletter marketing tools; Seats; Rides.",
+        "explanation": "In scope: Send/receive mail; Inbox listing; Full-text search. Out of scope for this interview: Calendar and contacts; Newsletter marketing tools; Calendar invites; Chat.",
         "tags": [
           "requirements"
         ],
@@ -60254,8 +60514,8 @@
         "Newsletter marketing tools"
       ],
       "requirementDistractors": [
-        "Seats",
-        "Rides"
+        "Calendar invites",
+        "Chat"
       ],
       "estimationScenario": "Email Service: assume 100M daily users each doing about 20 emails a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "Send is retried. How do you avoid sending twice?",
@@ -60480,18 +60740,22 @@
                 "label": "Send/receive mail"
               },
               {
-                "id": "c",
-                "label": "Rides"
+                "id": "b",
+                "label": "Calendar invites"
               },
               {
-                "id": "b",
-                "label": "Seats"
+                "id": "c",
+                "label": "Chat"
+              },
+              {
+                "id": "d",
+                "label": "Ad targeting in inbox"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Send/receive mail; Inbox listing; Full-text search. Out of scope for this interview: Calendar and contacts; Newsletter marketing tools; Seats; Rides.",
+            "explanation": "In scope: Send/receive mail; Inbox listing; Full-text search. Out of scope for this interview: Calendar and contacts; Newsletter marketing tools; Calendar invites; Chat.",
             "tags": [
               "requirements"
             ],
@@ -60876,16 +61140,16 @@
         "prompt": "Which of these belongs in the first version of S3-like Object Storage?",
         "choices": [
           {
+            "id": "c",
+            "label": "In-place partial edits"
+          },
+          {
             "id": "d",
             "label": "Chat presence"
           },
           {
             "id": "b",
             "label": "POSIX file locking"
-          },
-          {
-            "id": "c",
-            "label": "In-place partial edits"
           },
           {
             "id": "a",
@@ -60895,7 +61159,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: PUT and GET objects by bucket and key; Store objects from bytes to terabytes; List objects by prefix. Out of scope for this interview: POSIX file locking; In-place partial edits; Chat presence; Ride matching.",
+        "explanation": "In scope: PUT and GET objects by bucket and key; Store objects from bytes to terabytes; List objects by prefix. Out of scope for this interview: POSIX file locking; In-place partial edits; POSIX file locking; In-place partial edits.",
         "tags": [
           "requirements"
         ],
@@ -61141,8 +61405,8 @@
         "In-place partial edits"
       ],
       "requirementDistractors": [
-        "Chat presence",
-        "Ride matching"
+        "POSIX file locking",
+        "In-place partial edits"
       ],
       "estimationScenario": "S3-like Object Storage: assume about 2B object requests a day, with traffic peaking at 3× the daily average.",
       "apiPrompt": "A PUT is retried after a timeout. What happens?",
@@ -61347,16 +61611,16 @@
             "prompt": "Which of these belongs in the first version of S3-like Object Storage?",
             "choices": [
               {
+                "id": "c",
+                "label": "In-place partial edits"
+              },
+              {
                 "id": "d",
                 "label": "Chat presence"
               },
               {
                 "id": "b",
                 "label": "POSIX file locking"
-              },
-              {
-                "id": "c",
-                "label": "In-place partial edits"
               },
               {
                 "id": "a",
@@ -61366,7 +61630,7 @@
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: PUT and GET objects by bucket and key; Store objects from bytes to terabytes; List objects by prefix. Out of scope for this interview: POSIX file locking; In-place partial edits; Chat presence; Ride matching.",
+            "explanation": "In scope: PUT and GET objects by bucket and key; Store objects from bytes to terabytes; List objects by prefix. Out of scope for this interview: POSIX file locking; In-place partial edits; POSIX file locking; In-place partial edits.",
             "tags": [
               "requirements"
             ],
@@ -61755,22 +62019,22 @@
             "label": "Increment a counter (likes, views)"
           },
           {
+            "id": "d",
+            "label": "Trending ranking"
+          },
+          {
             "id": "b",
             "label": "Per-user like history UI"
           },
           {
             "id": "c",
             "label": "Fraud detection"
-          },
-          {
-            "id": "d",
-            "label": "Video upload"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In scope: Increment a counter (likes, views); Read the current count; Handle very hot counters. Out of scope for this interview: Per-user like history UI; Fraud detection; Video upload; Hotel search.",
+        "explanation": "In scope: Increment a counter (likes, views); Read the current count; Handle very hot counters. Out of scope for this interview: Per-user like history UI; Fraud detection; Per-user like history UI; Fraud detection.",
         "tags": [
           "requirements"
         ],
@@ -62016,8 +62280,8 @@
         "Fraud detection"
       ],
       "requirementDistractors": [
-        "Video upload",
-        "Hotel search"
+        "Per-user like history UI",
+        "Fraud detection"
       ],
       "estimationScenario": "Distributed Counter: assume 100M daily users each doing about 20 increments a day, with traffic peaking at 5× the daily average.",
       "apiPrompt": "A like is retried. How do you avoid double counting?",
@@ -62238,22 +62502,22 @@
                 "label": "Increment a counter (likes, views)"
               },
               {
+                "id": "d",
+                "label": "Trending ranking"
+              },
+              {
                 "id": "b",
                 "label": "Per-user like history UI"
               },
               {
                 "id": "c",
                 "label": "Fraud detection"
-              },
-              {
-                "id": "d",
-                "label": "Video upload"
               }
             ],
             "correctChoiceIds": [
               "a"
             ],
-            "explanation": "In scope: Increment a counter (likes, views); Read the current count; Handle very hot counters. Out of scope for this interview: Per-user like history UI; Fraud detection; Video upload; Hotel search.",
+            "explanation": "In scope: Increment a counter (likes, views); Read the current count; Handle very hot counters. Out of scope for this interview: Per-user like history UI; Fraud detection; Per-user like history UI; Fraud detection.",
             "tags": [
               "requirements"
             ],

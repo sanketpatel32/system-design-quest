@@ -113,7 +113,7 @@ TITLES = {
     90: "Google Docs",
     91: "Dropbox/Drive",
     92: "Payment System UPI-style",
-    93: "Digital Wallet Paytm/PhonePe",
+    93: "Digital Wallet (PhonePe-style PPI)",
     94: "BookMyShow",
     95: "IRCTC Tatkal Ticketing",
     96: "Leaderboard",
