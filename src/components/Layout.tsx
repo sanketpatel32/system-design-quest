@@ -5,6 +5,7 @@ import { BADGE_LABELS } from '../lib/progression/badges'
 import { IconBadge, IconFlame, IconGem, NavIcon } from './icons/HudIcons'
 import { Mascot } from './art/Mascot'
 import { HelpShortcuts } from './HelpShortcuts'
+import { AccountButton } from './AccountButton'
 
 const nav = [
   { to: '/', label: 'Learn', icon: 'map' },
@@ -103,6 +104,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             >
               ?
             </button>
+            <AccountButton />
           </div>
         </div>
       </header>
