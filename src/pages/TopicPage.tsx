@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { allTopics, topicsById } from '../content/catalog'
 import { LessonDeck } from '../components/LessonDeck'
-import { themeForRegion } from '../lib/design/regionTheme'
+import { transitLineColor } from '../lib/design/transitTheme'
 import { getUnlockHint, topicStatus } from '../lib/progression/unlocks'
 import { completedTopicIds, useGameStore } from '../stores/gameStore'
 
@@ -10,7 +10,7 @@ export function TopicPage() {
   const topic = allTopics.find((t) => t.slug === slug)
   const state = useGameStore()
   const completed = completedTopicIds(state)
-  const accent = topic ? themeForRegion(topic.region).accent : '#2dd4bf'
+  const accent = topic ? transitLineColor(topic.region) : 'var(--color-amber)'
 
   if (!topic) {
     return (

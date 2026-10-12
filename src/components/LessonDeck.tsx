@@ -7,7 +7,7 @@ function hasRealTitle(card: LessonCard) {
   return t.length > 0 && t !== card.kind && t !== 'text' && t !== 'diagram' && t !== 'animation'
 }
 
-export function LessonDeck({ cards, accent = '#2dd4bf' }: { cards: LessonCard[]; accent?: string }) {
+export function LessonDeck({ cards, accent = 'var(--color-amber)' }: { cards: LessonCard[]; accent?: string }) {
   const [index, setIndex] = useState(0)
   const card = cards[index]
 
