@@ -13302,6 +13302,34 @@
         "formula": "(6,000 − 4,000) × 15",
         "workedAnswer": "(6,000 − 4,000) × 15 = 30,000 jobs.",
         "explanation": "(6,000 − 4,000) × 15 = 30,000 jobs."
+      },
+      {
+        "id": "t36-d1",
+        "type": "multiple_choice",
+        "concept": "buffer",
+        "prompt": "500,000 jobs must be cleared within 1,200 seconds, and each worker does 5 jobs/s. About how many workers are needed?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "About 84"
+          },
+          {
+            "id": "b",
+            "label": "About 8"
+          },
+          {
+            "id": "c",
+            "label": "About 833"
+          },
+          {
+            "id": "d",
+            "label": "About 5,000"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "500,000 ÷ 1,200 ≈ 417 jobs/s; 417 ÷ 5 ≈ 84 workers."
       }
     ],
     "flashcards": [
@@ -13325,7 +13353,105 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "async",
+        "buffer",
+        "dlq",
+        "queue-flow"
+      ],
+      "mechanism": {
+        "title": "The life of a message in a work queue",
+        "steps": [
+          "The producer (for example the order service) writes a message such as 'send receipt for order 123' to the queue and returns to the user immediately.",
+          "The broker stores the message durably (on disk, often replicated) and makes it visible to consumers.",
+          "A worker receives the message; the broker hides it from other workers for a visibility timeout or marks it unacknowledged.",
+          "The worker does the job and acknowledges. Only then does the broker delete the message.",
+          "If the worker crashes or the timeout expires without an acknowledgement, the message becomes visible again and another worker retries it, so handlers must be idempotent.",
+          "After a set number of failed attempts (say 5), the message moves to a dead-letter queue (DLQ) for inspection, so one poison message does not block or loop forever."
+        ]
+      },
+      "useWhen": [
+        "Work the user does not need to wait for: emails, SMS, thumbnails, invoices, search indexing.",
+        "Absorbing bursts: the queue buffers a spike while workers drain it at a steady rate."
+      ],
+      "avoidWhen": [
+        "The caller needs the result in the same request, such as a price quote or a balance check.",
+        "Strict global ordering of all messages is required; ordinary queues order only loosely, and ordered queues cap throughput."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Option",
+          "Delivery",
+          "Ordering",
+          "Good for"
+        ],
+        "rows": [
+          [
+            "Simple queue (SQS standard, RabbitMQ)",
+            "At least once",
+            "Best effort",
+            "Independent background jobs"
+          ],
+          [
+            "FIFO queue (SQS FIFO)",
+            "At least once with deduplication",
+            "Per message group",
+            "Ordered jobs per entity at moderate rates"
+          ],
+          [
+            "Log (Kafka)",
+            "At least once by default",
+            "Per partition, replayable",
+            "High-throughput event streams, many consumers"
+          ],
+          [
+            "Direct synchronous call",
+            "Exactly the call",
+            "n/a",
+            "When the caller needs the answer now"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Sizing workers for a burst",
+        "assumptions": [
+          "Sale spike: 50,000 receipt jobs per minute for 10 minutes",
+          "Each job takes 200 ms; one worker does 5 jobs per second",
+          "Acceptable backlog: cleared within 20 minutes of the spike starting"
+        ],
+        "steps": [
+          "Arrival rate = 50,000 ÷ 60 ≈ 833 jobs per second.",
+          "Total jobs = 50,000 × 10 = 500,000.",
+          "To finish within 20 minutes (1,200 seconds) needs 500,000 ÷ 1,200 ≈ 417 jobs per second.",
+          "Workers needed = 417 ÷ 5 ≈ 84; to keep pace with the peak instead would need 833 ÷ 5 ≈ 167."
+        ],
+        "result": "The queue lets about 84 workers handle a peak that would otherwise need about 167, at the cost of receipts arriving up to 20 minutes late."
+      },
+      "india": {
+        "title": "Order confirmation SMS during a sale",
+        "label": "Illustrative estimate",
+        "body": "When a big festive sale starts at midnight, an e-commerce checkout may confirm orders far faster than its SMS provider accepts messages. Calling the SMS gateway inside checkout would make every order slow, and a provider outage would fail payments. Instead checkout commits the order, puts 'send confirmation' on a queue, and returns. Workers send SMS at the provider's permitted rate (also respecting DLT template rules for commercial SMS in India), retry on errors with backoff, and move messages with invalid numbers to a DLQ. Customers might get their SMS a minute late during the peak, which they will not notice; failed checkouts they would."
+      },
+      "pitfalls": [
+        {
+          "trap": "'The queue guarantees each message is processed once.'",
+          "say": "'Most queues are at-least-once, so the handler is idempotent, keyed by order_id.'"
+        },
+        {
+          "trap": "No plan for poison messages.",
+          "say": "'After five attempts with exponential backoff the message goes to a DLQ with an alert, and we can replay it after a fix.'"
+        }
+      ],
+      "takeaways": [
+        "Queues decouple the user-facing request from slow work.",
+        "They buffer spikes so you size workers for the average plus backlog, not the peak.",
+        "Delivery is at least once; make handlers idempotent.",
+        "Always configure retries with backoff and a dead-letter queue."
+      ],
+      "diagram": "producer -> [ queue | m1 m2 m3 ... ] -> worker (ack) \n                        |  after 5 failures\n                        v\n                      [ DLQ ] -> alert, inspect, replay"
+    }
   },
   {
     "id": 37,
@@ -13536,6 +13662,34 @@
           "s5"
         ],
         "explanation": "Each group tracks its own offset."
+      },
+      {
+        "id": "t37-d1",
+        "type": "multiple_choice",
+        "concept": "consumer-groups",
+        "prompt": "A topic has 12 partitions and a consumer group runs 20 instances. What happens?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "12 instances get partitions and 8 sit idle"
+          },
+          {
+            "id": "b",
+            "label": "All 20 share every partition equally"
+          },
+          {
+            "id": "c",
+            "label": "Kafka adds 8 partitions automatically"
+          },
+          {
+            "id": "d",
+            "label": "Ordering is lost for every key"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Each partition goes to at most one consumer in a group, so parallelism is capped at 12."
       }
     ],
     "flashcards": [
@@ -13563,7 +13717,105 @@
         "title": "Kafka Documentation",
         "url": "https://kafka.apache.org/documentation/"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "kafka-flow",
+        "partition-order",
+        "consumer-groups",
+        "replay"
+      ],
+      "mechanism": {
+        "title": "How Kafka stores and serves events",
+        "steps": [
+          "A topic is split into partitions. Each partition is an append-only log on disk; every record gets an increasing offset.",
+          "The producer picks a partition by hashing the record key (for example order_id), so all events for one key land in one partition, in order.",
+          "Each partition has a leader broker and followers. With acks=all, a write is acknowledged once all in-sync replicas have it; with min.insync.replicas = 2 and replication factor 3, one broker can fail without losing acknowledged data.",
+          "Consumers in a consumer group split the partitions: each partition is read by exactly one consumer in the group, so parallelism is capped by the partition count.",
+          "Consumers commit their offset (position). After a crash they resume from the last committed offset, which can reprocess some records, so processing must be idempotent.",
+          "Records stay for the retention period (for example 7 days) regardless of whether they have been read, so a new consumer group or a fixed bug can replay history from an earlier offset."
+        ]
+      },
+      "useWhen": [
+        "High-throughput event streams with several independent consumers: analytics, search indexing, notifications all reading the same order events.",
+        "When you need replay, per-key ordering, or to feed stream processors."
+      ],
+      "avoidWhen": [
+        "Simple task queues with per-message acknowledgement and retries, where SQS or RabbitMQ is simpler.",
+        "Request-response calls, or global ordering across all keys (that needs one partition and gives up parallelism)."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Aspect",
+          "Kafka",
+          "Classic queue"
+        ],
+        "rows": [
+          [
+            "Storage",
+            "Retained log, replayable",
+            "Deleted after acknowledgement"
+          ],
+          [
+            "Consumers",
+            "Many groups read the same data",
+            "Competing consumers share one copy"
+          ],
+          [
+            "Ordering",
+            "Per partition",
+            "Usually best effort"
+          ],
+          [
+            "Scaling consumers",
+            "Up to the number of partitions",
+            "Add workers freely"
+          ],
+          [
+            "Per-message retry",
+            "Manual (retry topics)",
+            "Built in, with DLQ"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Choosing a partition count",
+        "assumptions": [
+          "Peak 60,000 events per second",
+          "One consumer instance processes 2,500 events per second",
+          "Plan for 2× growth"
+        ],
+        "steps": [
+          "Consumers needed today = 60,000 ÷ 2,500 = 24.",
+          "With 2× growth = 24 × 2 = 48 consumers.",
+          "Since one partition is read by at most one consumer in a group, the topic needs at least 48 partitions.",
+          "Choose a round number such as 64 to allow headroom; increasing partitions later changes which partition a key maps to."
+        ],
+        "result": "Partition count caps consumer parallelism, so size it for future peak throughput divided by per-consumer throughput, with headroom."
+      },
+      "india": {
+        "title": "Order events in a quick-commerce app",
+        "label": "Illustrative estimate",
+        "body": "Each order in a 10-minute grocery delivery app emits events: placed, packed, picked up, delivered. They go to an orders topic keyed by order_id, so one order's events stay in sequence. The rider-assignment service, the customer notification service, the analytics pipeline and the fraud checker each read the topic through their own consumer group at their own pace. When the analytics team finds a bug in how they computed delivery times, they deploy the fix and replay the last seven days from the retained log instead of asking every other team to resend data."
+      },
+      "pitfalls": [
+        {
+          "trap": "'Kafka guarantees global ordering.'",
+          "say": "'Kafka orders within a partition; I key by order_id so each order's events stay in order.'"
+        },
+        {
+          "trap": "Adding consumers beyond the partition count to go faster.",
+          "say": "'Extra consumers in a group sit idle once each partition has one; I'd size partitions for peak parallelism up front.'"
+        }
+      ],
+      "takeaways": [
+        "Partitions give per-key ordering and parallelism.",
+        "Consumer parallelism per group is capped by the partition count.",
+        "Retention enables replay and many independent consumer groups.",
+        "acks=all with replication factor 3 and min.insync.replicas 2 survives one broker failure."
+      ],
+      "diagram": "producer --key=order_id--> topic orders\n  P0: [0][1][2][3]... -> consumer A (group: notify)\n  P1: [0][1][2]...    -> consumer B (group: notify)\n  same partitions also read by group: analytics (own offsets)"
+    }
   },
   {
     "id": 38,
@@ -13799,6 +14051,34 @@
           "r3": "Each open would gather posts from hundreds of followees; slow for the common case."
         },
         "explanation": "Treat the long tail and the giants differently."
+      },
+      {
+        "id": "t38-d1",
+        "type": "multiple_choice",
+        "concept": "celebrity",
+        "prompt": "Fan-out workers write 200,000 entries/s. How long does pushing one post to 10 million followers take?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "50 seconds"
+          },
+          {
+            "id": "b",
+            "label": "0.5 seconds"
+          },
+          {
+            "id": "c",
+            "label": "5 minutes"
+          },
+          {
+            "id": "d",
+            "label": "2 seconds"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "10,000,000 ÷ 200,000 = 50 seconds of the whole fleet's capacity."
       }
     ],
     "flashcards": [
@@ -13827,7 +14107,98 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "pubsub",
+        "fanout-read",
+        "celebrity",
+        "hybrid"
+      ],
+      "mechanism": {
+        "title": "Fan-out on write, fan-out on read, and the hybrid",
+        "steps": [
+          "Pub/sub basics: a publisher sends an event to a topic; every subscriber receives its own copy, unlike a queue where workers compete for one copy.",
+          "Fan-out on write (push): when a user posts, a worker writes the post id into the timeline cache of every follower. Reading a feed is then one fast lookup.",
+          "Fan-out on read (pull): store the post once; when a user opens their feed, fetch recent posts from everyone they follow and merge them. Writes are cheap, reads are expensive.",
+          "Celebrity problem: an account with 10 million followers makes push cost 10 million writes per post, and the feed of people following it is delayed while workers catch up.",
+          "Hybrid: push posts from ordinary accounts; for accounts above a threshold (say 100,000 followers), skip the push and merge their recent posts at read time.",
+          "Feeds keep only the latest few hundred ids per user in cache; older pages are rebuilt from storage."
+        ]
+      },
+      "useWhen": [
+        "Push for most users, because feeds are read far more often than posts are written.",
+        "Pull or hybrid for accounts with very large followings, and for inactive users who rarely open the app."
+      ],
+      "avoidWhen": [
+        "Pure push when follower counts are extremely skewed.",
+        "Pure pull when users follow thousands of accounts and expect feeds in tens of milliseconds."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Model",
+          "Write cost per post",
+          "Read cost per feed open",
+          "Weakness"
+        ],
+        "rows": [
+          [
+            "Push (fan-out on write)",
+            "One write per follower",
+            "One cache read",
+            "Celebrity posts are very expensive"
+          ],
+          [
+            "Pull (fan-out on read)",
+            "One write",
+            "One query per followed account, then merge",
+            "Slow reads for heavy followers"
+          ],
+          [
+            "Hybrid",
+            "Push for normal, none for celebrities",
+            "Cache read plus a few celebrity lookups",
+            "More logic, two paths to test"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Cost of pushing a celebrity post",
+        "assumptions": [
+          "Celebrity has 10,000,000 followers",
+          "Fan-out workers write 200,000 timeline entries per second in total"
+        ],
+        "steps": [
+          "Writes for one post = 10,000,000 timeline inserts.",
+          "Time to finish = 10,000,000 ÷ 200,000 = 50 seconds.",
+          "Three posts in a minute would keep the whole fan-out fleet busy for 150 seconds, delaying everyone else's posts.",
+          "With hybrid, the celebrity post is written once and merged at read time by followers who open the app."
+        ],
+        "result": "Pushing to 10 million followers takes the whole fan-out fleet 50 seconds per post; the hybrid model removes that cost."
+      },
+      "india": {
+        "title": "A cricketer's post during a match",
+        "label": "Illustrative estimate",
+        "body": "When a star Indian cricketer with tens of millions of followers posts after a match, a pure push model would generate tens of millions of timeline writes in seconds, delaying posts from everyone else. Social apps handle such accounts differently: the post is stored once, and when a follower opens their feed, the app merges their pushed timeline with the latest posts from the few celebrity accounts they follow. Ordinary users, who have a few hundred followers, still get push delivery, so their friends see posts instantly. We describe the general technique; it is not a claim about any specific app's internal thresholds."
+      },
+      "pitfalls": [
+        {
+          "trap": "Choosing pure push without addressing celebrities.",
+          "say": "'Push for accounts under about 100,000 followers; above that, pull at read time and merge.'"
+        },
+        {
+          "trap": "Confusing pub/sub with a queue.",
+          "say": "'In pub/sub each subscriber gets every event; in a queue, competing workers each get a share.'"
+        }
+      ],
+      "takeaways": [
+        "Pub/sub copies each event to every subscriber.",
+        "Push makes reads cheap, pull makes writes cheap.",
+        "Skewed follower counts call for a hybrid.",
+        "Quantify fan-out as followers divided by worker throughput."
+      ],
+      "diagram": "post by normal user -> fan-out workers -> follower timelines (push)\npost by celebrity   -> stored once\nfeed open -> read own timeline + fetch celebrity posts -> merge by time"
+    }
   },
   {
     "id": 39,
@@ -14041,6 +14412,34 @@
           "r3": "It avoids duplicates by risking loss; a lost settlement is just as bad."
         },
         "explanation": "Exactly-once effects come from at-least-once plus idempotency."
+      },
+      {
+        "id": "t39-d1",
+        "type": "multiple_choice",
+        "concept": "duplicates",
+        "prompt": "A consumer processes a message, then crashes before acknowledging it. Under at-least-once delivery, what happens?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The message is redelivered and processed again"
+          },
+          {
+            "id": "b",
+            "label": "The message is lost"
+          },
+          {
+            "id": "c",
+            "label": "The broker marks it processed automatically"
+          },
+          {
+            "id": "d",
+            "label": "Ordering of all other messages is reversed"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Without the acknowledgement the broker redelivers, so the handler must be idempotent."
       }
     ],
     "flashcards": [
@@ -14068,7 +14467,102 @@
         "title": "RFC 7231 — HTTP methods (safe/idempotent)",
         "url": "https://www.rfc-editor.org/rfc/rfc7231"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "semantics",
+        "duplicates",
+        "backoff",
+        "exactly-once"
+      ],
+      "mechanism": {
+        "title": "Where duplicates and losses come from",
+        "steps": [
+          "At-most-once: the consumer acknowledges (or commits the offset) before processing. If it crashes mid-way, the message is gone. Simple and lossy.",
+          "At-least-once: the consumer processes, then acknowledges. If it crashes after processing but before acknowledging, the message is redelivered and processed again.",
+          "Producers duplicate too: if an acknowledgement from the broker is lost, the producer retries and the broker may store the message twice (Kafka's idempotent producer removes this particular duplicate).",
+          "Exactly-once effect is built from at-least-once delivery plus idempotent processing: deduplicate by a message id, or make the write itself idempotent (upsert by key).",
+          "Kafka transactions give exactly-once within Kafka (read, process, write to another topic, commit offset atomically), but side effects outside Kafka such as sending an email still need idempotency.",
+          "Retries use exponential backoff with jitter (for example 1 s, 2 s, 4 s with random spread) so failing consumers do not hammer a recovering dependency in sync."
+        ]
+      },
+      "useWhen": [
+        "At-least-once plus idempotency for nearly all business events: payments, orders, notifications.",
+        "At-most-once for telemetry or metrics where losing a sample is cheaper than handling duplicates."
+      ],
+      "avoidWhen": [
+        "Do not promise 'exactly-once delivery' across arbitrary systems; promise exactly-once effect through idempotency.",
+        "Do not retry immediately in a tight loop; it turns a brief outage into a sustained overload."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Semantics",
+          "Lost messages?",
+          "Duplicates?",
+          "How"
+        ],
+        "rows": [
+          [
+            "At most once",
+            "Possible",
+            "No",
+            "Ack before processing"
+          ],
+          [
+            "At least once",
+            "No",
+            "Possible",
+            "Ack after processing, retry on failure"
+          ],
+          [
+            "Exactly-once effect",
+            "No",
+            "Absorbed",
+            "At least once plus dedup or idempotent writes"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Backoff schedule and total wait",
+        "assumptions": [
+          "Base delay 1 s, doubling, 5 retries",
+          "Full jitter: each wait is random between 0 and the cap"
+        ],
+        "steps": [
+          "Caps are 1, 2, 4, 8 and 16 seconds.",
+          "Worst-case total wait = 1 + 2 + 4 + 8 + 16 = 31 seconds.",
+          "With full jitter the expected wait is half of each cap, so about 31 ÷ 2 = 15.5 seconds in total.",
+          "If 10,000 consumers fail at once, jitter spreads their first retry over a second instead of all hitting at the same millisecond."
+        ],
+        "result": "Five doubling retries span about 31 seconds at most; jitter spreads the herd so the dependency can recover."
+      },
+      "india": {
+        "title": "Duplicate payment webhooks",
+        "label": "Illustrative estimate",
+        "body": "Payment gateways commonly deliver webhooks (for example 'payment captured') at least once and retry if your server does not return success quickly. If a merchant's server credits the order and then times out before replying, the gateway sends the same event again. A naive handler would mark the order paid twice or send two 'thank you' emails and ship twice. The fix is to record each gateway event id in a table with a unique constraint, inside the same transaction as the order update, and treat a duplicate insert as 'already done'. The gateway's retries then become harmless."
+      },
+      "pitfalls": [
+        {
+          "trap": "'We use exactly-once delivery.'",
+          "say": "'Delivery is at least once; I get an exactly-once effect by deduplicating on the event id in the same transaction as the update.'"
+        },
+        {
+          "trap": "Retrying without backoff.",
+          "say": "'Retries use exponential backoff with jitter and a cap, then go to a DLQ.'"
+        },
+        {
+          "trap": "Assuming Kafka transactions make an email send exactly-once.",
+          "say": "'Kafka transactions cover reads and writes inside Kafka; the email side effect still needs its own dedup record keyed by the event id.'"
+        }
+      ],
+      "takeaways": [
+        "At-most-once loses, at-least-once duplicates; pick deliberately.",
+        "Exactly-once is an effect built from idempotency, not a network property.",
+        "Producers and consumers both create duplicates.",
+        "Use exponential backoff with jitter and a DLQ."
+      ],
+      "diagram": "process -> crash before ack -> redelivered -> process again\n            (at least once)        dedup table: event_id UNIQUE -> second time = no-op"
+    }
   },
   {
     "id": 40,
@@ -14271,6 +14765,34 @@
         "formula": "2,000,000 keys × 100 bytes",
         "workedAnswer": "2,000,000 keys × 100 bytes = 200,000,000 bytes ≈ 200 MB.",
         "explanation": "2,000,000 keys × 100 bytes = 200,000,000 bytes ≈ 200 MB."
+      },
+      {
+        "id": "t40-d1",
+        "type": "multiple_choice",
+        "concept": "atomic-key",
+        "prompt": "Why must the idempotency key be inserted under a unique constraint in the same transaction as the work?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "So two concurrent retries cannot both pass a check and both do the work"
+          },
+          {
+            "id": "b",
+            "label": "To make the request faster"
+          },
+          {
+            "id": "c",
+            "label": "Because keys must be sorted"
+          },
+          {
+            "id": "d",
+            "label": "So the client can skip TLS"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "A separate check then insert races; the unique constraint makes the second attempt fail atomically."
       }
     ],
     "flashcards": [
@@ -14299,7 +14821,98 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "idem-key",
+        "atomic-key",
+        "natural"
+      ],
+      "mechanism": {
+        "title": "How an idempotency key makes a retry safe",
+        "steps": [
+          "The client generates a unique key (a UUID) for the operation, such as 'pay ₹500 for order 123', and sends it with the request in a header like Idempotency-Key.",
+          "The server, in one transaction, inserts the key into an idempotency table with status 'in progress'. A unique constraint makes a second insert with the same key fail.",
+          "If the insert succeeds, the server performs the operation and stores the response (status code and body) against the key, then commits.",
+          "If the client times out and retries with the same key, the insert fails; the server returns the stored response instead of charging again.",
+          "If the first request is still in progress, the retry gets 'conflict, try later' rather than running in parallel.",
+          "Keys expire after a window such as 24 hours; the server also checks that a retried key comes with the same request body, rejecting reuse of a key for a different operation."
+        ]
+      },
+      "useWhen": [
+        "Any non-idempotent POST that moves money, creates orders or sends messages, especially from mobile clients on flaky networks.",
+        "Consumers of at-least-once queues and webhooks."
+      ],
+      "avoidWhen": [
+        "Naturally idempotent operations such as PUT setting a value or DELETE by id do not need a separate key.",
+        "Do not check and then insert in two steps without a unique constraint; two concurrent retries can both pass the check."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Approach",
+          "How",
+          "Best for"
+        ],
+        "rows": [
+          [
+            "Client idempotency key",
+            "Unique key per operation, stored with response",
+            "Payments and order creation APIs"
+          ],
+          [
+            "Natural key",
+            "Unique constraint on business id, e.g. (order_id, event_type)",
+            "Event consumers"
+          ],
+          [
+            "Idempotent operation",
+            "SET or upsert rather than increment",
+            "Updates that set a state"
+          ],
+          [
+            "Version check",
+            "Update only if version matches",
+            "Concurrent edits"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Storage for idempotency keys",
+        "assumptions": [
+          "2,000 payment requests per second",
+          "Keep keys for 24 hours",
+          "Each row about 500 bytes with stored response"
+        ],
+        "steps": [
+          "Requests per day = 2,000 × 86,400 = 172,800,000.",
+          "Storage = 172,800,000 × 500 bytes = 86,400,000,000 bytes, about 86 GB.",
+          "That is acceptable in a database table partitioned by day, or in Redis with a 24-hour TTL if the response bodies are small."
+        ],
+        "result": "Idempotency keys at 2,000 requests per second for a day need tens of gigabytes; expire them by time."
+      },
+      "india": {
+        "title": "Retrying a payment on a 2G connection",
+        "label": "Illustrative estimate",
+        "body": "A user in a small town taps 'Pay ₹799' in a shopping app on a weak connection. The request reaches the server and the charge succeeds, but the response is lost, so the app shows a spinner and then retries. Without an idempotency key, the retry could charge the user twice, and refunds take days. With the key generated when the user tapped Pay, the server sees the same key, finds the stored success response and returns it, and the app shows 'Payment successful' once. This is the same pattern that payment APIs such as Stripe document publicly with their Idempotency-Key header."
+      },
+      "pitfalls": [
+        {
+          "trap": "'I'll check if the order exists, then create it.'",
+          "say": "'Check-then-insert races; I insert the idempotency key under a unique constraint in the same transaction as the order.'"
+        },
+        {
+          "trap": "Generating a new key on each retry.",
+          "say": "'The key is created once per user action and reused for every retry of that action.'"
+        }
+      ],
+      "takeaways": [
+        "An idempotency key turns a retry into a lookup.",
+        "Insert the key under a unique constraint, atomically with the work.",
+        "Reuse the same key for every retry of one user action.",
+        "Prefer natural keys and upserts when the business id already exists."
+      ],
+      "diagram": "client --(key K)--> server: INSERT key K (unique) -> do work -> save response\nretry  --(key K)--> server: key exists -> return saved response (no second charge)"
+    }
   },
   {
     "id": 41,
@@ -14508,6 +15121,34 @@
           "n3"
         ],
         "explanation": "Keep the counter in a shared store such as Redis."
+      },
+      {
+        "id": "t41-d1",
+        "type": "multiple_choice",
+        "concept": "token-bucket",
+        "prompt": "A token bucket has size 3 and refills one token every 30 seconds. At most how many requests pass in 10 minutes starting full?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "23"
+          },
+          {
+            "id": "b",
+            "label": "3"
+          },
+          {
+            "id": "c",
+            "label": "20"
+          },
+          {
+            "id": "d",
+            "label": "600"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "3 from the full bucket plus 600 ÷ 30 = 20 refills gives 23."
       }
     ],
     "flashcards": [
@@ -14531,7 +15172,104 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "token-bucket",
+        "fixed-window",
+        "limit-flow",
+        "shared-limit"
+      ],
+      "mechanism": {
+        "title": "How the main rate-limiting algorithms decide",
+        "steps": [
+          "Fixed window: count requests per client in the current minute; reject once the count passes the limit. Simple, but a client can send a full burst at 12:00:59 and another at 12:01:00, doubling the rate briefly.",
+          "Sliding window log: keep timestamps of recent requests and count those within the last 60 seconds. Accurate, but stores one entry per request.",
+          "Sliding window counter: blend the previous and current window counts weighted by time. Close to accurate at fixed-window cost.",
+          "Token bucket: a bucket holds up to B tokens and refills at R tokens per second; each request takes one token or is rejected. It allows short bursts up to B while enforcing an average rate R.",
+          "Leaky bucket: requests enter a queue drained at a fixed rate, smoothing output; excess is dropped.",
+          "In a fleet, the counters must be shared, typically in Redis with an atomic Lua script or INCR plus expiry, or approximated locally per node with the limit divided by the number of nodes."
+        ]
+      },
+      "useWhen": [
+        "Protecting APIs and login endpoints from abuse and accidental floods.",
+        "Fair sharing of capacity between tenants, and protecting expensive dependencies such as SMS or payment providers."
+      ],
+      "avoidWhen": [
+        "Do not use rate limiting as the only overload defence; also use timeouts, load shedding and autoscaling.",
+        "Do not rate limit by IP alone where many users share one IP, such as mobile carrier NAT in India; prefer user or API key."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Algorithm",
+          "Bursts",
+          "Memory per client",
+          "Accuracy"
+        ],
+        "rows": [
+          [
+            "Fixed window",
+            "Up to 2× at boundary",
+            "One counter",
+            "Low at edges"
+          ],
+          [
+            "Sliding log",
+            "None beyond limit",
+            "One entry per request",
+            "Exact"
+          ],
+          [
+            "Sliding counter",
+            "Small",
+            "Two counters",
+            "Good approximation"
+          ],
+          [
+            "Token bucket",
+            "Up to bucket size",
+            "Tokens plus timestamp",
+            "Good; average and burst both controlled"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Token bucket for an OTP endpoint",
+        "assumptions": [
+          "Allow on average 1 OTP per 30 seconds per phone",
+          "Allow a burst of 3"
+        ],
+        "steps": [
+          "Refill rate R = 1 ÷ 30 ≈ 0.033 tokens per second.",
+          "Bucket size B = 3, so a user can request 3 OTPs back to back.",
+          "After the burst, the next token arrives after 30 seconds; in 10 minutes at most 3 plus 600 ÷ 30 = 23 OTPs can be sent.",
+          "A fixed window of 3 per minute would instead allow 6 in two seconds across a minute boundary."
+        ],
+        "result": "A token bucket of size 3 refilling every 30 seconds caps a phone at 23 OTPs in 10 minutes while still allowing an honest quick retry."
+      },
+      "india": {
+        "title": "OTP abuse on a fintech login",
+        "label": "Illustrative estimate",
+        "body": "OTP SMS cost money per message, and attackers sometimes trigger thousands of OTPs to random numbers ('SMS pumping') or to harass one person. A fintech app limits OTP requests with a token bucket per phone number and a second, looser bucket per device and per IP range, all stored in Redis so every server sees the same counts. Many Indian mobile users share carrier IP addresses through NAT, so a strict IP-only limit would block innocent users on the same carrier; per-phone and per-device limits are fairer. Rejected requests get HTTP 429 with a Retry-After header."
+      },
+      "pitfalls": [
+        {
+          "trap": "Rate limiting only by IP.",
+          "say": "'Carrier NAT puts many users behind one IP, so I'd limit by user or phone first and use IP only as a loose second layer.'"
+        },
+        {
+          "trap": "Keeping counters in each server's memory.",
+          "say": "'With 20 servers behind a load balancer, local counters allow 20× the limit; I'd use Redis with an atomic script.'"
+        }
+      ],
+      "takeaways": [
+        "Fixed windows allow double bursts at the boundary.",
+        "Token bucket controls both average rate and burst size.",
+        "Share counters across servers with atomic operations.",
+        "Choose the key carefully: user, API key or phone beats IP alone."
+      ],
+      "diagram": "token bucket (B=3, R=1 per 30 s)\n [o o o] -> req -> [o o .] -> req -> [o . .] -> req -> [. . .] -> req: 429\n           +1 token every 30 s"
+    }
   },
   {
     "id": 42,
@@ -14742,6 +15480,34 @@
           "r3": "v4 is random; UUIDv7 is the time-ordered variant."
         },
         "explanation": "Snowflake gives both properties."
+      },
+      {
+        "id": "t42-d1",
+        "type": "multiple_choice",
+        "concept": "snowflake",
+        "prompt": "In the classic Snowflake layout, how many IDs can one machine generate per millisecond?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "4,096"
+          },
+          {
+            "id": "b",
+            "label": "1,024"
+          },
+          {
+            "id": "c",
+            "label": "41"
+          },
+          {
+            "id": "d",
+            "label": "Unlimited"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "12 sequence bits give 2 to the power 12 = 4,096 IDs per millisecond per machine."
       }
     ],
     "flashcards": [
@@ -14765,7 +15531,113 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "auto-increment",
+        "uuid",
+        "snowflake"
+      ],
+      "mechanism": {
+        "title": "How a Snowflake-style ID is built",
+        "steps": [
+          "A 64-bit integer is split into fields: 1 unused sign bit, 41 bits of milliseconds since a custom epoch, 10 bits of machine id and 12 bits of sequence.",
+          "Each ID generator knows its machine id, assigned at deploy time through configuration or a coordination service, so no two generators share one.",
+          "To create an ID, read the current millisecond. If it equals the last millisecond, increment the sequence; if the sequence overflows past 4,095, wait for the next millisecond.",
+          "Assemble the bits: timestamp shifted left by 22, machine id shifted left by 12, plus the sequence.",
+          "Because the timestamp is in the high bits, IDs sort roughly by creation time across machines, which keeps B-tree inserts near the end of the index and makes 'newest first' cheap.",
+          "If the clock moves backwards (for example after an NTP correction), the generator must wait or refuse, or it could reissue an ID."
+        ]
+      },
+      "useWhen": [
+        "Distributed systems that need unique, roughly time-ordered 64-bit IDs without a central database round trip: tweets, orders, messages.",
+        "UUIDv4 when IDs must be unguessable and ordering does not matter; UUIDv7 when you want time-ordered 128-bit IDs from a standard."
+      ],
+      "avoidWhen": [
+        "Auto-increment from a single database across many shards; it becomes a bottleneck and leaks business volume through guessable sequential numbers.",
+        "Random UUIDv4 as a primary key in a B-tree-heavy table with a high insert rate; random inserts scatter across index pages."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Scheme",
+          "Size",
+          "Ordered?",
+          "Coordination"
+        ],
+        "rows": [
+          [
+            "Auto-increment",
+            "64-bit",
+            "Strictly, per database",
+            "Single database"
+          ],
+          [
+            "UUIDv4",
+            "128-bit",
+            "No",
+            "None"
+          ],
+          [
+            "UUIDv7",
+            "128-bit",
+            "Roughly by time",
+            "None"
+          ],
+          [
+            "Snowflake",
+            "64-bit",
+            "Roughly by time",
+            "Unique machine ids"
+          ],
+          [
+            "Ticket server / ranges",
+            "64-bit",
+            "Roughly",
+            "Central range allocator"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Capacity of the Snowflake layout",
+        "assumptions": [
+          "41 timestamp bits in milliseconds",
+          "10 machine bits, 12 sequence bits"
+        ],
+        "steps": [
+          "Timestamp range = 2 to the power 41 ms, about 2,199,023,255,552 ms.",
+          "Divided by about 31,557,600,000 ms per year, that is roughly 69.7 years from the chosen epoch.",
+          "Machines = 2 to the power 10, which is 1,024.",
+          "IDs per machine per millisecond = 2 to the power 12, which is 4,096, so about 4,096,000 per second per machine."
+        ],
+        "result": "The classic layout lasts about 69 years, supports 1,024 generators and about 4 million IDs per second each."
+      },
+      "india": {
+        "title": "Order IDs for a food-delivery platform",
+        "label": "Illustrative estimate",
+        "body": "A delivery platform creating orders across dozens of services and data centres cannot afford a single auto-increment counter: every order would wait on one database, and sequential IDs would reveal daily order volume to competitors. A Snowflake-style scheme lets each order service instance mint IDs locally. Because IDs are roughly time-ordered, the orders table's primary key index grows at the right edge, and support tools can sort by ID instead of by a separate timestamp. The customer still sees a short friendly reference, derived separately, rather than a 19-digit number."
+      },
+      "pitfalls": [
+        {
+          "trap": "Using a single auto-increment counter for a global system.",
+          "say": "'A Snowflake-style ID lets each node generate unique, time-ordered IDs without a central round trip.'"
+        },
+        {
+          "trap": "Using random UUIDv4 as the clustered primary key at a high insert rate.",
+          "say": "'Random keys scatter inserts across the whole B-tree and hurt cache locality; a time-ordered id such as UUIDv7 or Snowflake keeps inserts at the right edge.'"
+        },
+        {
+          "trap": "Ignoring clock skew.",
+          "say": "'If the clock moves backwards, the generator waits until it passes the last timestamp rather than risk duplicates.'"
+        }
+      ],
+      "takeaways": [
+        "Snowflake IDs pack time, machine and sequence into 64 bits.",
+        "Time in the high bits makes IDs sortable and index-friendly.",
+        "Machine ids must be unique; clock rollback must be handled.",
+        "UUIDv4 for unguessable ids, UUIDv7 or Snowflake for ordered ones."
+      ],
+      "diagram": "| 0 | 41 bits: ms since epoch | 10 bits: machine | 12 bits: sequence |\n  sign   ~69 years                1,024 nodes        4,096 per ms"
+    }
   },
   {
     "id": 43,
@@ -15001,6 +15873,34 @@
           "r3": "Sagas are briefly inconsistent between steps; design for it."
         },
         "explanation": "Sagas trade instant consistency for availability."
+      },
+      {
+        "id": "t43-d1",
+        "type": "multiple_choice",
+        "concept": "2pc-blocking",
+        "prompt": "Participants in 2PC have voted yes and the coordinator crashes. What happens?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Participants hold their locks until they learn the outcome"
+          },
+          {
+            "id": "b",
+            "label": "They all commit automatically"
+          },
+          {
+            "id": "c",
+            "label": "They all abort immediately and safely"
+          },
+          {
+            "id": "d",
+            "label": "A compensating transaction runs"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "After voting yes a participant cannot decide alone, so it blocks with locks held."
       }
     ],
     "flashcards": [
@@ -15029,7 +15929,105 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "2pc",
+        "2pc-blocking",
+        "saga",
+        "compensation",
+        "choreo-orch"
+      ],
+      "mechanism": {
+        "title": "Two-phase commit versus a saga, step by step",
+        "steps": [
+          "2PC phase 1 (prepare): a coordinator asks every participant to prepare; each writes the change durably, holds its locks and votes yes or no.",
+          "2PC phase 2 (commit): if all vote yes, the coordinator logs 'commit' and tells everyone to commit; any no means abort for all.",
+          "Blocking: if the coordinator crashes after participants voted yes, they must keep their locks until it recovers, because they cannot know the outcome on their own.",
+          "Saga: split the business transaction into local transactions, each committed independently (create order, reserve stock, charge payment, assign rider).",
+          "If a later step fails, run compensating actions for completed steps in reverse (refund payment, release stock, cancel order). Compensations must be idempotent and must themselves eventually succeed.",
+          "Orchestration: a saga coordinator service drives the steps and tracks state. Choreography: each service reacts to events and emits the next. Orchestration is easier to follow and debug as steps grow."
+        ]
+      },
+      "useWhen": [
+        "2PC inside one trust boundary with few participants that support it, such as two databases in one system, when atomicity matters more than availability.",
+        "Sagas for long-running business flows across microservices or external parties, such as payment gateways, that cannot hold locks."
+      ],
+      "avoidWhen": [
+        "2PC across services you do not control or over unreliable networks; a stuck coordinator blocks everyone.",
+        "Sagas where intermediate states must never be visible; users may briefly see 'stock reserved, payment pending'."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Aspect",
+          "2PC",
+          "Saga"
+        ],
+        "rows": [
+          [
+            "Atomicity",
+            "All or nothing",
+            "Eventually all or compensated"
+          ],
+          [
+            "Isolation",
+            "Locks held until commit",
+            "None; intermediate states visible"
+          ],
+          [
+            "Failure of coordinator",
+            "Participants block",
+            "Resume from saga log"
+          ],
+          [
+            "Latency",
+            "Two round trips with locks held",
+            "Each step commits on its own"
+          ],
+          [
+            "Fits",
+            "Few databases, short transactions",
+            "Long multi-service workflows"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Lock time under 2PC",
+        "assumptions": [
+          "4 participants, each 20 ms away from the coordinator",
+          "Each prepare takes 5 ms locally"
+        ],
+        "steps": [
+          "Phase 1 takes about one round trip of 40 ms plus 5 ms of local prepare work, about 45 ms.",
+          "Phase 2 needs another 40 ms round trip, so locks are held for roughly 85 ms or more per transaction.",
+          "A row hit by 50 transactions per second would need 50 × 0.085 = 4.25 seconds of lock time every second, so they queue up and throughput collapses.",
+          "A saga commits each local step in a few milliseconds and holds no cross-service locks."
+        ],
+        "result": "Cross-service 2PC holds locks for round trips; hot rows cannot sustain it, which is why microservices use sagas."
+      },
+      "india": {
+        "title": "Booking a flight and hotel package",
+        "label": "Illustrative estimate",
+        "body": "A travel booking site in India sells a Goa package: flight, hotel and cab. The airline and hotel systems belong to other companies, so no 2PC is possible. An orchestrated saga reserves the flight seat, then the hotel room, then charges the card through a payment gateway. If the hotel step fails because the room has just gone, the orchestrator cancels the flight hold and the user sees 'hotel unavailable, nothing charged'. If payment fails after both holds, it releases both. Each step and compensation is retried idempotently, and the saga's state is persisted so a crash of the orchestrator resumes where it left off."
+      },
+      "pitfalls": [
+        {
+          "trap": "Proposing 2PC across microservices.",
+          "say": "'2PC blocks if the coordinator fails and holds locks across the network; I'd use an orchestrated saga with compensations.'"
+        },
+        {
+          "trap": "Forgetting that compensations can fail.",
+          "say": "'Compensations are idempotent and retried until they succeed, with alerts if they stall.'"
+        }
+      ],
+      "takeaways": [
+        "2PC gives atomicity but blocks and holds locks across round trips.",
+        "Sagas commit locally and undo with compensations.",
+        "Sagas lack isolation; design for visible intermediate states.",
+        "Orchestration is easier to debug than choreography for long flows."
+      ],
+      "diagram": "saga: [create order] -> [reserve stock] -> [charge] -> [assign rider]\n fail at charge:        <- release stock <- cancel order (compensate in reverse)"
+    }
   },
   {
     "id": 44,
@@ -15248,6 +16246,34 @@
           "a"
         ],
         "explanation": "At-least-once relays create duplicates."
+      },
+      {
+        "id": "t44-d1",
+        "type": "multiple_choice",
+        "concept": "dual-write",
+        "prompt": "A service updates its database, then crashes before publishing the event to Kafka. What pattern prevents this inconsistency?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Writing the event to an outbox table in the same transaction"
+          },
+          {
+            "id": "b",
+            "label": "Publishing first, then updating the database"
+          },
+          {
+            "id": "c",
+            "label": "Increasing Kafka retention"
+          },
+          {
+            "id": "d",
+            "label": "Using a bigger database server"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The outbox makes the event part of the same atomic commit; a relay publishes it afterwards."
       }
     ],
     "flashcards": [
@@ -15281,7 +16307,104 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "dual-write",
+        "outbox",
+        "cdc",
+        "outbox-dupes"
+      ],
+      "mechanism": {
+        "title": "How the outbox pattern publishes events reliably",
+        "steps": [
+          "The dual-write problem: a service writes to its database and then publishes to Kafka. If it crashes between the two, the database and the event stream disagree.",
+          "Outbox: in the same local transaction that changes business rows, insert an event row into an outbox table. Either both commit or neither does.",
+          "A relay process reads new outbox rows (by polling or by tailing the database log) and publishes them to the broker.",
+          "After the broker acknowledges, the relay marks the row as sent or advances its position. If it crashes before that, it publishes the row again, so consumers see duplicates and must be idempotent, using the event id.",
+          "Change data capture (CDC) tools such as Debezium read the database's replication log (Postgres WAL, MySQL binlog) and emit each committed change as an event, without the application writing to the broker at all.",
+          "Old outbox rows are deleted or archived after a retention period."
+        ]
+      },
+      "useWhen": [
+        "Any service that must update its database and notify others: order created, payment captured, profile changed.",
+        "CDC when you want to stream changes from an existing database (to search, caches or a warehouse) without changing application code."
+      ],
+      "avoidWhen": [
+        "Do not publish to Kafka inside the database transaction and hope; the two systems do not share a transaction.",
+        "Do not expose raw CDC table changes as a public contract to many teams; table schemas change. Publish curated outbox events instead."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Approach",
+          "Atomic with DB write?",
+          "Event shape",
+          "Duplicates"
+        ],
+        "rows": [
+          [
+            "Dual write",
+            "No",
+            "Designed",
+            "Losses and phantom events"
+          ],
+          [
+            "Outbox + poller",
+            "Yes",
+            "Designed",
+            "Possible; consumers dedupe"
+          ],
+          [
+            "Outbox + CDC relay",
+            "Yes",
+            "Designed",
+            "Possible; consumers dedupe"
+          ],
+          [
+            "Raw CDC of tables",
+            "Yes",
+            "Mirrors table schema",
+            "Possible; consumers dedupe"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Polling cost of an outbox relay",
+        "assumptions": [
+          "Relay polls every 100 ms",
+          "Average 300 events per second"
+        ],
+        "steps": [
+          "Polls per second = 1 ÷ 0.1 = 10.",
+          "Events per poll on average = 300 ÷ 10 = 30.",
+          "Average extra delay is half the poll interval, about 50 ms.",
+          "A CDC relay tailing the log usually delivers in tens of milliseconds without any polling queries."
+        ],
+        "result": "A 100 ms poller adds about 50 ms average latency and batches about 30 events per poll; CDC removes polling load."
+      },
+      "india": {
+        "title": "Payment captured and order confirmed",
+        "label": "Illustrative estimate",
+        "body": "When a payment succeeds in an Indian e-commerce checkout, the order service must mark the order paid and tell the warehouse, notification and loyalty-points services. If it updated the database and then crashed before publishing, the warehouse would never pack the item despite the customer being charged. With an outbox, 'order paid' and the event row commit together; a relay publishes the event within milliseconds and retries until Kafka confirms. If a duplicate slips through, the warehouse ignores a second 'pack order 123' because it deduplicates on the event id."
+      },
+      "pitfalls": [
+        {
+          "trap": "'I'll write to the DB, then publish to Kafka.'",
+          "say": "'That dual write can lose events on a crash; I'd write the event to an outbox table in the same transaction and relay it.'"
+        },
+        {
+          "trap": "Claiming the outbox gives exactly-once.",
+          "say": "'The relay can publish twice after a crash, so consumers dedupe on the event id.'"
+        }
+      ],
+      "takeaways": [
+        "Dual writes to a database and a broker are not atomic.",
+        "The outbox puts the event in the same transaction as the change.",
+        "Relays and CDC are at least once; consumers must dedupe.",
+        "Publish curated events, not raw table changes, as contracts."
+      ],
+      "diagram": "BEGIN; UPDATE orders SET paid; INSERT outbox(event); COMMIT\n relay/CDC --> Kafka --> warehouse, notifications (dedupe by event_id)"
+    }
   },
   {
     "id": 45,
