@@ -28,7 +28,9 @@ const PALETTE = {
   ext: ['#ffe3e3', '#c92a2a'],
   svc: ['#f3f0ff', '#6741d9'],
 }
-function kindOf(label) {
+const KIND_ALIAS = { svc: 'svc', service: 'svc', store: 'store', client: 'client', queue: 'queue', ext: 'ext', external: 'ext' }
+function kindOf(label, kind) {
+  if (kind) return KIND_ALIAS[kind]
   const l = label.toLowerCase()
   if (/(service|svc|server|worker|agent|indexer|builder|job|engine|gateway|scheduler|controller|fan-out|dispatch|limiter|api\b|lib)/.test(l)) return 'svc'
   if (/\b(client|clients|app|apps|user|users|browser|player|players|viewers|rider|driver|traders|customer|pod|phone|mobile)\b/.test(l)) return 'client'
@@ -81,20 +83,35 @@ function parse(src) {
 
 function buildGraph(spec) {
   const nodes = new Map(), edges = []
-  const node = (label) => {
+  const node = (raw) => {
+    // optional explicit colour: "App|metadata {svc}" (svc, store, client, queue, ext)
+    const km = /\s*\{(\w+)\}\s*$/.exec(raw)
+    const label = km ? raw.slice(0, km.index).trim() : raw
+    if (km && !KIND_ALIAS[km[1]]) throw new Error(`unknown kind {${km[1]}} in ${spec.id}`)
     if (!nodes.has(label)) nodes.set(label, { id: 'n' + nodes.size, label, lines: label.split('|').map((s) => s.trim()) })
-    return nodes.get(label)
+    const n = nodes.get(label)
+    if (km) n.kind = KIND_ALIAS[km[1]]
+    return n
   }
   for (const line of spec.lines) {
-    const parts = line.split(/\s+((?:\[[^\]]*\])?~?>)\s+/)
+    const parts = line.split(/\s+((?:\[[^\]]*\])?~?[<>])\s+/)
     for (let i = 0; i + 2 < parts.length; i += 2) {
       const a = node(parts[i].trim()), b = node(parts[i + 2].trim())
       const op = parts[i + 1]
       const lm = /^\[([^\]]*)\]/.exec(op)
-      edges.push({ from: a, to: b, dashed: op.endsWith('~>'), label: lm ? lm[1] : '' })
+      // "A [x]< B" draws B -> A but keeps A to the left of B in the layout
+      const rev = op.endsWith('<')
+      edges.push({ from: rev ? b : a, to: rev ? a : b, rf: a, rt: b, dashed: /~[<>]$/.test(op), label: lm ? lm[1] : '' })
     }
     if (parts.length === 1) node(parts[0].trim())
     for (const p of parts) if (!p.trim()) throw new Error(`empty node in ${spec.id}: ${line}`)
+  }
+  // the same component must not appear twice under slightly different labels (review D2)
+  const firsts = new Map()
+  for (const n of nodes.values()) {
+    const k = n.lines[0].toLowerCase()
+    if (firsts.has(k)) throw new Error(`diagram ${spec.id}: "${firsts.get(k)}" and "${n.label}" look like the same node; use one label`)
+    firsts.set(k, n.label)
   }
   return { nodes: [...nodes.values()], edges }
 }
@@ -102,20 +119,20 @@ function buildGraph(spec) {
 function layout(g) {
   // longest-path ranks; back edges (found by DFS in authoring order) are ignored for ranking
   const out = new Map(g.nodes.map((n) => [n, []]))
-  for (const e of g.edges) out.get(e.from).push(e)
+  for (const e of g.edges) out.get(e.rf).push(e)
   const state = new Map()
   const dfs = (n) => {
     state.set(n, 1)
     for (const e of out.get(n)) {
-      if (state.get(e.to) === 1) e.back = true
-      else if (!state.has(e.to)) dfs(e.to)
+      if (state.get(e.rt) === 1) e.back = true
+      else if (!state.has(e.rt)) dfs(e.rt)
     }
     state.set(n, 2)
   }
   for (const n of g.nodes) if (!state.has(n)) dfs(n)
   for (const n of g.nodes) n.rank = 0
   for (let k = 0; k < g.nodes.length; k++)
-    for (const e of g.edges) if (!e.back && e.to.rank < e.from.rank + 1) e.to.rank = e.from.rank + 1
+    for (const e of g.edges) if (!e.back && e.rt.rank < e.rf.rank + 1) e.rt.rank = e.rf.rank + 1
   for (const n of g.nodes) {
     n.w = Math.max(...n.lines.map((t) => width(t, FS))) + PADX * 2
     n.h = n.lines.length * LINE + PADY * 2
@@ -133,7 +150,7 @@ function layout(g) {
     for (const ri of order) {
       const bc = new Map()
       for (const n of ranks[ri]) {
-        const nb = fwd.filter((e) => (down ? e.to === n : e.from === n)).map((e) => pos.get(down ? e.from : e.to))
+        const nb = fwd.filter((e) => (down ? e.rt === n : e.rf === n)).map((e) => pos.get(down ? e.rf : e.rt))
         bc.set(n, nb.length ? nb.reduce((a, b) => a + b, 0) / nb.length : pos.get(n))
       }
       ranks[ri].sort((a, b) => bc.get(a) - bc.get(b) || pos.get(a) - pos.get(b))
@@ -149,7 +166,9 @@ function layout(g) {
       const cw = Math.max(...r.map((n) => n.w))
       let y = MARGIN + 18 + (H - colH[i]) / 2
       for (const n of r) { n.x = x + (cw - n.w) / 2; n.y = y; y += n.h + GAPY }
-      x += cw + GAPX
+      // widen the gap so labels on edges into the next column fit between the boxes
+      const lw = Math.max(0, ...g.edges.filter((e) => e.label && ((e.from.rank === i && e.to.rank === i + 1) || (e.to.rank === i && e.from.rank === i + 1))).map((e) => width(e.label, EFS) + 30))
+      x += cw + Math.max(GAPX, lw)
     })
   } else {
     let y = MARGIN
@@ -176,8 +195,32 @@ function clip(n, tx, ty) {
   return [cx + dx * s, cy + dy * s]
 }
 
+function hits(n, p, q) {
+  // does segment p-q pass through node n (inflated)?
+  const x0 = n.x - 6, x1 = n.x + n.w + 6, y0 = n.y - 6, y1 = n.y + n.h + 6
+  for (let i = 1; i < 40; i++) {
+    const t = i / 40, x = p[0] + (q[0] - p[0]) * t, y = p[1] + (q[1] - p[1]) * t
+    if (x > x0 && x < x1 && y > y0 && y < y1) return true
+  }
+  return false
+}
 function edgeGeom(e, g) {
+  if (e.geom) return e.geom
+  e.geom = edgeGeom0(e, g)
+  return e.geom
+}
+function edgeGeom0(e, g) {
   const a = e.from, b = e.to
+  // several edges between the same two nodes (either direction): straight, offset side by side
+  const pair = g.edges.filter((x) => (x.from === a && x.to === b) || (x.from === b && x.to === a))
+  if (pair.length > 1) {
+    const k = pair.indexOf(e), off = (k - (pair.length - 1) / 2) * 22
+    const sgn = e.from === pair[0].from ? 1 : -1
+    const s0 = clip(a, b.x + b.w / 2, b.y + b.h / 2), t0 = clip(b, a.x + a.w / 2, a.y + a.h / 2)
+    const dx = t0[0] - s0[0], dy = t0[1] - s0[1], L = Math.hypot(dx, dy) || 1
+    const nx = (-dy / L) * off * sgn, ny = (dx / L) * off * sgn
+    return { pts: [[s0[0] + nx, s0[1] + ny], [t0[0] + nx, t0[1] + ny]], curve: false }
+  }
   if (e.back) {
     // route around: below (horizontal) or to the right (vertical)
     if (!g.vertical) {
@@ -190,40 +233,104 @@ function edgeGeom(e, g) {
     return { pts: [p0, [x, p0[1]], [x, p3[1]], p3], curve: true }
   }
   const s = clip(a, b.x + b.w / 2, b.y + b.h / 2), t = clip(b, a.x + a.w / 2, a.y + a.h / 2)
+  const blockers = g.nodes.filter((n) => n !== a && n !== b && hits(n, s, t))
+  if (blockers.length) {
+    // route around the boxes in the way: over or under them (or left/right in vertical layouts)
+    if (!g.vertical) {
+      const lo = Math.min(s[0], t[0]), hi = Math.max(s[0], t[0])
+      const span = g.nodes.filter((n) => (n.x + n.w > lo && n.x < hi) || n === a || n === b)
+      const below = Math.max(...span.map((n) => n.y + n.h)) + 20, above = Math.min(...span.map((n) => n.y)) - 20
+      const yMid = (s[1] + t[1]) / 2
+      const route = (y) => {
+        const dn = y > yMid
+        const p0 = [a.x + a.w / 2, dn ? a.y + a.h + 4 : a.y - 4], p3 = [b.x + b.w / 2, dn ? b.y + b.h + 4 : b.y - 4]
+        const pts = [p0, [p0[0], y], [p3[0], y], p3]
+        let bad = 0
+        for (let i = 0; i < 3; i++) bad += g.nodes.filter((n) => n !== a && n !== b && hits(n, pts[i], pts[i + 1])).length
+        return { pts, bad, len: Math.abs(y - yMid) }
+      }
+      const opts = [route(below), ...(above >= 8 ? [route(above)] : [])].sort((x, y) => x.bad - y.bad || x.len - y.len)
+      return { pts: opts[0].pts, curve: true, poly: true }
+    }
+    const lo = Math.min(s[1], t[1]), hi = Math.max(s[1], t[1])
+    const span = g.nodes.filter((n) => (n.y + n.h > lo && n.y < hi) || n === a || n === b)
+    const right = Math.max(...span.map((n) => n.x + n.w)) + 26, left = Math.min(...span.map((n) => n.x)) - 26
+    const clear = (x0, y, x1) => !g.nodes.some((n) => n !== a && n !== b && hits(n, [x0, y], [x1, y]))
+    const useLeft = left > 8 && clear(a.x - 4, a.y + a.h / 2, left) && clear(b.x - 4, b.y + b.h / 2, left) && !(clear(a.x + a.w + 4, a.y + a.h / 2, right) && clear(b.x + b.w + 4, b.y + b.h / 2, right))
+    if (useLeft) {
+      const p0 = [a.x - 4, a.y + a.h / 2], p3 = [b.x - 4, b.y + b.h / 2]
+      return { pts: [p0, [left, p0[1]], [left, p3[1]], p3], curve: true, poly: true }
+    }
+    const x = right
+    const p0 = [a.x + a.w + 4, a.y + a.h / 2], p3 = [b.x + b.w + 4, b.y + b.h / 2]
+    return { pts: [p0, [x, p0[1]], [x, p3[1]], p3], curve: true, poly: true }
+  }
   return { pts: [s, t], curve: false }
 }
 
 function seedOf(str) { let h = 7; for (const c of str) h = (h * 31 + c.charCodeAt(0)) >>> 0; return (h % 2 ** 30) + 1 }
 function d2path(drawable) { return gen.toPaths(drawable).map((p) => `<path d="${p.d.replace(/(\d+\.\d)\d+/g, '$1')}" stroke="${p.stroke}" stroke-width="${p.strokeWidth}" fill="${p.fill ?? 'none'}"${drawable.options.strokeLineDash ? ` stroke-dasharray="${drawable.options.strokeLineDash.join(' ')}"` : ''}/>`).join('') }
 
+const LEGEND = [['client', 'client / user'], ['svc', 'service'], ['store', 'data store / cache'], ['queue', 'queue / stream'], ['ext', 'external']]
 function renderSvg(spec, g) {
   const parts = []
+  const placed = []
   const seed = seedOf(String(spec.id))
   for (const n of g.nodes) {
-    const [bg, stroke] = PALETTE[kindOf(n.label)]
+    const [bg, stroke] = PALETTE[kindOf(n.label, n.kind)]
     parts.push(d2path(gen.rectangle(n.x, n.y, n.w, n.h, { seed: seed + n.rank, roughness: 1.1, stroke, strokeWidth: 1.6, fill: bg, fillStyle: 'solid' })))
     n.lines.forEach((t, i) => {
       parts.push(`<path d="${textPath(t, n.x + n.w / 2, n.y + PADY + (i + 1) * LINE - 6, FS)}" fill="#1e1e1e"/>`)
     })
   }
+  let maxY = g.H - MARGIN - 18
   for (const e of g.edges) {
-    const { pts, curve } = edgeGeom(e, g)
+    const { pts, curve, poly } = edgeGeom(e, g)
+    for (const q of pts) maxY = Math.max(maxY, q[1] + 16)
     const opts = { seed, roughness: 0.9, stroke: '#343a40', strokeWidth: 1.4, ...(e.dashed ? { strokeLineDash: [6, 5] } : {}) }
-    parts.push(d2path(curve ? gen.curve(pts, opts) : gen.line(pts[0][0], pts[0][1], pts[1][0], pts[1][1], opts)))
+    parts.push(d2path(poly ? gen.linearPath(pts, opts) : curve ? gen.curve(pts, opts) : gen.line(pts[0][0], pts[0][1], pts[1][0], pts[1][1], opts)))
     const [px, py] = pts[pts.length - 2], [qx, qy] = pts[pts.length - 1]
     const ang = Math.atan2(qy - py, qx - px), L = 11
     const hx = (da) => (qx - L * Math.cos(ang + da)).toFixed(1), hy = (da) => (qy - L * Math.sin(ang + da)).toFixed(1)
     parts.push(`<path d="M${hx(0.45)} ${hy(0.45)}L${qx.toFixed(1)} ${qy.toFixed(1)}L${hx(-0.45)} ${hy(-0.45)}" stroke="#343a40" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`)
     if (e.label) {
       let mx, my
-      if (curve) { mx = (pts[1][0] + pts[2][0]) / 2; my = (pts[1][1] + pts[2][1]) / 2 + (g.vertical ? 0 : 15) }
-      else { mx = (pts[0][0] + pts[1][0]) / 2; my = (pts[0][1] + pts[1][1]) / 2 - 6 }
       const w = width(e.label, EFS) + 8
+      const free = (x, y) => !g.nodes.some((n) => x + w / 2 > n.x && x - w / 2 < n.x + n.w && y + 4 > n.y && y - 13 < n.y + n.h) && !placed.some((r) => x + w / 2 > r[0] && x - w / 2 < r[2] && y + 4 > r[1] && y - 13 < r[3])
+      const [A, Bp] = curve ? [pts[1], pts[2]] : [pts[0], pts[1]]
+      const cands = curve ? [0.5, 0.3, 0.7, 0.15, 0.85] : [0.5, 0.35, 0.65, 0.25, 0.75, 0.2, 0.8]
+      const dy = curve ? (g.vertical ? 0 : 15) : -6
+      ;[mx, my] = [A[0] + (Bp[0] - A[0]) / 2, A[1] + (Bp[1] - A[1]) / 2 + dy]
+      let found = false
+      for (const t of cands) { const x = A[0] + (Bp[0] - A[0]) * t, y = A[1] + (Bp[1] - A[1]) * t + dy; if (free(x, y)) { mx = x; my = y; found = true; break } }
+      if (!found) for (const t of cands) for (const oy of [-14, 14, -26, 26]) { const x = A[0] + (Bp[0] - A[0]) * t, y = A[1] + (Bp[1] - A[1]) * t + dy + oy; if (!found && free(x, y)) { mx = x; my = y; found = true } }
+      placed.push([mx - w / 2, my - 13, mx + w / 2, my + 4])
       parts.push(`<rect x="${(mx - w / 2).toFixed(1)}" y="${(my - 13).toFixed(1)}" width="${w.toFixed(1)}" height="17" rx="4" fill="#ffffff" opacity="0.9"/>`)
       parts.push(`<path d="${textPath(e.label, mx, my, EFS)}" fill="#495057"/>`)
     }
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${g.W} ${g.H}" width="${g.W}" height="${g.H}" role="img"><title>${spec.alt.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</title><rect width="100%" height="100%" fill="#ffffff"/>${parts.join('')}</svg>\n`
+  {
+    // legend: only the colours used, plus the dashed (async) style if present
+    const used = new Set(g.nodes.map((n) => kindOf(n.label, n.kind)))
+    let x = MARGIN, y = Math.max(g.H + 4, maxY + 22)
+    g.legendY = y
+    for (const [k, name] of LEGEND) {
+      if (!used.has(k)) continue
+      const [bg, stroke] = PALETTE[k]
+      parts.push(`<rect x="${x}" y="${y}" width="14" height="14" rx="2" fill="${bg}" stroke="${stroke}" stroke-width="1.4"/>`)
+      parts.push(`<path d="${textPath(name, x + 20 + width(name, EFS) / 2, y + 12, EFS)}" fill="#495057"/>`)
+      x += 20 + width(name, EFS) + 18
+    }
+    if (g.edges.some((e) => e.dashed)) {
+      parts.push(`<path d="M${x} ${y + 7}H${x + 26}" stroke="#343a40" stroke-width="1.4" stroke-dasharray="6 5"/>`)
+      parts.push(`<path d="${textPath('async / later', x + 32 + width('async / later', EFS) / 2, y + 12, EFS)}" fill="#495057"/>`)
+      x += 32 + width('async / later', EFS) + 10
+    }
+    g.legendW = x + MARGIN
+  }
+  const W = Math.max(g.W, Math.ceil(g.legendW)), H = Math.ceil(g.legendY + 22)
+  g.outW = W; g.outH = H
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img"><title>${spec.alt.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</title><rect width="100%" height="100%" fill="#ffffff"/>${parts.join('')}</svg>\n`
 }
 
 function renderExcalidraw(spec, g) {
@@ -236,7 +343,7 @@ function renderExcalidraw(spec, g) {
   })
   const idOf = new Map()
   for (const n of g.nodes) {
-    const [bg, stroke] = PALETTE[kindOf(n.label)]
+    const [bg, stroke] = PALETTE[kindOf(n.label, n.kind)]
     const rect = base('rectangle', { x: n.x, y: n.y, width: n.w, height: n.h, strokeColor: stroke, backgroundColor: bg, roundness: { type: 3 } })
     const text = n.lines.join('\n')
     const t = base('text', { x: n.x + PADX, y: n.y + PADY, width: n.w - PADX * 2, height: n.lines.length * LINE, text, originalText: text, fontSize: 16, fontFamily: 1, textAlign: 'center', verticalAlign: 'middle', containerId: rect.id, lineHeight: 1.25, autoResize: true })
@@ -276,7 +383,7 @@ for (const spec of specs) {
   layout(g)
   fs.writeFileSync(path.join(outDir, `${spec.id}.svg`), renderSvg(spec, g))
   fs.writeFileSync(path.join(outDir, `${spec.id}.excalidraw`), renderExcalidraw(spec, g))
-  index[spec.id] = { alt: spec.alt, width: g.W, height: g.H }
+  index[spec.id] = { alt: spec.alt, width: g.outW, height: g.outH }
 }
 const keep = new Set(Object.keys(index).flatMap((id) => [`${id}.svg`, `${id}.excalidraw`]))
 for (const f of fs.readdirSync(outDir)) if (!keep.has(f)) fs.rmSync(path.join(outDir, f))
