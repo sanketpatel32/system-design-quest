@@ -21,6 +21,19 @@ const TYPE_LABEL: Record<Question['type'], string> = {
   tradeoff: 'Make the call',
 }
 
+function FeedbackMark({ ok }: { ok: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
+      <circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" strokeWidth="2" />
+      {ok ? (
+        <path d="M6 10.5l2.6 2.6L14 7.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      ) : (
+        <path d="M7 7l6 6M13 7l-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      )}
+    </svg>
+  )
+}
+
 function hasStructuredTradeoff(q: TradeoffQuestion) {
   return Boolean(q.rationaleOptions?.length && q.correctRationaleIds?.length)
 }
@@ -68,10 +81,13 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
         <div className="space-y-2">
           {question.choices.map((c, idx) => {
             const selected = Array.isArray(answer) && answer.includes(c.id)
+            const isRight = question.correctChoiceIds.includes(c.id) || (question.alternativeChoiceIds ?? []).includes(c.id)
+            const reveal = result !== null
+            const stateClass = reveal && isRight ? 'choice-row-right' : reveal && selected ? 'choice-row-wrong' : selected ? 'choice-row-selected' : ''
             return (
               <label
                 key={c.id}
-                className={`choice-row flex gap-3 items-start p-3 cursor-pointer ${selected ? 'choice-row-selected' : ''}`}
+                className={`choice-row flex gap-3 items-start p-3 ${submitted ? '' : 'cursor-pointer'} ${stateClass}`}
               >
                 <input
                   type="radio"
@@ -230,12 +246,19 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
         </button>
       )}
       {result && (
-        <p className={`text-sm ${result.correct ? 'text-[var(--color-teal)]' : 'text-rose-400'}`} role="status">
-          {result.feedback}
-        </p>
+        <div className={`feedback ${result.correct ? 'feedback-ok' : 'feedback-miss'}`} role="status">
+          <p className="font-display font-semibold flex items-center gap-2">
+            <FeedbackMark ok={result.correct} />
+            {result.correct ? 'Correct' : 'Not this time'}
+          </p>
+          <p className="text-sm mt-1">{result.feedback}</p>
+        </div>
       )}
       {(submitted || result) && (
-        <p className="text-xs text-[var(--color-muted)] border-t border-[var(--color-line)] pt-2">{question.explanation}</p>
+        <p className="text-sm text-dim leading-relaxed border-t border-[var(--color-rail)] pt-3">
+          <span className="text-chalk font-semibold">Why: </span>
+          {question.explanation}
+        </p>
       )}
     </div>
   )
