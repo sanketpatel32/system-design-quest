@@ -1,0 +1,512 @@
+{
+ "11": {
+  "teaches": [
+   "round-robin",
+   "least-conn",
+   "weighted",
+   "hashing",
+   "p2c"
+  ],
+  "mechanism": {
+   "title": "How a load balancer picks a backend for each request",
+   "steps": [
+    "It keeps a list of healthy backends, updated by health checks.",
+    "Round robin hands requests to backends in turn: 1, 2, 3, 1, 2, 3. It is fair when every request costs about the same and every server is the same size.",
+    "Weighted round robin gives bigger servers proportionally more turns (weight 2 gets twice the requests of weight 1), useful during migrations or with mixed instance sizes.",
+    "Least connections sends each new request to the backend with the fewest in-flight requests, which adapts when some requests are slow (uploads, reports).",
+    "Power of two choices picks two backends at random and sends to the less loaded one. It gets most of the benefit of least-connections without every balancer needing a perfect global view.",
+    "Hashing (on client IP, user ID or a cache key) always maps the same key to the same backend, which keeps local caches warm; consistent hashing limits how many keys move when backends are added or removed."
+   ]
+  },
+  "useWhen": [
+   "Round robin: uniform, short requests on identical stateless servers.",
+   "Least connections or power of two choices: mixed request durations, long-lived connections, uneven load.",
+   "Consistent hashing: when a backend holds per-key state or a local cache (cache shards, chat rooms, partitions)."
+  ],
+  "avoidWhen": [
+   "Avoid plain round robin when request cost varies a lot; a slow server keeps receiving its full share and its queue grows.",
+   "Avoid modulo hashing (hash mod N) when N changes: adding one server remaps most keys and empties caches."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Algorithm",
+    "Needs",
+    "Strength",
+    "Weakness"
+   ],
+   "rows": [
+    [
+     "Round robin",
+     "Nothing",
+     "Simple, even for uniform work",
+     "Blind to load and slow requests"
+    ],
+    [
+     "Weighted round robin",
+     "Static weights",
+     "Mixed server sizes",
+     "Weights go stale"
+    ],
+    [
+     "Least connections",
+     "Live connection counts",
+     "Adapts to slow requests",
+     "Each balancer sees only its own counts"
+    ],
+    [
+     "Power of two choices",
+     "Load of 2 random servers",
+     "Near-optimal, scales across many balancers",
+     "Slightly random"
+    ],
+    [
+     "Consistent hashing",
+     "A hash ring",
+     "Key affinity, few keys move on resize",
+     "Hot keys overload one server"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "How many keys move when you add a server?",
+   "assumptions": [
+    "10 cache servers, growing to 11",
+    "Keys spread uniformly"
+   ],
+   "steps": [
+    "Modulo hashing: a key stays put only if hash mod 10 equals hash mod 11, which is true for about 1 key in 11.",
+    "So about 10 ÷ 11 ≈ 91% of keys move to a different server, and the cache hit rate collapses.",
+    "Consistent hashing: the new server takes over only its share of the ring, about 1 ÷ 11 ≈ 9% of keys.",
+    "With 1 billion cached keys, that is about 910 million keys moving versus about 91 million."
+   ],
+   "result": "Adding one server to ten moves about 91% of keys with modulo hashing but only about 9% with consistent hashing. That is why caches and partitions use consistent hashing."
+  },
+  "india": {
+   "title": "Ticket checkout when some requests are slow",
+   "label": "Illustrative estimate",
+   "body": "In a ticketing flow such as movie or train booking, most requests are quick (seat map, availability) but some are slow (payment confirmation that waits on a bank or UPI callback). Under round robin, a server that happens to collect several slow requests still gets its full share of new ones, its queue grows, and users see timeouts even though other servers are idle. Least connections or power of two choices sends new work to servers with fewer requests in flight, so slow calls do not pile up on one box. Separately, if seat-hold state is cached per show, consistent hashing on show ID keeps each show's state on one server, so adding servers before a big release moves only a small slice of shows."
+  },
+  "pitfalls": [
+   {
+    "trap": "Choosing round robin for everything.",
+    "say": "'Request times vary here, so I'd use least connections or power of two choices so slow requests don't pile up.'"
+   },
+   {
+    "trap": "Hashing with mod N on a cache tier that autoscales.",
+    "say": "'I'd use consistent hashing with virtual nodes so adding a server moves only about 1/N of the keys.'"
+   }
+  ],
+  "diagram": "round robin:    r1->A  r2->B  r3->C  r4->A ...\nleast conn:     A(12) B(3) C(7)   -> pick B\npower of two:   sample {A,C} -> A(12) vs C(7) -> pick C\nhash(user 42) -> ring position -> server B, every time",
+  "takeaways": [
+   "Round robin suits uniform work; least connections and power of two choices handle uneven work.",
+   "Weights handle mixed server sizes.",
+   "Hashing gives key affinity; use consistent hashing so a resize moves about 1/N of keys, not most of them.",
+   "Watch for hot keys whenever you hash."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t11-d1",
+    "type": "multiple_choice",
+    "concept": "hashing",
+    "prompt": "A cache tier grows from 10 to 11 servers. With consistent hashing, roughly what share of keys move?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "About 9%"
+     },
+     {
+      "id": "b",
+      "label": "About 91%"
+     },
+     {
+      "id": "c",
+      "label": "About 50%"
+     },
+     {
+      "id": "d",
+      "label": "None"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "The new server takes about 1/11 of the ring, about 9% of keys. With hash mod N about 10/11, roughly 91%, would move."
+   }
+  ]
+ },
+ "12": {
+  "teaches": [
+   "l4",
+   "l7",
+   "health",
+   "connection-draining"
+  ],
+  "mechanism": {
+   "title": "What happens to a request at each kind of balancer",
+   "steps": [
+    "An L4 balancer receives TCP or UDP packets and picks a backend using the 5-tuple (source IP and port, destination IP and port, protocol). It forwards bytes without reading them, so it is very fast and works for any protocol.",
+    "An L7 balancer terminates the connection (usually including TLS), parses the HTTP request, and routes on host, path, headers or cookies, for example /api/payments to the payments pool.",
+    "Because it understands HTTP, an L7 balancer can retry idempotent requests on another backend, add headers, compress responses, enforce rate limits and run a web application firewall.",
+    "Health checks run continuously: every few seconds the balancer calls each backend (a TCP connect for L4, an HTTP GET /healthz for L7). After a set number of consecutive failures it marks the backend unhealthy and stops sending traffic; after a set number of successes it adds it back.",
+    "Good health endpoints check the process can serve (it can reach its own dependencies within a timeout) but avoid failing just because a shared downstream is down, otherwise every backend fails together.",
+    "When removing a backend for a deploy, the balancer drains connections: no new requests, but in-flight ones finish within a timeout."
+   ]
+  },
+  "useWhen": [
+   "L4: very high throughput, non-HTTP protocols (databases, MQTT, game servers), or as the first tier in front of L7 balancers.",
+   "L7: path- or host-based routing, canary releases by header, auth and rate limiting at the edge, gRPC routing per method."
+  ],
+  "avoidWhen": [
+   "Do not put content-based routing on an L4 balancer; it cannot see the path.",
+   "Do not make health checks deep and strict (checking every downstream): a single shared dependency failure then marks every server unhealthy at once."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "",
+    "L4",
+    "L7"
+   ],
+   "rows": [
+    [
+     "Sees",
+     "IPs, ports, protocol",
+     "HTTP host, path, headers, cookies, body"
+    ],
+    [
+     "TLS",
+     "Usually passes through",
+     "Usually terminates"
+    ],
+    [
+     "Cost per request",
+     "Very low",
+     "Higher (parsing, TLS)"
+    ],
+    [
+     "Features",
+     "Fast forwarding",
+     "Routing, retries, WAF, rate limits, canaries"
+    ],
+    [
+     "Protocols",
+     "Any TCP/UDP",
+     "HTTP/1.1, HTTP/2, gRPC, WebSocket"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "How many requests fail before a dead server is removed?",
+   "assumptions": [
+    "10 backends sharing 1,000 requests per second evenly",
+    "Health check every 5 s; 3 consecutive failures mark a backend unhealthy",
+    "No retries at the balancer"
+   ],
+   "steps": [
+    "Each backend gets 1,000 ÷ 10 = 100 requests per second.",
+    "Detection takes up to 3 checks × 5 s = 15 s.",
+    "Failed requests ≈ 100 × 15 = 1,500 in that window.",
+    "With a 2 s interval and 2 failures to trip: 2 × 2 = 4 s, so about 100 × 4 = 400 failures; with passive health checks (eject after a few real errors) it can be under a second."
+   ],
+   "result": "Aggressive health checks plus passive outlier detection and safe retries cut the damage from about 1,500 failed requests to a few hundred or fewer."
+  },
+  "india": {
+   "title": "Routing a payments app by path",
+   "label": "Illustrative design",
+   "body": "Consider a payments app in India with very different traffic types behind one domain: /api/upi/collect for payment requests, /api/bills for bill payments, and /static for app assets. An L7 balancer can send each path to its own pool, so a surge in bill payments on the first of the month does not starve UPI payment requests, and it can give the payment path stricter timeouts and no automatic retries (to avoid double debits) while retrying idempotent reads. In front of the L7 tier, an L4 balancer spreads raw TCP connections across many L7 instances at very low cost. Health checks on the UPI pool should test the service's own readiness, not the bank's availability, so one slow bank does not take every server out of rotation."
+  },
+  "pitfalls": [
+   {
+    "trap": "'The load balancer will retry failed requests' for every endpoint.",
+    "say": "'Retries only for idempotent requests or ones carrying an idempotency key; a payment POST must not be blindly retried.'"
+   },
+   {
+    "trap": "Health checks that test every downstream dependency.",
+    "say": "'Liveness checks the process; readiness checks it can serve. A shared downstream outage is handled by circuit breakers, not by failing every health check.'"
+   }
+  ],
+  "diagram": "clients -> [L4 LB]  (TCP, fast)\n              |-> [L7 LB 1] --/api/upi-->   [UPI pool]\n              '-> [L7 LB 2] --/api/bills--> [bills pool]\n                            --/static-->    [CDN/origin]",
+  "takeaways": [
+   "L4 balancers forward connections by IP and port; L7 balancers route by HTTP content.",
+   "L7 enables path routing, retries, canaries, WAF and rate limits at some CPU cost.",
+   "Detection time = check interval × failure threshold; shorten it and add passive checks.",
+   "Keep health checks shallow and drain connections during deploys."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t12-d1",
+    "type": "multiple_choice",
+    "concept": "health",
+    "prompt": "Health checks run every 5 s and a backend is removed after 3 failures. It serves 100 requests/s when it dies. About how many requests fail before removal?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "About 1,500"
+     },
+     {
+      "id": "b",
+      "label": "About 300"
+     },
+     {
+      "id": "c",
+      "label": "About 15"
+     },
+     {
+      "id": "d",
+      "label": "About 15,000"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Detection takes up to 3 × 5 s = 15 s; 100 requests/s × 15 s = 1,500 failed requests."
+   }
+  ]
+ },
+ "13": {
+  "teaches": [
+   "reverse",
+   "forward",
+   "reverse-flow",
+   "proxy-caching"
+  ],
+  "mechanism": {
+   "title": "Same middle box, opposite sides",
+   "steps": [
+    "A forward proxy sits on the client side. Clients are configured to send requests to it, and it fetches from the internet on their behalf. Servers see the proxy's IP, not the client's.",
+    "Organisations use forward proxies to enforce outbound policy (block sites, scan downloads), to log access, and to share a cache of common downloads.",
+    "A reverse proxy sits on the server side. Clients think they are talking to the website; the proxy receives the request and forwards it to one of many hidden backends.",
+    "The reverse proxy terminates TLS, load balances, caches responses, compresses them, enforces rate limits and hides the backend topology. Nginx, Envoy, HAProxy and CDNs are typical examples.",
+    "It passes the real client IP to the backend in a header such as X-Forwarded-For, which the backend must trust only from the proxy.",
+    "A CDN is a globally distributed reverse proxy with caches close to users; an API gateway is a reverse proxy specialised for APIs (auth, quotas, routing)."
+   ]
+  },
+  "useWhen": [
+   "Reverse proxy: in front of every web service, for TLS, routing, caching, compression and protection.",
+   "Forward proxy: corporate or school networks controlling outbound access, or services that must reach the internet from a fixed egress IP (some partner APIs allow-list IPs)."
+  ],
+  "avoidWhen": [
+   "Do not add another reverse-proxy hop inside the cluster unless it does real work; each hop adds latency and a failure point.",
+   "Do not trust X-Forwarded-For from arbitrary clients; it is easily forged."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "",
+    "Forward proxy",
+    "Reverse proxy"
+   ],
+   "rows": [
+    [
+     "Acts for",
+     "Clients",
+     "Servers"
+    ],
+    [
+     "Who configures it",
+     "Client or network admin",
+     "Site owner"
+    ],
+    [
+     "Hides",
+     "Client identity from servers",
+     "Backend topology from clients"
+    ],
+    [
+     "Typical jobs",
+     "Egress filtering, logging, shared cache",
+     "TLS, load balancing, caching, WAF, rate limits"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "What a caching reverse proxy saves the origin",
+   "assumptions": [
+    "20,000 requests per second for product pages at peak",
+    "80% of them are cacheable for 60 s at the proxy",
+    "Each origin render costs about 20 ms of CPU"
+   ],
+   "steps": [
+    "Requests served from the proxy cache = 20,000 × 0.8 = 16,000 per second.",
+    "Requests reaching the origin = 20,000 − 16,000 = 4,000 per second.",
+    "Origin CPU needed = 4,000 × 0.02 s = 80 CPU-seconds per second, about 80 cores, versus 20,000 × 0.02 = 400 cores without the cache.",
+    "That is a 5× reduction in origin capacity."
+   ],
+   "result": "An 80% cache hit rate at the reverse proxy cuts origin load by 5× (from about 400 cores to about 80)."
+  },
+  "india": {
+   "title": "Sale-day product pages behind reverse proxies",
+   "label": "Illustrative estimate",
+   "body": "During an Indian e-commerce sale, millions of shoppers hit the same few hundred deal pages in the first minutes. Rendering each page from scratch at the origin would need several times more servers, as the maths above shows. Retailers put CDNs and caching reverse proxies in front: the shared parts of a page (product details, images) are cached for seconds to minutes, while price and stock are fetched separately and kept fresh. Many corporate networks in India, meanwhile, run forward proxies for employees: outbound traffic goes through a proxy that blocks some categories of sites and logs access. Same kind of software, opposite side of the connection."
+  },
+  "pitfalls": [
+   {
+    "trap": "Mixing up forward and reverse proxies.",
+    "say": "'A forward proxy represents clients going out; a reverse proxy represents servers taking requests in.'"
+   },
+   {
+    "trap": "Caching personalised responses at a shared proxy.",
+    "say": "'Only cache responses that are the same for everyone, or vary the cache key by the relevant header; user-specific data needs Cache-Control: private.'"
+   }
+  ],
+  "diagram": "Forward:  [employee PCs] -> [forward proxy] -> internet sites\nReverse:  internet users -> [reverse proxy / CDN] -> [app 1..N]",
+  "takeaways": [
+   "Forward proxies act for clients; reverse proxies act for servers.",
+   "Reverse proxies do TLS, load balancing, caching, compression and protection.",
+   "CDNs and API gateways are specialised reverse proxies.",
+   "Never cache personalised data in a shared proxy, and trust forwarded-IP headers only from your own proxy."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t13-d1",
+    "type": "multiple_choice",
+    "concept": "reverse",
+    "prompt": "A reverse proxy caches 80% of 20,000 requests/s. How many requests per second still reach the origin?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "4,000"
+     },
+     {
+      "id": "b",
+      "label": "16,000"
+     },
+     {
+      "id": "c",
+      "label": "20,000"
+     },
+     {
+      "id": "d",
+      "label": "800"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "20,000 × 0.8 = 16,000 are served from cache, so 20,000 − 16,000 = 4,000 reach the origin."
+   }
+  ]
+ },
+ "14": {
+  "teaches": [
+   "stateless",
+   "session-store",
+   "sticky",
+   "jwt-sessions"
+  ],
+  "mechanism": {
+   "title": "Moving state out of the web server",
+   "steps": [
+    "A stateful server keeps the user's session (login, cart, wizard progress) in its own memory. The next request must reach the same server, and a restart logs everyone out.",
+    "Sticky sessions patch this at the load balancer by pinning each user to one server (by cookie or IP hash). Load can become uneven, and a server failure still loses its sessions.",
+    "A stateless server keeps nothing between requests. Each request carries a session ID cookie, and the server looks the session up in a shared store such as Redis.",
+    "Alternatively, the session itself can travel in a signed token (a JWT): the server verifies the signature and reads the claims without a lookup, at the cost of harder revocation.",
+    "Files and uploads go to object storage, not local disk; caches are either shared or treated as disposable.",
+    "Now any server can handle any request, so you can add, remove or replace servers freely and the load balancer can use any algorithm."
+   ]
+  },
+  "useWhen": [
+   "Stateless services with a session store: almost every web and API tier that needs to autoscale or survive server loss.",
+   "Signed tokens: when you want to avoid a session lookup on every request and can live with short expiries plus a revocation strategy.",
+   "Sticky sessions: legacy apps you cannot change yet, or WebSocket connections that are naturally pinned."
+  ],
+  "avoidWhen": [
+   "Avoid in-memory sessions on autoscaled servers; scale-in events log users out.",
+   "Avoid long-lived JWTs for things that must be revocable instantly (bank logouts, banned users) unless you also keep a denylist."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Approach",
+    "Survives a server dying",
+    "Per-request cost",
+    "Revocation"
+   ],
+   "rows": [
+    [
+     "In-memory + sticky",
+     "No",
+     "None",
+     "Easy, but lost on restart"
+    ],
+    [
+     "Shared store (Redis)",
+     "Yes",
+     "One fast lookup (sub-millisecond in the same zone)",
+     "Delete the key"
+    ],
+    [
+     "Signed token (JWT)",
+     "Yes",
+     "Signature check, no lookup",
+     "Hard: wait for expiry or keep a denylist"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Sizing a Redis session store",
+   "assumptions": [
+    "10 million active sessions at peak",
+    "About 1 KB per session (user ID, roles, cart pointer, CSRF token)",
+    "50,000 requests per second, each reading its session",
+    "Redis replication factor 2 (primary + replica)"
+   ],
+   "steps": [
+    "Memory = 10M sessions × 1 KB ≈ 10 GB, so about 20 GB with one replica.",
+    "Lookups = 50,000 per second; one Redis node can serve well over 100,000 simple GETs per second, so a single primary covers it with headroom.",
+    "Shard by session ID across 2–3 primaries anyway, to keep each node's memory small and limit the blast radius.",
+    "Added latency per request ≈ one round trip inside the zone, typically well under 1 ms."
+   ],
+   "result": "About 10 GB of data (20 GB with replicas), 50K reads/s and sub-millisecond lookups: a small Redis cluster buys a fully stateless web tier."
+  },
+  "india": {
+   "title": "IRCTC-style booking when servers come and go",
+   "label": "Illustrative design",
+   "body": "In a train booking flow during Tatkal, a user moves through search, seat selection, passenger details and payment within a few minutes, while the platform adds servers to absorb the 10:00 spike. If the booking wizard's progress lived in one server's memory, any scale-in, crash or deploy would throw users back to the start at the worst possible moment. Keeping the session and the in-progress booking in a shared store keyed by session ID means any server can serve the next step, and a server can be killed without users noticing. The seat hold itself lives in the inventory database with an expiry, not in the session, because it must be consistent across all users."
+  },
+  "pitfalls": [
+   {
+    "trap": "Scaling out while sessions live in server memory.",
+    "say": "'First make the tier stateless: sessions in Redis, files in object storage; then autoscale behind any balancing algorithm.'"
+   },
+   {
+    "trap": "Choosing JWTs without a revocation plan.",
+    "say": "'Short-lived access tokens, say 15 minutes, plus refresh tokens I can revoke server-side.'"
+   }
+  ],
+  "diagram": "[LB] -> [web 1] --+\n     -> [web 2] --+--> [Redis: session:abc -> {user 7, cart 91}]\n     -> [web 3] --+--> [object storage: uploads]",
+  "takeaways": [
+   "Stateless servers let you scale out, replace and deploy freely.",
+   "Keep sessions in a shared store or a signed token, not in server memory.",
+   "Sticky sessions are a stopgap: uneven load and lost sessions on failure.",
+   "Signed tokens remove lookups but make revocation hard; keep them short-lived."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t14-d1",
+    "type": "multiple_choice",
+    "concept": "session-store",
+    "prompt": "10 million sessions of about 1 KB each are stored in Redis with one replica. Roughly how much memory is that in total?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "About 20 GB"
+     },
+     {
+      "id": "b",
+      "label": "About 10 MB"
+     },
+     {
+      "id": "c",
+      "label": "About 2 TB"
+     },
+     {
+      "id": "d",
+      "label": "About 200 MB"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "10 million sessions at 1 KB each is about 10 GB; a primary plus one replica doubles that to about 20 GB."
+   }
+  ]
+ }
+}
