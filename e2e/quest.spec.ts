@@ -10,8 +10,11 @@ test('map to lesson navigation', async ({ page }) => {
 
 test('wrong answer costs heart and shows feedback', async ({ page }) => {
   await page.goto('/quiz/the-system-design-interview')
+  // A blank answer cannot be submitted, so it can never cost a heart
+  await expect(page.getByRole('button', { name: 'Submit' }).first()).toBeDisabled()
+  await page.getByRole('radio').first().check()
   await page.getByRole('button', { name: 'Submit' }).first().click()
-  await expect(page.getByText(/Not quite|Enter a positive|Pick the/i).first()).toBeVisible({ timeout: 10000 })
+  await expect(page.getByText(/Not this time|Correct/).first()).toBeVisible({ timeout: 10000 })
 })
 
 test('quiz clear awards xp and unlocks next topic', async ({ page }) => {

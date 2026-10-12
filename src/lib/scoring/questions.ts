@@ -147,3 +147,31 @@ export function gradeQuestion(
       return { correct: false, feedback: 'Unknown question type.' }
   }
 }
+
+/**
+ * Whether an answer is complete enough to grade. Incomplete answers are never graded,
+ * so they can never cost a heart; the UI asks the learner to finish instead.
+ */
+export function incompleteReason(q: Question, answer: unknown): string | null {
+  switch (q.type) {
+    case 'multiple_choice':
+      return Array.isArray(answer) && answer.length > 0 ? null : 'Pick an option first.'
+    case 'spot_bottleneck':
+      return Array.isArray(answer) && answer.length > 0 ? null : 'Select a component in the diagram first.'
+    case 'drag_order': {
+      const arr = Array.isArray(answer) ? (answer as string[]) : []
+      const complete = arr.length === q.items.length && new Set(arr).size === q.items.length && arr.every(Boolean)
+      return complete ? null : 'Complete all positions first.'
+    }
+    case 'estimation':
+      return normalizeEstimationInput(typeof answer === 'string' ? answer : '') === null ? 'Enter a positive number first.' : null
+    case 'tradeoff': {
+      const a = (answer ?? {}) as { approachId?: string; rationaleIds?: string[] }
+      if (!a.approachId) return 'Choose an approach first.'
+      if (q.rationaleOptions?.length && !(a.rationaleIds?.length)) return 'Pick at least one reason first.'
+      return null
+    }
+    default:
+      return null
+  }
+}

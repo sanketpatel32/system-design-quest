@@ -8,7 +8,7 @@ import { recordStreakActivity, currentStreakCount } from '../lib/streak/kolkata'
 import { defaultPersistedState, type PersistedState } from '../lib/storage/schema'
 import { loadState, saveState, resetState, exportStateJson, importStateJson } from '../lib/storage/persistence'
 import type { Question } from '../content/types'
-import { gradeQuestion } from '../lib/scoring/questions'
+import { gradeQuestion, incompleteReason } from '../lib/scoring/questions'
 
 interface GameStore extends PersistedState {
   hydrated: boolean
@@ -78,6 +78,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       results: {},
     }
     if (attempt.completed || attempt.hearts <= 0) return
+    // Blank or partial answers are not attempts: never grade them, never take a heart
+    if (incompleteReason(question, answer)) return
     const grade = gradeQuestion(question, answer)
     const hearts = grade.correct ? attempt.hearts : Math.max(0, attempt.hearts - 1)
     const results = { ...(attempt as { results?: Record<string, boolean> }).results, [question.id]: grade.correct }
