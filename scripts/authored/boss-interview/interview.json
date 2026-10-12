@@ -1,0 +1,482 @@
+{
+ "75": {
+  "api": [
+   "POST /v1/links {longUrl, alias?, expiresAt?} (Idempotency-Key) -> 201 {code, shortUrl}",
+   "GET /{code} -> 302 Location: longUrl (301 if analytics are not needed)",
+   "DELETE /v1/links/{code} (owner only)"
+  ],
+  "outOfScope": [
+   "Link-in-bio pages and QR design",
+   "Full marketing analytics dashboards"
+  ],
+  "tradeoff": "302 keeps every click visible for analytics at the cost of more redirect traffic; 301 lets browsers cache and cuts load but loses later clicks. Counter-range IDs never collide but are guessable; random IDs need a uniqueness check on insert."
+ },
+ "76": {
+  "api": [
+   "POST /v1/pastes {content, syntax?, expiresIn?} -> 201 {id, url}",
+   "GET /v1/pastes/{id} -> metadata + content URL (404 after expiry)",
+   "GET /raw/{id} -> text/plain from CDN"
+  ],
+  "outOfScope": [
+   "Real-time collaborative editing",
+   "Code execution of pastes"
+  ],
+  "tradeoff": "Storing bodies in object storage keeps the database small and cheap but adds a second fetch; inlining small pastes in the row is faster for tiny pastes. Lazy expiry on read is simple, while a sweeper reclaims space on time."
+ },
+ "77": {
+  "api": [
+   "Gateway check: allow(key=user|ip|apiKey, rule) -> {allowed, remaining, resetAt}",
+   "Denied response: 429 Too Many Requests + Retry-After + X-RateLimit-* headers",
+   "PUT /v1/rules/{id} {limit, window, scope} (admin)"
+  ],
+  "outOfScope": [
+   "Billing and quota invoicing",
+   "Bot detection with ML"
+  ],
+  "tradeoff": "A central Redis token bucket is exact but adds a network hop per request; local in-process buckets are fast but let clients exceed the limit by up to N× across N gateways. Fail-open keeps the product up if Redis is down; fail-closed protects the backend."
+ },
+ "78": {
+  "api": [
+   "In-process library: nextId() -> 64-bit long (no network call)",
+   "Optional service: GET /v1/ids?count=100 -> batch of ids",
+   "Admin: lease worker id from etcd/ZooKeeper at startup"
+  ],
+  "outOfScope": [
+   "Human-readable vanity IDs",
+   "Cryptographic secrecy of IDs"
+  ],
+  "tradeoff": "Snowflake IDs are time-sortable and need no coordination per id, but rely on sane clocks (refuse to issue if the clock goes backwards). UUIDv4 needs no worker ids at all but is 128-bit and random, which hurts index locality."
+ },
+ "79": {
+  "api": [
+   "PUT /v1/kv/{key} {value, context?} (W=2 of 3) -> 200 {version}",
+   "GET /v1/kv/{key} (R=2 of 3) -> value(s) + version vector",
+   "DELETE /v1/kv/{key} -> tombstone"
+  ],
+  "outOfScope": [
+   "Secondary indexes and range queries",
+   "Multi-key transactions"
+  ],
+  "tradeoff": "W+R greater than N (2+2 over 3) gives read-your-writes on healthy replicas at the cost of latency; W=1/R=1 is fastest but can return stale data. Last-write-wins is simple but can drop concurrent cart updates; version vectors keep siblings for the client to merge."
+ },
+ "80": {
+  "api": [
+   "GET key -> value or miss",
+   "SET key value EX ttl (+ jitter) -> OK",
+   "DEL key (on writes to the source of truth)"
+  ],
+  "outOfScope": [
+   "Durable storage of record (the database stays the source of truth)",
+   "Cross-key transactions"
+  ],
+  "tradeoff": "Cache-aside with delete-on-write is simple and safe, with a short staleness window; write-through keeps the cache fresh but adds write latency. Replicas protect hot shards from restarts but double memory cost."
+ },
+ "81": {
+  "api": [
+   "POST /v1/notifications {userId, template, data, channels?, idempotencyKey} -> 202",
+   "PUT /v1/users/{id}/preferences {push, sms, email, quietHours}",
+   "Provider webhooks: POST /v1/receipts/{provider} (delivered/failed)"
+  ],
+  "outOfScope": [
+   "Marketing campaign builder UI",
+   "Writing the SMS/email content itself"
+  ],
+  "tradeoff": "Separate queues per channel isolate a slow SMS provider from push, at the cost of more moving parts. At-least-once delivery with an idempotency key avoids lost alerts; exactly-once to the user is impossible once a provider accepts the message."
+ },
+ "82": {
+  "api": [
+   "POST /v1/posts {text, mediaIds?} -> 201 {postId}",
+   "GET /v1/feed?cursor= -> ranked page of posts",
+   "POST /v1/posts/{id}/likes, POST /v1/posts/{id}/comments"
+  ],
+  "outOfScope": [
+   "Ads in the feed",
+   "Direct messages"
+  ],
+  "tradeoff": "Fan-out on write makes feed reads cheap but is expensive for accounts with millions of followers; fan-out on read is cheap to write but slow to read. The hybrid pushes for normal users and pulls celebrity posts at read time."
+ },
+ "83": {
+  "api": [
+   "POST /v1/tweets {text} (Idempotency-Key) -> 201 {tweetId}",
+   "POST /v1/follows {targetUserId}",
+   "GET /v1/timeline/home?cursor= -> tweets"
+  ],
+  "outOfScope": [
+   "Ads ranking",
+   "Direct messages"
+  ],
+  "tradeoff": "Precomputed timelines in cache give fast home reads at the cost of write amplification; celebrity tweets are merged at read time to cap fan-out. Timelines are eventually consistent: a tweet may take seconds to appear for followers."
+ },
+ "84": {
+  "api": [
+   "WebSocket: send {clientMsgId, to|groupId, ciphertext} -> ack {serverSeq}",
+   "Server push: message, delivered, read receipts",
+   "GET /v1/chats/{id}/messages?afterSeq= (sync after reconnect)"
+  ],
+  "outOfScope": [
+   "Voice and video calls",
+   "Payments in chat"
+  ],
+  "tradeoff": "Persistent connections give instant delivery but need a registry of which gateway holds each user. Storing messages until delivered (then deleting) keeps servers small; keeping history server-side enables multi-device sync but costs storage and privacy."
+ },
+ "85": {
+  "api": [
+   "POST /v1/uploads -> presigned PUT URL",
+   "POST /v1/posts {mediaKey, caption} -> 201",
+   "POST /v1/follows {userId}; GET /v1/feed?cursor="
+  ],
+  "outOfScope": [
+   "Stories and Reels",
+   "Direct messages"
+  ],
+  "tradeoff": "Presigned direct uploads keep large bytes off app servers; the trade-off is a two-step create (upload, then commit). Serving resized variants from a CDN costs storage per size but saves bandwidth on phones."
+ },
+ "86": {
+  "api": [
+   "POST /v1/uploads (resumable, chunked) -> uploadId",
+   "GET /v1/videos/{id}/manifest.m3u8 -> renditions",
+   "GET /v1/feed?cursor=; POST /v1/videos/{id}/likes"
+  ],
+  "outOfScope": [
+   "Live streaming",
+   "Creator monetisation and payouts"
+  ],
+  "tradeoff": "Transcoding every upload into a full bitrate ladder costs compute up front but makes playback adaptive; transcoding rare videos on demand saves cost but delays first play. CDN egress dominates cost, so popular segments must be cached at the edge."
+ },
+ "87": {
+  "api": [
+   "GET /v1/catalogue/rows -> personalised rows",
+   "POST /v1/playback/{titleId} -> manifest URL + licence",
+   "PUT /v1/progress/{titleId} {positionSec}"
+  ],
+  "outOfScope": [
+   "Live sports",
+   "User-uploaded video"
+  ],
+  "tradeoff": "Pushing content into ISP-embedded caches off-peak cuts backbone cost and startup time, but needs prediction of what will be watched. Progress writes are frequent and tolerate small loss, so a KV store with last-write-wins fits."
+ },
+ "88": {
+  "api": [
+   "POST /v1/rides {pickup, drop, idempotencyKey} -> rideId",
+   "Driver stream: location {lat, lng, ts} every 4 s",
+   "POST /v1/rides/{id}/accept (conditional: only if unassigned)"
+  ],
+  "outOfScope": [
+   "Fare surge pricing model details",
+   "Driver onboarding and KYC"
+  ],
+  "tradeoff": "Keeping live locations in an in-memory geo index is fast but loses data on a crash, which is fine because positions refresh every few seconds. Offering a ride to one driver at a time is fair but slower; offering to several needs an atomic accept."
+ },
+ "89": {
+  "api": [
+   "GET /v1/restaurants?lat&lng&q= -> list",
+   "POST /v1/orders {cart, addressId} (Idempotency-Key) -> orderId",
+   "GET /v1/orders/{id}/track (WebSocket/SSE for rider location)"
+  ],
+  "outOfScope": [
+   "Restaurant POS integration",
+   "Grocery delivery"
+  ],
+  "tradeoff": "A saga (pay, restaurant accept, rider assign) avoids distributed locks but needs compensations such as refunds. Search served from Elasticsearch plus a menu cache is fast but can show an item that just sold out, so the order step re-checks."
+ },
+ "90": {
+  "api": [
+   "WebSocket /v1/docs/{id}: op {baseVersion, ops} -> ack {version}",
+   "Server broadcast: transformed ops + presence (cursors)",
+   "GET /v1/docs/{id}/versions; POST /v1/docs/{id}/restore {version}"
+  ],
+  "outOfScope": [
+   "Offline editing for weeks",
+   "Spreadsheets and slides"
+  ],
+  "tradeoff": "One session server owning each document makes ordering simple (OT on a central log), but that server is a hotspot and must fail over. CRDTs allow peer-to-peer and offline edits but carry metadata overhead."
+ },
+ "91": {
+  "api": [
+   "POST /v1/files/{path}/commit {chunkHashes} -> missing chunk list",
+   "PUT /v1/chunks/{hash} (presigned) ; GET /v1/chunks/{hash}",
+   "POST /v1/shares {path, user, role}"
+  ],
+  "outOfScope": [
+   "In-browser document editing",
+   "Photo editing features"
+  ],
+  "tradeoff": "Content-defined chunking with hashes uploads only changed chunks and deduplicates, at the cost of a metadata service that tracks chunk lists. Last-writer-wins on conflicts is simple; saving a conflicted copy avoids silent data loss."
+ },
+ "92": {
+  "api": [
+   "POST /v1/pay {payerVpa, payeeVpa, amount, txnRef} -> PENDING",
+   "POST /v1/collect {fromVpa, amount} -> request id",
+   "GET /v1/txns/{txnRef} (status check after a timeout); GET /v1/txns?cursor="
+  ],
+  "outOfScope": [
+   "Merchant settlement and payouts",
+   "Credit or lending products"
+  ],
+  "tradeoff": "Treating a timeout as unknown (not failed) and checking status avoids double debits but leaves users waiting. A unique transaction reference makes retries idempotent end to end; daily reconciliation files catch anything the state machine missed."
+ },
+ "93": {
+  "api": [
+   "POST /v1/wallet/topups {amount} -> gateway order; webhook credits (dedup by gateway id)",
+   "POST /v1/wallet/transfers {to, amount} (Idempotency-Key) -> txnId",
+   "GET /v1/wallet -> balance; GET /v1/wallet/ledger?cursor="
+  ],
+  "outOfScope": [
+   "Bill payments and recharges",
+   "Rewards and cashback engine"
+  ],
+  "tradeoff": "A single SQL transaction with ordered row locks keeps balances correct but limits throughput per wallet; a double-entry ledger lets nightly jobs prove sum(ledger) equals balances. Sharding by user keeps most transfers on one shard but cross-shard transfers then need a saga."
+ },
+ "94": {
+  "api": [
+   "GET /v1/shows/{id}/seats -> seat map (cached, few seconds stale)",
+   "POST /v1/holds {showId, seatIds} -> holdId, expiresAt (+10 min)",
+   "POST /v1/bookings {holdId, paymentId} -> booking"
+  ],
+  "outOfScope": [
+   "Food and beverage add-ons",
+   "Dynamic pricing"
+  ],
+  "tradeoff": "A conditional update (FREE to HELD) per seat prevents double booking without global locks; the cached seat map may show a seat that was just taken, so the hold is the source of truth. Short holds free unsold seats sooner but frustrate slow payers."
+ },
+ "95": {
+  "api": [
+   "GET /v1/trains?from&to&date -> availability (cached)",
+   "POST /v1/bookings {trainId, class, quota, passengers} (token from waiting room) -> PNR pending",
+   "POST /v1/bookings/{pnr}/pay -> confirmed or released"
+  ],
+  "outOfScope": [
+   "Refund rules engine",
+   "Station display boards"
+  ],
+  "tradeoff": "A waiting room with tokens protects inventory from 10 a.m. spikes but adds queueing time; the conditional decrement per train, class and quota keeps counts exact. Releasing seats on payment timeout keeps inventory honest at the cost of some failed bookings."
+ },
+ "96": {
+  "api": [
+   "Internal: POST /v1/scores {contestId, teamId, points} (from scoring feed)",
+   "GET /v1/contests/{id}/rank/{teamId} -> rank",
+   "GET /v1/contests/{id}/top?n=100"
+  ],
+  "outOfScope": [
+   "Prize payout processing",
+   "Team creation UI"
+  ],
+  "tradeoff": "A Redis sorted set per contest gives O(log n) rank updates and reads but must fit in memory; sharding a huge contest needs approximate ranks. Caching top-N for a few seconds cuts load but shows slightly stale ranks."
+ },
+ "97": {
+  "api": [
+   "GET /v1/suggest?prefix=pan&lang= -> top 10 suggestions",
+   "Offline: builder publishes prefix to top-k snapshot every few minutes",
+   "Client: debounce 100-200 ms, cache recent prefixes"
+  ],
+  "outOfScope": [
+   "Full search results page",
+   "Personalised suggestions per user"
+  ],
+  "tradeoff": "Precomputed top-k per prefix in memory gives single-digit millisecond responses but trending terms appear only after the next snapshot. Normalising Hinglish and typos at build time widens matches but can surface odd suggestions."
+ },
+ "98": {
+  "api": [
+   "Internal: frontier.enqueue(url, priority) / dequeue(host)",
+   "Fetcher: GET page respecting robots.txt and per-host delay",
+   "Store: PUT raw page to object storage; emit links to the dedup stage"
+  ],
+  "outOfScope": [
+   "Ranking search results",
+   "Executing JavaScript-heavy pages"
+  ],
+  "tradeoff": "Per-host queues make politeness easy but need many queues; a Bloom filter for seen URLs is memory-cheap but has false positives that skip a few new pages. Re-crawl frequency trades freshness against bandwidth."
+ },
+ "99": {
+  "api": [
+   "GET /v1/search?q=&filters=&sort=&cursor= -> results + facets",
+   "Internal: catalogue CDC events -> indexer",
+   "GET /v1/search/suggest?q="
+  ],
+  "outOfScope": [
+   "Ads and sponsored listings",
+   "Recommendations"
+  ],
+  "tradeoff": "Indexing from CDC keeps search eventually consistent with the catalogue (seconds behind) but decouples it; more shards spread load but make every query fan out. Caching popular queries helps until filters make queries unique."
+ },
+ "100": {
+  "api": [
+   "POST /v1/metrics (batched samples: name, labels, ts, value)",
+   "GET /v1/query?expr=&from&to&step -> series",
+   "PUT /v1/alerts/{id} {expr, for, notify}"
+  ],
+  "outOfScope": [
+   "Distributed tracing",
+   "Log search"
+  ],
+  "tradeoff": "Rollups (1 min, 1 h) make long-range dashboards fast and cheap but lose detail; high-cardinality labels explode series count, so they must be limited. Evaluating alerts every 15-30 s trades detection speed against load."
+ },
+ "101": {
+  "api": [
+   "Agent ships batches: POST /v1/logs (compressed, at-least-once)",
+   "GET /v1/logs/search?q=&service=&from&to",
+   "Retention policy: hot 7 d, warm 30 d, archive"
+  ],
+  "outOfScope": [
+   "Metrics dashboards",
+   "Distributed tracing UI"
+  ],
+  "tradeoff": "Buffering in Kafka absorbs bursts and lets indexers fall behind safely, at the cost of a few seconds of search lag. Full-text indexing every line is powerful but expensive; indexing only labels and scanning text is cheaper but slower to search."
+ },
+ "102": {
+  "api": [
+   "Produce(topic, key, value) -> partition, offset (acks=all)",
+   "Fetch(topic, partition, offset, maxBytes) -> records",
+   "CommitOffset(group, partition, offset)"
+  ],
+  "outOfScope": [
+   "Message transformation and routing rules",
+   "Exactly-once end to end across external systems"
+  ],
+  "tradeoff": "acks=all with in-sync replicas makes writes durable but slower; acks=1 is faster and can lose recent messages on leader failure. Ordering holds only within a partition, so the key choice sets both ordering and parallelism."
+ },
+ "103": {
+  "api": [
+   "POST /v1/jobs {cron|runAt, payload, retries} -> jobId",
+   "GET /v1/jobs/{id}/runs -> history",
+   "Workers: claim due jobs (SKIP LOCKED), heartbeat, report result"
+  ],
+  "outOfScope": [
+   "Workflow DAG authoring UI",
+   "Running arbitrary user containers"
+  ],
+  "tradeoff": "Polling a SQL table indexed by next_run_time is simple and transactional but limits scale; a time-bucketed queue scales further but is harder to reason about. At-least-once execution means jobs must be idempotent."
+ },
+ "104": {
+  "api": [
+   "GET /v1/places/nearby?lat&lng&radius&category -> ids + distance",
+   "GET /v1/places/{id} -> details (cached)",
+   "POST /v1/places / PUT /v1/places/{id} (owners, moderated)"
+  ],
+  "outOfScope": [
+   "Reviews and ratings system",
+   "Turn-by-turn navigation"
+  ],
+  "tradeoff": "Geohash cells are easy to shard and cache but cell edges need neighbour lookups; a quadtree adapts to density but is harder to update. New places appear after the next index rebuild, which is acceptable for this product."
+ },
+ "105": {
+  "api": [
+   "GET /v1/sale/{itemId} -> static page from CDN + stock hint",
+   "POST /v1/reservations {itemId, qty} (token from waiting room) -> reservationId (expires)",
+   "POST /v1/orders {reservationId, paymentId}"
+  ],
+  "outOfScope": [
+   "Catalogue management",
+   "Post-sale returns"
+  ],
+  "tradeoff": "Splitting stock into buckets lets many atomic decrements run in parallel without one hot row, at the cost of possibly showing sold out while another bucket has units. The waiting room trades a queueing delay for a backend that stays up."
+ },
+ "106": {
+  "api": [
+   "GET /v1/hotels?city&checkIn&checkOut&filters -> results",
+   "POST /v1/reservations {roomTypeId, nights} -> hold",
+   "POST /v1/reservations/{id}/confirm {paymentId} -> confirmed (supplier API)"
+  ],
+  "outOfScope": [
+   "Loyalty programme",
+   "Reviews and photos moderation"
+  ],
+  "tradeoff": "Decrementing availability per night in one SQL transaction prevents overbooking; the search cache can be slightly stale, so booking re-checks. Calling the supplier synchronously gives instant confirmation but ties uptime to theirs; async confirmation needs a pending state."
+ },
+ "107": {
+  "api": [
+   "GET /c/{clickId} -> redirect to advertiser (logs the click)",
+   "Stream: clicks keyed by ad_id -> 1-minute counts",
+   "GET /v1/reports?adId&from&to&granularity=minute"
+  ],
+  "outOfScope": [
+   "Bidding and ad ranking",
+   "Fraud detection models"
+  ],
+  "tradeoff": "Stream aggregation gives near-real-time numbers but late or duplicate events make them approximate; the daily batch recompute from raw clicks is the number billing trusts. Dedup by click id costs state in the stream job."
+ },
+ "108": {
+  "api": [
+   "POST /v1/orders {symbol, side, type, price?, qty, clientOrderId} -> ack",
+   "DELETE /v1/orders/{id} -> cancel",
+   "Market data stream: trades and order-book updates"
+  ],
+  "outOfScope": [
+   "Portfolio analytics",
+   "KYC onboarding"
+  ],
+  "tradeoff": "A single-threaded in-memory matching engine per symbol gives deterministic price-time priority and microsecond latency, at the cost of scaling by symbol only. The sequenced, replicated log lets a standby replay to the same state."
+ },
+ "109": {
+  "api": [
+   "POST /v1/rooms -> roomId; POST /v1/rooms/{id}/join -> token + SFU address",
+   "WebSocket signalling: offer/answer/ICE candidates",
+   "Media: WebRTC to the SFU (TURN relay fallback)"
+  ],
+  "outOfScope": [
+   "Recording and transcription",
+   "Webinar mode for 10,000 viewers"
+  ],
+  "tradeoff": "An SFU forwards streams without mixing, keeping latency low and server CPU modest, but each client downloads several streams; simulcast lets the SFU send a lower layer to weak connections. TURN relays work through firewalls but cost bandwidth."
+ },
+ "110": {
+  "api": [
+   "GET /v1/live/{matchId}/manifest.m3u8 -> ABR renditions (multi-CDN)",
+   "POST /v1/entitlements/check -> allowed",
+   "PUT /v1/progress/{contentId} {positionSec} (VOD resume)"
+  ],
+  "outOfScope": [
+   "Live chat and polls",
+   "Fantasy contest integration"
+  ],
+  "tradeoff": "Multi-CDN spreads tens of millions of viewers and survives a CDN outage, at the cost of steering logic. Longer segments improve efficiency but add live latency; pre-scaling login and entitlement before the toss avoids a thundering herd."
+ },
+ "111": {
+  "api": [
+   "POST /v1/submissions {problemId, language, code} -> submissionId",
+   "GET /v1/submissions/{id} -> status/verdict (or push via WebSocket)",
+   "Workers: run tests in a sandbox with CPU, memory and time limits"
+  ],
+  "outOfScope": [
+   "Plagiarism detection",
+   "Interactive debugging"
+  ],
+  "tradeoff": "A queue per contest isolates contest spikes from practice traffic; warm sandbox pools cut start-up time but cost idle capacity. Strong isolation (no network, seccomp, separate VM) is slower to start but safer than plain containers."
+ },
+ "112": {
+  "api": [
+   "SMTP inbound on port 25 (SPF, DKIM, DMARC checks)",
+   "GET /v1/mailboxes/inbox?cursor= -> message headers; GET /v1/messages/{id}",
+   "POST /v1/messages/send -> queued; GET /v1/search?q="
+  ],
+  "outOfScope": [
+   "Calendar and contacts",
+   "Newsletter marketing tools"
+  ],
+  "tradeoff": "Bodies in object storage with per-user metadata keeps inbox listing fast and cheap; full-text search needs a per-user index that lags new mail slightly. Spam filtering before delivery protects users but adds latency to inbound mail."
+ },
+ "113": {
+  "api": [
+   "PUT /{bucket}/{key} (multipart for large objects) -> ETag",
+   "GET /{bucket}/{key} (Range supported)",
+   "GET /{bucket}?prefix=&continuation-token= -> list"
+  ],
+  "outOfScope": [
+   "POSIX file locking",
+   "In-place partial edits"
+  ],
+  "tradeoff": "Erasure coding (8+4) stores data at 1.5× overhead versus 3× for replication but needs more nodes per read and costly repairs; small objects are often replicated instead. Strong read-after-write needs the metadata commit to happen last."
+ },
+ "114": {
+  "api": [
+   "POST /v1/posts/{id}/like (idempotent per user) -> 200",
+   "GET /v1/posts/{id}/likes/count -> approximate within a second",
+   "Internal: INCR one of 32 sub-keys; periodic flush to durable store"
+  ],
+  "outOfScope": [
+   "Per-user like history UI",
+   "Fraud detection"
+  ],
+  "tradeoff": "Sharding a hot counter into 32 sub-keys spreads writes but makes reads sum 32 values; a 1-second read cache makes counts slightly stale. The unique (user, post) insert stops double likes but is itself a write per like."
+ }
+}

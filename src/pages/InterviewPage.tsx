@@ -8,6 +8,7 @@ import { BossCanvas, type CanvasSnapshot } from '../components/BossCanvas'
 import { INTERVIEW_STAGE_MINUTES, overallDeadlineMs, remainingMs, stageDeadlineMs } from '../lib/interview/timer'
 import { badgeAfterMock } from '../lib/progression/badges'
 import { useGameStore } from '../stores/gameStore'
+import { DiagramFigure } from '../components/DiagramFigure'
 
 const STAGES = [
   { label: 'Requirements', ask: 'Ask clarifying questions. Who uses it, which flows matter, what scale, what is out of scope?' },
@@ -53,6 +54,7 @@ export function InterviewPage() {
   const [finished, setFinished] = useState(existing?.finished ?? false)
   const [ratings, setRatings] = useState<Record<string, number>>(existing?.selfAssessment ?? {})
   const [now, setNow] = useState(Date.now())
+  const [canvasOpen, setCanvasOpen] = useState(false)
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000)
@@ -111,8 +113,11 @@ export function InterviewPage() {
     if (overallLeft <= 0) setFinished(true)
   }, [stageLeft, overallLeft, startedAt, finished, stageIndex])
 
+  const hasWork = stageNotes.some((n) => n?.trim()) || Boolean(canvas?.nodes.length)
   const finish = () => {
     setFinished(true)
+    // The mock badge is for real work: an empty "Finish early" earns nothing
+    if (!hasWork) return
     useGameStore.setState({ badges: [...new Set(badgeAfterMock(useGameStore.getState().badges))] })
     useGameStore.getState().recordActivity()
   }
@@ -128,6 +133,14 @@ export function InterviewPage() {
   )
   const running = Boolean(startedAt) && !finished
   const scenario = boss?.boss
+  const briefFacts = scenario ? (
+    <dl className="grid gap-3 sm:grid-cols-3 text-sm">
+      <div><dt className="text-dim">Users want to</dt><dd className="text-chalk mt-0.5">{scenario.functionalRequirements.join('; ')}</dd></div>
+      <div><dt className="text-dim">It must</dt><dd className="text-chalk mt-0.5">{scenario.nonFunctionalRequirements.join('; ')}</dd></div>
+      <div><dt className="text-dim">Out of scope</dt><dd className="text-chalk mt-0.5">{scenario.exclusions.join('; ')}</dd></div>
+    </dl>
+  ) : null
+  const showCanvas = canvasOpen || stageIndex >= 3
 
   return (
     <div className="space-y-5">
@@ -159,11 +172,8 @@ export function InterviewPage() {
               Your interviewer says: “Design {boss.title}.” Treat the details below as what you would learn by asking.
             </p>
           </div>
-          <dl className="grid gap-3 sm:grid-cols-3 text-sm">
-            <div><dt className="text-dim">Users want to</dt><dd className="text-chalk mt-0.5">{scenario.functionalRequirements.join('; ')}</dd></div>
-            <div><dt className="text-dim">It must</dt><dd className="text-chalk mt-0.5">{scenario.nonFunctionalRequirements.join('; ')}</dd></div>
-            <div><dt className="text-dim">Out of scope</dt><dd className="text-chalk mt-0.5">{scenario.exclusions.join('; ')}</dd></div>
-          </dl>
+          {briefFacts}
+          {scenario.estimationScenario && <p className="text-sm text-chalk"><span className="text-dim">Scale: </span>{scenario.estimationScenario}</p>}
           <ol className="grid gap-2 sm:grid-cols-3">
             {STAGES.map((s, i) => (
               <li key={s.label} className="flex items-center gap-3 rounded-2xl border border-[var(--color-rail)] bg-[var(--color-ink)] px-3 py-2">
@@ -209,6 +219,13 @@ export function InterviewPage() {
             </ol>
             <p className="text-[0.9375rem] text-chalk border-t border-[var(--color-rail)] pt-3">{STAGES[stageIndex]!.ask}</p>
           </section>
+          <details className="panel p-4" open data-testid="interview-brief">
+            <summary className="cursor-pointer font-display text-lg text-chalk">Brief: {boss?.title}</summary>
+            <div className="mt-3 space-y-2">
+              {briefFacts}
+              {scenario?.estimationScenario && <p className="text-sm text-chalk"><span className="text-dim">Scale: </span>{scenario.estimationScenario}</p>}
+            </div>
+          </details>
           <div>
             <label htmlFor="mock-notes" className="block text-sm font-semibold text-chalk mb-1">
               Notes for {STAGES[stageIndex]!.label.toLowerCase()}
@@ -225,7 +242,13 @@ export function InterviewPage() {
               placeholder="Saved as you type."
             />
           </div>
-          {stageIndex >= 3 && <BossCanvas key={sessionId} initial={canvas} onChange={setCanvas} suggested={suggested} />}
+          {showCanvas ? (
+            <BossCanvas key={sessionId} initial={canvas} onChange={setCanvas} suggested={suggested} />
+          ) : (
+            <button type="button" className="btn-quiet" onClick={() => setCanvasOpen(true)} data-testid="open-canvas">
+              Open the design canvas (it opens by itself at the high-level design stage)
+            </button>
+          )}
         </>
       )}
 
@@ -248,9 +271,12 @@ export function InterviewPage() {
                 </li>
               ))}
             </ol>
-            <p className="text-sm text-dim mt-3">
-              Canvas: {canvas?.nodes.length ? `${canvas.nodes.map((n) => n.label).join(', ')}; ${canvas.edges.length} connection${canvas.edges.length === 1 ? '' : 's'}.` : 'nothing drawn.'}
-            </p>
+            {canvas?.nodes.length ? (
+              <p className="text-sm text-dim mt-3">
+                Canvas: {canvas.nodes.map((n) => n.label).join(', ')}; {canvas.edges.length} connection{canvas.edges.length === 1 ? '' : 's'}.
+              </p>
+            ) : null}
+            {!hasWork && <p className="text-sm font-bold text-dim mt-3" data-testid="no-badge-note">No notes or canvas yet, so this mock doesn’t earn the badge. Retry and write as you go.</p>}
           </div>
 
           <fieldset className="panel p-5 space-y-3">
@@ -281,11 +307,32 @@ export function InterviewPage() {
 
           <details className="panel p-5" open>
             <summary className="cursor-pointer font-display text-lg font-bold text-chalk">Reference solution</summary>
-            <div className="mt-3 space-y-2 text-sm text-chalk leading-relaxed">
-              <p>{boss.boss?.referenceNotes}</p>
-              <p><span className="text-chalk font-semibold">Estimate: </span>{boss.boss?.workedEstimate}</p>
-              <pre className="whitespace-pre-wrap rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 text-[0.8125rem] text-chalk">{boss.boss?.exampleApi}</pre>
-              <p><span className="text-chalk font-semibold">Trade-offs: </span>{boss.boss?.tradeoffAnalysis}</p>
+            <div className="mt-3 space-y-4 text-sm text-chalk leading-relaxed" data-testid="reference-solution">
+              {boss.bossDeep && (
+                <div>
+                  <h3 className="font-extrabold">Estimate</h3>
+                  <ul className="mt-1 list-disc pl-5 space-y-0.5">{boss.bossDeep.capacity.steps.map((x) => <li key={x}>{x}</li>)}</ul>
+                  <p className="mt-1 font-bold">{boss.bossDeep.capacity.result}</p>
+                </div>
+              )}
+              <div>
+                <h3 className="font-extrabold">API sketch</h3>
+                <pre className="mt-1 whitespace-pre-wrap rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 text-[0.8125rem] text-chalk">{boss.boss?.exampleApi}</pre>
+              </div>
+              {boss.bossDeep && (
+                <div>
+                  <h3 className="font-extrabold">Design</h3>
+                  <ol className="mt-1 list-decimal pl-5 space-y-0.5">{boss.bossDeep.architecture.steps.map((x) => <li key={x}>{x}</li>)}</ol>
+                  <DiagramFigure topicId={boss.id} ascii={boss.bossDeep.architecture.diagram} label="Reference architecture" />
+                </div>
+              )}
+              {boss.bossDeep && (
+                <div>
+                  <h3 className="font-extrabold">Deep dives</h3>
+                  {boss.bossDeep.deepDives.map((d) => <p key={d.title} className="mt-1"><span className="font-bold">{d.title}. </span>{d.body}</p>)}
+                </div>
+              )}
+              <p><span className="font-extrabold">Key trade-off: </span>{boss.boss?.tradeoffAnalysis}</p>
             </div>
           </details>
 

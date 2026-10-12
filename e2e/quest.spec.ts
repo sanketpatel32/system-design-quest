@@ -178,7 +178,7 @@ test('lesson shows hand-drawn diagram with excalidraw download', async ({ page }
   await fig.scrollIntoViewIfNeeded()
   const img = fig.locator('img')
   await expect(img).toHaveAttribute('src', '/diagrams/1.svg')
-  await expect(img).toHaveAttribute('alt', /clarify/i)
+  await expect(img).toHaveAttribute('alt', /requirements/i)
   await expect.poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(100)
   await expect(fig.getByRole('link', { name: 'Download .excalidraw' })).toHaveAttribute('href', '/diagrams/1.excalidraw')
 })
