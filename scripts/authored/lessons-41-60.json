@@ -20,13 +20,21 @@
         "kind": "text",
         "title": "Why interviewers ask",
         "body": "Token bucket: tokens refill at rate r up to capacity b; each request spends one — allows bursts. Sliding window counters smooth boundary spikes. Store counters in Redis for a shared limit.",
-        "accent": "Interview lens"
+        "accent": "Interview lens",
+        "teaches": [
+          "token-bucket",
+          "sliding-window",
+          "shared-limit"
+        ]
       },
       {
         "id": "t41-c2",
         "kind": "text",
         "title": "The core idea",
-        "body": "Protect services by capping requests per key using token bucket, leaky bucket or sliding windows."
+        "body": "Protect services by capping requests per key using token bucket, leaky bucket or sliding windows.",
+        "teaches": [
+          "token-bucket"
+        ]
       },
       {
         "id": "t41-c3",
@@ -39,82 +47,167 @@
           "Token available?",
           "Yes: allow & spend",
           "No: 429 Too Many Requests"
+        ],
+        "teaches": [
+          "limit-flow"
         ]
       },
       {
         "id": "t41-c4",
         "kind": "text",
         "title": "Watch out for",
-        "body": "Fixed windows let 2× traffic through at window boundaries. Mention sliding windows or token buckets."
+        "body": "Fixed windows let 2× traffic through at window boundaries. Mention sliding windows or token buckets.",
+        "teaches": [
+          "fixed-window"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t41-q1",
+        "id": "t41-a1",
+        "concept": "token-bucket",
         "type": "multiple_choice",
         "prompt": "Which algorithm naturally allows short bursts?",
         "choices": [
           {
-            "id": "b",
+            "id": "a",
             "label": "Token bucket"
           },
           {
-            "id": "c",
-            "label": "Strict FIFO queue"
-          },
-          {
-            "id": "d",
-            "label": "Round robin"
-          },
-          {
-            "id": "a",
-            "label": "Fixed window"
-          }
-        ],
-        "correctChoiceIds": [
-          "b"
-        ],
-        "explanation": "Saved-up tokens allow a burst up to bucket capacity."
-      },
-      {
-        "id": "t41-q2",
-        "type": "estimation",
-        "prompt": "Token bucket refills 5 tokens/s with capacity 20, starting full. Max requests allowed in the first 4 seconds?",
-        "unit": "count",
-        "target": 40,
-        "assumptions": [
-          "Use rounded daily volume ÷ 86,400 unless stated otherwise."
-        ],
-        "formula": "See explanation",
-        "workedAnswer": "20 initial + 5 × 4 refilled = 40.",
-        "explanation": "20 initial + 5 × 4 refilled = 40."
-      },
-      {
-        "id": "t41-r1",
-        "type": "multiple_choice",
-        "prompt": "HTTP status for rate limited?",
-        "choices": [
-          {
             "id": "b",
-            "label": "Deliberately dropping low-priority work."
-          },
-          {
-            "id": "d",
-            "label": "Fast feed reads for accounts with modest follower counts."
-          },
-          {
-            "id": "a",
-            "label": "429 Too Many Requests."
+            "label": "Fixed window counter"
           },
           {
             "id": "c",
-            "label": "Make the key insert atomic, e.g. a unique constraint in the same transaction."
+            "label": "Leaky bucket"
+          },
+          {
+            "id": "d",
+            "label": "Sliding window log"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "From the lesson: 429 Too Many Requests."
+        "explanation": "Saved-up tokens can be spent at once."
+      },
+      {
+        "id": "t41-a2",
+        "concept": "token-bucket",
+        "type": "estimation",
+        "prompt": "A token bucket refills 5 tokens/s with capacity 20 and starts full. Maximum requests in the first 4 seconds?",
+        "unit": "requests",
+        "target": 40,
+        "assumptions": [],
+        "formula": "Refill over 4 s: 4 × 5",
+        "workedAnswer": "Refill over 4 s: 4 × 5 = 20 tokens. Add the 20 already in the bucket: 40 requests.",
+        "explanation": "Refill over 4 s: 4 × 5 = 20 tokens. Add the 20 already in the bucket: 40 requests."
+      },
+      {
+        "id": "t41-a3",
+        "concept": "limit-flow",
+        "type": "multiple_choice",
+        "prompt": "What should a rate-limited API return?",
+        "choices": [
+          {
+            "id": "c",
+            "label": "403 Forbidden"
+          },
+          {
+            "id": "a",
+            "label": "429 Too Many Requests, ideally with Retry-After"
+          },
+          {
+            "id": "d",
+            "label": "200 with an error message"
+          },
+          {
+            "id": "b",
+            "label": "500 Internal Server Error"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Tell clients to slow down, and when to come back."
+      },
+      {
+        "id": "t41-a4",
+        "concept": "fixed-window",
+        "type": "multiple_choice",
+        "prompt": "A fixed-window limit of 100 per minute. A client sends 100 at 0:59 and 100 at 1:00. What happened?",
+        "choices": [
+          {
+            "id": "b",
+            "label": "The second 100 were rejected"
+          },
+          {
+            "id": "d",
+            "label": "The window slid to block them"
+          },
+          {
+            "id": "a",
+            "label": "200 requests passed within two seconds"
+          },
+          {
+            "id": "c",
+            "label": "Only 100 passed in total"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Window boundaries allow double bursts; sliding windows smooth this."
+      },
+      {
+        "id": "t41-a5",
+        "concept": "shared-limit",
+        "type": "spot_bottleneck",
+        "prompt": "The limit is 100/min per user, but each of 20 API servers counts in its own memory, so users get far more. Click the component to fix.",
+        "diagramNodes": [
+          {
+            "id": "n1",
+            "label": "Client",
+            "x": 40,
+            "y": 40
+          },
+          {
+            "id": "n2",
+            "label": "Load balancer",
+            "x": 150,
+            "y": 40
+          },
+          {
+            "id": "n3",
+            "label": "API servers (local counters)",
+            "x": 260,
+            "y": 40
+          },
+          {
+            "id": "n4",
+            "label": "Database",
+            "x": 370,
+            "y": 40
+          }
+        ],
+        "diagramEdges": [
+          {
+            "from": "n1",
+            "to": "n2"
+          },
+          {
+            "from": "n2",
+            "to": "n3"
+          },
+          {
+            "from": "n3",
+            "to": "n4"
+          }
+        ],
+        "correctNodeIds": [
+          "n3"
+        ],
+        "explanation": "Keep the counter in a shared store such as Redis."
       }
     ],
     "flashcards": [
@@ -161,13 +254,20 @@
         "kind": "text",
         "title": "Why interviewers ask",
         "body": "UUIDv4 is random and needs no coordination but indexes poorly. Snowflake 64-bit IDs (timestamp + worker + sequence) are sortable. UUIDv7 adds time ordering.",
-        "accent": "Interview lens"
+        "accent": "Interview lens",
+        "teaches": [
+          "uuid",
+          "snowflake"
+        ]
       },
       {
         "id": "t42-c2",
         "kind": "text",
         "title": "The core idea",
-        "body": "Generate unique IDs at scale: UUIDs, DB sequences, Snowflake, or ticket servers."
+        "body": "Generate unique IDs at scale: UUIDs, DB sequences, Snowflake, or ticket servers.",
+        "teaches": [
+          "snowflake"
+        ]
       },
       {
         "id": "t42-c3",
@@ -180,82 +280,170 @@
           "Sequence bits",
           "Combine",
           "Sortable 64-bit ID"
+        ],
+        "teaches": [
+          "snowflake"
         ]
       },
       {
         "id": "t42-c4",
         "kind": "text",
         "title": "Watch out for",
-        "body": "Using auto-increment IDs exposed publicly — leaks volume and enables enumeration."
+        "body": "Using auto-increment IDs exposed publicly — leaks volume and enables enumeration.",
+        "teaches": [
+          "auto-increment"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t42-q1",
+        "id": "t42-a1",
+        "concept": "snowflake",
         "type": "multiple_choice",
-        "prompt": "Which ID is time-sortable and 64-bit?",
+        "prompt": "Which ID is 64-bit and sortable by time?",
         "choices": [
           {
-            "id": "a",
-            "label": "UUIDv4"
-          },
-          {
             "id": "c",
-            "label": "MD5 of email"
+            "label": "Auto-increment per shard"
           },
           {
-            "id": "d",
-            "label": "Random int"
-          },
-          {
-            "id": "b",
+            "id": "a",
             "label": "Snowflake"
-          }
-        ],
-        "correctChoiceIds": [
-          "b"
-        ],
-        "explanation": "Timestamp in the high bits."
-      },
-      {
-        "id": "t42-q2",
-        "type": "estimation",
-        "prompt": "Snowflake uses a 12-bit sequence per ms per worker. Max IDs per worker per second (approx)?",
-        "unit": "count",
-        "target": 4096000,
-        "assumptions": [
-          "Use rounded daily volume ÷ 86,400 unless stated otherwise."
-        ],
-        "formula": "See explanation",
-        "workedAnswer": "4096 per ms × 1000 ms.",
-        "explanation": "4096 per ms × 1000 ms."
-      },
-      {
-        "id": "t42-r1",
-        "type": "multiple_choice",
-        "prompt": "UUIDv7?",
-        "choices": [
-          {
-            "id": "c",
-            "label": "Make retries of non-idempotent operations safe."
-          },
-          {
-            "id": "a",
-            "label": "Time-ordered UUID."
           },
           {
             "id": "d",
-            "label": "Lets the server return the stored result for a retried request instead of repeating it."
+            "label": "A random 64-bit number"
           },
           {
             "id": "b",
-            "label": "Wait 1s, 2s, 4s… plus random jitter."
+            "label": "UUIDv4"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "From the lesson: Time-ordered UUID."
+        "explanation": "Timestamp bits come first."
+      },
+      {
+        "id": "t42-a2",
+        "concept": "snowflake",
+        "type": "estimation",
+        "prompt": "Snowflake has a 12-bit sequence per millisecond per worker. Roughly how many IDs per second can one worker make?",
+        "unit": "IDs/sec",
+        "target": 4096000,
+        "assumptions": [],
+        "formula": "2^12",
+        "workedAnswer": "2^12 = 4,096 per ms; 4,096 × 1,000 = 4,096,000 per second.",
+        "explanation": "2^12 = 4,096 per ms; 4,096 × 1,000 = 4,096,000 per second."
+      },
+      {
+        "id": "t42-a3",
+        "concept": "uuid",
+        "type": "multiple_choice",
+        "prompt": "Why do random UUIDv4 primary keys hurt B-tree inserts?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Inserts land at random places in the index, splitting pages and hurting caching"
+          },
+          {
+            "id": "c",
+            "label": "They are too short"
+          },
+          {
+            "id": "b",
+            "label": "They are not unique enough"
+          },
+          {
+            "id": "d",
+            "label": "They need a central coordinator"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Time-ordered IDs (UUIDv7, Snowflake) insert at the end."
+      },
+      {
+        "id": "t42-a4",
+        "concept": "auto-increment",
+        "type": "multiple_choice",
+        "prompt": "Public order URLs look like /orders/1043, from an auto-increment id. Main risk?",
+        "choices": [
+          {
+            "id": "c",
+            "label": "The ids are not sortable"
+          },
+          {
+            "id": "d",
+            "label": "URLs get too long"
+          },
+          {
+            "id": "b",
+            "label": "The ids cannot be indexed"
+          },
+          {
+            "id": "a",
+            "label": "Anyone can guess other ids and estimate your order volume"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Sequential ids leak volume and invite enumeration."
+      },
+      {
+        "id": "t42-a5",
+        "concept": "snowflake",
+        "type": "tradeoff",
+        "prompt": "IDs for orders created on 50 app servers.",
+        "constraints": [
+          "Sortable by creation time",
+          "No coordination per request"
+        ],
+        "approaches": [
+          {
+            "id": "p3",
+            "label": "UUIDv4",
+            "description": "Random 128-bit"
+          },
+          {
+            "id": "p2",
+            "label": "Database auto-increment",
+            "description": "One counter"
+          },
+          {
+            "id": "p1",
+            "label": "Snowflake-style IDs",
+            "description": "Timestamp + worker + sequence"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r2",
+            "label": "Worker bits avoid coordination"
+          },
+          {
+            "id": "r1",
+            "label": "The timestamp prefix sorts by creation time"
+          },
+          {
+            "id": "r3",
+            "label": "UUIDv4 is time-sortable"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3"
+        ],
+        "rationaleConflicts": {
+          "r3": "v4 is random; UUIDv7 is the time-ordered variant."
+        },
+        "explanation": "Snowflake gives both properties."
       }
     ],
     "flashcards": [
@@ -289,9 +477,9 @@
     "title": "2PC & Saga",
     "kind": "lesson",
     "objectives": [
-      "When overloaded, slow producers or drop low-priority work to keep core flows alive.",
-      "Answer: Consumer lag?",
-      "Answer: Load shedding?"
+      "Explain two-phase commit and why it blocks",
+      "Design a saga with compensations",
+      "Choose choreography or orchestration"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -300,131 +488,238 @@
       {
         "id": "t43-c1",
         "kind": "text",
-        "title": "Why interviewers ask",
-        "body": "Bounded queues, 429s, and priority shedding protect a system. Shed analytics before checkout. Monitor consumer lag.",
-        "accent": "Interview lens"
+        "title": "Two-phase commit",
+        "body": "A coordinator asks every participant to prepare (lock and promise), then tells all to commit or all to abort. It gives atomicity across databases, but participants hold locks while waiting, and if the coordinator dies after prepare they are stuck.",
+        "teaches": [
+          "2pc",
+          "2pc-blocking"
+        ]
       },
       {
         "id": "t43-c2",
         "kind": "text",
-        "title": "The core idea",
-        "body": "When overloaded, slow producers or drop low-priority work to keep core flows alive."
+        "title": "Sagas",
+        "body": "A saga splits the work into local transactions, one per service. If a later step fails, earlier steps are undone by compensating actions (refund, release the seat). No global locks, but the system is briefly inconsistent.",
+        "teaches": [
+          "saga",
+          "compensation"
+        ]
       },
       {
         "id": "t43-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Load rises” to “Core path protected”, via “Queue fills”.",
+        "title": "A trip booking saga",
+        "body": "5 steps from “Reserve flight” to “Compensate: cancel flight”, via “Reserve hotel”.",
         "steps": [
-          "Load rises",
-          "Queue fills",
-          "Signal backpressure",
-          "Shed low priority",
-          "Core path protected"
+          "Reserve flight",
+          "Reserve hotel",
+          "Charge payment: fails",
+          "Compensate: cancel hotel",
+          "Compensate: cancel flight"
+        ],
+        "teaches": [
+          "compensation"
         ]
       },
       {
         "id": "t43-c4",
         "kind": "text",
-        "title": "Watch out for",
-        "body": "Unbounded queues that grow until memory runs out."
+        "title": "Choreography vs orchestration",
+        "body": "Choreography: each service reacts to the others’ events; no central brain, but the flow is hard to see. Orchestration: a coordinator calls each step and runs compensations; easier to follow and change.",
+        "teaches": [
+          "choreo-orch"
+        ]
+      },
+      {
+        "id": "t43-c5",
+        "kind": "text",
+        "title": "Common trap",
+        "body": "Defaulting to 2PC across microservices. It ties every service’s availability together and holds locks across network calls. Prefer sagas unless you truly need atomic commit.",
+        "teaches": [
+          "2pc-blocking"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t43-q1",
+        "id": "t43-a1",
+        "concept": "2pc-blocking",
         "type": "multiple_choice",
-        "prompt": "Under overload, what should a shopping app shed first?",
+        "prompt": "Main drawback of two-phase commit?",
         "choices": [
           {
             "id": "b",
-            "label": "Checkout"
-          },
-          {
-            "id": "a",
-            "label": "Payment"
-          },
-          {
-            "id": "d",
-            "label": "Login"
+            "label": "It cannot guarantee atomicity"
           },
           {
             "id": "c",
-            "label": "Recommendation widgets"
-          }
-        ],
-        "correctChoiceIds": [
-          "c"
-        ],
-        "explanation": "Non-critical features go first."
-      },
-      {
-        "id": "t43-q2",
-        "type": "multiple_choice",
-        "prompt": "Select backpressure techniques.",
-        "choices": [
-          {
-            "id": "a",
-            "label": "Bounded queues"
-          },
-          {
-            "id": "c",
-            "label": "Infinite in-memory buffers"
+            "label": "It only gives eventual consistency"
           },
           {
             "id": "d",
-            "label": "Priority-based shedding"
-          },
-          {
-            "id": "b",
-            "label": "Return 429/503 with Retry-After"
-          }
-        ],
-        "correctChoiceIds": [
-          "a",
-          "b",
-          "d"
-        ],
-        "explanation": "Unbounded buffers hide overload until crash."
-      },
-      {
-        "id": "t43-r1",
-        "type": "multiple_choice",
-        "prompt": "Consumer lag?",
-        "choices": [
-          {
-            "id": "c",
-            "label": "Decoupling and load levelling."
-          },
-          {
-            "id": "b",
-            "label": "Redis with atomic INCR/Lua."
-          },
-          {
-            "id": "d",
-            "label": "Prevent resource exhaustion from slow calls."
+            "label": "It only works with NoSQL"
           },
           {
             "id": "a",
-            "label": "How far consumers are behind producers."
+            "label": "Participants hold locks and can be stuck if the coordinator fails after prepare"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "From the lesson: How far consumers are behind producers."
+        "explanation": "Blocking is the price of atomic commit."
+      },
+      {
+        "id": "t43-a2",
+        "concept": "2pc",
+        "type": "drag_order",
+        "prompt": "Order two-phase commit.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "Coordinator sends prepare"
+          },
+          {
+            "id": "s2",
+            "label": "Participants lock and vote yes"
+          },
+          {
+            "id": "s3",
+            "label": "Coordinator decides commit"
+          },
+          {
+            "id": "s4",
+            "label": "Participants commit and release locks"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Locks are held from prepare to commit."
+      },
+      {
+        "id": "t43-a3",
+        "concept": "compensation",
+        "type": "multiple_choice",
+        "prompt": "A saga’s payment step fails after the flight and hotel were reserved. What happens?",
+        "choices": [
+          {
+            "id": "d",
+            "label": "The user keeps the reservations"
+          },
+          {
+            "id": "a",
+            "label": "Compensating actions cancel the hotel and then the flight"
+          },
+          {
+            "id": "b",
+            "label": "The database rolls back all three automatically"
+          },
+          {
+            "id": "c",
+            "label": "The saga retries the payment forever"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Sagas undo with new actions, in reverse order."
+      },
+      {
+        "id": "t43-a4",
+        "concept": "choreo-orch",
+        "type": "multiple_choice",
+        "prompt": "Which is orchestration?",
+        "choices": [
+          {
+            "id": "c",
+            "label": "Services share one database transaction"
+          },
+          {
+            "id": "a",
+            "label": "A booking coordinator calls flight, hotel and payment in turn and runs compensations"
+          },
+          {
+            "id": "d",
+            "label": "The client calls each service itself"
+          },
+          {
+            "id": "b",
+            "label": "Each service listens for the previous service’s event and reacts"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "A central coordinator owns the flow."
+      },
+      {
+        "id": "t43-a5",
+        "concept": "saga",
+        "type": "tradeoff",
+        "prompt": "Checkout spans order, payment and inventory services.",
+        "constraints": [
+          "Each service owns its database",
+          "Services deploy and fail independently"
+        ],
+        "approaches": [
+          {
+            "id": "p2",
+            "label": "Two-phase commit",
+            "description": "Atomic across services"
+          },
+          {
+            "id": "p1",
+            "label": "Saga with compensations",
+            "description": "Local transactions"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r3",
+            "label": "Sagas keep data consistent at every instant"
+          },
+          {
+            "id": "r2",
+            "label": "Compensations undo partial work"
+          },
+          {
+            "id": "r1",
+            "label": "Services stay available independently"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3"
+        ],
+        "rationaleConflicts": {
+          "r3": "Sagas are briefly inconsistent between steps; design for it."
+        },
+        "explanation": "Sagas trade instant consistency for availability."
       }
     ],
     "flashcards": [
       {
-        "id": "43-f0",
-        "front": "Consumer lag?",
-        "back": "How far consumers are behind producers."
+        "id": "t43-f1",
+        "front": "Main drawback of two-phase commit?",
+        "back": "Participants hold locks and can be stuck if the coordinator fails after prepare. Blocking is the price of atomic commit."
       },
       {
-        "id": "43-f1",
-        "front": "Load shedding?",
-        "back": "Deliberately dropping low-priority work."
+        "id": "t43-f2",
+        "front": "A saga’s payment step fails after the flight and hotel were reserved. What happens?",
+        "back": "Compensating actions cancel the hotel and then the flight. Sagas undo with new actions, in reverse order."
+      },
+      {
+        "id": "t43-f3",
+        "front": "Which is orchestration?",
+        "back": "A booking coordinator calls flight, hotel and payment in turn and runs compensations. A central coordinator owns the flow."
       }
     ],
     "sources": [
@@ -446,9 +741,9 @@
     "title": "Outbox Pattern & CDC",
     "kind": "lesson",
     "objectives": [
-      "Fail fast when a dependency is unhealthy; always set timeouts.",
-      "Answer: Bulkhead?",
-      "Answer: Why timeouts?"
+      "Explain the dual-write problem",
+      "Implement a transactional outbox",
+      "Use change data capture to publish database changes"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -457,132 +752,226 @@
       {
         "id": "t44-c1",
         "kind": "text",
-        "title": "Why interviewers ask",
-        "body": "States: closed (normal), open (fail fast), half-open (probe). Timeouts bound waiting; bulkheads isolate thread pools so one slow dependency can’t exhaust everything.",
-        "accent": "Interview lens"
+        "title": "The dual-write problem",
+        "body": "A service saves an order and then publishes OrderPlaced to Kafka. If it crashes between the two, the order exists but nobody hears about it; if the publish succeeds and the database write fails, consumers act on an order that does not exist.",
+        "teaches": [
+          "dual-write"
+        ]
       },
       {
         "id": "t44-c2",
         "kind": "text",
-        "title": "The core idea",
-        "body": "Fail fast when a dependency is unhealthy; always set timeouts."
+        "title": "Transactional outbox",
+        "body": "Write the order and an outbox row in the same database transaction. A relay reads unsent outbox rows, publishes them to the broker and marks them sent. Either both are saved or neither is.",
+        "teaches": [
+          "outbox"
+        ]
       },
       {
         "id": "t44-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Closed” to “Close on success”, via “Failures exceed threshold”.",
+        "title": "Outbox to broker",
+        "body": "5 steps from “BEGIN” to “Relay publishes to Kafka and marks them sent”, via “Insert the order and an outbox event”.",
         "steps": [
-          "Closed",
-          "Failures exceed threshold",
-          "Open: fail fast",
-          "Half-open probe",
-          "Close on success"
+          "BEGIN",
+          "Insert the order and an outbox event",
+          "COMMIT",
+          "Relay reads unsent outbox rows",
+          "Relay publishes to Kafka and marks them sent"
+        ],
+        "teaches": [
+          "outbox"
         ]
       },
       {
         "id": "t44-c4",
         "kind": "text",
-        "title": "Watch out for",
-        "body": "No timeouts on outbound calls — threads pile up waiting forever."
+        "title": "Change data capture",
+        "body": "CDC tools such as Debezium tail the database’s write-ahead log and turn each committed change into an event. No polling and no app changes; it can publish the outbox table or any other table.",
+        "teaches": [
+          "cdc"
+        ]
+      },
+      {
+        "id": "t44-c5",
+        "kind": "text",
+        "title": "Common trap",
+        "body": "Forgetting the relay delivers at least once. It can crash after publishing but before marking the row sent, so consumers must handle duplicates idempotently.",
+        "teaches": [
+          "outbox-dupes"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t44-q1",
+        "id": "t44-a1",
+        "concept": "dual-write",
         "type": "multiple_choice",
-        "prompt": "After cooldown, a circuit breaker enters:",
+        "prompt": "A service writes an order to its database, then publishes to Kafka, and crashes in between. Result?",
         "choices": [
           {
-            "id": "b",
-            "label": "Half-open"
-          },
-          {
-            "id": "a",
-            "label": "Closed"
+            "id": "d",
+            "label": "Both are lost"
           },
           {
             "id": "c",
-            "label": "Deleted"
-          },
-          {
-            "id": "d",
-            "label": "Permanent open"
-          }
-        ],
-        "correctChoiceIds": [
-          "b"
-        ],
-        "explanation": "It lets a few trial requests through."
-      },
-      {
-        "id": "t44-q2",
-        "type": "drag_order",
-        "prompt": "Order circuit breaker states during an outage and recovery.",
-        "items": [
-          {
-            "id": "i0",
-            "label": "Closed: normal traffic"
-          },
-          {
-            "id": "i1",
-            "label": "Open: fail fast"
-          },
-          {
-            "id": "i2",
-            "label": "Half-open: trial requests"
-          },
-          {
-            "id": "i3",
-            "label": "Closed again: recovered"
-          }
-        ],
-        "correctOrder": [
-          "i0",
-          "i1",
-          "i2",
-          "i3"
-        ],
-        "explanation": "Normal → tripped → probing → recovered."
-      },
-      {
-        "id": "t44-r1",
-        "type": "multiple_choice",
-        "prompt": "Bulkhead?",
-        "choices": [
-          {
-            "id": "c",
-            "label": "Number of partitions."
+            "label": "The database retries the publish"
           },
           {
             "id": "b",
-            "label": "Skip write fan-out for them and merge their posts at read time."
+            "label": "Kafka rolls back the order"
           },
           {
             "id": "a",
-            "label": "Isolate resources per dependency."
-          },
-          {
-            "id": "d",
-            "label": "Per partition only."
+            "label": "The order exists but no event was published"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "From the lesson: Isolate resources per dependency."
+        "explanation": "Two separate writes are not atomic."
+      },
+      {
+        "id": "t44-a2",
+        "concept": "outbox",
+        "type": "multiple_choice",
+        "prompt": "How does the outbox pattern avoid the dual-write problem?",
+        "choices": [
+          {
+            "id": "b",
+            "label": "It publishes to Kafka before writing to the database"
+          },
+          {
+            "id": "a",
+            "label": "The event is saved in the same transaction as the data, then relayed"
+          },
+          {
+            "id": "c",
+            "label": "It uses two-phase commit between the database and Kafka"
+          },
+          {
+            "id": "d",
+            "label": "It retries the publish from memory until it works"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "One local transaction, then an at-least-once relay."
+      },
+      {
+        "id": "t44-a3",
+        "concept": "outbox",
+        "type": "drag_order",
+        "prompt": "Order the outbox flow.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "BEGIN"
+          },
+          {
+            "id": "s2",
+            "label": "Insert the order and an outbox event"
+          },
+          {
+            "id": "s3",
+            "label": "COMMIT"
+          },
+          {
+            "id": "s4",
+            "label": "Relay reads unsent rows"
+          },
+          {
+            "id": "s5",
+            "label": "Relay publishes and marks them sent"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "The relay runs after commit."
+      },
+      {
+        "id": "t44-a4",
+        "concept": "cdc",
+        "type": "multiple_choice",
+        "prompt": "How does CDC capture changes?",
+        "choices": [
+          {
+            "id": "c",
+            "label": "By intercepting HTTP requests to the service"
+          },
+          {
+            "id": "d",
+            "label": "By asking each developer to publish events"
+          },
+          {
+            "id": "a",
+            "label": "By reading the database’s write-ahead log"
+          },
+          {
+            "id": "b",
+            "label": "By running SELECT * on every table each second"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The log already has every committed change."
+      },
+      {
+        "id": "t44-a5",
+        "concept": "outbox-dupes",
+        "type": "multiple_choice",
+        "prompt": "The relay publishes an event, then crashes before marking it sent. What happens next?",
+        "choices": [
+          {
+            "id": "c",
+            "label": "The database rolls back the order"
+          },
+          {
+            "id": "b",
+            "label": "The event is lost"
+          },
+          {
+            "id": "d",
+            "label": "Kafka removes the duplicate automatically"
+          },
+          {
+            "id": "a",
+            "label": "It publishes the event again, so consumers must be idempotent"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "At-least-once relays create duplicates."
       }
     ],
     "flashcards": [
       {
-        "id": "44-f0",
-        "front": "Bulkhead?",
-        "back": "Isolate resources per dependency."
+        "id": "t44-f1",
+        "front": "A service writes an order to its database, then publishes to Kafka, and crashes in between. Result?",
+        "back": "The order exists but no event was published. Two separate writes are not atomic."
       },
       {
-        "id": "44-f1",
-        "front": "Why timeouts?",
-        "back": "Prevent resource exhaustion from slow calls."
+        "id": "t44-f2",
+        "front": "How does the outbox pattern avoid the dual-write problem?",
+        "back": "The event is saved in the same transaction as the data, then relayed. One local transaction, then an at-least-once relay."
+      },
+      {
+        "id": "t44-f3",
+        "front": "How does CDC capture changes?",
+        "back": "By reading the database’s write-ahead log. The log already has every committed change."
+      },
+      {
+        "id": "t44-f4",
+        "front": "The relay publishes an event, then crashes before marking it sent. What happens next?",
+        "back": "It publishes the event again, so consumers must be idempotent. At-least-once relays create duplicates."
       }
     ],
     "sources": [
@@ -604,9 +993,9 @@
     "title": "Consensus & Raft",
     "kind": "lesson",
     "objectives": [
-      "Services react to events; sagas coordinate multi-step transactions with compensations.",
-      "Answer: Saga?",
-      "Answer: Orchestration vs choreography?"
+      "Explain what consensus provides",
+      "Walk through a Raft write and election",
+      "Size a cluster for a number of failures"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -615,125 +1004,206 @@
       {
         "id": "t45-c1",
         "kind": "text",
-        "title": "Why interviewers ask",
-        "body": "Instead of a distributed 2PC, a saga runs local transactions and compensates on failure. Choreography = services react to events; orchestration = a coordinator directs steps.",
-        "accent": "Interview lens"
+        "title": "What consensus solves",
+        "body": "Several nodes must agree on one ordered log of commands even when some crash. Raft and Paxos do this; etcd, Consul and ZooKeeper use them to hold config, locks and leader information.",
+        "teaches": [
+          "consensus"
+        ]
       },
       {
         "id": "t45-c2",
         "kind": "text",
-        "title": "The core idea",
-        "body": "Services react to events; sagas coordinate multi-step transactions with compensations."
+        "title": "Raft in brief",
+        "body": "One leader accepts writes, appends them to its log and replicates them to followers. An entry is committed once a majority has stored it. If followers stop hearing heartbeats, one starts an election for a new term and wins with a majority of votes.",
+        "teaches": [
+          "raft-commit",
+          "raft-election"
+        ]
       },
       {
         "id": "t45-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Reserve flight” to “Run compensations”, via “Reserve hotel”.",
+        "title": "A Raft write",
+        "body": "5 steps from “Client sends the write to the leader” to “Leader commits and applies it”, via “Leader appends it to its log”.",
         "steps": [
-          "Reserve flight",
-          "Reserve hotel",
-          "Charge payment",
-          "Failure?",
-          "Run compensations"
+          "Client sends the write to the leader",
+          "Leader appends it to its log",
+          "Leader replicates to followers",
+          "A majority acknowledges",
+          "Leader commits and applies it"
+        ],
+        "teaches": [
+          "raft-commit"
         ]
       },
       {
         "id": "t45-c4",
         "kind": "text",
-        "title": "Watch out for",
-        "body": "Forgetting compensations — partial failures leave money charged without a booking."
+        "title": "Majorities and fault tolerance",
+        "body": "N nodes need a majority, floor(N/2) + 1, so they tolerate floor((N − 1)/2) failures: 3 nodes survive 1, 5 survive 2. Even sizes add cost without adding tolerance.",
+        "teaches": [
+          "majority"
+        ]
+      },
+      {
+        "id": "t45-c5",
+        "kind": "text",
+        "title": "Common trap",
+        "body": "Running consensus on 2 nodes, or putting a high-latency link in every write. Two nodes cannot lose one and keep a majority, and every commit waits for the slowest member of the majority.",
+        "teaches": [
+          "majority"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t45-q1",
+        "id": "t45-a1",
+        "concept": "majority",
         "type": "multiple_choice",
-        "prompt": "A saga handles failure by:",
+        "prompt": "How many failures does a 5-node Raft cluster tolerate?",
         "choices": [
           {
             "id": "d",
-            "label": "Restarting the DB"
+            "label": "4"
           },
           {
             "id": "a",
-            "label": "Global locks"
+            "label": "2"
           },
           {
             "id": "b",
-            "label": "Compensating transactions"
+            "label": "1"
           },
           {
             "id": "c",
-            "label": "Ignoring errors"
-          }
-        ],
-        "correctChoiceIds": [
-          "b"
-        ],
-        "explanation": "Each step has an undo action."
-      },
-      {
-        "id": "t45-q2",
-        "type": "multiple_choice",
-        "prompt": "Choreography vs Orchestration: which pairing is correct?",
-        "choices": [
-          {
-            "id": "d",
-            "label": "Orchestration → Services react to events"
-          },
-          {
-            "id": "c",
-            "label": "Choreography → Central coordinator"
-          },
-          {
-            "id": "a",
-            "label": "Choreography → Services react to events"
+            "label": "3"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Sagas trade atomicity for availability."
+        "explanation": "A majority of 3 must stay up."
       },
       {
-        "id": "t45-r1",
+        "id": "t45-a2",
+        "concept": "majority",
+        "type": "estimation",
+        "prompt": "Smallest cluster that tolerates 3 failures with majority quorums?",
+        "unit": "nodes",
+        "target": 7,
+        "assumptions": [],
+        "formula": "2 × 3 + 1",
+        "workedAnswer": "2 × 3 + 1 = 7 nodes.",
+        "explanation": "2 × 3 + 1 = 7 nodes."
+      },
+      {
+        "id": "t45-a3",
+        "concept": "raft-commit",
+        "type": "drag_order",
+        "prompt": "Order a Raft write.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "Client sends the write to the leader"
+          },
+          {
+            "id": "s2",
+            "label": "Leader appends it to its log"
+          },
+          {
+            "id": "s3",
+            "label": "Leader replicates to followers"
+          },
+          {
+            "id": "s4",
+            "label": "A majority acknowledges"
+          },
+          {
+            "id": "s5",
+            "label": "Leader commits and applies it"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Commit needs a majority, not everyone."
+      },
+      {
+        "id": "t45-a4",
+        "concept": "raft-election",
         "type": "multiple_choice",
-        "prompt": "Saga?",
+        "prompt": "Followers stop receiving heartbeats from the leader. What happens?",
         "choices": [
           {
-            "id": "b",
-            "label": "Timestamp + machine ID + sequence."
-          },
-          {
-            "id": "d",
-            "label": "Wrong ordering for last-write-wins."
-          },
-          {
             "id": "c",
-            "label": "Connect user journeys to SLOs, then justify components and trade-offs for Bloom Filters/HyperLogLog/Count-Min."
+            "label": "The cluster waits until the old leader returns"
+          },
+          {
+            "id": "b",
+            "label": "Every follower becomes a leader"
           },
           {
             "id": "a",
-            "label": "Sequence of local transactions with compensations."
+            "label": "A follower starts an election for a new term and needs a majority of votes"
+          },
+          {
+            "id": "d",
+            "label": "The lowest-id follower takes over without a vote"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "From the lesson: Sequence of local transactions with compensations."
+        "explanation": "Terms and majority votes prevent two leaders."
+      },
+      {
+        "id": "t45-a5",
+        "concept": "majority",
+        "type": "multiple_choice",
+        "prompt": "Why run 3 nodes rather than 4?",
+        "choices": [
+          {
+            "id": "d",
+            "label": "Four nodes split every vote evenly forever"
+          },
+          {
+            "id": "b",
+            "label": "Four nodes cannot elect a leader"
+          },
+          {
+            "id": "a",
+            "label": "Four nodes still tolerate only one failure but need three acknowledgements per write"
+          },
+          {
+            "id": "c",
+            "label": "Four nodes tolerate two failures"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Majority of 4 is 3, so tolerance stays at 1."
       }
     ],
     "flashcards": [
       {
-        "id": "45-f0",
-        "front": "Saga?",
-        "back": "Sequence of local transactions with compensations."
+        "id": "t45-f1",
+        "front": "How many failures does a 5-node Raft cluster tolerate?",
+        "back": "2. A majority of 3 must stay up."
       },
       {
-        "id": "45-f1",
-        "front": "Orchestration vs choreography?",
-        "back": "Central coordinator vs event reactions."
+        "id": "t45-f2",
+        "front": "Followers stop receiving heartbeats from the leader. What happens?",
+        "back": "A follower starts an election for a new term and needs a majority of votes. Terms and majority votes prevent two leaders."
+      },
+      {
+        "id": "t45-f3",
+        "front": "Why run 3 nodes rather than 4?",
+        "back": "Four nodes still tolerate only one failure but need three acknowledgements per write. Majority of 4 is 3, so tolerance stays at 1."
       }
     ],
     "sources": [
@@ -772,13 +1242,19 @@
         "kind": "text",
         "title": "Why interviewers ask",
         "body": "Redis SET NX PX gives a simple lock with TTL; ZooKeeper/etcd give safer locks. Always bound locks with TTLs and design for lock loss.",
-        "accent": "Interview lens"
+        "accent": "Interview lens",
+        "teaches": [
+          "lock-ttl"
+        ]
       },
       {
         "id": "t46-c2",
         "kind": "text",
         "title": "The core idea",
-        "body": "Coordinate exclusive access across services with leases, fencing, and caution."
+        "body": "Coordinate exclusive access across services with leases, fencing, and caution.",
+        "teaches": [
+          "fencing"
+        ]
       },
       {
         "id": "t46-c3",
@@ -791,155 +1267,178 @@
           "Got it? do work",
           "Release",
           "TTL auto-expires on crash"
+        ],
+        "teaches": [
+          "lock-flow"
         ]
       },
       {
         "id": "t46-c4",
         "kind": "text",
         "title": "Watch out for",
-        "body": "Holding a lock without a TTL — a crashed holder blocks everyone forever."
+        "body": "Holding a lock without a TTL — a crashed holder blocks everyone forever.",
+        "teaches": [
+          "lock-ttl"
+        ]
+      },
+      {
+        "id": "t46-y1",
+        "kind": "text",
+        "title": "Fencing tokens",
+        "body": "A lock holder can pause (GC, network) past its lease while another node takes the lock. Give each grant an increasing token and make storage reject writes with an older token, so a paused former holder cannot corrupt data.",
+        "teaches": [
+          "fencing"
+        ]
+      },
+      {
+        "id": "t46-y2",
+        "kind": "text",
+        "title": "Leader election",
+        "body": "Leader election is a long-lived lock: one node wins a lease in etcd or ZooKeeper, renews it while healthy, and another takes over when it expires. Use it for singletons such as a scheduler.",
+        "teaches": [
+          "election"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t46-q1",
+        "id": "t46-a1",
+        "concept": "lock-ttl",
         "type": "multiple_choice",
         "prompt": "Why must a distributed lock have a TTL?",
         "choices": [
           {
-            "id": "d",
-            "label": "For pagination"
+            "id": "c",
+            "label": "To spread load across Redis nodes"
           },
           {
             "id": "b",
-            "label": "So a crashed holder doesn’t block forever"
+            "label": "To make acquiring the lock faster"
           },
           {
-            "id": "c",
-            "label": "To encrypt keys"
+            "id": "d",
+            "label": "To let the same holder lock twice"
           },
           {
             "id": "a",
-            "label": "To speed up Redis"
+            "label": "So a crashed holder does not block everyone forever"
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Expiry recovers from crashed holders."
+        "explanation": "Leases expire on their own."
       },
       {
-        "id": "t46-q2",
+        "id": "t46-a2",
+        "concept": "fencing",
+        "type": "estimation",
+        "prompt": "Lease TTL is 10 s; the holder hits a 12 s GC pause. Without fencing, how many nodes may believe they hold the lock at once?",
+        "unit": "nodes",
+        "target": 2,
+        "assumptions": [],
+        "formula": "The pause outlasts the lease, so a second node acquires the lock while the first still thinks it owns it: 2.",
+        "workedAnswer": "The pause outlasts the lease, so a second node acquires the lock while the first still thinks it owns it: 2.",
+        "explanation": "The pause outlasts the lease, so a second node acquires the lock while the first still thinks it owns it: 2."
+      },
+      {
+        "id": "t46-a3",
+        "concept": "fencing",
         "type": "multiple_choice",
-        "prompt": "Safer alternatives or additions to a Redis lock for critical data?",
+        "prompt": "How does a fencing token stop a paused former lock holder?",
         "choices": [
           {
-            "id": "a",
-            "label": "Fencing tokens"
-          },
-          {
-            "id": "c",
-            "label": "Consensus-backed locks (etcd)"
+            "id": "d",
+            "label": "Redis replicates the lock to every node"
           },
           {
             "id": "b",
-            "label": "Conditional DB update (compare-and-set)"
+            "label": "The lock service kills the old holder’s process"
           },
           {
-            "id": "d",
-            "label": "Locks without expiry"
+            "id": "a",
+            "label": "Storage rejects writes carrying a token older than the newest it has seen"
+          },
+          {
+            "id": "c",
+            "label": "The token makes the lease never expire"
           }
         ],
         "correctChoiceIds": [
-          "a",
-          "b",
-          "c"
+          "a"
         ],
-        "explanation": "Never use locks without expiry."
+        "explanation": "Safety is enforced where the data lives."
       },
       {
-        "id": "t46-q3",
+        "id": "t46-a4",
+        "concept": "lock-flow",
         "type": "drag_order",
-        "prompt": "Order safe lock usage pattern.",
+        "prompt": "Order safe lock usage.",
         "items": [
           {
-            "id": "1",
-            "label": "Acquire lease with fencing token"
+            "id": "s1",
+            "label": "Acquire the lock with a TTL"
           },
           {
-            "id": "2",
-            "label": "Perform guarded operation with token passed to storage"
+            "id": "s2",
+            "label": "Receive a fencing token"
           },
           {
-            "id": "3",
-            "label": "Renew lease if work continues"
+            "id": "s3",
+            "label": "Do the work, sending the token with each write"
           },
           {
-            "id": "4",
-            "label": "Release or let lease expire"
+            "id": "s4",
+            "label": "Release the lock (or let it expire)"
           }
         ],
         "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
+          "s1",
+          "s2",
+          "s3",
+          "s4"
         ],
-        "explanation": "Fencing prevents stale lock holders from writing."
+        "explanation": "The token travels with the writes."
       },
       {
-        "id": "t46-q4",
-        "type": "estimation",
-        "prompt": "Lease TTL 10s, GC pause 12s. How many active writers could exist without fencing?",
-        "unit": "writers",
-        "target": 2,
-        "assumptions": [
-          "Old holder resumes",
-          "New holder acquired after TTL"
-        ],
-        "formula": "writers ≈ 2",
-        "workedAnswer": "Two writers possible briefly—unsafe for inventory.",
-        "explanation": "Motivates fencing tokens (Chubby/ZooKeeper patterns)."
-      },
-      {
-        "id": "t46-q5",
+        "id": "t46-a5",
+        "concept": "election",
         "type": "tradeoff",
-        "prompt": "Coordinate critical cron job across 50 workers.",
+        "prompt": "Run a nightly billing job once across 50 workers.",
         "constraints": [
-          "Only one runner",
-          "Rare long tasks",
-          "Network partitions happen"
+          "Exactly one worker should run it",
+          "Workers can pause or crash"
         ],
         "approaches": [
           {
-            "id": "none",
-            "label": "Run everywhere",
-            "description": "Duplicates"
+            "id": "p1",
+            "label": "Leader election through an etcd lease, with fencing",
+            "description": "One elected runner"
           },
           {
-            "id": "ttl",
-            "label": "Redis SETNX TTL only",
-            "description": "Simple but GC-risk"
+            "id": "p3",
+            "label": "Every worker runs it",
+            "description": "Dedupe later"
           },
           {
-            "id": "db",
-            "label": "Transactional DB advisory lock/lease row",
-            "description": "Slower but strongly guarded"
+            "id": "p2",
+            "label": "Redis SET NX without a TTL",
+            "description": "Simple lock"
           }
         ],
-        "correctApproachId": "db",
+        "correctApproachId": "p1",
         "rationaleOptions": [
           {
-            "id": "r2",
-            "label": "Survives process pause better than naive TTL"
+            "id": "r3",
+            "label": "A lock without a TTL is safest because it never expires"
           },
           {
-            "id": "bad",
-            "label": "TTL-only locks risk double execution"
+            "id": "r2",
+            "label": "Fencing stops a paused former leader from writing"
           },
           {
             "id": "r1",
-            "label": "DB compares fencing version on writes"
+            "label": "Only the lease holder runs the job"
           }
         ],
         "correctRationaleIds": [
@@ -947,36 +1446,12 @@
           "r2"
         ],
         "distractorRationaleIds": [
-          "bad"
+          "r3"
         ],
-        "explanation": "Prefer strongly consistent coordination for mutual exclusion."
-      },
-      {
-        "id": "t46-q6",
-        "type": "multiple_choice",
-        "prompt": "Leader election differs from a lock because:",
-        "choices": [
-          {
-            "id": "b",
-            "label": "Leader role is sticky and drives writes; locks guard short sections"
-          },
-          {
-            "id": "a",
-            "label": "Leaders never fail"
-          },
-          {
-            "id": "c",
-            "label": "Locks are only in Kubernetes"
-          },
-          {
-            "id": "d",
-            "label": "Election uses UDP only"
-          }
-        ],
-        "correctChoiceIds": [
-          "b"
-        ],
-        "explanation": "Leaders batch responsibility; locks protect smaller critical regions."
+        "rationaleConflicts": {
+          "r3": "A crashed holder would then block the job forever."
+        },
+        "explanation": "Leases plus fencing handle both crashes and pauses."
       }
     ],
     "flashcards": [
@@ -1027,13 +1502,22 @@
         "kind": "text",
         "title": "Why interviewers ask",
         "body": "NTP-synced clocks can skew by milliseconds. Lamport clocks give a causal total order; vector clocks detect concurrency. Snowflake-style IDs combine time + machine + sequence.",
-        "accent": "Interview lens"
+        "accent": "Interview lens",
+        "teaches": [
+          "skew",
+          "lamport",
+          "vector"
+        ]
       },
       {
         "id": "t47-c2",
         "kind": "text",
         "title": "The core idea",
-        "body": "Wall clocks drift; use logical clocks (Lamport, vector) or hybrid clocks for ordering."
+        "body": "Wall clocks drift; use logical clocks (Lamport, vector) or hybrid clocks for ordering.",
+        "teaches": [
+          "lamport",
+          "vector"
+        ]
       },
       {
         "id": "t47-c3",
@@ -1046,92 +1530,169 @@
           "Send with timestamp",
           "B takes max+1",
           "Causal order preserved"
+        ],
+        "teaches": [
+          "lamport"
         ]
       },
       {
         "id": "t47-c4",
         "kind": "text",
         "title": "Watch out for",
-        "body": "Using server timestamps to decide \"last write wins\" across regions without accounting for skew."
+        "body": "Using server timestamps to decide \"last write wins\" across regions without accounting for skew.",
+        "teaches": [
+          "skew"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t47-q1",
+        "id": "t47-a1",
+        "concept": "vector",
         "type": "multiple_choice",
-        "prompt": "Which detects concurrent updates?",
+        "prompt": "Which can tell that two updates were concurrent?",
         "choices": [
           {
             "id": "c",
-            "label": "Vector clock"
+            "label": "NTP-synced wall clocks"
           },
           {
             "id": "b",
-            "label": "Lamport clock"
+            "label": "Lamport clocks"
           },
           {
             "id": "d",
-            "label": "Cron"
+            "label": "Snowflake IDs"
           },
           {
             "id": "a",
-            "label": "Wall clock"
-          }
-        ],
-        "correctChoiceIds": [
-          "c"
-        ],
-        "explanation": "Vector clocks show when neither event happened-before the other."
-      },
-      {
-        "id": "t47-q2",
-        "type": "multiple_choice",
-        "prompt": "Lamport clock vs Vector clock: which pairing is correct?",
-        "choices": [
-          {
-            "id": "a",
-            "label": "Lamport clock → Logical counter"
-          },
-          {
-            "id": "c",
-            "label": "Lamport clock → Detects concurrency"
-          },
-          {
-            "id": "d",
-            "label": "Vector clock → Logical counter"
+            "label": "Vector clocks"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Ordering needs more than wall time."
+        "explanation": "Lamport clocks give an order but cannot detect concurrency."
       },
       {
-        "id": "t47-r1",
+        "id": "t47-a2",
+        "concept": "lamport",
         "type": "multiple_choice",
-        "prompt": "Snowflake ID parts?",
+        "prompt": "Node B has counter 7 and receives a message stamped 12. B’s new counter?",
         "choices": [
           {
-            "id": "a",
-            "label": "Timestamp + machine ID + sequence."
+            "id": "c",
+            "label": "12"
           },
           {
             "id": "b",
-            "label": "floor(N/2) + 1."
+            "label": "8"
+          },
+          {
+            "id": "a",
+            "label": "13"
           },
           {
             "id": "d",
-            "label": "Skipping scale numbers, ignoring retries/idempotency, or mixing AuthN with AuthZ."
-          },
-          {
-            "id": "c",
-            "label": "p95 latency on the hot path plus error rate on writes/reads that affect revenue or safety."
+            "label": "19"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "From the lesson: Timestamp + machine ID + sequence."
+        "explanation": "max(7, 12) + 1 = 13."
+      },
+      {
+        "id": "t47-a3",
+        "concept": "skew",
+        "type": "multiple_choice",
+        "prompt": "Two regions use server time for last-write-wins and region B’s clock runs 50 ms fast. Risk?",
+        "choices": [
+          {
+            "id": "d",
+            "label": "Reads get slower"
+          },
+          {
+            "id": "b",
+            "label": "Writes are rejected"
+          },
+          {
+            "id": "a",
+            "label": "B’s older writes can beat A’s newer ones"
+          },
+          {
+            "id": "c",
+            "label": "Nothing: NTP keeps clocks exact"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Skew decides the winner, not real order."
+      },
+      {
+        "id": "t47-a4",
+        "concept": "lamport",
+        "type": "drag_order",
+        "prompt": "Order a Lamport clock exchange.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "Event happens on A"
+          },
+          {
+            "id": "s2",
+            "label": "A increments its counter"
+          },
+          {
+            "id": "s3",
+            "label": "A sends a message with its counter"
+          },
+          {
+            "id": "s4",
+            "label": "B sets its counter to max(own, received) + 1"
+          },
+          {
+            "id": "s5",
+            "label": "Causal order is preserved"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Receivers jump ahead of what they have seen."
+      },
+      {
+        "id": "t47-a5",
+        "concept": "lamport",
+        "type": "multiple_choice",
+        "prompt": "What does a Lamport clock guarantee?",
+        "choices": [
+          {
+            "id": "c",
+            "label": "Timestamps match wall-clock time"
+          },
+          {
+            "id": "d",
+            "label": "Concurrent events get equal timestamps"
+          },
+          {
+            "id": "b",
+            "label": "If A’s timestamp is smaller, A happened before B"
+          },
+          {
+            "id": "a",
+            "label": "If A happened before B, A’s timestamp is smaller"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The implication only goes one way."
       }
     ],
     "flashcards": [
@@ -1165,9 +1726,9 @@
     "title": "Gossip & Failure Detection",
     "kind": "lesson",
     "objectives": [
-      "Consensus lets a cluster agree on a log despite failures, needing a majority quorum.",
-      "Answer: Quorum size for N nodes?",
-      "Answer: Nodes to tolerate f failures?"
+      "Explain how gossip spreads cluster state",
+      "Compare fixed timeouts with phi-accrual detection",
+      "Avoid false failure declarations"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -1176,115 +1737,201 @@
       {
         "id": "t48-c1",
         "kind": "text",
-        "title": "Why interviewers ask",
-        "body": "Raft elects a leader, replicates log entries and commits once a majority acks. A 5-node cluster tolerates 2 failures. Used inside etcd, Consul, CockroachDB.",
-        "accent": "Interview lens"
+        "title": "Gossip",
+        "body": "Every second each node picks a few random peers and swaps what it knows: membership, heartbeats, versions. News reaches the whole cluster in about log N rounds with no central server, which is why Cassandra and Consul use it.",
+        "teaches": [
+          "gossip"
+        ]
       },
       {
         "id": "t48-c2",
         "kind": "text",
-        "title": "The core idea",
-        "body": "Consensus lets a cluster agree on a log despite failures, needing a majority quorum."
+        "title": "Failure detection",
+        "body": "Nodes send heartbeats. A fixed timeout declares a node dead after one missed beat and flaps during GC pauses. Phi-accrual detectors output a suspicion level from recent arrival times, so slow-but-alive nodes are not evicted.",
+        "teaches": [
+          "phi",
+          "heartbeat"
+        ]
       },
       {
         "id": "t48-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Leader receives write” to “Commit & apply”, via “Append to log”.",
+        "title": "One gossip round",
+        "body": "5 steps from “Node picks random peers” to “Cluster converges”, via “They exchange state with version numbers”.",
         "steps": [
-          "Leader receives write",
-          "Append to log",
-          "Replicate to followers",
-          "Majority ack",
-          "Commit & apply"
+          "Node picks random peers",
+          "They exchange state with version numbers",
+          "Each keeps the newer entries",
+          "Repeat every second",
+          "Cluster converges"
+        ],
+        "teaches": [
+          "gossip"
         ]
       },
       {
         "id": "t48-c4",
         "kind": "text",
-        "title": "Watch out for",
-        "body": "Running consensus with 2 nodes — you can’t tolerate any failure and still have a majority."
+        "title": "Suspect before dead",
+        "body": "SWIM-style detectors ask other nodes to ping a silent node before marking it suspect, then dead. Indirect checks avoid blaming a node for one bad network path.",
+        "teaches": [
+          "indirect"
+        ]
+      },
+      {
+        "id": "t48-c5",
+        "kind": "text",
+        "title": "Common trap",
+        "body": "Declaring a node dead on one missed heartbeat. A GC pause triggers a rebalance, the node comes back, and data moves twice.",
+        "teaches": [
+          "heartbeat"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t48-q1",
+        "id": "t48-a1",
+        "concept": "gossip",
         "type": "multiple_choice",
-        "prompt": "How many failures does a 5-node Raft cluster tolerate?",
+        "prompt": "Gossip reaches N nodes in roughly how many rounds?",
         "choices": [
           {
-            "id": "d",
-            "label": "4"
-          },
-          {
-            "id": "b",
-            "label": "2"
-          },
-          {
             "id": "c",
-            "label": "3"
+            "label": "O(N²)"
           },
           {
             "id": "a",
-            "label": "1"
-          }
-        ],
-        "correctChoiceIds": [
-          "b"
-        ],
-        "explanation": "Majority of 5 is 3, so 2 can fail."
-      },
-      {
-        "id": "t48-q2",
-        "type": "estimation",
-        "prompt": "Minimum nodes needed to tolerate 3 failures with majority quorum?",
-        "unit": "count",
-        "target": 7,
-        "assumptions": [
-          "Use rounded daily volume ÷ 86,400 unless stated otherwise."
-        ],
-        "formula": "See explanation",
-        "workedAnswer": "2f + 1 = 7.",
-        "explanation": "2f + 1 = 7."
-      },
-      {
-        "id": "t48-r1",
-        "type": "multiple_choice",
-        "prompt": "Quorum size for N nodes?",
-        "choices": [
-          {
-            "id": "d",
-            "label": "Timestamp + machine ID + sequence."
-          },
-          {
-            "id": "a",
-            "label": "floor(N/2) + 1."
+            "label": "O(log N)"
           },
           {
             "id": "b",
-            "label": "p95 latency on the hot path plus error rate on writes/reads that affect revenue or safety."
+            "label": "O(N)"
           },
           {
-            "id": "c",
-            "label": "Skipping scale numbers, ignoring retries/idempotency, or mixing AuthN with AuthZ."
+            "id": "d",
+            "label": "Exactly one"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "From the lesson: floor(N/2) + 1."
+        "explanation": "Each round roughly doubles who knows."
+      },
+      {
+        "id": "t48-a2",
+        "concept": "gossip",
+        "type": "estimation",
+        "prompt": "Each node tells one random peer per round, so the number who know roughly doubles. About how many rounds to reach 1,000 nodes?",
+        "unit": "rounds",
+        "target": 10,
+        "assumptions": [],
+        "formula": "2^10",
+        "workedAnswer": "2^10 = 1,024, so about 10 rounds.",
+        "explanation": "2^10 = 1,024, so about 10 rounds."
+      },
+      {
+        "id": "t48-a3",
+        "concept": "phi",
+        "type": "multiple_choice",
+        "prompt": "What does a phi-accrual detector output?",
+        "choices": [
+          {
+            "id": "d",
+            "label": "The leader’s term number"
+          },
+          {
+            "id": "c",
+            "label": "The node’s CPU usage"
+          },
+          {
+            "id": "a",
+            "label": "A suspicion level based on recent heartbeat timing"
+          },
+          {
+            "id": "b",
+            "label": "Dead or alive after one missed heartbeat"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "A level lets you pick a threshold per use."
+      },
+      {
+        "id": "t48-a4",
+        "concept": "indirect",
+        "type": "multiple_choice",
+        "prompt": "Node A cannot reach node C. Before marking C dead, a SWIM-style detector:",
+        "choices": [
+          {
+            "id": "d",
+            "label": "Waits for C’s next leader election"
+          },
+          {
+            "id": "a",
+            "label": "Asks other nodes to ping C indirectly"
+          },
+          {
+            "id": "c",
+            "label": "Removes C at once"
+          },
+          {
+            "id": "b",
+            "label": "Restarts C"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "One bad path should not condemn a node."
+      },
+      {
+        "id": "t48-a5",
+        "concept": "gossip",
+        "type": "drag_order",
+        "prompt": "Order one gossip round.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "Node picks random peers"
+          },
+          {
+            "id": "s2",
+            "label": "They exchange state with versions"
+          },
+          {
+            "id": "s3",
+            "label": "Each keeps the newer entries"
+          },
+          {
+            "id": "s4",
+            "label": "Repeat next second"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Versions decide what is newer."
       }
     ],
     "flashcards": [
       {
-        "id": "48-f0",
-        "front": "Quorum size for N nodes?",
-        "back": "floor(N/2) + 1."
+        "id": "t48-f1",
+        "front": "Gossip reaches N nodes in roughly how many rounds?",
+        "back": "O(log N). Each round roughly doubles who knows."
       },
       {
-        "id": "48-f1",
-        "front": "Nodes to tolerate f failures?",
-        "back": "2f + 1."
+        "id": "t48-f2",
+        "front": "What does a phi-accrual detector output?",
+        "back": "A suspicion level based on recent heartbeat timing. A level lets you pick a threshold per use."
+      },
+      {
+        "id": "t48-f3",
+        "front": "Node A cannot reach node C. Before marking C dead, a SWIM-style detector:",
+        "back": "Asks other nodes to ping C indirectly. One bad path should not condemn a node."
       }
     ],
     "sources": [
@@ -1318,13 +1965,21 @@
         "id": "t49-c1",
         "kind": "text",
         "title": "Answers that are almost right",
-        "body": "At billions of items exact answers get expensive. Probabilistic structures trade a small, known error for tiny memory: kilobytes instead of gigabytes."
+        "body": "At billions of items exact answers get expensive. Probabilistic structures trade a small, known error for tiny memory: kilobytes instead of gigabytes.",
+        "teaches": [
+          "probabilistic"
+        ]
       },
       {
         "id": "t49-c2",
         "kind": "text",
         "title": "Which one when",
-        "body": "Bloom filter: “have I seen this?” (false positives possible, no false negatives). HyperLogLog: “how many distinct?” (about 1% error in ~12 KB). Count-Min Sketch: “how often?” (may overcount, never undercounts)."
+        "body": "Bloom filter: “have I seen this?” (false positives possible, no false negatives). HyperLogLog: “how many distinct?” (about 1% error in ~12 KB). Count-Min Sketch: “how often?” (may overcount, never undercounts).",
+        "teaches": [
+          "bloom",
+          "hll",
+          "cms"
+        ]
       },
       {
         "id": "t49-c3",
@@ -1336,96 +1991,164 @@
           "Check Bloom filter",
           "Probably seen: skip",
           "Definitely new: fetch and add to filter"
+        ],
+        "teaches": [
+          "bloom"
         ]
       },
       {
         "id": "t49-c4",
         "kind": "text",
         "title": "Common trap",
-        "body": "Using a Bloom filter where a false positive is harmful, such as deciding a username is taken. A false positive there blocks a real user; confirm against the database."
+        "body": "Using a Bloom filter where a false positive is harmful, such as deciding a username is taken. A false positive there blocks a real user; confirm against the database.",
+        "teaches": [
+          "bloom-risk"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t49-q1",
+        "id": "t49-a1",
+        "concept": "hll",
         "type": "multiple_choice",
-        "prompt": "You need daily unique visitors across 500M events with little memory. Which structure fits?",
+        "prompt": "Count daily unique visitors across 500M events with little memory. Which structure?",
         "choices": [
           {
-            "id": "d",
-            "label": "A sorted array of all visitor IDs"
-          },
-          {
-            "id": "b",
-            "label": "Bloom filter"
-          },
-          {
             "id": "c",
-            "label": "Count-Min Sketch"
+            "label": "Count-Min sketch"
           },
           {
             "id": "a",
             "label": "HyperLogLog"
+          },
+          {
+            "id": "d",
+            "label": "A hash set of every visitor id"
+          },
+          {
+            "id": "b",
+            "label": "Bloom filter"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "HyperLogLog estimates cardinality in about 12 KB per counter."
+        "explanation": "HLL estimates distinct counts in kilobytes."
       },
       {
-        "id": "t49-q2",
+        "id": "t49-a2",
+        "concept": "bloom",
         "type": "multiple_choice",
         "prompt": "A Bloom filter says a URL is not present. What do you know?",
         "choices": [
           {
-            "id": "c",
-            "label": "It is present with 99% probability"
-          },
-          {
             "id": "b",
-            "label": "It is probably present"
-          },
-          {
-            "id": "a",
-            "label": "It is definitely not present"
+            "label": "It is probably not in the set"
           },
           {
             "id": "d",
-            "label": "Nothing"
+            "label": "The filter is full"
+          },
+          {
+            "id": "a",
+            "label": "It is definitely not in the set"
+          },
+          {
+            "id": "c",
+            "label": "It might be there; check the database"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Bloom filters have no false negatives."
+        "explanation": "Bloom filters have false positives, never false negatives."
       },
       {
-        "id": "t49-q3",
+        "id": "t49-a3",
+        "concept": "cms",
         "type": "multiple_choice",
-        "prompt": "Which use of a Bloom filter is risky without a second check?",
+        "prompt": "Track how often each search term appears per minute in tiny memory. Which?",
         "choices": [
           {
-            "id": "d",
-            "label": "Avoiding cache lookups for absent keys"
+            "id": "c",
+            "label": "Bloom filter"
+          },
+          {
+            "id": "a",
+            "label": "Count-Min sketch"
           },
           {
             "id": "b",
+            "label": "HyperLogLog"
+          },
+          {
+            "id": "d",
+            "label": "A sorted set of every term"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Count-Min answers “how often”, possibly overcounting."
+      },
+      {
+        "id": "t49-a4",
+        "concept": "bloom",
+        "type": "drag_order",
+        "prompt": "Order crawler deduplication with a Bloom filter.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "New URL found"
+          },
+          {
+            "id": "s2",
+            "label": "Check the Bloom filter"
+          },
+          {
+            "id": "s3",
+            "label": "Probably seen: skip it"
+          },
+          {
+            "id": "s4",
+            "label": "Definitely new: fetch it and add it to the filter"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "A false positive only skips a page."
+      },
+      {
+        "id": "t49-a5",
+        "concept": "bloom-risk",
+        "type": "multiple_choice",
+        "prompt": "Which Bloom-filter use is risky without a second check?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Declaring a username already taken"
+          },
+          {
+            "id": "d",
+            "label": "Hiding recommendations already shown"
+          },
+          {
+            "id": "c",
             "label": "Skipping a disk read for keys that are definitely absent"
           },
           {
-            "id": "a",
-            "label": "Rejecting a signup because the username “may exist”"
-          },
-          {
-            "id": "c",
-            "label": "Skipping crawl of URLs probably seen"
+            "id": "b",
+            "label": "Skipping already-crawled URLs"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "A false positive would block a real user, so confirm in the database."
+        "explanation": "A false positive would block a real user."
       }
     ],
     "flashcards": [
@@ -1477,13 +2200,21 @@
         "kind": "text",
         "title": "Why interviewers ask",
         "body": "Microservices give independent deploys and scaling but add network calls, distributed data and ops cost. A modular monolith keeps boundaries without the overhead.",
-        "accent": "Interview lens"
+        "accent": "Interview lens",
+        "teaches": [
+          "ms-costs",
+          "modular-monolith"
+        ]
       },
       {
         "id": "t50-c2",
         "kind": "text",
         "title": "The core idea",
-        "body": "Start with a modular monolith; split services along team and domain boundaries when needed."
+        "body": "Start with a modular monolith; split services along team and domain boundaries when needed.",
+        "teaches": [
+          "modular-monolith",
+          "extract"
+        ]
       },
       {
         "id": "t50-c3",
@@ -1496,98 +2227,195 @@
           "Team/scale pressure",
           "Extract service",
           "Own its data"
+        ],
+        "teaches": [
+          "extract"
         ]
       },
       {
         "id": "t50-c4",
         "kind": "text",
         "title": "Watch out for",
-        "body": "Splitting a 3-person team’s app into 15 services."
+        "body": "Splitting a 3-person team’s app into 15 services.",
+        "teaches": [
+          "ms-costs"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t50-q1",
+        "id": "t50-a1",
+        "concept": "extract",
         "type": "multiple_choice",
         "prompt": "Strongest reason to extract a microservice?",
         "choices": [
           {
             "id": "b",
-            "label": "A domain needs independent scaling and team ownership"
-          },
-          {
-            "id": "d",
-            "label": "To share one database"
-          },
-          {
-            "id": "c",
-            "label": "To add network calls"
+            "label": "Microservices are the modern default"
           },
           {
             "id": "a",
-            "label": "It is trendy"
-          }
-        ],
-        "correctChoiceIds": [
-          "b"
-        ],
-        "explanation": "Ownership and scaling needs justify the cost."
-      },
-      {
-        "id": "t50-q2",
-        "type": "multiple_choice",
-        "prompt": "Select costs of microservices.",
-        "choices": [
-          {
-            "id": "c",
-            "label": "Independent deploys"
-          },
-          {
-            "id": "b",
-            "label": "Distributed debugging"
-          },
-          {
-            "id": "a",
-            "label": "Network latency"
+            "label": "A team needs to deploy and scale that part independently"
           },
           {
             "id": "d",
-            "label": "Data consistency across services"
-          }
-        ],
-        "correctChoiceIds": [
-          "a",
-          "b",
-          "d"
-        ],
-        "explanation": "Independent deploys is a benefit."
-      },
-      {
-        "id": "t50-r1",
-        "type": "multiple_choice",
-        "prompt": "Modular monolith?",
-        "choices": [
-          {
-            "id": "b",
-            "label": "About log N rounds."
-          },
-          {
-            "id": "d",
-            "label": "Horizontal Pod Autoscaler."
-          },
-          {
-            "id": "a",
-            "label": "One deployable with strict internal module boundaries."
+            "label": "To try a new language"
           },
           {
             "id": "c",
-            "label": "Putting business logic in it."
+            "label": "The codebase passed 10,000 lines"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "From the lesson: One deployable with strict internal module boundaries."
+        "explanation": "Split along team and scaling needs."
+      },
+      {
+        "id": "t50-a2",
+        "concept": "ms-costs",
+        "type": "multiple_choice",
+        "prompt": "Which is a real cost of microservices?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Network calls, distributed data and more to operate"
+          },
+          {
+            "id": "d",
+            "label": "Less independent scaling"
+          },
+          {
+            "id": "c",
+            "label": "One shared deploy for everything"
+          },
+          {
+            "id": "b",
+            "label": "Slower local function calls"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Calls become network hops; data spreads out."
+      },
+      {
+        "id": "t50-a3",
+        "concept": "modular-monolith",
+        "type": "multiple_choice",
+        "prompt": "A three-person startup wants clear boundaries without ops overhead. What fits?",
+        "choices": [
+          {
+            "id": "d",
+            "label": "A serverless function per endpoint"
+          },
+          {
+            "id": "c",
+            "label": "One module with no boundaries"
+          },
+          {
+            "id": "b",
+            "label": "Fifteen microservices on Kubernetes"
+          },
+          {
+            "id": "a",
+            "label": "A modular monolith"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Boundaries in code, one deployable."
+      },
+      {
+        "id": "t50-a4",
+        "concept": "extract",
+        "type": "drag_order",
+        "prompt": "Order a typical evolution.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "Monolith"
+          },
+          {
+            "id": "s2",
+            "label": "Add modular boundaries"
+          },
+          {
+            "id": "s3",
+            "label": "Team or scale pressure appears"
+          },
+          {
+            "id": "s4",
+            "label": "Extract a service"
+          },
+          {
+            "id": "s5",
+            "label": "Give it its own data"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Extraction is driven by pressure, not fashion."
+      },
+      {
+        "id": "t50-a5",
+        "concept": "extract",
+        "type": "tradeoff",
+        "prompt": "Extract payments from the monolith?",
+        "constraints": [
+          "A separate compliance team owns payments",
+          "Payment traffic spikes independently",
+          "Payments share tables today"
+        ],
+        "approaches": [
+          {
+            "id": "p2",
+            "label": "Keep it in the monolith",
+            "description": "No change"
+          },
+          {
+            "id": "p1",
+            "label": "Extract it, with its own database",
+            "description": "Independent service"
+          },
+          {
+            "id": "p3",
+            "label": "Split every module into services now",
+            "description": "Full microservices"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "A separate team can deploy on its own schedule"
+          },
+          {
+            "id": "r2",
+            "label": "Payments can scale separately"
+          },
+          {
+            "id": "r3",
+            "label": "Extraction is free once the code is in its own module"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3"
+        ],
+        "rationaleConflicts": {
+          "r3": "The service needs its own data, and function calls become network calls."
+        },
+        "explanation": "Extract where team and scaling pressure are real."
       }
     ],
     "flashcards": [
@@ -1634,13 +2462,20 @@
         "kind": "text",
         "title": "Why interviewers ask",
         "body": "The gateway terminates client traffic, verifies tokens, applies quotas, routes to services and can aggregate responses. It keeps cross-cutting concerns out of each service.",
-        "accent": "Interview lens"
+        "accent": "Interview lens",
+        "teaches": [
+          "gateway-jobs",
+          "aggregation"
+        ]
       },
       {
         "id": "t51-c2",
         "kind": "text",
         "title": "The core idea",
-        "body": "A single entry point that handles auth, rate limiting, routing, and request aggregation."
+        "body": "A single entry point that handles auth, rate limiting, routing, and request aggregation.",
+        "teaches": [
+          "gateway-jobs"
+        ]
       },
       {
         "id": "t51-c3",
@@ -1653,98 +2488,191 @@
           "Auth + rate limit",
           "Route",
           "Microservice"
+        ],
+        "teaches": [
+          "gateway-flow"
         ]
       },
       {
         "id": "t51-c4",
         "kind": "text",
         "title": "Watch out for",
-        "body": "Putting business logic in the gateway. It becomes a bottleneck and a deployment choke point."
+        "body": "Putting business logic in the gateway. It becomes a bottleneck and a deployment choke point.",
+        "teaches": [
+          "gateway-logic"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t51-q1",
+        "id": "t51-a1",
+        "concept": "gateway-jobs",
         "type": "multiple_choice",
         "prompt": "Which belongs in an API gateway?",
         "choices": [
           {
             "id": "d",
-            "label": "Inventory reservation"
+            "label": "Choosing which products to recommend"
           },
           {
             "id": "b",
-            "label": "Token validation and rate limiting"
+            "label": "Calculating order discounts"
           },
           {
             "id": "a",
-            "label": "Order pricing logic"
+            "label": "Token verification and rate limiting"
           },
           {
             "id": "c",
-            "label": "Database migrations"
-          }
-        ],
-        "correctChoiceIds": [
-          "b"
-        ],
-        "explanation": "Cross-cutting concerns live at the edge; business logic stays in services."
-      },
-      {
-        "id": "t51-q2",
-        "type": "multiple_choice",
-        "prompt": "Select common gateway responsibilities.",
-        "choices": [
-          {
-            "id": "c",
-            "label": "Running SQL joins for orders"
-          },
-          {
-            "id": "d",
-            "label": "Rate limiting"
-          },
-          {
-            "id": "a",
-            "label": "Authentication"
-          },
-          {
-            "id": "b",
-            "label": "Request routing"
-          }
-        ],
-        "correctChoiceIds": [
-          "a",
-          "b",
-          "d"
-        ],
-        "explanation": "Data logic belongs in the owning service."
-      },
-      {
-        "id": "t51-r1",
-        "type": "multiple_choice",
-        "prompt": "Gateway anti-pattern?",
-        "choices": [
-          {
-            "id": "d",
-            "label": "Controllers drive actual state to desired state."
-          },
-          {
-            "id": "b",
-            "label": "About log N rounds."
-          },
-          {
-            "id": "c",
-            "label": "99% of requests are faster than this."
-          },
-          {
-            "id": "a",
-            "label": "Putting business logic in it."
+            "label": "Writing orders to the database"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "From the lesson: Putting business logic in it."
+        "explanation": "Cross-cutting concerns, not business logic."
+      },
+      {
+        "id": "t51-a2",
+        "concept": "aggregation",
+        "type": "multiple_choice",
+        "prompt": "A mobile home screen needs data from four services. What can the gateway do?",
+        "choices": [
+          {
+            "id": "d",
+            "label": "Force the app to call each one"
+          },
+          {
+            "id": "c",
+            "label": "Replace the four services"
+          },
+          {
+            "id": "a",
+            "label": "Call them and return one combined response"
+          },
+          {
+            "id": "b",
+            "label": "Store all four services’ data"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Aggregation saves mobile round trips."
+      },
+      {
+        "id": "t51-a3",
+        "concept": "gateway-logic",
+        "type": "multiple_choice",
+        "prompt": "What goes wrong when business logic moves into the gateway?",
+        "choices": [
+          {
+            "id": "d",
+            "label": "Services must share a database"
+          },
+          {
+            "id": "b",
+            "label": "The gateway can no longer route"
+          },
+          {
+            "id": "c",
+            "label": "Tokens stop being verified"
+          },
+          {
+            "id": "a",
+            "label": "Every change needs a gateway deploy and it becomes a bottleneck"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Keep the gateway thin."
+      },
+      {
+        "id": "t51-a4",
+        "concept": "gateway-flow",
+        "type": "drag_order",
+        "prompt": "Order a request through a gateway.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "Mobile client"
+          },
+          {
+            "id": "s2",
+            "label": "API gateway"
+          },
+          {
+            "id": "s3",
+            "label": "Auth and rate limit"
+          },
+          {
+            "id": "s4",
+            "label": "Route"
+          },
+          {
+            "id": "s5",
+            "label": "Microservice"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Reject bad requests before routing."
+      },
+      {
+        "id": "t51-a5",
+        "concept": "gateway-logic",
+        "type": "spot_bottleneck",
+        "prompt": "One gateway also computes discounts for every request and sits at 100% CPU. Click the bottleneck.",
+        "diagramNodes": [
+          {
+            "id": "n1",
+            "label": "Mobile client",
+            "x": 40,
+            "y": 40
+          },
+          {
+            "id": "n2",
+            "label": "API gateway (discount logic)",
+            "x": 150,
+            "y": 40
+          },
+          {
+            "id": "n3",
+            "label": "Orders",
+            "x": 260,
+            "y": 40
+          },
+          {
+            "id": "n4",
+            "label": "Catalog",
+            "x": 370,
+            "y": 40
+          }
+        ],
+        "diagramEdges": [
+          {
+            "from": "n1",
+            "to": "n2"
+          },
+          {
+            "from": "n2",
+            "to": "n3"
+          },
+          {
+            "from": "n2",
+            "to": "n4"
+          }
+        ],
+        "correctNodeIds": [
+          "n2"
+        ],
+        "explanation": "Move discount logic into a service and keep the gateway thin."
       }
     ],
     "flashcards": [
@@ -1778,9 +2706,9 @@
     "title": "Service Discovery",
     "kind": "lesson",
     "objectives": [
-      "Two-phase commit gives atomicity across nodes but blocks if the coordinator fails.",
-      "Answer: 2PC phases?",
-      "Answer: Alternative to 2PC?"
+      "Explain why services need discovery",
+      "Compare client-side and server-side discovery",
+      "Keep registries accurate with heartbeats"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -1789,132 +2717,227 @@
       {
         "id": "t52-c1",
         "kind": "text",
-        "title": "Why interviewers ask",
-        "body": "Phase 1: prepare (participants vote). Phase 2: commit/abort. It is safe but blocking and slow. Prefer sagas, outbox, or single-database designs when possible.",
-        "accent": "Interview lens"
+        "title": "The problem",
+        "body": "Instances come and go with autoscaling and deploys, so their addresses change. Callers need a live list of healthy instances for each service.",
+        "teaches": [
+          "discovery"
+        ]
       },
       {
         "id": "t52-c2",
         "kind": "text",
-        "title": "The core idea",
-        "body": "Two-phase commit gives atomicity across nodes but blocks if the coordinator fails."
+        "title": "Registries",
+        "body": "Instances register with a registry (Consul, etcd, Eureka) on start and send heartbeats; dead ones expire. In Kubernetes, a Service and its DNS name do this for you.",
+        "teaches": [
+          "registry",
+          "k8s-service"
+        ]
       },
       {
         "id": "t52-c3",
-        "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Coordinator: prepare” to “Else abort”, via “Participants vote”.",
-        "steps": [
-          "Coordinator: prepare",
-          "Participants vote",
-          "All yes?",
-          "Commit",
-          "Else abort"
+        "kind": "text",
+        "title": "Client-side vs server-side",
+        "body": "Client-side discovery: the caller asks the registry and picks an instance itself. Server-side: the caller hits a load balancer or DNS name, which picks for it. Server-side keeps clients simple.",
+        "teaches": [
+          "client-server"
         ]
       },
       {
         "id": "t52-c4",
+        "kind": "diagram",
+        "title": "A call with discovery",
+        "body": "5 steps from “Instance starts and registers” to “Caller calls one; dead instances expire from the list”, via “It sends heartbeats”.",
+        "steps": [
+          "Instance starts and registers",
+          "It sends heartbeats",
+          "Caller looks up “payments”",
+          "Registry returns healthy instances",
+          "Caller calls one; dead instances expire from the list"
+        ],
+        "teaches": [
+          "registry"
+        ]
+      },
+      {
+        "id": "t52-c5",
         "kind": "text",
-        "title": "Watch out for",
-        "body": "Defaulting to 2PC across microservices; it couples availability of all participants."
+        "title": "Common trap",
+        "body": "Hard-coding IPs in config, or caching lookups with no refresh. Deploys then send traffic to instances that no longer exist.",
+        "teaches": [
+          "discovery"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t52-q1",
+        "id": "t52-a1",
+        "concept": "discovery",
         "type": "multiple_choice",
-        "prompt": "Main drawback of 2PC?",
+        "prompt": "Why do microservices need service discovery?",
         "choices": [
           {
             "id": "b",
-            "label": "Blocking when coordinator fails"
+            "label": "To encrypt traffic between services"
           },
           {
             "id": "a",
-            "label": "Not atomic"
+            "label": "Instance addresses change with autoscaling and deploys"
           },
           {
             "id": "c",
-            "label": "Too eventually consistent"
+            "label": "To store each service’s data"
           },
           {
             "id": "d",
-            "label": "No SQL support"
-          }
-        ],
-        "correctChoiceIds": [
-          "b"
-        ],
-        "explanation": "Participants can hold locks waiting."
-      },
-      {
-        "id": "t52-q2",
-        "type": "drag_order",
-        "prompt": "Order 2PC.",
-        "items": [
-          {
-            "id": "i0",
-            "label": "Coordinator sends prepare"
-          },
-          {
-            "id": "i1",
-            "label": "Participants lock & vote yes"
-          },
-          {
-            "id": "i2",
-            "label": "Coordinator decides commit"
-          },
-          {
-            "id": "i3",
-            "label": "Participants commit & release locks"
-          }
-        ],
-        "correctOrder": [
-          "i0",
-          "i1",
-          "i2",
-          "i3"
-        ],
-        "explanation": "Two round trips with locks held between them."
-      },
-      {
-        "id": "t52-r1",
-        "type": "multiple_choice",
-        "prompt": "2PC phases?",
-        "choices": [
-          {
-            "id": "a",
-            "label": "Prepare/vote, then commit/abort."
-          },
-          {
-            "id": "b",
-            "label": "Connect user journeys to SLOs, then justify components and trade-offs for Containers & Kubernetes."
-          },
-          {
-            "id": "d",
-            "label": "Show depth on the hardest component."
-          },
-          {
-            "id": "c",
-            "label": "Failure detector outputting suspicion level."
+            "label": "To version the APIs"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "From the lesson: Prepare/vote, then commit/abort."
+        "explanation": "Callers need current, healthy addresses."
+      },
+      {
+        "id": "t52-a2",
+        "concept": "registry",
+        "type": "multiple_choice",
+        "prompt": "An instance crashes without deregistering. How does the registry notice?",
+        "choices": [
+          {
+            "id": "d",
+            "label": "Callers edit the registry by hand"
+          },
+          {
+            "id": "b",
+            "label": "The crashed instance sends a final message"
+          },
+          {
+            "id": "c",
+            "label": "It never notices"
+          },
+          {
+            "id": "a",
+            "label": "Its heartbeats stop and its entry expires"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Heartbeats plus expiry clean up dead entries."
+      },
+      {
+        "id": "t52-a3",
+        "concept": "client-server",
+        "type": "multiple_choice",
+        "prompt": "Which is server-side discovery?",
+        "choices": [
+          {
+            "id": "d",
+            "label": "Every instance broadcasts its address to every caller"
+          },
+          {
+            "id": "a",
+            "label": "The caller hits a load balancer, which picks a healthy instance"
+          },
+          {
+            "id": "c",
+            "label": "The caller reads IPs from a config file"
+          },
+          {
+            "id": "b",
+            "label": "The caller queries Consul and picks an instance itself"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The picking happens outside the client."
+      },
+      {
+        "id": "t52-a4",
+        "concept": "registry",
+        "type": "drag_order",
+        "prompt": "Order a call with discovery.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "Instance starts and registers"
+          },
+          {
+            "id": "s2",
+            "label": "It sends heartbeats"
+          },
+          {
+            "id": "s3",
+            "label": "Caller looks up the service"
+          },
+          {
+            "id": "s4",
+            "label": "Registry returns healthy instances"
+          },
+          {
+            "id": "s5",
+            "label": "Caller calls one"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Registration comes first."
+      },
+      {
+        "id": "t52-a5",
+        "concept": "k8s-service",
+        "type": "multiple_choice",
+        "prompt": "In Kubernetes, what gives you discovery out of the box?",
+        "choices": [
+          {
+            "id": "c",
+            "label": "A ConfigMap of IP addresses"
+          },
+          {
+            "id": "b",
+            "label": "A Deployment’s replica count"
+          },
+          {
+            "id": "a",
+            "label": "A Service with a stable DNS name"
+          },
+          {
+            "id": "d",
+            "label": "A liveness probe"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The Service tracks ready pods behind one name."
       }
     ],
     "flashcards": [
       {
-        "id": "52-f0",
-        "front": "2PC phases?",
-        "back": "Prepare/vote, then commit/abort."
+        "id": "t52-f1",
+        "front": "Why do microservices need service discovery?",
+        "back": "Instance addresses change with autoscaling and deploys. Callers need current, healthy addresses."
       },
       {
-        "id": "52-f1",
-        "front": "Alternative to 2PC?",
-        "back": "Saga with compensations, outbox pattern."
+        "id": "t52-f2",
+        "front": "An instance crashes without deregistering. How does the registry notice?",
+        "back": "Its heartbeats stop and its entry expires. Heartbeats plus expiry clean up dead entries."
+      },
+      {
+        "id": "t52-f3",
+        "front": "Which is server-side discovery?",
+        "back": "The caller hits a load balancer, which picks a healthy instance. The picking happens outside the client."
+      },
+      {
+        "id": "t52-f4",
+        "front": "In Kubernetes, what gives you discovery out of the box?",
+        "back": "A Service with a stable DNS name. The Service tracks ready pods behind one name."
       }
     ],
     "sources": [
@@ -1936,9 +2959,9 @@
     "title": "Timeouts/Retries/Circuit Breakers",
     "kind": "lesson",
     "objectives": [
-      "Nodes spread membership and health info peer-to-peer; detectors use heartbeats and suspicion.",
-      "Answer: Phi accrual?",
-      "Answer: Gossip convergence?"
+      "Set timeouts that fit the caller’s deadline",
+      "Retry safely without multiplying load",
+      "Use circuit breakers and bulkheads to contain failures"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -1947,131 +2970,220 @@
       {
         "id": "t53-c1",
         "kind": "text",
-        "title": "Why interviewers ask",
-        "body": "Gossip protocols scale to thousands of nodes with O(log N) spread. Phi-accrual detectors output suspicion levels instead of binary dead/alive.",
-        "accent": "Interview lens"
+        "title": "Timeouts",
+        "body": "Every outbound call needs a timeout shorter than the caller’s own deadline. Without one, threads wait forever on a hung dependency and the caller runs out of threads too.",
+        "teaches": [
+          "timeouts"
+        ]
       },
       {
         "id": "t53-c2",
         "kind": "text",
-        "title": "The core idea",
-        "body": "Nodes spread membership and health info peer-to-peer; detectors use heartbeats and suspicion."
+        "title": "Retries",
+        "body": "Retry only idempotent operations, a few times, with exponential backoff and jitter. Retries at every layer multiply: 3 attempts at each of 3 layers is up to 27 calls.",
+        "teaches": [
+          "retries"
+        ]
       },
       {
         "id": "t53-c3",
-        "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Node picks random peers” to “Cluster converges”, via “Exchange state”.",
-        "steps": [
-          "Node picks random peers",
-          "Exchange state",
-          "Merge newer info",
-          "Repeat each second",
-          "Cluster converges"
+        "kind": "text",
+        "title": "Circuit breakers",
+        "body": "Closed: calls flow and failures are counted. Open: after too many failures, calls fail fast without trying. Half-open: after a cooldown, a few trial calls decide whether to close again.",
+        "teaches": [
+          "breaker"
         ]
       },
       {
         "id": "t53-c4",
+        "kind": "diagram",
+        "title": "A breaker through an outage",
+        "body": "5 steps from “Closed: calls flow” to “Trials succeed: closed again”, via “Failures pass the threshold”.",
+        "steps": [
+          "Closed: calls flow",
+          "Failures pass the threshold",
+          "Open: fail fast",
+          "Cooldown, then half-open trial calls",
+          "Trials succeed: closed again"
+        ],
+        "teaches": [
+          "breaker"
+        ]
+      },
+      {
+        "id": "t53-c5",
         "kind": "text",
-        "title": "Watch out for",
-        "body": "Declaring nodes dead on one missed heartbeat — causes flapping during GC pauses."
+        "title": "Bulkheads",
+        "body": "Give each dependency its own pool of threads or connections, so a slow recommendations service cannot use up the pool checkout needs.",
+        "teaches": [
+          "bulkhead"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t53-q1",
+        "id": "t53-a1",
+        "concept": "breaker",
         "type": "multiple_choice",
-        "prompt": "Gossip spreads information in roughly:",
+        "prompt": "After the cooldown, a circuit breaker enters:",
         "choices": [
           {
-            "id": "d",
-            "label": "Never"
+            "id": "a",
+            "label": "Half-open: a few trial calls"
           },
           {
-            "id": "a",
-            "label": "O(1) rounds"
+            "id": "d",
+            "label": "A retry storm"
           },
           {
             "id": "b",
-            "label": "O(log N) rounds"
+            "label": "Closed: all calls flow at once"
           },
           {
             "id": "c",
-            "label": "O(N^2) rounds"
-          }
-        ],
-        "correctChoiceIds": [
-          "b"
-        ],
-        "explanation": "Each round roughly doubles informed nodes."
-      },
-      {
-        "id": "t53-q2",
-        "type": "multiple_choice",
-        "prompt": "Select properties of gossip.",
-        "choices": [
-          {
-            "id": "d",
-            "label": "Scales to large clusters"
-          },
-          {
-            "id": "a",
-            "label": "Decentralised"
-          },
-          {
-            "id": "c",
-            "label": "Requires a single master"
-          },
-          {
-            "id": "b",
-            "label": "Eventually consistent membership"
-          }
-        ],
-        "correctChoiceIds": [
-          "a",
-          "b",
-          "d"
-        ],
-        "explanation": "Gossip avoids a central coordinator."
-      },
-      {
-        "id": "t53-r1",
-        "type": "multiple_choice",
-        "prompt": "Phi accrual?",
-        "choices": [
-          {
-            "id": "d",
-            "label": "Show depth on the hardest component."
-          },
-          {
-            "id": "b",
-            "label": "Connect user journeys to SLOs, then justify components and trade-offs for Containers & Kubernetes."
-          },
-          {
-            "id": "c",
-            "label": "Backend-for-frontend: a gateway tailored to one client type."
-          },
-          {
-            "id": "a",
-            "label": "Failure detector outputting suspicion level."
+            "label": "Open again, permanently"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "From the lesson: Failure detector outputting suspicion level."
+        "explanation": "Trials decide whether to close."
+      },
+      {
+        "id": "t53-a2",
+        "concept": "retries",
+        "type": "estimation",
+        "prompt": "Three layers each make up to 3 attempts. Worst case, how many calls reach the bottom service for one user request?",
+        "unit": "calls",
+        "target": 27,
+        "assumptions": [],
+        "formula": "Each attempt above triggers up to 3 below: 3^3",
+        "workedAnswer": "Each attempt above triggers up to 3 below: 3^3 = 27 calls.",
+        "explanation": "Each attempt above triggers up to 3 below: 3^3 = 27 calls."
+      },
+      {
+        "id": "t53-a3",
+        "concept": "timeouts",
+        "type": "multiple_choice",
+        "prompt": "A dependency hangs and no timeout is set. What happens to the caller?",
+        "choices": [
+          {
+            "id": "c",
+            "label": "The operating system retries the call"
+          },
+          {
+            "id": "d",
+            "label": "Only one thread waits"
+          },
+          {
+            "id": "b",
+            "label": "The call fails fast automatically"
+          },
+          {
+            "id": "a",
+            "label": "Its threads pile up waiting until it cannot serve anyone"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Hung calls spread the outage upward."
+      },
+      {
+        "id": "t53-a4",
+        "concept": "breaker",
+        "type": "drag_order",
+        "prompt": "Order a breaker through an outage and recovery.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "Closed: calls flow"
+          },
+          {
+            "id": "s2",
+            "label": "Failures pass the threshold"
+          },
+          {
+            "id": "s3",
+            "label": "Open: fail fast"
+          },
+          {
+            "id": "s4",
+            "label": "Half-open: trial calls"
+          },
+          {
+            "id": "s5",
+            "label": "Closed again"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Fail fast while it is down."
+      },
+      {
+        "id": "t53-a5",
+        "concept": "bulkhead",
+        "type": "tradeoff",
+        "prompt": "Checkout calls a flaky recommendations service.",
+        "constraints": [
+          "Recommendations are optional",
+          "Checkout must stay fast"
+        ],
+        "approaches": [
+          {
+            "id": "p2",
+            "label": "Retry many times with no timeout",
+            "description": "Keep trying until it works"
+          },
+          {
+            "id": "p1",
+            "label": "Timeout, circuit breaker and a default fallback, in its own pool",
+            "description": "Contain the dependency"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r2",
+            "label": "Failing fast while it is down keeps threads free"
+          },
+          {
+            "id": "r1",
+            "label": "Checkout must not wait on an optional feature"
+          },
+          {
+            "id": "r3",
+            "label": "More retries help the dependency recover faster"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3"
+        ],
+        "rationaleConflicts": {
+          "r3": "Extra retries add load to a struggling service and slow its recovery."
+        },
+        "explanation": "Contain optional dependencies so they cannot take checkout down."
       }
     ],
     "flashcards": [
       {
-        "id": "53-f0",
-        "front": "Phi accrual?",
-        "back": "Failure detector outputting suspicion level."
+        "id": "t53-f1",
+        "front": "After the cooldown, a circuit breaker enters:",
+        "back": "Half-open: a few trial calls. Trials decide whether to close."
       },
       {
-        "id": "53-f1",
-        "front": "Gossip convergence?",
-        "back": "About log N rounds."
+        "id": "t53-f2",
+        "front": "A dependency hangs and no timeout is set. What happens to the caller?",
+        "back": "Its threads pile up waiting until it cannot serve anyone. Hung calls spread the outage upward."
       }
     ],
     "sources": [
@@ -2106,13 +3218,21 @@
         "kind": "text",
         "title": "Why interviewers ask",
         "body": "Track RED (rate, errors, duration) for services and USE (utilisation, saturation, errors) for resources. Correlate with a trace ID propagated through every hop.",
-        "accent": "Interview lens"
+        "accent": "Interview lens",
+        "teaches": [
+          "red",
+          "use",
+          "trace-id"
+        ]
       },
       {
         "id": "t54-c2",
         "kind": "text",
         "title": "The core idea",
-        "body": "Metrics show what, logs show details, traces show where across services."
+        "body": "Metrics show what, logs show details, traces show where across services.",
+        "teaches": [
+          "pillars"
+        ]
       },
       {
         "id": "t54-c3",
@@ -2125,92 +3245,169 @@
           "Spans recorded",
           "Metrics aggregated",
           "Dashboards & alerts"
+        ],
+        "teaches": [
+          "trace-id"
         ]
       },
       {
         "id": "t54-c4",
         "kind": "text",
         "title": "Watch out for",
-        "body": "Logging everything at DEBUG in production with no structure or sampling."
+        "body": "Logging everything at DEBUG in production with no structure or sampling.",
+        "teaches": [
+          "log-hygiene"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t54-q1",
+        "id": "t54-a1",
+        "concept": "trace-id",
         "type": "multiple_choice",
-        "prompt": "Best tool to find which of 8 services added latency to one request?",
+        "prompt": "Best tool to find which of 8 services slowed down one request?",
         "choices": [
           {
             "id": "a",
-            "label": "CPU metric"
+            "label": "A distributed trace"
+          },
+          {
+            "id": "d",
+            "label": "Error-rate metrics"
+          },
+          {
+            "id": "c",
+            "label": "A CPU dashboard"
           },
           {
             "id": "b",
-            "label": "Distributed tracing"
-          },
-          {
-            "id": "c",
-            "label": "Error log grep"
-          },
-          {
-            "id": "d",
-            "label": "DNS lookup"
-          }
-        ],
-        "correctChoiceIds": [
-          "b"
-        ],
-        "explanation": "Traces show per-hop timing."
-      },
-      {
-        "id": "t54-q2",
-        "type": "multiple_choice",
-        "prompt": "Rate vs Errors: which pairing is correct?",
-        "choices": [
-          {
-            "id": "d",
-            "label": "Errors → Requests per second"
-          },
-          {
-            "id": "a",
-            "label": "Rate → Requests per second"
-          },
-          {
-            "id": "c",
-            "label": "Rate → Failed requests"
+            "label": "Grepping each service’s logs by timestamp"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Standard golden signals."
+        "explanation": "Spans show time spent per hop."
       },
       {
-        "id": "t54-r1",
+        "id": "t54-a2",
+        "concept": "red",
         "type": "multiple_choice",
-        "prompt": "Three pillars?",
+        "prompt": "RED metrics for a service are:",
         "choices": [
           {
-            "id": "c",
-            "label": "Saga with compensations, outbox pattern."
-          },
-          {
-            "id": "b",
-            "label": "Skipping scale numbers, ignoring retries/idempotency, or mixing AuthN with AuthZ."
+            "id": "a",
+            "label": "Rate, errors, duration"
           },
           {
             "id": "d",
-            "label": "Each service owns its data."
+            "label": "Retries, exceptions, deploys"
           },
           {
-            "id": "a",
-            "label": "Logs, metrics, traces."
+            "id": "b",
+            "label": "Requests, events, disks"
+          },
+          {
+            "id": "c",
+            "label": "Reads, edits, deletes"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "From the lesson: Logs, metrics, traces."
+        "explanation": "Service-level health in three numbers."
+      },
+      {
+        "id": "t54-a3",
+        "concept": "use",
+        "type": "multiple_choice",
+        "prompt": "Which is a USE metric for a database disk?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Saturation, such as the I/O queue depth"
+          },
+          {
+            "id": "b",
+            "label": "Requests per second to the API"
+          },
+          {
+            "id": "c",
+            "label": "p99 checkout latency"
+          },
+          {
+            "id": "d",
+            "label": "Number of deploys"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "USE (utilisation, saturation, errors) is for resources."
+      },
+      {
+        "id": "t54-a4",
+        "concept": "trace-id",
+        "type": "drag_order",
+        "prompt": "Order how observability data flows.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "Request gets a trace id"
+          },
+          {
+            "id": "s2",
+            "label": "Each service logs with it"
+          },
+          {
+            "id": "s3",
+            "label": "Spans are recorded"
+          },
+          {
+            "id": "s4",
+            "label": "Metrics are aggregated"
+          },
+          {
+            "id": "s5",
+            "label": "Dashboards and alerts use them"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "The trace id ties it together."
+      },
+      {
+        "id": "t54-a5",
+        "concept": "log-hygiene",
+        "type": "multiple_choice",
+        "prompt": "Production logs everything at DEBUG as free text. Problem?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Huge volume and cost, and hard to query"
+          },
+          {
+            "id": "d",
+            "label": "Metrics become inaccurate"
+          },
+          {
+            "id": "c",
+            "label": "Traces stop working"
+          },
+          {
+            "id": "b",
+            "label": "Logs become too short"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Structure and sample logs."
       }
     ],
     "flashcards": [
@@ -2257,13 +3454,22 @@
         "kind": "text",
         "title": "Why interviewers ask",
         "body": "99.9% ≈ 8.8 h/year down, 99.99% ≈ 53 min/year. Components in series multiply availability (lower); redundant components in parallel raise it. SLO = internal target; SLA = contractual promise.",
-        "accent": "Interview lens"
+        "accent": "Interview lens",
+        "teaches": [
+          "nines",
+          "series",
+          "parallel",
+          "slo-sla"
+        ]
       },
       {
         "id": "t55-c2",
         "kind": "text",
         "title": "The core idea",
-        "body": "Availability is uptime percentage; each extra nine cuts allowed downtime by 10×."
+        "body": "Availability is uptime percentage; each extra nine cuts allowed downtime by 10×.",
+        "teaches": [
+          "nines"
+        ]
       },
       {
         "id": "t55-c3",
@@ -2276,82 +3482,153 @@
           "Add replicas",
           "Spread across zones",
           "Health checks + failover"
+        ],
+        "teaches": [
+          "spof"
         ]
       },
       {
         "id": "t55-c4",
         "kind": "text",
         "title": "Watch out for",
-        "body": "Claiming five nines without redundancy across zones. Availability comes from removing single points of failure."
+        "body": "Claiming five nines without redundancy across zones. Availability comes from removing single points of failure.",
+        "teaches": [
+          "spof"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t55-q1",
+        "id": "t55-a1",
+        "concept": "series",
         "type": "multiple_choice",
         "prompt": "Two services in series, each 99.9% available. End-to-end availability?",
         "choices": [
-          {
-            "id": "c",
-            "label": "≈99.8%"
-          },
           {
             "id": "b",
             "label": "99.9%"
           },
           {
-            "id": "d",
-            "label": "≈99.0%"
-          },
-          {
-            "id": "a",
-            "label": "99.99%"
-          }
-        ],
-        "correctChoiceIds": [
-          "c"
-        ],
-        "explanation": "0.999 × 0.999 ≈ 0.998."
-      },
-      {
-        "id": "t55-q2",
-        "type": "estimation",
-        "prompt": "Allowed downtime per year at 99.9% availability, in hours?",
-        "unit": "hours",
-        "target": 8.76,
-        "assumptions": [
-          "Use rounded daily volume ÷ 86,400 unless stated otherwise."
-        ],
-        "formula": "See explanation",
-        "workedAnswer": "0.1% of 8,760 hours = 8.76 hours.",
-        "explanation": "0.1% of 8,760 hours = 8.76 hours."
-      },
-      {
-        "id": "t55-r1",
-        "type": "multiple_choice",
-        "prompt": "99.99% downtime/year?",
-        "choices": [
-          {
-            "id": "a",
-            "label": "≈ 52.6 minutes."
-          },
-          {
-            "id": "b",
-            "label": "Show depth on the hardest component."
-          },
-          {
             "id": "c",
-            "label": "Horizontal Pod Autoscaler."
+            "label": "99.99%"
+          },
+          {
+            "id": "a",
+            "label": "About 99.8%"
           },
           {
             "id": "d",
-            "label": "Connect user journeys to SLOs, then justify components and trade-offs for Containers & Kubernetes."
+            "label": "99.95%"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "From the lesson: ≈ 52.6 minutes."
+        "explanation": "0.999 × 0.999 ≈ 0.998, assuming independent failures."
+      },
+      {
+        "id": "t55-a2",
+        "concept": "nines",
+        "type": "estimation",
+        "prompt": "Allowed downtime per year at 99.9% availability, in hours?",
+        "unit": "hours",
+        "target": 8.76,
+        "assumptions": [],
+        "formula": "0.1% × 8,760 h",
+        "workedAnswer": "0.1% × 8,760 h = 8.76 h.",
+        "explanation": "0.1% × 8,760 h = 8.76 h."
+      },
+      {
+        "id": "t55-a3",
+        "concept": "parallel",
+        "type": "multiple_choice",
+        "prompt": "Two independent replicas, each 99% available, with instant failover. Availability?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "About 99.99%"
+          },
+          {
+            "id": "d",
+            "label": "99.5%"
+          },
+          {
+            "id": "c",
+            "label": "98%"
+          },
+          {
+            "id": "b",
+            "label": "99%"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Both must fail: 0.01 × 0.01 = 0.0001, so availability is 1 − 0.0001 = 0.9999."
+      },
+      {
+        "id": "t55-a4",
+        "concept": "slo-sla",
+        "type": "multiple_choice",
+        "prompt": "SLO versus SLA?",
+        "choices": [
+          {
+            "id": "d",
+            "label": "SLA is measured per request, SLO per year"
+          },
+          {
+            "id": "a",
+            "label": "SLO is the internal target; SLA is the promise to customers, with penalties"
+          },
+          {
+            "id": "b",
+            "label": "SLA is the internal target; SLO is the customer promise"
+          },
+          {
+            "id": "c",
+            "label": "They mean the same thing"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Set the SLO tighter than the SLA."
+      },
+      {
+        "id": "t55-a5",
+        "concept": "spof",
+        "type": "drag_order",
+        "prompt": "Order the path to higher availability.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "Single node"
+          },
+          {
+            "id": "s2",
+            "label": "Find single points of failure"
+          },
+          {
+            "id": "s3",
+            "label": "Add replicas"
+          },
+          {
+            "id": "s4",
+            "label": "Spread across zones"
+          },
+          {
+            "id": "s5",
+            "label": "Health checks and failover"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Remove single points of failure step by step."
       }
     ],
     "flashcards": [
@@ -2385,9 +3662,9 @@
     "title": "Disaster Recovery & Multi-Region",
     "kind": "lesson",
     "objectives": [
-      "Containers package apps; Kubernetes schedules, heals and scales them declaratively.",
-      "Answer: Reconciliation loop?",
-      "Answer: HPA?"
+      "Define RPO and RTO and derive them from business needs",
+      "Choose a disaster-recovery strategy",
+      "Explain the data cost of cross-region replication"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -2396,125 +3673,246 @@
       {
         "id": "t56-c1",
         "kind": "text",
-        "title": "Why interviewers ask",
-        "body": "Pods run containers; Deployments manage replicas and rollouts; Services expose them; HPA autoscales. You declare desired state; controllers reconcile it.",
-        "accent": "Interview lens"
+        "title": "RPO and RTO",
+        "body": "RPO: how much data you can lose, measured in time (the last 5 minutes of writes). RTO: how long until service is back. Both are business decisions that set the design and the cost.",
+        "teaches": [
+          "rpo-rto"
+        ]
       },
       {
         "id": "t56-c2",
         "kind": "text",
-        "title": "The core idea",
-        "body": "Containers package apps; Kubernetes schedules, heals and scales them declaratively."
+        "title": "Strategies",
+        "body": "Backup and restore: cheapest, hours of RTO. Pilot light: data replicated, minimal servers ready to scale. Warm standby: a smaller full copy running. Active-active: every region serves traffic; lowest RTO, hardest consistency.",
+        "teaches": [
+          "strategies"
+        ]
       },
       {
         "id": "t56-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Write manifest” to “HPA scales”, via “kubectl apply”.",
+        "title": "Regional failover",
+        "body": "5 steps from “Mumbai region fails health checks” to “Fail back after the incident”, via “DNS or a global load balancer shifts traffic”.",
         "steps": [
-          "Write manifest",
-          "kubectl apply",
-          "Scheduler places pods",
-          "Controller reconciles",
-          "HPA scales"
+          "Mumbai region fails health checks",
+          "DNS or a global load balancer shifts traffic",
+          "Singapore promotes its database replica",
+          "Capacity scales up",
+          "Fail back after the incident"
+        ],
+        "teaches": [
+          "failover"
         ]
       },
       {
         "id": "t56-c4",
         "kind": "text",
-        "title": "Watch out for",
-        "body": "Treating Kubernetes as a requirement for a simple system design."
+        "title": "Data across regions",
+        "body": "Async replication between regions keeps writes fast but means RPO above zero: the last seconds of writes can be lost. Synchronous cross-region writes give RPO zero at tens of ms per write.",
+        "teaches": [
+          "cross-region"
+        ]
+      },
+      {
+        "id": "t56-c5",
+        "kind": "text",
+        "title": "Common trap",
+        "body": "Never testing failover. Backups that were never restored and runbooks that were never run tend to fail on the day. Rehearse with game days.",
+        "teaches": [
+          "failover"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t56-q1",
+        "id": "t56-a1",
+        "concept": "rpo-rto",
         "type": "multiple_choice",
-        "prompt": "Which K8s object keeps N replicas of a pod running and handles rollouts?",
+        "prompt": "The business can lose at most 5 minutes of orders. Which number is this?",
         "choices": [
           {
             "id": "b",
-            "label": "Deployment"
-          },
-          {
-            "id": "c",
-            "label": "Secret"
-          },
-          {
-            "id": "d",
-            "label": "Namespace"
+            "label": "An RTO of 5 minutes"
           },
           {
             "id": "a",
-            "label": "ConfigMap"
-          }
-        ],
-        "correctChoiceIds": [
-          "b"
-        ],
-        "explanation": "Deployments manage ReplicaSets."
-      },
-      {
-        "id": "t56-q2",
-        "type": "multiple_choice",
-        "prompt": "Pod vs Deployment: which pairing is correct?",
-        "choices": [
-          {
-            "id": "d",
-            "label": "Deployment → Smallest deployable unit"
+            "label": "An RPO of 5 minutes"
           },
           {
-            "id": "a",
-            "label": "Pod → Smallest deployable unit"
+            "id": "d",
+            "label": "A TTL of 5 minutes"
           },
           {
             "id": "c",
-            "label": "Pod → Replicas & rollouts"
+            "label": "An SLA of 5 minutes"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Declarative objects reconcile desired state."
+        "explanation": "RPO is data loss; RTO is downtime."
       },
       {
-        "id": "t56-r1",
+        "id": "t56-a2",
+        "concept": "strategies",
         "type": "multiple_choice",
-        "prompt": "Reconciliation loop?",
+        "prompt": "Cheapest DR strategy when hours of RTO are acceptable?",
         "choices": [
           {
-            "id": "b",
-            "label": "Failure detector outputting suspicion level."
-          },
-          {
             "id": "a",
-            "label": "Controllers drive actual state to desired state."
-          },
-          {
-            "id": "d",
-            "label": "Series multiplies (lower); parallel redundancy raises it."
+            "label": "Backup and restore"
           },
           {
             "id": "c",
-            "label": "Backend-for-frontend: a gateway tailored to one client type."
+            "label": "Warm standby"
+          },
+          {
+            "id": "d",
+            "label": "Pilot light"
+          },
+          {
+            "id": "b",
+            "label": "Active-active"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "From the lesson: Controllers drive actual state to desired state."
+        "explanation": "Nothing runs until you need it."
+      },
+      {
+        "id": "t56-a3",
+        "concept": "failover",
+        "type": "drag_order",
+        "prompt": "Order a regional failover.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "Mumbai fails health checks"
+          },
+          {
+            "id": "s2",
+            "label": "Traffic shifts to Singapore"
+          },
+          {
+            "id": "s3",
+            "label": "Singapore promotes its replica"
+          },
+          {
+            "id": "s4",
+            "label": "Capacity scales up"
+          },
+          {
+            "id": "s5",
+            "label": "Fail back later"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Promote data before scaling."
+      },
+      {
+        "id": "t56-a4",
+        "concept": "cross-region",
+        "type": "multiple_choice",
+        "prompt": "Cross-region replication is asynchronous. Consequence on failover?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The last seconds of writes may be lost (RPO above zero)"
+          },
+          {
+            "id": "c",
+            "label": "Every write gets slower by one round trip"
+          },
+          {
+            "id": "b",
+            "label": "Failover takes days"
+          },
+          {
+            "id": "d",
+            "label": "Reads become strongly consistent"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Async trades a small data-loss window for fast writes."
+      },
+      {
+        "id": "t56-a5",
+        "concept": "strategies",
+        "type": "tradeoff",
+        "prompt": "DR for a payments app: RTO under 5 minutes, RPO near zero.",
+        "constraints": [
+          "A nearby second region exists",
+          "Writes can afford a few extra ms"
+        ],
+        "approaches": [
+          {
+            "id": "p2",
+            "label": "Nightly backups",
+            "description": "Restore when needed"
+          },
+          {
+            "id": "p1",
+            "label": "Warm standby with synchronous replication to the nearby region",
+            "description": "Running copy, no data lag"
+          },
+          {
+            "id": "p3",
+            "label": "Async replication to a far region only",
+            "description": "Fast writes"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "Synchronous replication keeps RPO at zero"
+          },
+          {
+            "id": "r3",
+            "label": "Nightly backups meet a 5-minute RTO"
+          },
+          {
+            "id": "r2",
+            "label": "A running standby can take traffic within minutes"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3"
+        ],
+        "rationaleConflicts": {
+          "r3": "Restoring from backups takes hours and loses up to a day of data."
+        },
+        "explanation": "Targets drive the strategy."
       }
     ],
     "flashcards": [
       {
-        "id": "56-f0",
-        "front": "Reconciliation loop?",
-        "back": "Controllers drive actual state to desired state."
+        "id": "t56-f1",
+        "front": "The business can lose at most 5 minutes of orders. Which number is this?",
+        "back": "An RPO of 5 minutes. RPO is data loss; RTO is downtime."
       },
       {
-        "id": "56-f1",
-        "front": "HPA?",
-        "back": "Horizontal Pod Autoscaler."
+        "id": "t56-f2",
+        "front": "Cheapest DR strategy when hours of RTO are acceptable?",
+        "back": "Backup and restore. Nothing runs until you need it."
+      },
+      {
+        "id": "t56-f3",
+        "front": "Cross-region replication is asynchronous. Consequence on failover?",
+        "back": "The last seconds of writes may be lost (RPO above zero). Async trades a small data-loss window for fast writes."
       }
     ],
     "sources": [
