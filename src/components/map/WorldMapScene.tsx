@@ -121,9 +121,9 @@ function StationDot({
         y={y - 19}
         textAnchor="middle"
         className="font-display"
-        fontSize={12}
+        fontSize={13}
         fontWeight={600}
-        fill={status === 'locked' ? '#4E6680' : '#EDE6D6'}
+        fill={status === 'locked' ? '#5F7790' : '#EDE6D6'}
       >
         {stop.id}
       </text>
@@ -182,12 +182,15 @@ export function WorldMapScene() {
       <section aria-labelledby="map-title" className="min-w-0">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-dim">Transit map</p>
             <h1 id="map-title" className="font-display text-3xl font-extrabold md:text-4xl text-chalk">
               The network
             </h1>
+            <p className="text-dim text-[15px] mt-1">Ten lines, one per region. Ride each line in order to open the next.</p>
           </div>
-          <p className="text-dim text-sm tabular-nums">{doneCount} of {total} stations cleared</p>
+          <p className="text-sm tabular-nums">
+            <span className="font-display text-xl font-bold text-chalk">{doneCount}</span>
+            <span className="text-dim"> / {total} stations cleared</span>
+          </p>
         </div>
         <div className="panel overflow-x-auto p-2">
           <svg viewBox={`0 0 ${W} ${H}`} className="min-w-[720px] w-full" role="group" aria-label="World map of learning regions">
@@ -269,7 +272,9 @@ export function WorldMapScene() {
                     fill={color}
                   >
                     {r.subtitle}
-                    <tspan fill="#8FA0B3" fontWeight={400} fontSize={12}>{`  ${r.name}`}</tspan>
+                    <tspan dx={8} fill="#8FA0B3" fontWeight={400} fontSize={12} className="font-sans">
+                      {r.name}
+                    </tspan>
                   </text>
                 </g>
               )
