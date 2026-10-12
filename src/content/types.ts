@@ -88,8 +88,11 @@ export interface TradeoffQuestion extends BaseQuestion {
   constraints: string[]
   approaches: { id: string; label: string; description: string }[]
   correctApproachId: string
-  rationaleKeywords: string[]
-  sampleRationale: string
+  /** Structured rationale — select valid option ids (not free text). */
+  rationaleOptions: { id: string; label: string }[]
+  correctRationaleIds: string[]
+  /** Optional distractor rationale ids that fail grading if selected */
+  distractorRationaleIds?: string[]
 }
 
 export type Question =

@@ -20,7 +20,11 @@ function AppRoutes() {
   }, [hydrate])
 
   if (!hydrated) {
-    return <div className="p-8 text-slate-400" role="status">Loading your quest progress…</div>
+    return (
+      <div className="font-mono text-xs uppercase tracking-widest text-[var(--color-muted)] p-8" role="status">
+        Syncing progress…
+      </div>
+    )
   }
 
   return (
