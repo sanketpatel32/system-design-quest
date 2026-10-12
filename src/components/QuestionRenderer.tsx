@@ -301,22 +301,34 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
         />
       )}
       {question.type === 'estimation' && (
-        <div className="space-y-2">
-          <input
-            type="number"
-            min={0}
-            disabled={submitted}
-            className="w-full max-w-xs field "
-            value={typeof answer === 'string' ? answer : ''}
-            onChange={(e) => setAnswer(e.target.value)}
-            placeholder={`Answer in ${question.unit}`}
-          />
+        <div className="space-y-3">
+          <label className="block">
+            <span className="text-xs text-dim">Your estimate</span>
+            <span className="mt-1 flex max-w-xs items-stretch">
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                disabled={submitted}
+                className="field w-full rounded-r-none text-base tabular-nums"
+                value={typeof answer === 'string' ? answer : ''}
+                onChange={(e) => setAnswer(e.target.value)}
+                placeholder="e.g. 1200"
+              />
+              <span className="grid place-items-center rounded-r-md border border-l-0 border-[var(--color-rail)] bg-[var(--color-platform)] px-3 text-sm text-dim">
+                {question.unit}
+              </span>
+            </span>
+          </label>
           {submitted && (
-            <div className="text-xs text-[var(--color-muted)] space-y-1 border-l-2 border-[var(--color-teal)] pl-3">
-              <p>Assumptions: {question.assumptions.join(' · ')}</p>
-              <p>Formula: {question.formula}</p>
-              <p>Worked: {question.workedAnswer}</p>
-            </div>
+            <dl className="rounded-md border border-[var(--color-rail)] bg-[#0a1624] p-3 text-sm grid gap-2 sm:grid-cols-[110px_1fr]">
+              <dt className="text-dim">Assumptions</dt>
+              <dd className="text-chalk">{question.assumptions.join(' · ')}</dd>
+              <dt className="text-dim">Formula</dt>
+              <dd className="text-chalk tabular-nums">{question.formula}</dd>
+              <dt className="text-dim">Worked answer</dt>
+              <dd className="text-chalk tabular-nums">{question.workedAnswer}</dd>
+            </dl>
           )}
         </div>
       )}
