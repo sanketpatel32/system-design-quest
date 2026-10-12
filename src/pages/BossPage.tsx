@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { topicLabel } from '../content/numbering'
 import { Link, useParams } from 'react-router-dom'
 import { allTopics } from '../content/catalog'
 import { BossCanvas, type CanvasSnapshot } from '../components/BossCanvas'
@@ -73,7 +74,7 @@ export function BossPage() {
           <IconCastle size={64} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-extrabold uppercase tracking-wider">Boss fight · topic {topic.id}</p>
+          <p className="text-sm font-extrabold uppercase tracking-wider">Boss fight · {topicLabel(topic.id)}</p>
           <h1 className="font-display text-3xl sm:text-4xl mt-1 leading-tight">{topic.title}</h1>
           <p className="font-bold mt-2 max-w-2xl">{topic.boss.estimationScenario}</p>
         </div>

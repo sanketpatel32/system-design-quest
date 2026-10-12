@@ -1,5 +1,6 @@
 import type { Topic } from '../../content/types'
 import { regions, topicsById, orderedTopicsInRegion } from '../../content/catalog'
+import { BOSS_N, bosses, LESSON_N, learningRegions, PLAYBOOK_ID, unitOf } from '../../content/numbering'
 
 export type TopicStatus = 'locked' | 'available' | 'in_progress' | 'completed'
 
@@ -23,54 +24,33 @@ export function isTopicUnlocked(topicId: number, unlockedIds: number[]): boolean
   return devUnlockAll() || unlockedIds.includes(topicId)
 }
 
-export function getUnlockHint(topicId: number, completedIds: Set<number>): string {
+export function getUnlockHint(topicId: number, _completedIds: Set<number>): string {
   const topic = topicsById.get(topicId)
   if (!topic) return 'Topic not found.'
+  const unit1Last = orderedTopicsInRegion('r1-foundations').at(-1)
+  // Arena entrance: the playbook opens when Unit 1 is cleared
+  if (topicId === PLAYBOOK_ID) {
+    return `Clear Unit 1 (finish Lesson ${unit1Last ? LESSON_N.get(unit1Last.id) : 3}: ${unit1Last?.title ?? 'the last lesson'}) to open the Architecture Colosseum.`
+  }
+  if (BOSS_N.has(topicId)) {
+    const n = BOSS_N.get(topicId)!
+    if (n === 1) return 'Finish the Interview Playbook to fight Boss 1.'
+    const prevBoss = bosses[n - 2]!
+    return `Defeat Boss ${n - 1} (${prevBoss.title}) to unlock Boss ${n}.`
+  }
   const region = regions.find((r) => r.id === topic.region)
-  if (!region) return 'Complete prerequisites to unlock.'
-
+  if (!region) return 'Complete the previous lesson to unlock this one.'
   const ordered = orderedTopicsInRegion(region.id)
   const idx = ordered.findIndex((t) => t.id === topicId)
-  if (idx <= 0) {
-    const prevRegion = regions.find((r) => r.topicIds.includes(topicId))
-    if (prevRegion) {
-      const regionIndex = regions.indexOf(prevRegion)
-      if (regionIndex > 0) {
-        const prevRegion = regions[regionIndex - 1]
-        if (!prevRegion) return 'Complete earlier topics in this region.'
-        const lastTopic = orderedTopicsInRegion(prevRegion.id).at(-1)
-        if (lastTopic && !completedIds.has(lastTopic.id)) {
-          return `Finish ${lastTopic.title} in ${prevRegion.name} to unlock this region.`
-        }
-      }
-    }
-    return 'Complete earlier topics in this region.'
+  if (idx > 0) {
+    const prev = ordered[idx - 1]!
+    return `Clear Lesson ${LESSON_N.get(prev.id)} (${prev.title}) to unlock Lesson ${LESSON_N.get(topicId)}.`
   }
-  const prev = ordered[idx - 1]
-  if (prev && !completedIds.has(prev.id)) {
-    return `Clear "${prev.title}" (topic ${prev.id}) to unlock this topic.`
-  }
-  if (topic.region === 'boss-arena' && topic.id === 75) {
-    if (!completedIds.has(74)) {
-      return 'Complete Interview Playbook (topic 74) to fight your first boss.'
-    }
-  }
-  if (topic.region === 'boss-arena' && topic.id > 75) {
-    const prevBoss = topicsById.get(topic.id - 1)
-    if (prevBoss && !completedIds.has(prevBoss.id)) {
-      return `Defeat "${prevBoss.title}" (topic ${prevBoss.id}) first.`
-    }
-  }
-  if (topic.prereqIds.length > 0) {
-    const missing = topic.prereqIds.filter((id) => !completedIds.has(id))
-    if (missing.length > 0) {
-      const names = missing
-        .map((id) => topicsById.get(id)?.title ?? `Topic ${id}`)
-        .join(', ')
-      return `Recommended: review ${names} before this boss.`
-    }
-  }
-  return 'Complete the previous topic in sequence.'
+  const unit = unitOf(topicId) ?? 1
+  const prevRegion = learningRegions[unit - 2]
+  const last = prevRegion ? orderedTopicsInRegion(prevRegion.id).at(-1) : undefined
+  if (last) return `Clear Unit ${unit - 1} (finish Lesson ${LESSON_N.get(last.id)}: ${last.title}) to open Unit ${unit}.`
+  return 'Complete the previous lesson to unlock this one.'
 }
 
 export function computeUnlocksAfterClear(
