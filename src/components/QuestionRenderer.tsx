@@ -334,16 +334,21 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
       )}
       {question.type === 'tradeoff' && (
         <div className="space-y-3">
-          <ul className="text-xs text-[var(--color-muted)] list-none space-y-1">
-            {question.constraints.map((c) => (
-              <li key={c} className="before:content-['—'] before:mr-2 before:text-[var(--color-teal)]">{c}</li>
-            ))}
-          </ul>
+          <div className="rounded-md bg-[#0a1624] border border-[var(--color-rail)] p-3">
+            <p className="text-xs text-dim mb-1.5">Constraints</p>
+            <ul className="flex flex-wrap gap-1.5">
+              {question.constraints.map((c) => (
+                <li key={c} className="rounded-full border border-[var(--color-rail)] px-2.5 py-0.5 text-xs text-chalk">{c}</li>
+              ))}
+            </ul>
+          </div>
+          <p className="text-xs text-dim">Choose an approach</p>
           {question.approaches.map((a) => (
-            <label key={a.id} className={`choice-row block p-3 ${(answer as { approachId?: string })?.approachId === a.id ? 'choice-row-selected' : ''}`}>
+            <label key={a.id} className={`choice-row flex gap-3 items-start p-3 ${submitted ? '' : 'cursor-pointer'} ${(answer as { approachId?: string })?.approachId === a.id ? 'choice-row-selected' : ''}`}>
               <input
                 type="radio"
-                name="approach"
+                className="mt-1"
+                name={`approach-${question.id}`}
                 disabled={submitted}
                 checked={(answer as { approachId?: string })?.approachId === a.id}
                 onChange={() =>
@@ -353,20 +358,23 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
                   })
                 }
               />
-              <span className="ml-2 font-semibold text-sm">{a.label}</span>
-              <p className="text-xs text-[var(--color-muted)] ml-6 mt-1">{a.description}</p>
+              <span>
+                <span className="block font-semibold text-sm text-chalk">{a.label}</span>
+                <span className="block text-sm text-dim mt-0.5">{a.description}</span>
+              </span>
             </label>
           ))}
           {hasStructuredTradeoff(question) ? (
             <div className="space-y-2 pt-2 border-t border-[var(--color-line)]">
-              <p className="text-[10px] uppercase tracking-widest text-[var(--color-muted)]">Why (pick all that apply)</p>
+              <p className="text-xs text-dim">Why? Pick every reason that applies</p>
               {question.rationaleOptions.map((opt) => {
                 const ids = (answer as { rationaleIds?: string[] })?.rationaleIds ?? []
                 const checked = ids.includes(opt.id)
                 return (
-                  <label key={opt.id} className={`choice-row flex gap-2 p-2 text-sm ${checked ? 'choice-row-selected' : ''}`}>
+                  <label key={opt.id} className={`choice-row flex gap-2.5 items-start p-2.5 text-sm text-chalk ${submitted ? '' : 'cursor-pointer'} ${checked ? 'choice-row-selected' : ''}`}>
                     <input
                       type="checkbox"
+                      className="mt-0.5"
                       disabled={submitted}
                       checked={checked}
                       onChange={(e) => {
