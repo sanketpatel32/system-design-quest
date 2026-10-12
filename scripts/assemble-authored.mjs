@@ -21,6 +21,26 @@ for (const f of files) {
   topics.push(...chunk)
 }
 
+// Merge deep lessons (scripts/authored/deep/*.json: { "<topicId>": { ...DeepLesson, extraQuestions?: Question[] } })
+const deepDir = join(authoredDir, 'deep')
+let deepCount = 0
+try {
+  for (const f of readdirSync(deepDir).filter((x) => x.endsWith('.json')).sort()) {
+    const chunk = JSON.parse(readFileSync(join(deepDir, f), 'utf8'))
+    for (const [id, entry] of Object.entries(chunk)) {
+      const t = topics.find((x) => x.id === Number(id))
+      if (!t) throw new Error(`${f}: unknown topic ${id}`)
+      const { extraQuestions = [], ...deep } = entry
+      t.deep = deep
+      const have = new Set(t.questions.map((q) => q.id))
+      for (const q of extraQuestions) if (!have.has(q.id)) t.questions.push(q)
+      deepCount += 1
+    }
+  }
+} catch (e) {
+  if (e.code !== 'ENOENT') throw e
+}
+
 topics.sort((a, b) => a.id - b.id)
 writeFileSync(out, JSON.stringify(topics, null, 2))
-console.log(`Assembled ${topics.length} topics from ${files.length} files -> ${out}`)
+console.log(`Assembled ${topics.length} topics from ${files.length} files (+${deepCount} deep lessons) -> ${out}`)
