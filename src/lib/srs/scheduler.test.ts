@@ -17,6 +17,9 @@ describe('SRS scheduler', () => {
   it('resets interval on again', () => {
     const base = { ease: 2.4, intervalDays: 6, dueAt: new Date().toISOString() }
     const next = scheduleNext(base, 'again')
-    expect(next.intervalDays).toBeLessThanOrEqual(1)
+    expect(next.intervalDays).toBe(0)
+    const mins = (new Date(next.dueAt).getTime() - Date.now()) / 60_000
+    expect(mins).toBeGreaterThan(5)
+    expect(mins).toBeLessThanOrEqual(10.1)
   })
 })

@@ -85,3 +85,21 @@ test('bug 5: one numbering scheme and consistent lock messages', async ({ page }
   await page.goto('/topic/back-of-envelope-estimation')
   await expect(page.getByText(/Clear Lesson 1 \(The System Design Interview\) to unlock Lesson 2\./)).toBeVisible()
 })
+
+test('review: Again brings the card back in the same session', async ({ page }) => {
+  await seed(page)
+  await page.goto('/revision')
+  const front = page.locator('.panel p.font-display').first()
+  const first = (await front.textContent())!
+  await page.getByRole('button', { name: 'Show answer' }).click()
+  await expect(page.getByRole('button', { name: /^Again/ })).toContainText('in 10 min')
+  await page.getByRole('button', { name: /^Again/ }).click()
+  await expect(page.getByRole('status')).toContainText('comes back at the end of this session')
+  let seenAgain = false
+  for (let i = 0; i < 30; i++) {
+    if ((await front.textContent()) === first) { seenAgain = true; break }
+    await page.getByRole('button', { name: 'Show answer' }).click()
+    await page.getByRole('button', { name: /^Good/ }).click()
+  }
+  expect(seenAgain).toBe(true)
+})

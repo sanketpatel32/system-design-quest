@@ -6,6 +6,9 @@ export interface SrsState {
   dueAt: string
 }
 
+/** Minutes until a card rated Again is due again */
+export const AGAIN_MINUTES = 10
+
 export function initialSrs(): SrsState {
   const due = new Date()
   return { ease: 2.5, intervalDays: 0, dueAt: due.toISOString() }
@@ -19,9 +22,9 @@ export function scheduleNext(
   let { ease, intervalDays } = state
   switch (rating) {
     case 'again':
-      intervalDays = 1
+      // Relearn: the card comes back in ~10 minutes (and later in the same review session), not tomorrow
       ease = Math.max(1.3, ease - 0.2)
-      break
+      return { ease, intervalDays: 0, dueAt: new Date(now.getTime() + AGAIN_MINUTES * 60_000).toISOString() }
     case 'hard':
       intervalDays = Math.max(1, Math.round(intervalDays * 1.2) || 1)
       ease = Math.max(1.3, ease - 0.05)

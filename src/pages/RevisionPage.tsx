@@ -4,7 +4,7 @@ import { Mascot } from '../components/art/Mascot'
 import { Link } from 'react-router-dom'
 import { allTopics, regions, topicsById } from '../content/catalog'
 import { transitLineColor } from '../lib/design/transitTheme'
-import { isDue, scheduleNext, initialSrs } from '../lib/srs/scheduler'
+import { AGAIN_MINUTES, isDue, scheduleNext, initialSrs } from '../lib/srs/scheduler'
 import { useGameStore } from '../stores/gameStore'
 
 export function RevisionPage() {
@@ -16,6 +16,8 @@ export function RevisionPage() {
   const [filter, setFilter] = useState<string>('all')
   const [flipped, setFlipped] = useState(false)
   const [last, setLast] = useState<{ front: string; rating: string; dueAt: string } | null>(null)
+  /** Cards rated Again this session: they return at the end of the queue (and are due in ~10 minutes anyway) */
+  const [relearn, setRelearn] = useState<string[]>([])
 
   const queue = useMemo(() => {
     const studied = allTopics.filter((t) => unlocked.includes(t.id) || topicProgress[t.id]?.completed)
@@ -27,10 +29,12 @@ export function RevisionPage() {
         state: srs.find((s) => s.topicId === t.id && s.flashcardId === f.id),
       })),
     )
-    return cards
-      .filter((c) => filter === 'all' || c.region === filter)
-      .filter((c) => !c.state || isDue(c.state.dueAt))
-  }, [srs, filter, unlocked, topicProgress])
+    const key = (c: { topicId: number; flashcard: { id: string } }) => `${c.topicId}:${c.flashcard.id}`
+    const inFilter = cards.filter((c) => filter === 'all' || c.region === filter)
+    const due = inFilter.filter((c) => !relearn.includes(key(c)) && (!c.state || isDue(c.state.dueAt)))
+    const again = relearn.map((k) => inFilter.find((c) => key(c) === k)).filter((c): c is (typeof inFilter)[number] => Boolean(c))
+    return [...due, ...again]
+  }, [srs, filter, unlocked, topicProgress, relearn])
 
   const current = queue[0]
 
@@ -55,6 +59,8 @@ export function RevisionPage() {
         ],
       }
     })
+    const k = `${current.topicId}:${current.flashcard.id}`
+    setRelearn((list) => (rating === 'again' ? [...list.filter((x) => x !== k), k] : list.filter((x) => x !== k)))
     setLast({ front: current.flashcard.front, rating, dueAt: next.dueAt })
     setFlipped(false)
     setReviewed((n) => n + 1)
@@ -64,6 +70,7 @@ export function RevisionPage() {
     if (!current) return ''
     const base = current.state ?? { ...initialSrs(), topicId: current.topicId, flashcardId: current.flashcard.id, history: [] }
     const next = scheduleNext({ ease: base.ease, intervalDays: base.intervalDays, dueAt: base.dueAt }, rating)
+    if (rating === 'again') return `in ${AGAIN_MINUTES} min`
     const days = Math.round((new Date(next.dueAt).getTime() - Date.now()) / 86_400_000)
     return days < 1 ? 'today' : days === 1 ? 'in 1 day' : `in ${days} days`
   }
@@ -97,7 +104,9 @@ export function RevisionPage() {
       </div>
       {last && (
         <p className="rounded-2xl bg-[#d7ffb8] px-4 py-2 text-sm font-bold text-[#235c00]" role="status">
-          Next due {new Date(last.dueAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} for the card you rated {last.rating}.
+          {last.rating === 'again'
+            ? `“${last.front}” comes back at the end of this session (due again in ${AGAIN_MINUTES} minutes).`
+            : `Next due ${new Date(last.dueAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} for the card you rated ${last.rating}.`}
         </p>
       )}
       {!current ? (
