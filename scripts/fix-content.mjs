@@ -147,9 +147,17 @@ for (const t of all.filter((t) => t.kind !== 'boss')) {
   t.questions = t.questions.map(shuffleChoices)
 
   if (L?.objectives) t.objectives = L.objectives
+  if (t.objectives?.some((o) => /^Answer: /.test(o))) {
+    const keep = t.objectives.filter((o) => !/^Answer: /.test(o))
+    const extra = t.cards.filter((c) => !/interview lens|recap|summary|say it/i.test(c.title)).map((c) => `Explain ${c.title.charAt(0).toLowerCase()}${c.title.slice(1)}`)
+    t.objectives = keep.length ? keep : extra.slice(0, 2)
+  }
   else if (t.objectives?.some((o) => /with measurable requirements and failure modes/.test(o))) {
     const rest = t.objectives.filter((o) => !/with measurable requirements and failure modes/.test(o))
-    t.objectives = [...rest, ...t.flashcards.slice(0, 2).map((f) => `Answer: ${f.front.replace(/\?$/, '')}?`)]
+    const qs = t.flashcards.map((f) => f.front.replace(/\?$/, '')).filter((f) => /^(what|how|why|when|which|where)\b/i.test(f))
+    const asObj = qs.map((f) => `Explain ${f.charAt(0).toLowerCase()}${f.slice(1)}`)
+    const fromCards = t.cards.filter((c) => !/interview lens|recap|summary/i.test(c.title)).map((c) => `Explain ${c.title.charAt(0).toLowerCase()}${c.title.slice(1)}`)
+    t.objectives = [...rest, ...[...asObj, ...fromCards].slice(0, 3 - Math.min(rest.length, 1))]
   }
 }
 
