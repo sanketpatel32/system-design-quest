@@ -27,6 +27,7 @@ export function QuizPage() {
     attemptKey ? s.quizAttempts[attemptKey] : undefined,
   ) ?? { hearts: INITIAL_HEARTS, answers: {}, results: {} as Record<string, boolean>, completed: false }
   const prefs = useGameStore((s) => s.preferences)
+  const lessonViewed = useGameStore((s) => (topicId ? Boolean(s.lessonProgress[topicId]?.viewed) : false))
   const streak = useStreak()
 
   const [index, setIndex] = useState<number | null>(null)
@@ -220,7 +221,7 @@ export function QuizPage() {
         )
       ) : (
         <>
-          {answeredCount === 0 && !alreadyCleared && !skipLessonHint && (
+          {answeredCount === 0 && !alreadyCleared && !lessonViewed && !skipLessonHint && (
             <div className="panel mb-5 flex flex-wrap items-center gap-3 p-3 text-sm" data-testid="lesson-first">
               <span className="flex-1 font-bold text-chalk">New to this topic? The short lesson comes first and makes this quiz much easier.</span>
               <Link to={`/topic/${topic.slug}`} className="btn-cta !min-h-[40px]">Read the lesson</Link>

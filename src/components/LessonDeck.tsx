@@ -21,13 +21,22 @@ export function LessonDeck({
   cards,
   accent = 'var(--color-amber)',
   finalAction,
+  initialIndex = 0,
+  onIndexChange,
 }: {
   cards: LessonCard[]
   accent?: string
   /** Rendered instead of the Next button on the last card */
   finalAction?: ReactNode
+  /** Card to open on (resume) */
+  initialIndex?: number
+  onIndexChange?: (index: number) => void
 }) {
-  const [index, setIndex] = useState(0)
+  const [index, setIndex] = useState(() => Math.min(Math.max(0, initialIndex), Math.max(0, cards.length - 1)))
+  useEffect(() => {
+    onIndexChange?.(index)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index])
   const card = cards[index]
 
   const next = useCallback(() => setIndex((i) => Math.min(cards.length - 1, i + 1)), [cards.length])

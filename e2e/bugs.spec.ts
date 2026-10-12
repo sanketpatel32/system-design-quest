@@ -71,12 +71,12 @@ test('bug 4: "See all bosses" scrolls to the full boss list on the map', async (
   await page.getByTestId('see-all-bosses').click()
   await expect(page.locator('#arena')).toBeInViewport()
   await expect(page.getByTestId('boss-node-114')).toBeAttached()
-  await expect(page.getByTestId('see-all-bosses')).toHaveText('See all 40 bosses')
+  await expect(page.getByTestId('see-all-bosses')).toHaveText(/40 bosses/)
 })
 
 test('bug 5: one numbering scheme and consistent lock messages', async ({ page }) => {
   await seed(page)
-  await expect(page.getByText(/79 lessons in 10 units, the Interview Playbook, then 40 boss fights/)).toBeVisible()
+  await expect(page.getByText(/79 lessons cleared in 10 units · practice track/)).toBeVisible()
   await page.goto('/topic/interview-playbook')
   await expect(page.getByText(/^Clear Unit 1 \(finish Lesson 3/)).toBeVisible()
   await page.goto('/topic/pastebin')

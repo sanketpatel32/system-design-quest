@@ -39,6 +39,13 @@ export function migrateState(raw: unknown): PersistedState {
   if (!Array.isArray(state.unlockedTopicIds)) {
     state.unlockedTopicIds = [1]
   }
+  // Unit 10 used to open only after the last boss; it follows Unit 9 (bosses are a parallel track)
+  if (isRecord(state.topicProgress) && (state.topicProgress as Record<string, { completed?: boolean }>)[73]?.completed && !state.unlockedTopicIds.includes(115)) {
+    state.unlockedTopicIds = [...state.unlockedTopicIds, 115]
+  }
+  if (!isRecord(state.lessonProgress)) {
+    state.lessonProgress = {}
+  }
   if (typeof state.xp !== 'number' || Number.isNaN(state.xp)) {
     state.xp = 0
   }

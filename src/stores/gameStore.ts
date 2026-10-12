@@ -22,6 +22,8 @@ interface GameStore extends PersistedState {
   markBossSubmission: (bossId: number, score: number, breakdown: Record<string, number>) => void
   saveBossDraft: (bossId: number, draft: PersistedState['bossProgress']['drafts'][number]) => void
   recordActivity: () => void
+  /** Remember the card the learner is on; reaching the last card marks the lesson as read */
+  recordLessonCard: (topicId: number, card: number, total: number) => void
   setPreferences: (p: Partial<PersistedState['preferences']>) => void
   exportProgress: () => string
   importProgress: (json: string) => Promise<void>
@@ -215,6 +217,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
         ...s.bossProgress,
         drafts: { ...s.bossProgress.drafts, [bossId]: draft },
       },
+    }))
+    void saveState(get())
+  },
+
+  recordLessonCard(topicId, card, total) {
+    const prev = get().lessonProgress[topicId]
+    const viewed = Boolean(prev?.viewed) || card >= total - 1
+    if (prev && prev.card === card && prev.viewed === viewed) return
+    set((s) => ({
+      lessonProgress: { ...s.lessonProgress, [topicId]: { card, viewed, updatedAt: new Date().toISOString() } },
     }))
     void saveState(get())
   },

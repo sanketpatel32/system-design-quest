@@ -96,7 +96,7 @@ export function RevisionPage() {
           <select className="field mt-1 block min-w-[240px]" value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="all">All units</option>
             {regions.filter((r) => r.id !== 'boss-arena').map((r) => (
-              <option key={r.id} value={r.id}>{r.subtitle}</option>
+              <option key={r.id} value={r.id}>{r.name}</option>
             ))}
           </select>
         </label>
