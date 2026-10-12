@@ -1,0 +1,778 @@
+{
+ "115": {
+  "teaches": [
+   "clarify-flow",
+   "functional",
+   "nonfunctional",
+   "assumptions",
+   "anchors"
+  ],
+  "mechanism": {
+   "title": "The first five minutes, step by step",
+   "steps": [
+    "Restate the problem in one sentence to confirm scope: 'A service where riders request autos and nearby drivers accept, in one country, mobile apps only.'",
+    "Functional requirements: list 3–5 core user actions and agree which are in scope (request ride, match driver, track trip, pay) and which are out (ratings, scheduled rides, chat).",
+    "Non-functional requirements: ask for scale (daily active users, peak factor), latency targets, availability, consistency needs per feature, durability, and regional or regulatory constraints.",
+    "Write explicit assumptions where the interviewer has no preference: '10 million DAU, peak 3× average, 99.9% availability, match within 5 seconds at p99.'",
+    "Turn assumptions into anchor numbers you will reuse: requests per second, storage per year, bandwidth. Do the arithmetic aloud and round sensibly.",
+    "Confirm priorities: 'I'll focus on matching and location updates, and treat payments as a black box unless you want me to go there.'"
+   ]
+  },
+  "useWhen": [
+   "Always, in the first few minutes, before drawing any boxes.",
+   "Again whenever the interviewer adds a twist ('now make it work offline'): restate the changed requirement before redesigning."
+  ],
+  "avoidWhen": [
+   "Do not spend more than about five to eight minutes of a 45-minute interview on requirements; move on with stated assumptions.",
+   "Do not ask questions you will not use; every number you gather should change a design decision."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Question type",
+    "Example",
+    "Design decision it drives"
+   ],
+   "rows": [
+    [
+     "Scale",
+     "How many daily users? Peak factor?",
+     "Sharding, caching, number of servers"
+    ],
+    [
+     "Latency",
+     "How fast must a match feel?",
+     "In-memory geo index, async work"
+    ],
+    [
+     "Consistency",
+     "Can two drivers accept one ride?",
+     "Conditional writes or locks on the ride"
+    ],
+    [
+     "Availability",
+     "What if a region fails?",
+     "Multi-zone, failover strategy"
+    ],
+    [
+     "Scope",
+     "Payments in scope?",
+     "Whether to design a ledger"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Turning assumptions into anchor numbers",
+   "assumptions": [
+    "10 million DAU; each user makes 2 ride requests per day",
+    "Peak factor 3×"
+   ],
+   "steps": [
+    "Requests per day = 10,000,000 × 2 = 20,000,000.",
+    "Average per second = 20,000,000 ÷ 86,400 ≈ 231.",
+    "Peak per second = 231 × 3 = 693, call it about 700.",
+    "Driver location pings: 500,000 online drivers every 4 seconds gives 500,000 ÷ 4 = 125,000 writes per second, far larger than ride requests, so location ingestion is the scaling hot spot."
+   ],
+   "result": "Anchor numbers show that location pings, not ride requests, dominate load, which tells you where to spend the deep dive."
+  },
+  "india": {
+   "title": "Clarifying a 'design an IRCTC-like booking system' prompt",
+   "label": "Illustrative estimate",
+   "body": "If asked to design a train-booking system for India, strong candidates first separate normal booking from the Tatkal window, when demand spikes sharply at the opening minute. They ask whether the focus is search, seat inventory or payments, whether waitlist and RAC (reservation against cancellation) rules are in scope, and what consistency is required: a berth must never be sold twice, so seat allocation is strongly consistent while availability displays can be slightly stale. Stating 'I'll assume a burst of a few lakh booking attempts in the first minute, an illustrative estimate' lets them size queues and inventory locks instead of guessing later."
+  },
+  "pitfalls": [
+   {
+    "trap": "Jumping straight to drawing a load balancer and a database.",
+    "say": "'Before designing, let me confirm the core features and the scale, so I size the right parts.'"
+   },
+   {
+    "trap": "Collecting numbers and never using them.",
+    "say": "'At about 700 peak ride requests per second but 125,000 location writes per second, I'll focus the design on location ingestion.'"
+   }
+  ],
+  "takeaways": [
+   "Clarify scope before drawing anything.",
+   "Ask only questions that change design decisions.",
+   "Write assumptions down and turn them into anchor numbers.",
+   "Use the numbers to choose where to deep-dive."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t115-d1",
+    "type": "multiple_choice",
+    "concept": "anchors",
+    "prompt": "10 million DAU each make 2 requests a day with a 3× peak factor. What is the approximate peak request rate?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "About 700 per second"
+     },
+     {
+      "id": "b",
+      "label": "About 230 per second"
+     },
+     {
+      "id": "c",
+      "label": "About 20,000 per second"
+     },
+     {
+      "id": "d",
+      "label": "About 70 per second"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "20,000,000 ÷ 86,400 ≈ 231 per second on average; × 3 ≈ 693 at peak."
+   }
+  ],
+  "diagram": "restate -> functional (in/out) -> non-functional (scale, latency, consistency, availability)\n -> assumptions -> anchor numbers -> agreed focus"
+ },
+ "116": {
+  "teaches": [
+   "dive-flow",
+   "pick-dive",
+   "tradeoff-template",
+   "absolutes"
+  ],
+  "mechanism": {
+   "title": "Running a deep dive",
+   "steps": [
+    "Pick the component where the requirements are hardest: the hot path at peak, the strongest consistency need, or the biggest data volume. Say why you picked it.",
+    "State the problem precisely: 'Two drivers can accept the same ride within milliseconds; we must allow exactly one.'",
+    "Offer two or three options, each in one sentence.",
+    "Compare with the trade-off template: 'Option A gives X at the cost of Y; option B gives Y but costs Z. Given our requirement W, I choose A.'",
+    "Go one level deeper on the chosen option: data model, the exact query or write, failure cases, and the numbers it must handle.",
+    "Close the loop: name what would make you switch options later (for example, 'if accepts exceed 10,000 per second on one city partition, I'd split by zone')."
+   ]
+  },
+  "useWhen": [
+   "Whenever you choose a technology or pattern, and whenever the interviewer asks 'why not X?'.",
+   "On the one or two components that carry the most risk; depth beats breadth."
+  ],
+  "avoidWhen": [
+   "Do not deep-dive into something generic, like the load balancer algorithm, while the hard problem (matching, consistency) stays vague.",
+   "Do not use absolutes such as 'always use Kafka' or 'NoSQL is faster'; tie every claim to a requirement."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Phrase to avoid",
+    "Better phrasing"
+   ],
+   "rows": [
+    [
+     "'X is the best'",
+     "'X fits because we need ...; the cost is ...'"
+    ],
+    [
+     "'It scales infinitely'",
+     "'It scales to about N per second per node; we need M, so about M ÷ N nodes'"
+    ],
+    [
+     "'We'll just use a cache'",
+     "'Cache menus for 5 minutes, invalidate on edit; prices at checkout from the database'"
+    ],
+    [
+     "'Strong consistency everywhere'",
+     "'Strong for ride acceptance, eventual for driver locations shown on the map'"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Comparing two options with numbers",
+   "assumptions": [
+    "Ride accept rate at peak 700 per second across a city",
+    "Option A: conditional update on the ride row in Postgres, about 2 ms each",
+    "Option B: a Redis lock per ride, about 0.5 ms each plus lock expiry handling"
+   ],
+   "steps": [
+    "Option A load: 700 writes per second, each touching one row, which one Postgres primary handles comfortably.",
+    "Total busy time for option A = 700 × 2 ms = 1,400 ms of work per second, spread over many connections and cores.",
+    "Option B is faster per call but adds a second system whose failover can drop locks, plus a lease to manage.",
+    "Since option A meets the load with the source of truth, choose A and mention B only if accepts grow 10× or more."
+   ],
+   "result": "Use numbers to show the simpler option is enough, and name the threshold at which you would switch."
+  },
+  "india": {
+   "title": "Deep dive on Tatkal seat allocation",
+   "label": "Illustrative estimate",
+   "body": "In a train-booking interview, the right deep dive is seat allocation during the Tatkal opening, not the search page. A good answer compares a queue in front of the inventory service (fair and smooth, but adds waiting time), conditional decrements per train-class-date row (simple and strongly consistent, but one hot row per popular train), and pre-splitting a train's quota into several counters (more parallelism, slightly more complex rebalancing). The candidate then picks, for example, a queue plus conditional decrements, explains the failure cases (payment fails, hold expires and the seat returns), and states the illustrative load the design must take."
+  },
+  "pitfalls": [
+   {
+    "trap": "'Cassandra is better than Postgres.'",
+    "say": "'For ride acceptance we need a conditional write on one row; Postgres does that at 700 per second easily, so I'd keep it there.'"
+   },
+   {
+    "trap": "Diving into a generic component.",
+    "say": "'The hard part here is double acceptance, so I'll go deep on that rather than load-balancer algorithms.'"
+   }
+  ],
+  "takeaways": [
+   "Deep-dive where the requirements are hardest.",
+   "Use 'X gives A at the cost of B; given W, I choose X'.",
+   "Replace absolutes with numbers and requirements.",
+   "Say what would make you change your mind."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t116-d1",
+    "type": "multiple_choice",
+    "concept": "tradeoff-template",
+    "prompt": "Which statement best follows the trade-off template?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "'A conditional update in Postgres gives exactly-once acceptance at the cost of a hot row; at 700/s that is fine, so I choose it'"
+     },
+     {
+      "id": "b",
+      "label": "'Postgres is the best database'"
+     },
+     {
+      "id": "c",
+      "label": "'Redis scales infinitely'"
+     },
+     {
+      "id": "d",
+      "label": "'We should always use microservices'"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "It names the benefit, the cost, the requirement and the decision, with a number to back it."
+   }
+  ],
+  "diagram": "pick hardest part -> state problem -> 2-3 options -> trade-off template -> deeper on choice -> 'switch if ...'"
+ },
+ "117": {
+  "teaches": [
+   "no-scope",
+   "overeng",
+   "unused-numbers",
+   "silence",
+   "recover"
+  ],
+  "mechanism": {
+   "title": "How common mistakes unfold, and how to catch them",
+   "steps": [
+    "No scope: the candidate starts drawing before agreeing on features and scale, then designs the wrong thing for 20 minutes.",
+    "Over-engineering: Kafka, microservices, multi-region active-active and a service mesh for a system with 50 requests per second.",
+    "Unused numbers: the estimate says 2 TB per year, then the design ignores it (or contradicts it by sharding across 100 nodes).",
+    "Silence: long stretches of thinking without speaking, so the interviewer cannot follow or help.",
+    "Ignoring hints: the interviewer asks 'what if two users book the same seat?' and the candidate moves on.",
+    "Recovery: when you notice any of these, say so plainly ('I over-built this; at 50 requests per second one service and Postgres are enough'), simplify and continue. Correcting yourself is a positive signal."
+   ]
+  },
+  "useWhen": [
+   "Use this list as a self-check every ten minutes: scope agreed? numbers used? speaking aloud? following hints?",
+   "Use the recovery script whenever you realise you are off track."
+  ],
+  "avoidWhen": [
+   "Do not hide a mistake and hope the interviewer misses it; they almost never do.",
+   "Do not overcorrect into designing nothing; keep a working end-to-end design on the board."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Mistake",
+    "Symptom",
+    "Fix"
+   ],
+   "rows": [
+    [
+     "No scope",
+     "Designing features nobody asked for",
+     "Restate and agree core features first"
+    ],
+    [
+     "Over-engineering",
+     "Many components, low traffic",
+     "Match components to anchor numbers"
+    ],
+    [
+     "Unused numbers",
+     "Estimates never referenced",
+     "Tie each component to a number"
+    ],
+    [
+     "Silence",
+     "Interviewer waits, then interrupts",
+     "Narrate the options you are weighing"
+    ],
+    [
+     "Ignoring hints",
+     "Interviewer repeats a question",
+     "Treat a repeated question as the priority"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Is Kafka justified here?",
+   "assumptions": [
+    "Internal tool: 5,000 users, each creating 20 events per day",
+    "Kafka cluster minimum: 3 brokers, plus operations effort"
+   ],
+   "steps": [
+    "Events per day = 5,000 × 20 = 100,000.",
+    "Average per second = 100,000 ÷ 86,400 ≈ 1.2.",
+    "Even at a 10× peak that is about 12 events per second, which a Postgres table or a simple managed queue handles easily.",
+    "A three-broker Kafka cluster adds cost and on-call load for no benefit at this scale."
+   ],
+   "result": "About 1 event per second does not need Kafka; matching tools to numbers is the cure for over-engineering."
+  },
+  "india": {
+   "title": "Over-building a college fest ticketing app",
+   "label": "Illustrative estimate",
+   "body": "A candidate asked to design ticketing for a college fest in Kolkata, about 20,000 tickets sold over two weeks, proposes Kubernetes, Kafka, Cassandra and multi-region failover. The interviewer asks for the numbers: 20,000 tickets over 14 days is about 1,430 a day, and even if a quarter sell in the first hour, that is about 5,000 in an hour, around 1.4 per second. The strong recovery is: 'I over-built this. A single web app with Postgres, a unique constraint on seat ids, a payment gateway webhook and a CDN for the poster is enough; I'd add a queue only if launch traffic proves bursty.'"
+  },
+  "pitfalls": [
+   {
+    "trap": "Defending an over-built design when challenged.",
+    "say": "'You're right, at about 1.4 tickets per second this is over-built; let me simplify to one service and Postgres.'"
+   },
+   {
+    "trap": "Ignoring a repeated question from the interviewer.",
+    "say": "'You've asked about double booking twice, so let me address it now: a unique constraint on (show_id, seat_id) makes the second booking fail cleanly.'"
+   },
+   {
+    "trap": "Long silent thinking.",
+    "say": "'I'm weighing a queue against direct writes; the queue smooths bursts but adds latency. Given our numbers, direct writes are fine.'"
+   }
+  ],
+  "takeaways": [
+   "Agree scope before designing.",
+   "Match every component to a number.",
+   "Think aloud; silence hides good reasoning.",
+   "Recover openly; self-correction is a strength."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t117-d1",
+    "type": "multiple_choice",
+    "concept": "overeng",
+    "prompt": "A system handles about 1–12 events per second. A candidate proposes a three-broker Kafka cluster. What is the best feedback?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "It is over-engineered; a database table or simple managed queue is enough at this rate"
+     },
+     {
+      "id": "b",
+      "label": "It is required for any event-driven system"
+     },
+     {
+      "id": "c",
+      "label": "It should use five brokers instead"
+     },
+     {
+      "id": "d",
+      "label": "It is fine because Kafka is popular"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Components should match the anchor numbers; at about 1 event per second Kafka adds cost without benefit."
+   }
+  ],
+  "diagram": "every ~10 min: scope agreed? -> numbers used? -> talking aloud? -> hints followed?\n off track -> name it -> simplify -> continue"
+ },
+ "118": {
+  "teaches": [
+   "narrate",
+   "collaborate",
+   "evolve"
+  ],
+  "mechanism": {
+   "title": "A communication rhythm for a 45-minute design interview",
+   "steps": [
+    "Minutes 0–5: requirements and assumptions, spoken and written down.",
+    "Minutes 5–10: estimates and the API (key endpoints with request and response shapes).",
+    "Minutes 10–20: a simple end-to-end design that works for the core flow, narrating each box: what it does and why it exists.",
+    "Minutes 20–35: evolve the design under the numbers: add caching, sharding, queues or replicas one at a time, each tied to a requirement; check in with the interviewer about which area to go deep on.",
+    "Minutes 35–42: failure modes and trade-offs: what breaks, how you detect it, and what you would monitor.",
+    "Minutes 42–45: summarise the design, the main trade-offs and what you would do next with more time."
+   ]
+  },
+  "useWhen": [
+   "Narrate continuously: options, the choice, and the reason.",
+   "Collaborate: ask 'shall I go deeper on matching or on payments?' at natural checkpoints, and use the interviewer's hints."
+  ],
+  "avoidWhen": [
+   "Do not monologue for 15 minutes without checking in.",
+   "Do not present a final complex design in one go; evolve from simple to scaled so each addition is justified."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Behaviour",
+    "Weak signal",
+    "Strong signal"
+   ],
+   "rows": [
+    [
+     "Starting",
+     "Draws boxes silently",
+     "Restates the problem, asks scoped questions"
+    ],
+    [
+     "Choosing",
+     "'We'll use Redis'",
+     "'Redis for sessions because ...; cost is ...'"
+    ],
+    [
+     "Hints",
+     "Ignores or argues",
+     "Acknowledges, adapts, explains"
+    ],
+    [
+     "Evolving",
+     "Final architecture at once",
+     "Simple first, then scaled step by step"
+    ],
+    [
+     "Ending",
+     "Runs out of time mid-sentence",
+     "Summarises trade-offs and next steps"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Budgeting the 45 minutes",
+   "assumptions": [
+    "45-minute interview",
+    "Target split: 10% requirements, 10% estimates and API, 25% simple design, 35% evolution and deep dive, 15% failures, 5% summary"
+   ],
+   "steps": [
+    "Requirements: 45 × 0.1 = 4.5 minutes.",
+    "Estimates and API: 4.5 minutes; simple design: 45 × 0.25 = 11.25 minutes.",
+    "Evolution and deep dive: 45 × 0.35 = 15.75 minutes.",
+    "Failures: 45 × 0.15 = 6.75 minutes; summary: 45 × 0.05 = 2.25 minutes, which adds up to 45."
+   ],
+   "result": "The deep dive gets the largest single block, about 16 minutes; protect it by keeping requirements under 5."
+  },
+  "india": {
+   "title": "A food-delivery design interview, narrated",
+   "label": "Illustrative estimate",
+   "body": "Asked to design a Zomato- or Swiggy-style ordering flow, a strong candidate says: 'I'll start with one order service and Postgres so the core flow works: browse menu, place order, pay, track. At about 1,000 orders per second at dinner peak, an illustrative estimate, Postgres handles writes, so first I'll cache menus, since they are read about a hundred times per order. Shall I go deeper on rider assignment or on payment consistency?' The interviewer picks rider assignment, and the candidate evolves the design there, keeping the rest simple. Each step is spoken, justified and checked."
+  },
+  "pitfalls": [
+   {
+    "trap": "Silent drawing for several minutes.",
+    "say": "'I'm adding a cache in front of menus because they're read about a hundred times per order and change rarely.'"
+   },
+   {
+    "trap": "Running out of time before failures and a summary.",
+    "say": "'We have about eight minutes left, so let me cover what breaks and how we detect it, then summarise the trade-offs.'"
+   },
+   {
+    "trap": "Using jargon without explaining the choice.",
+    "say": "'I'll use an outbox here, which means the order and its event commit in one transaction, so no event is lost if we crash.'"
+   },
+   {
+    "trap": "Arguing with a hint.",
+    "say": "'Good point about duplicate payments; I'll add an idempotency key on the payment request.'"
+   }
+  ],
+  "takeaways": [
+   "Think aloud: options, choice, reason.",
+   "Check in at natural points and use hints.",
+   "Start simple, then evolve under the numbers.",
+   "Keep time for failures and a summary."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t118-d1",
+    "type": "multiple_choice",
+    "concept": "evolve",
+    "prompt": "Why present a simple working design before adding caches, shards and queues?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Each addition can then be justified by a requirement or number"
+     },
+     {
+      "id": "b",
+      "label": "Interviewers prefer small diagrams"
+     },
+     {
+      "id": "c",
+      "label": "Complex designs are always wrong"
+     },
+     {
+      "id": "d",
+      "label": "It avoids discussing trade-offs"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Evolving step by step shows why each component exists rather than presenting an unexplained final picture."
+   }
+  ],
+  "diagram": "0-5 reqs | 5-10 estimates + API | 10-20 simple design | 20-35 evolve + deep dive | 35-42 failures | 42-45 summary"
+ },
+ "119": {
+  "teaches": [
+   "latency",
+   "powers",
+   "sizing"
+  ],
+  "mechanism": {
+   "title": "Estimating with the cheat sheet, step by step",
+   "steps": [
+    "Memorise rough latency orders: L1 cache about 1 ns; main memory about 100 ns; SSD random read about 100 µs; same-zone network round trip about 0.5 ms; disk seek about 10 ms; cross-continent round trip about 150 ms. These are order-of-magnitude figures, not exact.",
+    "Memorise powers of two and ten: 2 to the power 10 ≈ 1 thousand, 2 to the power 20 ≈ 1 million, 2 to the power 30 ≈ 1 billion, 2 to the power 40 ≈ 1 trillion.",
+    "Memorise the day: 86,400 seconds, so 1 million requests per day is about 12 per second, and 1 billion per day is about 11,600 per second.",
+    "Estimate requests per second: daily actions ÷ 86,400, then multiply by a peak factor (2–5×).",
+    "Estimate storage: items per day × bytes per item × retention days × replication factor.",
+    "Estimate servers: peak requests per second ÷ requests one server handles (measure or assume, for example 1,000–5,000 simple requests per second), plus headroom for failures."
+   ]
+  },
+  "useWhen": [
+   "Any time a design choice depends on scale: caching, sharding, number of servers, bandwidth, storage tier.",
+   "Sanity checks: if an estimate says one server handles everything, do not shard; if it says petabytes, do not use one database."
+  ],
+  "avoidWhen": [
+   "Do not chase precision; one significant figure is enough.",
+   "Do not quote latency figures as exact facts about specific hardware; say 'roughly' and use them for orders of magnitude."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Operation",
+    "Rough latency",
+    "Relative to memory read"
+   ],
+   "rows": [
+    [
+     "Main memory reference",
+     "~100 ns",
+     "1×"
+    ],
+    [
+     "SSD random read",
+     "~100 µs",
+     "~1,000×"
+    ],
+    [
+     "Same-datacentre round trip",
+     "~0.5 ms",
+     "~5,000×"
+    ],
+    [
+     "Disk seek",
+     "~10 ms",
+     "~100,000×"
+    ],
+    [
+     "India to US round trip",
+     "~200–250 ms",
+     "~2,000,000×"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Sizing photo storage for a social app",
+   "assumptions": [
+    "5 million photos uploaded per day",
+    "Average 500 KB after compression; keep 3 sizes adding 50% more",
+    "Replication or erasure-coding overhead 1.5×; keep 5 years"
+   ],
+   "steps": [
+    "Bytes per photo with sizes = 500 KB × 1.5 = 750 KB.",
+    "Per day = 5,000,000 × 750 KB = 3,750,000,000 KB, which is about 3.75 TB.",
+    "Per year = 3.75 TB × 365 ≈ 1,369 TB, about 1.4 PB.",
+    "Five years with 1.5× storage overhead = 1.4 PB × 5 × 1.5 ≈ 10.5 PB, which points to object storage rather than any database."
+   ],
+   "result": "About 10 PB over five years: the estimate itself decides the storage tier."
+  },
+  "india": {
+   "title": "Latency from Indian users to servers",
+   "label": "Illustrative estimate",
+   "body": "A user in Chennai calling an API hosted in a US region pays a round trip of roughly 200–250 ms before any server work, and a page needing four sequential calls pays that four times, about a second. Hosting in an Indian cloud region (Mumbai, Hyderabad or Chennai offerings exist from major providers) cuts round trips to tens of milliseconds for most Indian users. That is why Indian consumer apps keep latency-sensitive APIs in India and push static assets to CDN edges in many Indian cities. These latency numbers are typical orders of magnitude, not measurements of a specific network."
+  },
+  "pitfalls": [
+   {
+    "trap": "Spending minutes on exact arithmetic.",
+    "say": "'Roughly 20 million a day is about 230 per second; with 3× peak, about 700.'"
+   },
+   {
+    "trap": "Never using the cheat sheet in decisions.",
+    "say": "'A same-zone round trip is about 0.5 ms, so five sequential service calls add only a few milliseconds; cross-region calls would add hundreds.'"
+   }
+  ],
+  "takeaways": [
+   "Know latency orders of magnitude from nanoseconds to hundreds of milliseconds.",
+   "Divide daily counts by 86,400, then apply a peak factor.",
+   "Storage = items × size × retention × replication.",
+   "Round to one significant figure and let the result pick the architecture."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t119-d1",
+    "type": "multiple_choice",
+    "concept": "sizing",
+    "prompt": "About how many requests per second is 1 billion requests per day on average?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "About 11,600"
+     },
+     {
+      "id": "b",
+      "label": "About 1,160"
+     },
+     {
+      "id": "c",
+      "label": "About 116,000"
+     },
+     {
+      "id": "d",
+      "label": "About 86,400"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "1,000,000,000 ÷ 86,400 ≈ 11,574, roughly 11,600 per second before any peak factor."
+   }
+  ],
+  "diagram": "ns: L1 (1) -> RAM (100)\nµs: SSD read (100)\nms: zone RTT (0.5) -> disk seek (10) -> India-US RTT (~200+)\n day = 86,400 s | 1M/day ≈ 12/s | 1B/day ≈ 11,600/s"
+ },
+ "120": {
+  "teaches": [
+   "read-heavy",
+   "write-heavy",
+   "realtime",
+   "correctness",
+   "search-geo"
+  ],
+  "mechanism": {
+   "title": "Mapping a requirement to a pattern",
+   "steps": [
+    "Read-heavy (reads much greater than writes): cache-aside with Redis, a CDN for static and cacheable responses, read replicas, and denormalised read models.",
+    "Write-heavy (high ingest): append-only logs (Kafka), LSM-based stores (Cassandra), batching, partitioning by a high-cardinality key, and asynchronous processing.",
+    "Real-time updates to clients: WebSockets or server-sent events for push, pub/sub to fan out, presence in memory with TTLs.",
+    "Correctness under concurrency (money, inventory, bookings): ACID transactions, conditional writes, unique constraints, idempotency keys, outbox for events, sagas across services.",
+    "Search and location: inverted index (Elasticsearch) for text, geohash or H3 cells for nearby queries, kept in sync from the source of truth by CDC.",
+    "Analytics: CDC into a warehouse or lake with columnar storage; stream processing for second-level dashboards."
+   ]
+  },
+  "useWhen": [
+   "Use the map to propose a first design quickly once requirements are clear.",
+   "Combine patterns per feature: one product can be read-heavy in the catalogue and correctness-critical at checkout."
+  ],
+  "avoidWhen": [
+   "Do not apply a pattern just because the system 'sounds like' one category; check the numbers.",
+   "Do not use one pattern for every feature; the cache that helps the catalogue would harm the wallet balance."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Requirement",
+    "Pattern",
+    "Example component"
+   ],
+   "rows": [
+    [
+     "Read-heavy",
+     "Cache, CDN, replicas",
+     "Redis, CloudFront, Postgres replicas"
+    ],
+    [
+     "Write-heavy",
+     "Log, LSM store, partitioning",
+     "Kafka, Cassandra"
+    ],
+    [
+     "Real-time",
+     "Push channels, pub/sub",
+     "WebSockets, Redis pub/sub"
+    ],
+    [
+     "Correctness",
+     "Transactions, idempotency, outbox",
+     "Postgres, unique constraints"
+    ],
+    [
+     "Search / geo",
+     "Inverted index, geo cells",
+     "Elasticsearch, H3 or geohash"
+    ],
+    [
+     "Analytics",
+     "CDC, columnar warehouse",
+     "Debezium, BigQuery, ClickHouse"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Classifying a feature by its numbers",
+   "assumptions": [
+    "Product page: 50,000 reads per second, 50 writes per second",
+    "Rider location: 125,000 writes per second, 10,000 reads per second"
+   ],
+   "steps": [
+    "Product page read-to-write ratio = 50,000 ÷ 50 = 1,000 to 1, so it is read-heavy: cache plus CDN.",
+    "Rider location write-to-read ratio = 125,000 ÷ 10,000 = 12.5 to 1, so it is write-heavy: in-memory geo store, partitioned by city, with short TTLs.",
+    "The two features in the same app need opposite patterns.",
+    "Checkout, at a few hundred writes per second, is correctness-first: transactions and idempotency keys rather than caches."
+   ],
+   "result": "Ratios, not product names, decide patterns: 1,000 to 1 reads means cache; 12.5 to 1 writes means an ingest-optimised store."
+  },
+  "india": {
+   "title": "One quick-commerce app, four patterns",
+   "label": "Illustrative estimate",
+   "body": "A 10-minute grocery app in India shows all four families at once. The catalogue is read-heavy, served from a cache and CDN images. Rider and order-tracking updates are real-time, pushed to the customer's phone over a persistent connection. Stock reservation at each dark store is correctness-critical, using conditional decrements and idempotent order creation so that the last packet of milk is not sold twice. Product search uses an inverted index with Hinglish synonyms, filtered by the customer's nearest dark store using geo cells. Naming the requirement first, then the pattern, then the component, is what interviewers want to hear."
+  },
+  "pitfalls": [
+   {
+    "trap": "Putting a cache on everything.",
+    "say": "'The catalogue is read-heavy, so it's cached; stock reservation must be exact, so it goes to the database with a conditional write.'"
+   },
+   {
+    "trap": "Forgetting that one product mixes patterns.",
+    "say": "'The same app is read-heavy in the catalogue and correctness-critical at checkout, so I design those two paths differently.'"
+   },
+   {
+    "trap": "Naming tools without the requirement.",
+    "say": "'Because location updates are write-heavy at about 125,000 per second, I'd use a partitioned in-memory geo store rather than a relational table.'"
+   }
+  ],
+  "takeaways": [
+   "Name the requirement, then the pattern, then the component.",
+   "Read-to-write ratios decide caching versus ingest designs.",
+   "Different features of one product need different patterns.",
+   "Correctness-critical paths never rely on caches."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t120-d1",
+    "type": "multiple_choice",
+    "concept": "read-heavy",
+    "prompt": "A product page gets 50,000 reads/s and 50 writes/s. Which pattern fits first?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Cache-aside plus CDN, since reads outnumber writes 1,000 to 1"
+     },
+     {
+      "id": "b",
+      "label": "Kafka for every read"
+     },
+     {
+      "id": "c",
+      "label": "Two-phase commit"
+     },
+     {
+      "id": "d",
+      "label": "A write-optimised LSM store"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "A 1,000 to 1 read-to-write ratio is the classic case for caching."
+   }
+  ],
+  "diagram": "requirement -> pattern -> component\nread-heavy -> cache/CDN -> Redis\nwrite-heavy -> log/LSM -> Kafka/Cassandra\ncorrectness -> txn/idempotency -> Postgres\nreal-time -> push -> WebSockets\nsearch/geo -> index/cells -> Elasticsearch/H3"
+ }
+}
