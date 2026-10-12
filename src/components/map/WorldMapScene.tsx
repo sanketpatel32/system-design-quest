@@ -379,7 +379,7 @@ function Onboarding() {
   }
   return (
     <section className="panel mb-6 p-5" aria-labelledby="onboard-title" data-testid="onboarding">
-      <MascotSays mood="happy" size={88}>
+      <MascotSays mood="happy" size={88} motion="wave">
         <h2 id="onboard-title" className="font-display text-xl text-chalk">Hi, I’m Byte! Here’s how DesignQuest works.</h2>
       </MascotSays>
       <ul className="mt-3 grid gap-3 text-[15px] sm:grid-cols-2">
