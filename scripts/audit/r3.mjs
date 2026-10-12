@@ -70,5 +70,26 @@ export function checkR3(topics, root) {
     info.push(`Card repetition: highest same-topic similarity ${worst.toFixed(2)} (limit ${LIMIT})`)
   }
 
+  // 7. No categorical capacity claims; peak factors are example assumptions; Lesson 2 shows its reasoning
+  {
+    const BANNED = /needs? a sharded|Writes at that rate need|too much for one (Postgres|primary|database)|bandwidth is not the bottleneck|which is impossible|Most systems never need sharding|one machine is often enough below|can serve well over|Peak ≈ 2–10× average|standard peak factor(?! for every system)/i
+    const walk = (o, at, out) => {
+      if (typeof o === 'string') { if (BANNED.test(o)) out.push(at); return }
+      if (o && typeof o === 'object') for (const k of Object.keys(o)) if (k !== 'choices') walk(o[k], `${at}.${k}`, out)
+    }
+    for (const t of topics) {
+      const hits = []
+      walk({ cards: t.cards, deep: t.deep, bossDeep: t.bossDeep, questions: t.questions, flashcards: t.flashcards }, '', hits)
+      for (const h of hits) errors.push(`Topic ${t.id}${h}: categorical claim (state the assumptions and when it holds)`)
+    }
+    const t2 = byId.get(2)
+    const ex = t2.cards.find((c) => c.source === 'deep-numbers')
+    if (!ex || (ex.steps ?? []).length < 4) errors.push('Topic 2: the short cards need one complete worked calculation')
+    else {
+      if (!/relatively modest under these assumptions/.test(ex.note ?? '')) errors.push('Topic 2: bandwidth conclusion must say raw ingress is relatively modest under these assumptions')
+      for (const w of ['fan-out', 'replication', 'protocol overhead', 'media', 'hardware', 'indexes', 'durability', 'batching', 'engine']) if (!(ex.note ?? '').includes(w)) errors.push(`Topic 2: worked example should mention ${w}`)
+    }
+  }
+
   return { errors, info }
 }
