@@ -8,6 +8,8 @@ import { IconBadge, IconFlame, IconGem } from '../components/icons/HudIcons'
 import { regionPalette } from '../lib/design/transitTheme'
 import { AnimatePresence, motion } from 'motion/react'
 import { spring, useCalm } from '../lib/motion'
+import { CountUp, GemFlight, LevelUp } from '../components/ui/Celebrate'
+import { levelFromXp } from '../lib/progression/unlocks'
 import { fireConfetti, playCelebrationSound } from '../lib/celebrate'
 import { BADGE_LABELS } from '../lib/progression/badges'
 import { INITIAL_HEARTS, PASS_PERCENT } from '../lib/scoring/quiz'
@@ -35,6 +37,8 @@ export function QuizPage() {
   const [index, setIndex] = useState<number | null>(null)
   const [practice, setPractice] = useState(0)
   const [claim, setClaim] = useState<Claim>(null)
+  const [levelUp, setLevelUp] = useState<number | null>(null)
+  const xpTile = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (topicId) startQuizAttempt(topicId)
@@ -69,8 +73,11 @@ export function QuizPage() {
   const next = line[line.findIndex((t) => t.id === topic.id) + 1]
 
   const claimProgress = () => {
+    const before = levelFromXp(useGameStore.getState().xp)
     const res = finishQuizIfReady(topic.id)
     if (res.cleared) {
+      const after = levelFromXp(useGameStore.getState().xp)
+      if (after > before) setLevelUp(after)
       setClaim({ xpGained: res.xpGained, newBadges: res.newBadges })
       fireConfetti(prefs.reducedMotion)
       playCelebrationSound(prefs.soundEnabled, prefs.hasGestureForSound)
@@ -155,10 +162,13 @@ export function QuizPage() {
             </h1>
             <p className="mt-1 text-lg font-bold text-dim">{correctCount}/{total} correct</p>
             <div className="mx-auto mt-6 grid max-w-md grid-cols-3 gap-3">
-              <StatTile label="Total XP" color="#FFC800" deep="#8A5A00" value={claim ? `+${claim.xpGained}` : alreadyCleared ? '0' : '—'} icon={<IconGem size={28} />} />
+              <div ref={xpTile}>
+                <StatTile label="Total XP" color="#FFC800" deep="#8A5A00" value={claim ? <CountUp to={claim.xpGained} prefix="+" /> : alreadyCleared ? '0' : '—'} icon={<IconGem size={28} />} />
+              </div>
               <StatTile label="Accuracy" color="#58CC02" deep="#2F7D00" value={`${Math.round((correctCount / total) * 100)}%`} icon={<Target />} />
-              <StatTile label="Streak" color="#FF9600" deep="#A35F00" value={`${streak}`} icon={<IconFlame size={28} />} />
+              <StatTile label="Streak" color="#FF9600" deep="#A35F00" value={`${streak}`} icon={<span className="flame-flicker inline-flex"><IconFlame size={28} /></span>} />
             </div>
+            {claim && claim.xpGained > 0 && <GemFlight from={xpTile} />}
             {claim ? (
               <div className="mt-6 space-y-3">
                 <p className="text-[17px] font-bold text-chalk">
@@ -166,9 +176,16 @@ export function QuizPage() {
                   {next ? `${next.title} is now open.` : 'Unit complete!'}
                 </p>
                 {claim.newBadges.length > 0 && (
-                  <p className="inline-flex items-center gap-2 rounded-2xl bg-[#FFF6CC] px-4 py-2 font-extrabold text-[#8A5A00]">
+                  <motion.p
+                    className="relative inline-flex items-center gap-2 overflow-hidden rounded-2xl bg-[#FFF6CC] px-4 py-2 font-extrabold text-[#8A5A00]"
+                    style={{ transformPerspective: 600 }}
+                    initial={calm ? false : { rotateY: -180, opacity: 0, scale: 0.6 }}
+                    animate={{ rotateY: 0, opacity: 1, scale: 1 }}
+                    transition={{ ...spring.pop, delay: 0.6 }}
+                  >
                     <IconBadge /> New badge: {claim.newBadges.map((b) => BADGE_LABELS[b as keyof typeof BADGE_LABELS] ?? b).join(', ')}
-                  </p>
+                    <span className="bar-shine" aria-hidden />
+                  </motion.p>
                 )}
                 <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
                   {next && <Link to={`/topic/${next.slug}`} className="btn-cta min-w-[220px]">Continue</Link>}
@@ -251,6 +268,7 @@ export function QuizPage() {
         </motion.div>
       )}
       <ComboBurst run={run} tick={answeredCount} />
+      <LevelUp level={levelUp} onDone={() => setLevelUp(null)} />
     </div>
   )
 }
@@ -294,7 +312,7 @@ function ComboBurst({ run, tick }: { run: number; tick: number }) {
   )
 }
 
-function StatTile({ label, value, color, deep, icon }: { label: string; value: string; color: string; deep: string; icon: React.ReactNode }) {
+function StatTile({ label, value, color, deep, icon }: { label: string; value: React.ReactNode; color: string; deep: string; icon: React.ReactNode }) {
   return (
     <div className="anim-pop overflow-hidden rounded-2xl border-2" style={{ borderColor: color, background: color }}>
       <p className="py-1 text-xs font-extrabold uppercase tracking-wider text-[#29303D]">{label}</p>
