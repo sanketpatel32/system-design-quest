@@ -11,6 +11,8 @@ interface Props {
   hotkeys?: boolean
   number?: number
   total?: number
+  /** Outcome of an earlier, saved attempt: shows its result without regrading */
+  reveal?: { correct: boolean }
 }
 
 const TYPE_LABEL: Record<Question['type'], string> = {
@@ -210,10 +212,12 @@ function hasStructuredTradeoff(q: TradeoffQuestion) {
   return Boolean(q.rationaleOptions?.length && q.correctRationaleIds?.length)
 }
 
-export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, hotkeys = true, number, total }: Props) {
+export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, hotkeys = true, number, total, reveal }: Props) {
   const [answer, setAnswer] = useState<unknown>(initialAnswer)
   const [result, setResult] = useState<ReturnType<typeof gradeQuestion> | null>(null)
   const submitted = locked || result !== null
+  const shown: { correct: boolean; feedback: string } | null =
+    result ?? (reveal ? { correct: reveal.correct, feedback: reveal.correct ? 'You answered this one correctly.' : 'You missed this one; the right answer is marked.' } : null)
   const pending = incompleteReason(
     question,
     question.type === 'drag_order' && !(Array.isArray(answer) && answer.length === question.items.length)
@@ -266,8 +270,8 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
           {question.choices.map((c, idx) => {
             const selected = Array.isArray(answer) && answer.includes(c.id)
             const isRight = question.correctChoiceIds.includes(c.id) || (question.alternativeChoiceIds ?? []).includes(c.id)
-            const reveal = result !== null
-            const stateClass = reveal && isRight ? 'choice-row-right' : reveal && selected ? 'choice-row-wrong' : selected ? 'choice-row-selected' : ''
+            const revealNow = shown !== null
+            const stateClass = revealNow && isRight ? 'choice-row-right' : revealNow && selected ? 'choice-row-wrong' : selected ? 'choice-row-selected' : ''
             return (
               <label
                 key={c.id}
@@ -295,7 +299,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
           question={question}
           picked={Array.isArray(answer) ? (answer as string[]) : []}
           disabled={submitted}
-          reveal={result !== null}
+          reveal={shown !== null}
           onPick={(id) => setAnswer([id])}
         />
       )}
@@ -306,6 +310,16 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
           disabled={submitted}
           onChange={setAnswer}
         />
+      )}
+      {question.type === 'drag_order' && shown && !shown.correct && (
+        <div className="rounded-md border border-[rgba(111,211,139,0.45)] bg-[rgba(111,211,139,0.06)] p-3">
+          <p className="text-sm font-semibold text-[var(--color-clear)] mb-1.5">Correct sequence</p>
+          <ol className="list-decimal pl-5 text-sm text-chalk space-y-0.5">
+            {question.correctOrder.map((id) => (
+              <li key={id}>{question.items.find((i) => i.id === id)?.label}</li>
+            ))}
+          </ol>
+        </div>
       )}
       {question.type === 'estimation' && (
         <div className="space-y-3">
@@ -424,16 +438,16 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
           {pending && <span className="text-sm text-dim">{pending}</span>}
         </div>
       )}
-      {result && (
-        <div className={`feedback ${result.correct ? 'feedback-ok' : 'feedback-miss'}`} role="status">
+      {shown && (
+        <div className={`feedback ${shown.correct ? 'feedback-ok' : 'feedback-miss'}`} role="status">
           <p className="font-display font-semibold flex items-center gap-2">
-            <FeedbackMark ok={result.correct} />
-            {result.correct ? 'Correct' : 'Not this time'}
+            <FeedbackMark ok={shown.correct} />
+            {shown.correct ? 'Correct' : 'Not this time'}
           </p>
-          <p className="text-sm mt-1">{result.feedback}</p>
+          <p className="text-sm mt-1">{shown.feedback}</p>
         </div>
       )}
-      {(submitted || result) && (
+      {submitted && (
         <p className="text-sm text-dim leading-relaxed border-t border-[var(--color-rail)] pt-3">
           <span className="text-chalk font-semibold">Why: </span>
           {question.explanation}
