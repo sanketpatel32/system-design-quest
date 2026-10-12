@@ -280,6 +280,12 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
     onSubmit(final, r)
   }
 
+  // Choices are stored with the answer first in many questions; show them in a per-question, per-attempt order.
+  const shownChoices =
+    question.type === 'multiple_choice'
+      ? scrambled(question.choices.map((c) => c.id), 'mc' + question.id + (scrambleSeed ?? '')).map((id) => question.choices.find((c) => c.id === id)!)
+      : []
+
   useEffect(() => {
     if (!hotkeys || question.type !== 'multiple_choice' || submitted) return
     const onKey = (e: KeyboardEvent) => {
@@ -287,7 +293,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
       if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return
       const n = Number(e.key)
       if (n >= 1 && n <= 4) {
-        const choice = question.choices[n - 1]
+        const choice = shownChoices[n - 1]
         if (!choice) return
         e.preventDefault()
         setAnswer([choice.id])
@@ -312,7 +318,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
       <p className={`font-display text-chalk leading-snug ${sheet ? 'text-2xl' : 'text-lg'}`}>{question.prompt}</p>
       {question.type === 'multiple_choice' && (
         <div className="space-y-2">
-          {question.choices.map((c, idx) => {
+          {shownChoices.map((c, idx) => {
             const selected = Array.isArray(answer) && answer.includes(c.id)
             const isRight = question.correctChoiceIds.includes(c.id) || (question.alternativeChoiceIds ?? []).includes(c.id)
             const revealNow = shown !== null
