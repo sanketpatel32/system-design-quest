@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useGameStore } from '../stores/gameStore'
 
 type Notice = { tone: 'ok' | 'error'; text: string } | null
@@ -6,7 +6,7 @@ type Notice = { tone: 'ok' | 'error'; text: string } | null
 function Toggle({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="flex items-start gap-3 py-3 border-b border-[var(--color-rail)] last:border-0 cursor-pointer">
-      <input type="checkbox" className="mt-1" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" role="switch" className="switch mt-0.5" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       <span>
         <span className="block text-chalk">{label}</span>
         <span className="block text-sm text-dim">{hint}</span>
@@ -22,8 +22,20 @@ export function SettingsPage() {
   const importProgress = useGameStore((s) => s.importProgress)
   const resetProgress = useGameStore((s) => s.resetProgress)
   const [importText, setImportText] = useState('')
-  const [confirmReset, setConfirmReset] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const restoreFile = async (file: File | undefined) => {
+    if (!file) return
+    try {
+      await importProgress(await file.text())
+      setNotice({ tone: 'ok', text: `Restored progress from ${file.name}.` })
+    } catch {
+      setNotice({ tone: 'error', text: 'That file is not a DesignQuest backup. Nothing was changed.' })
+    }
+    if (fileRef.current) fileRef.current.value = ''
+  }
 
   const copy = async () => {
     try {
@@ -59,6 +71,11 @@ export function SettingsPage() {
       <header className="border-b border-[var(--color-rail)] pb-4">
         <p className="text-sm font-semibold text-[var(--color-amber)]">Stored only in this browser</p>
         <h1 className="font-display text-4xl font-extrabold text-chalk mt-1">Settings</h1>
+        <p className="text-[15px] text-dim mt-2">
+          Your XP, cleared stations, review schedule, quiz attempts, boss drafts and mock-interview notes live in this
+          browser's local storage. Nothing is sent to a server, so clearing site data or switching browsers loses it unless
+          you keep a backup.
+        </p>
       </header>
 
       {notice && (
@@ -85,46 +102,61 @@ export function SettingsPage() {
 
       <section className="panel p-5 space-y-3" aria-labelledby="backup">
         <h2 id="backup" className="font-display text-lg font-bold text-chalk">Back up or move your progress</h2>
+        <p className="text-sm text-dim">A backup is a small .json file. Restoring one replaces the progress in this browser.</p>
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn-quiet" onClick={download}>Download .json</button>
-          <button type="button" className="btn-quiet" onClick={copy}>Copy export JSON</button>
+          <button type="button" className="btn-cta" onClick={download}>Download backup</button>
+          <button type="button" className="btn-quiet" onClick={() => fileRef.current?.click()}>Restore from file</button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            className="sr-only"
+            aria-label="Backup file to restore"
+            onChange={(e) => restoreFile(e.target.files?.[0])}
+          />
         </div>
-        <label htmlFor="import-json" className="block text-sm text-dim pt-2">Paste an export to restore it</label>
-        <textarea
-          id="import-json"
-          className="field w-full h-28 font-mono text-xs"
-          value={importText}
-          onChange={(e) => setImportText(e.target.value)}
-          placeholder='{"version": 3, ...}'
-        />
-        <button type="button" className="btn-cta" disabled={!importText.trim()} onClick={doImport}>
-          Import
-        </button>
+        <details className="pt-1">
+          <summary className="cursor-pointer text-sm text-dim">Move between devices by copy and paste instead</summary>
+          <div className="mt-3 space-y-2">
+            <button type="button" className="btn-quiet" onClick={copy}>Copy backup text</button>
+            <label htmlFor="import-json" className="block text-sm text-dim">Paste backup text to restore it</label>
+            <textarea
+              id="import-json"
+              className="field w-full h-24 font-mono text-xs"
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+            />
+            <button type="button" className="btn-quiet" disabled={!importText.trim()} onClick={doImport}>
+              Restore pasted backup
+            </button>
+          </div>
+        </details>
       </section>
 
       <section className="panel p-5 space-y-2 border-[rgba(255,90,78,0.35)]" aria-labelledby="danger">
-        <h2 id="danger" className="font-display text-lg font-bold text-chalk">Start over</h2>
+        <h2 id="danger" className="font-display text-lg font-bold text-[var(--color-fault)]">Danger zone</h2>
         <p className="text-sm text-dim">Clears XP, badges, unlocks, review history and drafts. This cannot be undone.</p>
-        {!confirmReset ? (
-          <button type="button" className="btn-quiet !border-[var(--color-fault)] !text-[var(--color-fault)]" onClick={() => setConfirmReset(true)}>
-            Reset all progress
-          </button>
-        ) : (
-          <div className="flex flex-wrap gap-2">
+        <button type="button" className="btn-quiet !border-[var(--color-fault)] !text-[var(--color-fault)]" onClick={() => dialogRef.current?.showModal()}>
+          Reset all progress
+        </button>
+        <dialog ref={dialogRef} className="confirm-dialog" aria-labelledby="reset-title">
+          <h3 id="reset-title" className="font-display text-xl font-bold text-chalk">Reset all progress?</h3>
+          <p className="text-sm text-dim mt-2">XP, badges, cleared stations, review history and drafts will be deleted. Download a backup first if you might want them back.</p>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <button type="button" className="btn-quiet" autoFocus onClick={() => dialogRef.current?.close()}>Keep my progress</button>
             <button
               type="button"
               className="btn-quiet !bg-[var(--color-fault)] !text-[var(--color-ink)] !border-[var(--color-fault)] font-semibold"
               onClick={async () => {
                 await resetProgress()
-                setConfirmReset(false)
+                dialogRef.current?.close()
                 setNotice({ tone: 'ok', text: 'Progress reset. Launchpad is open again.' })
               }}
             >
-              Confirm reset
+              Yes, reset everything
             </button>
-            <button type="button" className="btn-quiet" onClick={() => setConfirmReset(false)}>Keep my progress</button>
           </div>
-        )}
+        </dialog>
       </section>
     </div>
   )
