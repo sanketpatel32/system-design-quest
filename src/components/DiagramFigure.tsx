@@ -25,7 +25,7 @@ export function DiagramFigure({ topicId, ascii, label }: { topicId: number; asci
           loading="lazy"
           decoding="async"
           className="sketch-img"
-          style={{ maxWidth: d.width }}
+          style={{ maxWidth: d.width, minWidth: Math.min(d.width, 560) }}
         />
       </div>
       <figcaption className="sketch-caption">
