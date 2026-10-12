@@ -74,6 +74,18 @@ try {
   if (e.code !== 'ENOENT') throw e
 }
 
+// Render powers as real superscripts everywhere (10^5 -> 10⁵); the source keeps the ASCII form
+const SUP = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' }
+const supify = (v) =>
+  typeof v === 'string'
+    ? v.replace(/(\d)\^(\d+)/g, (_, b, e) => b + [...e].map((d) => SUP[d]).join(''))
+    : Array.isArray(v)
+      ? v.map(supify)
+      : v && typeof v === 'object'
+        ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === 'diagram' && typeof x === 'string' && x.startsWith('<svg') ? x : supify(x)]))
+        : v
+for (let i = 0; i < topics.length; i++) topics[i] = supify(topics[i])
+
 topics.sort((a, b) => a.id - b.id)
 writeFileSync(out, JSON.stringify(topics, null, 2))
 console.log(`Assembled ${topics.length} topics from ${files.length} files (+${deepCount} deep lessons, +${bossDeepCount} boss briefs) -> ${out}`)

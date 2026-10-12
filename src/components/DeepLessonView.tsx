@@ -48,7 +48,7 @@ export function DeepLessonView({ deep, accent, topicId }: { deep: DeepLesson; ac
             </thead>
             <tbody>
               {deep.tradeoffs.rows.map((r, i) => (
-                <tr key={i}>{r.map((c, j) => (j === 0 ? <th key={j} scope="row">{c}</th> : <td key={j}>{c}</td>))}</tr>
+                <tr key={i}>{r.map((c, j) => (j === 0 ? <th key={j} scope="row">{c}</th> : <td key={j} data-label={deep.tradeoffs.columns[j]}>{c}</td>))}</tr>
               ))}
             </tbody>
           </table>

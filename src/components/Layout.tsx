@@ -87,7 +87,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <span className="tabular-nums">{xp} xp</span>
               </span>
               {badges.length > 0 && (
-                <span className="hud-chip text-[#8A5A00] hidden sm:inline-flex" title={`${badges.length} badge${badges.length === 1 ? "" : "s"} earned`}>
+                <span className="hud-chip text-[#8A5A00] inline-flex" title={`${badges.length} badge${badges.length === 1 ? "" : "s"} earned`}>
                   <IconBadge />
                   <span className="tabular-nums">{badges.length}</span>
                 </span>
