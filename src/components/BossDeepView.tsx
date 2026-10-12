@@ -1,5 +1,6 @@
 import type { BossDeep } from '../content/types'
 import { DiagramFigure } from './DiagramFigure'
+import { SectionNav } from './SectionNav'
 
 /** Boss study brief: requirements, capacity maths, reference architecture, deep dives and a rubric hint. */
 export function BossDeepView({ brief, accent, topicId }: { brief: BossDeep; accent: string; topicId: number }) {
@@ -7,9 +8,10 @@ export function BossDeepView({ brief, accent, topicId }: { brief: BossDeep; acce
   return (
     <section aria-labelledby="boss-brief-title" className="space-y-3" style={{ ['--accent' as string]: accent }}>
       <h2 id="boss-brief-title" className="font-display text-2xl text-chalk">Study brief</h2>
+      <SectionNav sections={[{ id: 'brief-requirements', label: 'Requirements' }, { id: 'brief-capacity-maths', label: 'Capacity maths' }, { id: 'brief-reference-architecture', label: 'Reference architecture' }, { id: 'brief-deep-dives', label: 'Deep dives' }]} />
       <p className="text-chalk">{brief.pitch}</p>
 
-      <details className="deep-card" open>
+      <details id="brief-requirements" className="deep-card" open>
         <summary>Requirements</summary>
         <div className="deep-body grid gap-4 sm:grid-cols-3">
           <div>
@@ -27,7 +29,7 @@ export function BossDeepView({ brief, accent, topicId }: { brief: BossDeep; acce
         </div>
       </details>
 
-      <details className="deep-card" open>
+      <details id="brief-capacity-maths" className="deep-card" open>
         <summary>Capacity maths</summary>
         <div className="deep-body">
           <div className="deep-callout deep-callout-maths">
@@ -40,7 +42,7 @@ export function BossDeepView({ brief, accent, topicId }: { brief: BossDeep; acce
         </div>
       </details>
 
-      <details className="deep-card">
+      <details id="brief-reference-architecture" className="deep-card" open>
         <summary>Reference architecture</summary>
         <div className="deep-body">
           <ol className="deep-steps">
@@ -55,7 +57,7 @@ export function BossDeepView({ brief, accent, topicId }: { brief: BossDeep; acce
         </div>
       </details>
 
-      <details className="deep-card">
+      <details id="brief-deep-dives" className="deep-card">
         <summary>Deep dives</summary>
         <div className="deep-body space-y-3">
           {brief.deepDives.map((d) => (

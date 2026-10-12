@@ -1,13 +1,15 @@
 import type { DeepLesson } from '../content/types'
 import { DiagramFigure } from './DiagramFigure'
+import { SectionNav } from './SectionNav'
 
 /** "Go deeper" material under the card deck: collapsible cards, callouts and a comparison table. */
 export function DeepLessonView({ deep, accent, topicId }: { deep: DeepLesson; accent: string; topicId: number }) {
   return (
     <section aria-labelledby="deep-title" className="space-y-3" style={{ ['--accent' as string]: accent }}>
       <h2 id="deep-title" className="font-display text-2xl text-chalk">Go deeper</h2>
+      <SectionNav sections={[{ id: 'deep-how-it-works', label: 'How it works' }, { id: 'deep-when-to-use', label: 'When to use' }, { id: 'deep-trade-offs', label: 'Trade-offs' }, { id: 'deep-do-the-maths', label: 'Do the maths' }, { id: 'deep-india-example', label: 'India example' }, { id: 'deep-interview-pitfalls', label: 'Interview pitfalls' }]} />
 
-      <details className="deep-card" open>
+      <details id="deep-how-it-works" className="deep-card" open>
         <summary>How it works</summary>
         <div className="deep-body">
           <p className="font-extrabold text-chalk">{deep.mechanism.title}</p>
@@ -23,7 +25,7 @@ export function DeepLessonView({ deep, accent, topicId }: { deep: DeepLesson; ac
         </div>
       </details>
 
-      <details className="deep-card">
+      <details id="deep-when-to-use" className="deep-card">
         <summary>When to use it, and when not to</summary>
         <div className="deep-body grid gap-4 sm:grid-cols-2">
           <div>
@@ -37,7 +39,7 @@ export function DeepLessonView({ deep, accent, topicId }: { deep: DeepLesson; ac
         </div>
       </details>
 
-      <details className="deep-card">
+      <details id="deep-trade-offs" className="deep-card">
         <summary>Trade-offs at a glance</summary>
         <div className="deep-body overflow-x-auto">
           <table className="deep-table">
@@ -53,7 +55,7 @@ export function DeepLessonView({ deep, accent, topicId }: { deep: DeepLesson; ac
         </div>
       </details>
 
-      <details className="deep-card" open>
+      <details id="deep-do-the-maths" className="deep-card" open>
         <summary>Do the maths</summary>
         <div className="deep-body">
           <div className="deep-callout deep-callout-maths">
@@ -67,7 +69,7 @@ export function DeepLessonView({ deep, accent, topicId }: { deep: DeepLesson; ac
         </div>
       </details>
 
-      <details className="deep-card">
+      <details id="deep-india-example" className="deep-card">
         <summary>India example: {deep.india.title}</summary>
         <div className="deep-body">
           <div className="deep-callout deep-callout-india">
@@ -77,7 +79,7 @@ export function DeepLessonView({ deep, accent, topicId }: { deep: DeepLesson; ac
         </div>
       </details>
 
-      <details className="deep-card">
+      <details id="deep-interview-pitfalls" className="deep-card">
         <summary>Interview pitfalls</summary>
         <div className="deep-body space-y-3">
           {deep.pitfalls.map((p) => (
