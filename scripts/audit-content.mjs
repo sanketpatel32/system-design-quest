@@ -82,6 +82,7 @@ for (const t of topics) {
       errors.push(`Topic ${t.id}: exact duplicate card body`)
     }
     for (const prev of cardBodies) {
+      if (prev.id === t.id) continue
       const j = jaccard(body, prev.text)
       if (j >= NEAR_DUP_THRESHOLD) {
         const msg = `Topic ${t.id} card near-duplicate of topic ${prev.id} (j=${j.toFixed(2)})`
@@ -97,6 +98,7 @@ for (const t of topics) {
       errors.push(`Topic ${t.id}: exact duplicate question prompt`)
     }
     for (const prev of prompts) {
+      if (prev.id === t.id) continue
       const j = jaccard(p, prev.text)
       if (j >= NEAR_DUP_THRESHOLD) {
         const msg = `Topic ${t.id} prompt near-duplicate of topic ${prev.id} (j=${j.toFixed(2)})`

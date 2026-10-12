@@ -133,7 +133,7 @@ export function InterviewPage() {
 
       {startedAt && !finished && (
         <div className="grid sm:grid-cols-3 gap-3 text-sm">
-          <div className="rounded-lg border border-cyan-500/30 p-3">Overall: {fmt(overallLeft)}</div>
+          <div className="rounded-lg border border-cyan-500/30 p-3" data-testid="interview-overall-timer">Overall: {fmt(overallLeft)}</div>
           <div className="rounded-lg border border-violet-500/30 p-3">Stage {stageIndex + 1}: {STAGE_LABELS[stageIndex]} ({INTERVIEW_STAGE_MINUTES[stageIndex]}m) — {fmt(stageLeft)}</div>
           <div className="rounded-lg border border-slate-600 p-3">Prompt: {boss?.boss?.apiPrompt ?? 'Clarify users, scale, and constraints.'}</div>
         </div>

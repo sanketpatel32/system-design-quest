@@ -2,6 +2,7 @@ import { Link, NavLink } from 'react-router-dom'
 import { useGameStore, useLevel, useStreak } from '../stores/gameStore'
 import { BADGE_LABELS } from '../lib/progression/badges'
 import { IconBadge, IconFlame } from './icons/HudIcons'
+import { HelpShortcuts } from './HelpShortcuts'
 
 const nav = [
   { to: '/', label: 'Map' },
@@ -61,10 +62,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <span className="font-bold tabular-nums">{badges.length}</span>
               </div>
             )}
+            <button
+              type="button"
+              className="hud-block px-2 font-bold text-[var(--color-teal)]"
+              data-testid="help-shortcuts-trigger"
+              aria-label="Keyboard shortcuts"
+              onClick={() => document.dispatchEvent(new CustomEvent('sdq-toggle-help'))}
+            >
+              ?
+            </button>
           </div>
         </div>
       </header>
       <main className="flex-1 w-full max-w-[1180px] mx-auto px-4 py-5">{children}</main>
+      <HelpShortcuts />
     </div>
   )
 }

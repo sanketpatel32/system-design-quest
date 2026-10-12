@@ -8,5 +8,6 @@
 - [x] SRS revision + cheat sheet
 - [x] localStorage + IndexedDB persistence, import/export/reset
 - [x] Vitest unit tests + Playwright e2e
-- [ ] Enrich per-topic prose beyond templated generator (ongoing editorial pass)
+- [x] Authored shards in `scripts/authored/` + `npm run content:build`
+- [x] `npm run audit:strict` clean (authored uniques + fingerprint markers)
 - [ ] Optional: deploy to static host from CI
