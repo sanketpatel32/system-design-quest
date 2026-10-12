@@ -13,12 +13,12 @@ export function HeartsHud({ hearts, max = 3 }: { hearts: number; max?: number })
   return (
     <div
       key={shakeKey}
-      className={`flex items-center gap-1 rounded-full border border-[var(--color-rail)] bg-[var(--color-platform)] px-2.5 py-1 ${shakeKey ? 'hearts-shake' : ''}`}
+      className={`flex items-center gap-0.5 ${shakeKey ? 'hearts-shake' : ''}`}
       role="img"
       aria-label={`${hearts} of ${max} hearts remaining`}
     >
       {Array.from({ length: max }).map((_, i) => (
-        <IconHeart key={i} filled={i < hearts} />
+        <IconHeart key={i} filled={i < hearts} size={30} />
       ))}
     </div>
   )
