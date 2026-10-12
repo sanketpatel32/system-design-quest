@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
+import { topicLabel } from '../content/numbering'
 import { allTopics, regions, topicsById } from '../content/catalog'
 import { LessonDeck } from '../components/LessonDeck'
 import { DeepLessonView } from '../components/DeepLessonView'
@@ -33,7 +34,7 @@ export function TopicPage() {
     return (
       <div className="mx-auto mt-6 max-w-lg space-y-3 panel p-6 text-center">
         <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-[#E5E0D8] shadow-[0_6px_0_#CFC7BA]"><IconLock size={40} color="#8C8476" /></div>
-        <p className="text-sm font-extrabold uppercase tracking-wide text-dim">Locked · topic {topic.id}</p>
+        <p className="text-sm font-extrabold uppercase tracking-wide text-dim">Locked · {topicLabel(topic.id)}</p>
         <h1 className="font-display text-3xl text-chalk">{topic.title}</h1>
         <p className="font-bold text-chalk">{getUnlockHint(topic.id, completed)}</p>
         <Link to="/" className="btn-cta">Back to the map</Link>
@@ -59,7 +60,7 @@ export function TopicPage() {
       <div className="space-y-5 min-w-0">
         <header className="unit-banner flex items-center gap-4 p-5 sm:p-6" style={{ background: pal.deep, ['--banner-shadow' as string]: pal.shadow }}>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-extrabold uppercase tracking-wider text-white">{regionName} · topic {topic.id}</p>
+            <p className="text-sm font-extrabold uppercase tracking-wider text-white">{regionName} · {topicLabel(topic.id)}</p>
             <h1 className="font-display text-3xl sm:text-4xl text-white mt-1 leading-tight" data-testid="topic-title">{topic.title}</h1>
             {topic.objectives.length > 0 && (
               <ul className="mt-3 space-y-1 font-bold text-white max-w-xl">
