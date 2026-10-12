@@ -5,8 +5,6 @@ import type { Topic } from '../../content/types'
 import { regionPalette } from '../../lib/design/transitTheme'
 import { getUnlockHint, topicStatus } from '../../lib/progression/unlocks'
 import { useGameStore } from '../../stores/gameStore'
-import { motion } from 'motion/react'
-import { spring, useCalm } from '../../lib/motion'
 import { RegionArt } from '../art/RegionArt'
 import { Mascot, MascotSays } from '../art/Mascot'
 import { IconBook, IconCastle, IconCheck, IconLock, IconStar } from '../icons/HudIcons'
@@ -226,24 +224,6 @@ function UnitBanner({ regionId, index, done, total, title, subtitle }: { regionI
   )
 }
 
-function Trail({ offsets, boss, color }: { offsets: number[]; boss?: boolean; color: string }) {
-  const h = boss ? 78 : 66
-  const pts = offsets.map((x, i) => [x, i * (h + 40) + h / 2] as const)
-  let d = `M ${pts[0]![0]} ${pts[0]![1]}`
-  for (let i = 1; i < pts.length; i++) {
-    const [x0, y0] = pts[i - 1]!
-    const [x1, y1] = pts[i]!
-    const my = (y0 + y1) / 2
-    d += ` C ${x0} ${my}, ${x1} ${my}, ${x1} ${y1}`
-  }
-  const H = pts[pts.length - 1]![1] + h / 2
-  return (
-    <svg aria-hidden className="pointer-events-none absolute left-1/2 top-0 overflow-visible" width="1" height={H}>
-      <motion.path d={d} fill="none" stroke={color} strokeWidth={10} strokeLinecap="round" initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true, margin: '-40px' }} transition={{ duration: 1.1, ease: 'easeInOut' }} />
-    </svg>
-  )
-}
-
 function Unit({ regionId, index, statusMap, completed, nextId }: { regionId: string; index: number; statusMap: Map<number, Status>; completed: Set<number>; nextId?: number }) {
   const region = learningRegions.find((r) => r.id === regionId)!
   const topics = orderedTopicsInRegion(regionId as Topic['region'])
@@ -252,9 +232,8 @@ function Unit({ regionId, index, statusMap, completed, nextId }: { regionId: str
     <section aria-label={`Unit ${index + 1}: ${region.subtitle}`}>
       <UnitBanner regionId={regionId} index={index} done={done} total={topics.length} title={region.name} subtitle={region.subtitle} />
       <ol className="relative mx-auto mt-8 flex max-w-[420px] flex-col items-center gap-10">
-        <Trail offsets={topics.map((_, j) => WIND[(j + index * 3) % WIND.length]!)} color={regionPalette(regionId as Topic['region']).soft} />
         {topics.map((t, j) => (
-          <PathNode key={t.id} i={j} topic={t} offset={WIND[(j + index * 3) % WIND.length]!} status={statusMap.get(t.id) ?? 'locked'} current={t.id === nextId} completed={completed} first={j === 0} />
+          <PathNode key={t.id} topic={t} offset={WIND[(j + index * 3) % WIND.length]!} status={statusMap.get(t.id) ?? 'locked'} current={t.id === nextId} completed={completed} first={j === 0} />
         ))}
       </ol>
     </section>
@@ -270,9 +249,8 @@ function ArenaUnit({ statusMap, completed, open }: { statusMap: Map<number, Stat
     <section aria-label="Final unit: Architecture Colosseum">
       <UnitBanner regionId="boss-arena" index={null} done={done} total={arenaTopics.length} title={open ? 'Full design problems, scored stage by stage' : 'Clear Unit 1 to open the gates'} subtitle={arena?.subtitle ?? 'Architecture Colosseum'} />
       <ol className="relative mx-auto mt-8 flex max-w-[420px] flex-col items-center gap-10">
-        <Trail boss offsets={shown.map((_, j) => WIND[(j * 2) % WIND.length]!)} color="#FFE9A3" />
         {shown.map((t, j) => (
-          <PathNode key={t.id} i={j} topic={t} offset={WIND[(j * 2) % WIND.length]!} status={statusMap.get(t.id) ?? 'locked'} current={false} completed={completed} boss />
+          <PathNode key={t.id} topic={t} offset={WIND[(j * 2) % WIND.length]!} status={statusMap.get(t.id) ?? 'locked'} current={false} completed={completed} boss />
         ))}
       </ol>
       {!all && (
@@ -284,7 +262,7 @@ function ArenaUnit({ statusMap, completed, open }: { statusMap: Map<number, Stat
   )
 }
 
-function PathNode({ i = 0, topic, offset, status, current, completed, first, boss }: { i?: number; topic: Topic; offset: number; status: Status; current: boolean; completed: Set<number>; first?: boolean; boss?: boolean }) {
+function PathNode({ topic, offset, status, current, completed, first, boss }: { topic: Topic; offset: number; status: Status; current: boolean; completed: Set<number>; first?: boolean; boss?: boolean }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLLIElement>(null)
   const p = regionPalette(topic.region)
@@ -292,7 +270,6 @@ function PathNode({ i = 0, topic, offset, status, current, completed, first, bos
   const fill = locked ? '#E5E0D8' : boss ? '#FFC800' : p.bright
   const shadow = locked ? '#CFC7BA' : boss ? '#E0A800' : p.shadow
   const n = STATION_N.get(topic.id)
-  const calm = useCalm()
 
   useEffect(() => {
     if (!open) return
@@ -312,9 +289,7 @@ function PathNode({ i = 0, topic, offset, status, current, completed, first, bos
   ) : locked ? (
     <IconLock />
   ) : status === 'completed' ? (
-    <motion.span className="flex" initial={calm ? false : { scale: 0, rotate: -30 }} whileInView={{ scale: 1, rotate: 0 }} viewport={{ once: true }} transition={{ ...spring.pop, delay: 0.25 + i * 0.05 }}>
-      <IconCheck size={34} />
-    </motion.span>
+    <IconCheck size={34} />
   ) : first ? (
     <IconBook size={32} />
   ) : (
@@ -323,16 +298,7 @@ function PathNode({ i = 0, topic, offset, status, current, completed, first, bos
   const labelSide = offset > 0 ? 'right-[calc(100%+14px)] text-right' : 'left-[calc(100%+14px)] text-left'
 
   return (
-    <motion.li
-      ref={ref}
-      className="relative"
-      style={{ x: offset, zIndex: open ? 40 : undefined }}
-      initial={calm ? false : { opacity: 0, scale: 0.5 }}
-      whileInView={{ opacity: 1, scale: 1 }}
-      viewport={{ once: true, margin: '-30px' }}
-      transition={{ ...spring.pop, delay: (i % 6) * 0.06 }}
-    >
-      {current && <span aria-hidden className="pulse-ring" style={{ ['--ring' as string]: p.bright }} />}
+    <li ref={ref} className="relative" style={{ transform: `translateX(${offset}px)` }}>
       {current && !open && (
         <span className="pointer-events-none absolute bottom-[calc(100%+14px)] left-1/2 -translate-x-1/2" aria-hidden>
           <span className="bubble-bob block">
@@ -340,10 +306,8 @@ function PathNode({ i = 0, topic, offset, status, current, completed, first, bos
           </span>
         </span>
       )}
-      <motion.button
+      <button
         type="button"
-        whileTap={calm ? undefined : { scaleX: 1.12, scaleY: 0.86, y: 5 }}
-        transition={spring.snappy}
         data-testid={boss ? `boss-node-${topic.id}` : `station-${topic.id}`}
         data-status={status}
         aria-label={`${boss ? 'Boss' : `Station ${n}`}: ${topic.title}, ${STATUS_WORD[status]}`}
@@ -353,16 +317,13 @@ function PathNode({ i = 0, topic, offset, status, current, completed, first, bos
         onClick={() => setOpen(true)}
       >
         {icon}
-      </motion.button>
+      </button>
       <span className={`pointer-events-none absolute top-1/2 w-[112px] sm:w-[132px] -translate-y-1/2 text-[13px] font-extrabold leading-tight ${labelSide} ${locked ? 'text-dim' : 'text-chalk'}`}>
         {topic.title}
       </span>
       {open && (
-        <motion.div
-          initial={calm ? false : { opacity: 0, scale: 0.7, y: -10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={spring.pop}
-          className="absolute top-[calc(100%+16px)] z-30 w-[min(290px,86vw)] -translate-x-1/2 rounded-2xl p-4 text-white"
+        <div
+          className="anim-pop absolute top-[calc(100%+16px)] z-30 w-[min(290px,86vw)] -translate-x-1/2 rounded-2xl p-4 text-white"
           style={{ left: `calc(50% - ${offset}px)`, background: locked ? '#5B6472' : boss ? '#8A5A00' : p.deep, boxShadow: `0 5px 0 ${locked ? '#3f4652' : boss ? '#5c3c00' : p.shadow}` }}
           role="dialog"
           aria-label={topic.title}
@@ -391,9 +352,9 @@ function PathNode({ i = 0, topic, offset, status, current, completed, first, bos
               )}
             </div>
           )}
-        </motion.div>
+        </div>
       )}
-    </motion.li>
+    </li>
   )
 }
 
@@ -418,7 +379,7 @@ function Onboarding() {
   }
   return (
     <section className="panel mb-6 p-5" aria-labelledby="onboard-title" data-testid="onboarding">
-      <MascotSays mood="happy" size={88} motion="wave">
+      <MascotSays mood="happy" size={88}>
         <h2 id="onboard-title" className="font-display text-xl text-chalk">Hi, I’m Byte! Here’s how DesignQuest works.</h2>
       </MascotSays>
       <ul className="mt-3 grid gap-3 text-[15px] sm:grid-cols-2">

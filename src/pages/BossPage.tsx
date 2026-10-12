@@ -1,6 +1,3 @@
-import { motion } from 'motion/react'
-import { spring, useCalm } from '../lib/motion'
-import { CountUp } from '../components/ui/Celebrate'
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { allTopics } from '../content/catalog'
@@ -138,17 +135,17 @@ export function BossPage() {
                 {grade.passed ? 'Boss cleared · 70 needed to pass' : 'Not cleared yet · 70 needed to pass'}
               </p>
               <h2 id="boss-score" className="font-display text-4xl text-chalk mt-1">
-                Score: <CountUp to={grade.total} duration={1.2} />
+                Score: <span className="tabular-nums">{grade.total}</span>
                 <span className="text-dim text-xl font-semibold">/100</span>
               </h2>
             </div>
           </div>
           <div className="score-track" aria-hidden>
-            <Fill pct={grade.total} color={grade.passed ? 'var(--color-hero)' : '#FF9600'} delay={0.1} />
+            <div className="score-fill" style={{ width: `${grade.total}%`, background: grade.passed ? 'var(--color-hero)' : '#FF9600' }} />
             <div className="score-pass" />
           </div>
           <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-3">
-            {RUBRIC.map(({ key, label, max }, i) => {
+            {RUBRIC.map(({ key, label, max }) => {
               const v = grade.breakdown[key]
               return (
                 <div key={key}>
@@ -159,7 +156,7 @@ export function BossPage() {
                     </dd>
                   </div>
                   <div className="score-track score-track-thin mt-1" aria-hidden>
-                    <Fill pct={(v / max) * 100} color={v === max ? 'var(--color-clear)' : 'var(--color-dim)'} delay={0.6 + i * 0.15} />
+                    <div className="score-fill" style={{ width: `${(v / max) * 100}%`, background: v === max ? 'var(--color-clear)' : 'var(--color-dim)' }} />
                   </div>
                 </div>
               )
@@ -203,19 +200,5 @@ export function BossPage() {
 
       <Link to="/" className="btn-quiet">Back to map</Link>
     </div>
-  )
-}
-
-/** Score bar fill that springs in from the left (transform only), in sequence via `delay`. */
-function Fill({ pct, color, delay }: { pct: number; color: string; delay: number }) {
-  const calm = useCalm()
-  return (
-    <motion.div
-      className="score-fill w-full"
-      style={{ background: color }}
-      initial={calm ? false : { x: '-100%' }}
-      animate={{ x: `${pct - 100}%` }}
-      transition={{ ...spring.bar, delay }}
-    />
   )
 }
