@@ -16,16 +16,18 @@ export function RegionArt({ regionId, width = 160, className = '' }: { regionId:
       <>
         <ellipse cx="45" cy="92" rx="26" ry="10" fill={S} opacity="0.5" />
         <ellipse cx="118" cy="95" rx="30" ry="9" fill={S} opacity="0.5" />
+        <g className="art-float">
         <path d="M80 8c14 10 18 32 12 56H68c-6-24-2-46 12-56z" fill={W} />
         <circle cx="80" cy="34" r="8" fill={B} stroke={S} strokeWidth="3" />
         <path d="M68 52 56 68h13zM92 52l12 16H91z" fill={B} />
         <path d="M70 64h20l-3 6H73z" fill={S} />
-        <path d="M74 72q6 22 6 22t6-22z" fill={G} />
-        <path d="M77 72q3 12 3 12t3-12z" fill={W} />
+        <path d="M74 72q6 22 6 22t6-22z" fill={G} className="art-flicker" />
+        <path d="M77 72q3 12 3 12t3-12z" fill={W} className="art-flicker" />
+        </g>
         <rect x="40" y="96" width="80" height="6" rx="3" fill={S} />
-        <circle cx="28" cy="20" r="3" fill={G} />
-        <circle cx="134" cy="30" r="2.5" fill={W} />
-        <circle cx="122" cy="14" r="2" fill={G} />
+        <circle cx="28" cy="20" r="3" fill={G} className="art-twinkle" />
+        <circle cx="134" cy="30" r="2.5" fill={W} className="art-twinkle" />
+        <circle cx="122" cy="14" r="2" fill={G} className="art-twinkle" />
       </>
     ),
     'r2-networking': (
@@ -36,7 +38,7 @@ export function RegionArt({ regionId, width = 160, className = '' }: { regionId:
         <rect x="116" y="60" width="28" height="42" rx="6" fill={W} />
         <path d="M66 28V12" stroke={W} strokeWidth="4" strokeLinecap="round" />
         <circle cx="66" cy="10" r="4" fill={G} />
-        <path d="M54 8q12-10 24 0M48 2q18-14 36 0" stroke={G} strokeWidth="3" fill="none" strokeLinecap="round" />
+        <path d="M54 8q12-10 24 0M48 2q18-14 36 0" stroke={G} strokeWidth="3" fill="none" strokeLinecap="round" className="art-twinkle" />
         {[40, 54, 68, 82].map((y) => (
           <g key={y}>
             <rect x="57" y={y} width="7" height="7" rx="2" fill={B} />
@@ -73,9 +75,9 @@ export function RegionArt({ regionId, width = 160, className = '' }: { regionId:
           <circle r="6" fill={B} stroke={W} strokeWidth="3" />
         </g>
         <path d="M40 88l6-12 6 12zM104 90l5-10 5 10z" fill={B} />
-        <circle cx="26" cy="22" r="3" fill={W} />
-        <circle cx="134" cy="16" r="3" fill={W} />
-        <circle cx="140" cy="40" r="2" fill={G} />
+        <circle cx="26" cy="22" r="3" fill={W} className="art-twinkle" />
+        <circle cx="134" cy="16" r="3" fill={W} className="art-twinkle" />
+        <circle cx="140" cy="40" r="2" fill={G} className="art-twinkle" />
       </>
     ),
     'r5-databases': (
@@ -105,6 +107,7 @@ export function RegionArt({ regionId, width = 160, className = '' }: { regionId:
       <>
         <path d="M6 98h148" stroke={W} strokeWidth="4" strokeLinecap="round" />
         <path d="M12 104h4M32 104h4M52 104h4M72 104h4M92 104h4M112 104h4M132 104h4" stroke={W} strokeWidth="4" strokeLinecap="round" opacity="0.6" />
+        <g className="art-chug">
         <rect x="16" y="56" width="42" height="34" rx="9" fill={W} />
         <rect x="24" y="64" width="11" height="11" rx="3" fill={B} />
         <rect x="39" y="64" width="11" height="11" rx="3" fill={B} />
@@ -113,12 +116,13 @@ export function RegionArt({ regionId, width = 160, className = '' }: { regionId:
         <rect x="104" y="40" width="46" height="50" rx="12" fill={W} />
         <rect x="112" y="48" width="18" height="16" rx="4" fill={S} />
         <rect x="136" y="28" width="9" height="14" rx="3" fill={D} />
-        <circle cx="140" cy="20" r="6" fill={W} opacity="0.8" />
-        <circle cx="128" cy="10" r="4" fill={W} opacity="0.6" />
+        <circle cx="140" cy="20" r="6" fill={W} opacity="0.8" className="art-twinkle" />
+        <circle cx="128" cy="10" r="4" fill={W} opacity="0.6" className="art-twinkle" />
         {[30, 46, 74, 90, 116, 138].map((x) => (
           <circle key={x} cx={x} cy="92" r="6" fill={D} stroke={W} strokeWidth="2.5" />
         ))}
-        <circle cx="146" cy="80" r="4" fill={G} />
+        </g>
+        <circle cx="146" cy="80" r="4" fill={G} className="art-twinkle" />
       </>
     ),
     'r7-coordination': (
@@ -131,7 +135,7 @@ export function RegionArt({ regionId, width = 160, className = '' }: { regionId:
         <path d="M40 44V14" stroke={D} strokeWidth="3" />
         <path d="M40 14l18 6-18 7z" fill={G} />
         <circle cx="122" cy="20" r="10" fill={G} />
-        <circle cx="16" cy="28" r="3" fill={W} />
+        <circle cx="16" cy="28" r="3" fill={W} className="art-twinkle" />
       </>
     ),
     'r8-microservices': (
@@ -144,10 +148,10 @@ export function RegionArt({ regionId, width = 160, className = '' }: { regionId:
         <path d="M18 64c20 12 50 10 64-14z" fill={S} transform="translate(2 3)" opacity="0.6" />
         <path d="M50 58l18-22" stroke={D} strokeWidth="3.5" strokeLinecap="round" />
         <circle cx="68" cy="36" r="5" fill={G} />
-        <path d="M76 26q8 2 10 10M80 18q14 4 16 18" stroke={G} strokeWidth="3" fill="none" strokeLinecap="round" />
-        <circle cx="16" cy="20" r="2.5" fill={W} />
-        <circle cx="66" cy="10" r="2" fill={W} />
-        <circle cx="150" cy="80" r="2.5" fill={W} />
+        <path d="M76 26q8 2 10 10M80 18q14 4 16 18" stroke={G} strokeWidth="3" fill="none" strokeLinecap="round" className="art-twinkle" />
+        <circle cx="16" cy="20" r="2.5" fill={W} className="art-twinkle" />
+        <circle cx="66" cy="10" r="2" fill={W} className="art-twinkle" />
+        <circle cx="150" cy="80" r="2.5" fill={W} className="art-twinkle" />
       </>
     ),
     'r9-security-storage': (
@@ -172,10 +176,10 @@ export function RegionArt({ regionId, width = 160, className = '' }: { regionId:
         <path d="M70 64c0-14 6-22 11-22s11 8 11 22z" fill={G} />
         <path d="M70 48h-6c0 8 4 10 8 10M92 48h6c0 8-4 10-8 10" stroke={G} strokeWidth="3" fill="none" />
         <path d="M76 50l5-4v12" stroke="#8A5A00" strokeWidth="3" fill="none" strokeLinecap="round" />
-        <circle cx="30" cy="22" r="3" fill={G} />
+        <circle cx="30" cy="22" r="3" fill={G} className="art-twinkle" />
         <circle cx="120" cy="18" r="4" fill={W} />
-        <circle cx="136" cy="36" r="2.5" fill={G} />
-        <path d="M118 30l3 6 6 1-4 4 1 6-6-3-6 3 1-6-4-4 6-1z" fill={W} />
+        <circle cx="136" cy="36" r="2.5" fill={G} className="art-twinkle" />
+        <path d="M118 30l3 6 6 1-4 4 1 6-6-3-6 3 1-6-4-4 6-1z" fill={W} className="art-twinkle" />
       </>
     ),
     'boss-arena': (
