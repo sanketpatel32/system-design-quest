@@ -128,6 +128,71 @@ function BottleneckDiagram({
   )
 }
 
+/** Deterministic scramble: authored items are stored in the correct order, so showing them as-is leaks the answer. */
+function scrambled(ids: string[], seed: string): string[] {
+  let h = 2166136261
+  for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619)
+  const out = [...ids]
+  for (let i = out.length - 1; i > 0; i--) {
+    h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0
+    const j = h % (i + 1)
+    ;[out[i], out[j]] = [out[j]!, out[i]!]
+  }
+  if (out.length > 1 && out.every((id, i) => id === ids[i])) out.push(out.shift()!)
+  return out
+}
+
+function OrderList({
+  items,
+  order,
+  disabled,
+  onChange,
+}: {
+  items: { id: string; label: string }[]
+  order: string[]
+  disabled: boolean
+  onChange: (next: string[]) => void
+}) {
+  const label = (id: string) => items.find((i) => i.id === id)?.label ?? id
+  const move = (from: number, to: number) => {
+    if (to < 0 || to >= order.length) return
+    const next = [...order]
+    const [x] = next.splice(from, 1)
+    next.splice(to, 0, x!)
+    onChange(next)
+  }
+  return (
+    <ol className="space-y-1.5" aria-label="Order the steps">
+      {order.map((id, idx) => (
+        <li key={id} className="order-row">
+          <span className="order-num tabular-nums" aria-hidden>{idx + 1}</span>
+          <span className="flex-1 text-sm text-chalk">{label(id)}</span>
+          <span className="flex gap-1">
+            <button
+              type="button"
+              className="order-btn"
+              disabled={disabled || idx === 0}
+              onClick={() => move(idx, idx - 1)}
+              aria-label={`Move "${label(id)}" up`}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden><path d="M2 8l4-4 4 4" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+            </button>
+            <button
+              type="button"
+              className="order-btn"
+              disabled={disabled || idx === order.length - 1}
+              onClick={() => move(idx, idx + 1)}
+              aria-label={`Move "${label(id)}" down`}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+            </button>
+          </span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
 function FeedbackMark({ ok }: { ok: boolean }) {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
@@ -152,9 +217,14 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
 
   const submit = () => {
     if (submitted) return
-    const r = gradeQuestion(question, answer)
+    // A reorder list always has an order on screen; submit that one even if untouched
+    const final =
+      question.type === 'drag_order' && !(Array.isArray(answer) && answer.length === question.items.length)
+        ? scrambled(question.items.map((i) => i.id), question.id)
+        : answer
+    const r = gradeQuestion(question, final)
     setResult(r)
-    onSubmit(answer, r)
+    onSubmit(final, r)
   }
 
   useEffect(() => {
@@ -223,29 +293,12 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
         />
       )}
       {question.type === 'drag_order' && (
-        <ol className="space-y-2">
-          {question.items.map((item, idx) => (
-            <li key={item.id} className="flex gap-2 items-center">
-              <select
-                disabled={submitted}
-                className="field text-sm "
-                value={(answer as string[] | undefined)?.[idx] ?? ''}
-                onChange={(e) => {
-                  const arr = [...(Array.isArray(answer) ? (answer as string[]) : question.items.map((i) => i.id))]
-                  arr[idx] = e.target.value
-                  setAnswer(arr)
-                }}
-                aria-label={`Position ${idx + 1}`}
-              >
-                <option value="">Pick…</option>
-                {question.items.map((i) => (
-                  <option key={i.id} value={i.id}>{i.label}</option>
-                ))}
-              </select>
-              <span className="text-[var(--color-muted)] text-xs font-mono">#{idx + 1}</span>
-            </li>
-          ))}
-        </ol>
+        <OrderList
+          items={question.items}
+          order={Array.isArray(answer) && (answer as string[]).length === question.items.length ? (answer as string[]) : scrambled(question.items.map((i) => i.id), question.id)}
+          disabled={submitted}
+          onChange={setAnswer}
+        />
       )}
       {question.type === 'estimation' && (
         <div className="space-y-2">
