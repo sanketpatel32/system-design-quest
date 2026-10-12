@@ -3,8 +3,24 @@ import { regions, topicsById, orderedTopicsInRegion } from '../../content/catalo
 
 export type TopicStatus = 'locked' | 'available' | 'in_progress' | 'completed'
 
+/**
+ * Dev-only: open any URL with ?unlockAll=1 to unlock every topic for this tab (for screenshots and QA).
+ * `import.meta.env.DEV` is false in production builds, so this is compiled out of the deployed app.
+ */
+export function devUnlockAll(): boolean {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return false
+  try {
+    const flag = new URLSearchParams(window.location.search).get('unlockAll')
+    if (flag === '1') window.sessionStorage.setItem('sdq-dev-unlock-all', '1')
+    if (flag === '0') window.sessionStorage.removeItem('sdq-dev-unlock-all')
+    return window.sessionStorage.getItem('sdq-dev-unlock-all') === '1'
+  } catch {
+    return false
+  }
+}
+
 export function isTopicUnlocked(topicId: number, unlockedIds: number[]): boolean {
-  return unlockedIds.includes(topicId)
+  return devUnlockAll() || unlockedIds.includes(topicId)
 }
 
 export function getUnlockHint(topicId: number, completedIds: Set<number>): string {
