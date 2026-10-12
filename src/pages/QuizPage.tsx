@@ -87,7 +87,7 @@ export function QuizPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-3xl pb-24">
       <header className="mb-6 flex items-center gap-3 sm:gap-4">
         <Link to={`/topic/${topic.slug}`} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-dim hover:bg-[#f4f1ec]" aria-label="Leave quiz, back to the lesson">
           <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" /></svg>

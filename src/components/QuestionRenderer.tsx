@@ -26,6 +26,15 @@ const TYPE_LABEL: Record<Question['type'], string> = {
   tradeoff: 'Make the call',
 }
 
+/** Split a node label into at most two lines that fit the node. */
+function wrapLabel(label: string, max = 14) {
+  if (label.length <= max) return [label]
+  const words = label.split(' ')
+  let a = ''
+  while (words.length && (a + ' ' + words[0]).trim().length <= max) a = (a + ' ' + words.shift()).trim()
+  return [a || words.shift()!, words.join(' ')].filter(Boolean)
+}
+
 /** Lay the request path out left-to-right by edge depth; authored x/y coordinates overlap at real label widths. */
 function BottleneckDiagram({
   question,
@@ -59,10 +68,10 @@ function BottleneckDiagram({
     const d = depth.get(n.id) ?? 0
     cols.set(d, [...(cols.get(d) ?? []), n.id])
   }
-  const NW = 150
-  const NH = 44
-  const GX = 70
-  const GY = 22
+  const NW = 168
+  const NH = 76
+  const GX = 64
+  const GY = 26
   const pos = new Map<string, { x: number; y: number }>()
   const maxRows = Math.max(1, ...[...cols.values()].map((c) => c.length))
   for (const [d, ids] of cols) {
@@ -72,9 +81,9 @@ function BottleneckDiagram({
   const W = 20 + cols.size * NW + (cols.size - 1) * GX
   const H = 20 + maxRows * NH + (maxRows - 1) * GY
   return (
-    <div className="rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 overflow-x-auto">
-      <p className="text-xs text-dim mb-2">Requests flow left to right. Select the component that saturates first.</p>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-full" style={{ minWidth: Math.min(W, 520), maxHeight: 260 }} role="group" aria-label="Request path diagram">
+    <div className="rounded-[20px] border-2 border-[var(--color-rail)] bg-[#fbfaf7] p-4 overflow-x-auto">
+      <p className="text-sm font-bold text-dim mb-3">Requests flow left to right. Tap the component that saturates first.</p>
+      <svg viewBox={`0 0 ${W} ${H + 6}`} className="w-full max-w-full" style={{ minWidth: Math.min(W, 560), maxHeight: 320 }} role="group" aria-label="Request path diagram">
         <defs>
           <marker id={`arrow-${question.id}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
             <path d="M0 0L10 5L0 10z" fill="#9AA3AF" />
@@ -92,7 +101,7 @@ function BottleneckDiagram({
               x2={b.x - 2}
               y2={b.y + NH / 2}
               stroke="#9AA3AF"
-              strokeWidth={2}
+              strokeWidth={3}
               markerEnd={`url(#arrow-${question.id})`}
             />
           )
@@ -120,11 +129,14 @@ function BottleneckDiagram({
                 }
               }}
             >
-              <rect className="station-focus" x={p.x - 4} y={p.y - 4} width={NW + 8} height={NH + 8} rx={9} fill="none" stroke="#1CB0F6" strokeWidth={3} />
-              <rect x={p.x} y={p.y} width={NW} height={NH} rx={6} fill={sel ? '#DDF4FE' : '#FFFFFF'} stroke={stroke} strokeWidth={2} />
-              <text x={p.x + NW / 2} y={p.y + NH / 2 + 4} textAnchor="middle" fontSize={13} fontWeight={600} fill="#29303D" className="font-display">
-                {n.label}
-              </text>
+              <rect className="station-focus" x={p.x - 5} y={p.y - 5} width={NW + 10} height={NH + 14} rx={20} fill="none" stroke="#1CB0F6" strokeWidth={3} />
+              <rect x={p.x} y={p.y + 4} width={NW} height={NH} rx={16} fill={stroke === '#E6E0D6' ? '#E6E0D6' : stroke} />
+              <rect x={p.x} y={p.y} width={NW} height={NH} rx={16} fill={right ? '#D7FFB8' : wrong ? '#FFDFE0' : sel ? '#DDF4FE' : '#FFFFFF'} stroke={stroke} strokeWidth={2.5} />
+              {wrapLabel(n.label).map((line, li, all) => (
+                <text key={li} x={p.x + NW / 2} y={p.y + NH / 2 + 5 + (li - (all.length - 1) / 2) * 23} textAnchor="middle" fontSize={20} fontWeight={800} fill="#29303D" className="font-display">
+                  {line}
+                </text>
+              ))}
             </g>
           )
         })}
@@ -358,25 +370,25 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
       {question.type === 'estimation' && (
         <div className="space-y-3">
           <label className="block">
-            <span className="text-xs text-dim">Your estimate</span>
-            <span className="mt-1 flex max-w-xs items-stretch">
+            <span className="text-sm font-extrabold uppercase tracking-wide text-dim">Your estimate</span>
+            <span className="mt-2 flex max-w-md items-stretch">
               <input
                 type="number"
                 inputMode="decimal"
                 min={0}
                 disabled={submitted}
-                className="field w-full rounded-r-none text-base tabular-nums"
+                className="field w-full rounded-r-none !min-h-[60px] !text-2xl font-extrabold tabular-nums"
                 value={typeof answer === 'string' ? answer : ''}
                 onChange={(e) => setAnswer(e.target.value)}
                 placeholder="e.g. 1200"
               />
-              <span className="grid place-items-center rounded-r-md border border-l-0 border-[var(--color-rail)] bg-[var(--color-platform)] px-3 text-sm text-dim">
+              <span className="grid place-items-center rounded-r-2xl border-2 border-l-0 border-[var(--color-rail)] bg-[var(--color-sky)] px-4 font-extrabold text-[#12749f]">
                 {question.unit}
               </span>
             </span>
           </label>
           {submitted && (
-            <dl className="rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 text-sm grid gap-2 sm:grid-cols-[110px_1fr]">
+            <dl className="rounded-2xl border-2 border-[var(--color-rail)] bg-white p-4 grid gap-2 sm:grid-cols-[110px_1fr]">
               <dt className="text-dim">Assumptions</dt>
               <dd className="text-chalk">{question.assumptions.join(' · ')}</dd>
               <dt className="text-dim">Formula</dt>
@@ -389,17 +401,17 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
       )}
       {question.type === 'tradeoff' && (
         <div className="space-y-3">
-          <div className="rounded-2xl bg-[#f7f5f0] border border-[var(--color-rail)] p-3">
-            <p className="text-xs text-dim mb-1.5">Constraints</p>
-            <ul className="flex flex-wrap gap-1.5">
+          <div>
+            <p className="text-sm font-extrabold uppercase tracking-wide text-dim mb-2">Constraints</p>
+            <ul className="flex flex-wrap gap-2">
               {question.constraints.map((c) => (
-                <li key={c} className="rounded-full border border-[var(--color-rail)] px-2.5 py-0.5 text-xs text-chalk">{c}</li>
+                <li key={c} className="rounded-full bg-[#FFF1DB] px-3 py-1 text-sm font-extrabold text-[#8A4B00]">{c}</li>
               ))}
             </ul>
           </div>
-          <p className="text-xs text-dim">Choose an approach</p>
+          <p className="text-sm font-extrabold uppercase tracking-wide text-dim pt-1">Choose an approach</p>
           {question.approaches.map((a) => (
-            <label key={a.id} className={`choice-row flex gap-3 items-start p-3 ${submitted ? '' : 'cursor-pointer'} ${(answer as { approachId?: string })?.approachId === a.id ? 'choice-row-selected' : ''}`}>
+            <label key={a.id} className={`choice-row flex gap-3 items-center p-3.5 ${submitted ? '' : 'cursor-pointer'} ${(answer as { approachId?: string })?.approachId === a.id ? 'choice-row-selected' : ''}`}>
               <input
                 type="radio"
                 className="mt-1"
@@ -414,19 +426,19 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
                 }
               />
               <span>
-                <span className="block font-semibold text-sm text-chalk">{a.label}</span>
-                <span className="block text-sm text-dim mt-0.5">{a.description}</span>
+                <span className="block font-extrabold text-chalk">{a.label}</span>
+                <span className="block text-[15px] font-semibold text-dim mt-0.5">{a.description}</span>
               </span>
             </label>
           ))}
           {hasStructuredTradeoff(question) ? (
-            <div className="space-y-2 pt-2 border-t border-[var(--color-line)]">
-              <p className="text-xs text-dim">Why? Pick every reason that applies</p>
+            <div className="space-y-2.5 pt-3">
+              <p className="text-sm font-extrabold uppercase tracking-wide text-dim">Why? Pick every reason that applies</p>
               {question.rationaleOptions.map((opt) => {
                 const ids = (answer as { rationaleIds?: string[] })?.rationaleIds ?? []
                 const checked = ids.includes(opt.id)
                 return (
-                  <label key={opt.id} className={`choice-row flex gap-2.5 items-start p-2.5 text-sm text-chalk ${submitted ? '' : 'cursor-pointer'} ${checked ? 'choice-row-selected' : ''}`}>
+                  <label key={opt.id} className={`choice-row flex gap-3 items-center p-3 font-bold text-chalk ${submitted ? '' : 'cursor-pointer'} ${checked ? 'choice-row-selected' : ''}`}>
                     <input
                       type="checkbox"
                       className="mt-0.5"
