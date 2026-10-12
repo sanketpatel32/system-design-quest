@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Question, TradeoffQuestion } from '../content/types'
 import { gradeQuestion, incompleteReason } from '../lib/scoring/questions'
+import { Mascot } from './art/Mascot'
 
 interface Props {
   question: Question
@@ -13,6 +14,8 @@ interface Props {
   total?: number
   /** Outcome of an earlier, saved attempt: shows its result without regrading */
   reveal?: { correct: boolean }
+  /** Duolingo-style mode: a fixed bottom bar holds Submit, and feedback slides up as a coloured sheet */
+  sheet?: { onContinue: () => void; continueLabel: string; extra?: React.ReactNode }
 }
 
 const TYPE_LABEL: Record<Question['type'], string> = {
@@ -229,12 +232,12 @@ function OrderList({
 
 function FeedbackMark({ ok }: { ok: boolean }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
-      <circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" strokeWidth="2" />
+    <svg width="28" height="28" viewBox="0 0 20 20" aria-hidden className="shrink-0">
+      <circle cx="10" cy="10" r="10" fill="#fff" />
       {ok ? (
-        <path d="M6 10.5l2.6 2.6L14 7.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M6 10.5l2.6 2.6L14 7.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
       ) : (
-        <path d="M7 7l6 6M13 7l-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <path d="M7 7l6 6M13 7l-6 6" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
       )}
     </svg>
   )
@@ -244,7 +247,7 @@ function hasStructuredTradeoff(q: TradeoffQuestion) {
   return Boolean(q.rationaleOptions?.length && q.correctRationaleIds?.length)
 }
 
-export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, hotkeys = true, number, total, reveal }: Props) {
+export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, hotkeys = true, number, total, reveal, sheet }: Props) {
   const [answer, setAnswer] = useState<unknown>(initialAnswer)
   const [result, setResult] = useState<ReturnType<typeof gradeQuestion> | null>(null)
   const submitted = locked || result !== null
@@ -289,14 +292,14 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
   })
 
   return (
-    <div className={`panel-slab p-5 space-y-4 ${hotkeys && !submitted ? 'question-active' : ''}`}>
+    <div className={sheet ? 'space-y-5' : `panel-slab p-5 space-y-4 ${hotkeys && !submitted ? 'question-active' : ''}`}>
       {number !== undefined && (
-        <p className="text-xs text-dim tabular-nums">
+        <p className="text-sm font-extrabold uppercase tracking-wide text-[#12749f] tabular-nums">
           Question {number}
           {total ? ` of ${total}` : ''} · {TYPE_LABEL[question.type]}
         </p>
       )}
-      <p className="font-display font-semibold text-chalk text-lg leading-snug">{question.prompt}</p>
+      <p className={`font-display text-chalk leading-snug ${sheet ? 'text-2xl' : 'text-lg'}`}>{question.prompt}</p>
       {question.type === 'multiple_choice' && (
         <div className="space-y-2">
           {question.choices.map((c, idx) => {
@@ -307,20 +310,18 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
             return (
               <label
                 key={c.id}
-                className={`choice-row flex gap-3 items-start p-3 ${submitted ? '' : 'cursor-pointer'} ${stateClass}`}
+                className={`choice-row flex gap-3 items-center p-3.5 ${submitted ? '' : 'cursor-pointer'} ${stateClass}`}
               >
                 <input
                   type="radio"
                   name={`mcq-${question.id}`}
-                  className="mt-0.5"
+                  className="sr-only"
                   disabled={submitted}
                   checked={selected}
                   onChange={() => setAnswer([c.id])}
                 />
-                <span className="text-[15px] text-chalk">
-                  <kbd className="kbd mr-2.5">{idx + 1}</kbd>
-                  {c.label}
-                </span>
+                <kbd className="kbd shrink-0">{idx + 1}</kbd>
+                <span className="text-[16px] font-bold text-chalk">{c.label}</span>
               </label>
             )
           })}
@@ -462,28 +463,72 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
           )}
         </div>
       )}
-      {!submitted && (
+      {!submitted && !sheet && (
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" onClick={submit} className="btn-cta disabled:opacity-40" disabled={pending !== null}>
+          <button type="button" onClick={submit} className="btn-cta" disabled={pending !== null}>
             Submit
           </button>
           {pending && <span className="text-sm text-dim">{pending}</span>}
         </div>
       )}
-      {shown && (
+      {!submitted && sheet && (
+        <div className="quizbar">
+          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+            <span className="text-sm font-bold text-dim">{pending ?? 'Ready when you are.'}</span>
+            <button type="button" onClick={submit} className="btn-cta min-w-[160px]" disabled={pending !== null}>
+              Submit
+            </button>
+          </div>
+        </div>
+      )}
+      {shown && !sheet && (
         <div className={`feedback ${shown.correct ? 'feedback-ok' : 'feedback-miss'}`} role="status">
-          <p className="font-display font-semibold flex items-center gap-2">
+          <p className="font-display flex items-center gap-2">
             <FeedbackMark ok={shown.correct} />
             {shown.correct ? 'Correct' : 'Not this time'}
           </p>
           <p className="text-sm mt-1">{shown.feedback}</p>
         </div>
       )}
-      {submitted && (
-        <p className="text-sm text-dim leading-relaxed border-t border-[var(--color-rail)] pt-3">
-          <span className="text-chalk font-semibold">Why: </span>
+      {submitted && !sheet && (
+        <p className="text-sm text-dim leading-relaxed border-t-2 border-[var(--color-rail)] pt-3">
+          <span className="text-chalk font-extrabold">Why: </span>
           {question.explanation}
         </p>
+      )}
+      {shown && sheet && (
+        <>
+          <div aria-hidden className="h-72" />
+          <div className={`sheet ${shown.correct ? 'sheet-ok' : 'sheet-miss'}`} role="status" data-testid="feedback-sheet">
+            <div className="mx-auto flex max-w-4xl flex-col gap-4 px-4 py-5 sm:flex-row sm:items-end">
+              <div className="flex min-w-0 flex-1 gap-3">
+                <Mascot mood={shown.correct ? 'happy' : 'sad'} size={76} className={`shrink-0 ${shown.correct ? 'anim-pop' : 'anim-wiggle'}`} />
+                <div className="min-w-0">
+                  <p className="sheet-title flex items-center gap-2">
+                    <FeedbackMark ok={shown.correct} />
+                    {shown.correct ? 'Correct' : 'Not this time'}
+                  </p>
+                  {!/^correct\.?$/i.test(shown.feedback.trim()) && <p className="font-bold">{shown.feedback}</p>}
+                  <p className="mt-1 text-[15px] leading-relaxed text-chalk">
+                    <span className="font-extrabold">Why: </span>
+                    {question.explanation}
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+                <button
+                  type="button"
+                  autoFocus
+                  className={`${shown.correct ? 'btn-cta' : 'btn-danger'} min-w-[180px]`}
+                  onClick={sheet.onContinue}
+                >
+                  {sheet.continueLabel}
+                </button>
+                {sheet.extra}
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )

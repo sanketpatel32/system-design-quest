@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useGameStore, useLevel, useStreak } from '../stores/gameStore'
 import { BADGE_LABELS } from '../lib/progression/badges'
 import { IconBadge, IconFlame, IconGem, NavIcon } from './icons/HudIcons'
@@ -21,6 +21,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const badges = useGameStore((s) => s.badges)
   const reducedMotion = useGameStore((s) => s.preferences.reducedMotion)
   const [hudOpen, setHudOpen] = useState(false)
+  const inQuiz = useLocation().pathname.startsWith('/quiz/')
 
   // The in-app setting applies the same rules as the OS-level prefers-reduced-motion
   useEffect(() => {
@@ -28,28 +29,32 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [reducedMotion])
 
   return (
-    <div className="min-h-full flex flex-col">
+    <div className="min-h-full flex flex-col lg:pl-[248px]">
+      <aside className="sidebar hidden lg:flex">
+        <Link to="/" className="flex items-center gap-2 px-3 py-2" aria-label="System Design Quest, back to map">
+          <Mascot size={44} />
+          <span className="font-display text-[26px] text-[var(--color-hero-deep)]">designquest</span>
+        </Link>
+        <nav className="mt-4 flex flex-col gap-1.5" aria-label="Main">
+          {nav.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === '/'}
+              className={({ isActive }) => `nav-link ${isActive ? 'nav-link-active' : ''}`}
+            >
+              <NavIcon name={item.icon} size={30} />
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
       <header className="shell-header sticky top-0 z-50">
         <div className="max-w-[1180px] mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-6 min-w-0">
-            <Link to="/" className="flex items-center gap-2 shrink-0" aria-label="System Design Quest, back to map">
-              <Mascot size={40} />
-              <span className="font-display text-2xl text-[var(--color-hero-deep)] hidden sm:inline">designquest</span>
-            </Link>
-            <nav className="hidden md:flex gap-1" aria-label="Main">
-              {nav.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === '/'}
-                  className={({ isActive }) => `nav-link ${isActive ? 'nav-link-active' : ''}`}
-                >
-                  <NavIcon name={item.icon} size={22} /><span className="sr-only xl:hidden">{item.label}</span>
-                  <span className="hidden xl:inline">{item.label}</span>
-                </NavLink>
-              ))}
-            </nav>
-          </div>
+          <Link to="/" className="flex items-center gap-2 shrink-0 lg:invisible" aria-label="System Design Quest, back to map" tabIndex={-1}>
+            <Mascot size={40} />
+            <span className="font-display text-2xl text-[var(--color-hero-deep)] hidden sm:inline">designquest</span>
+          </Link>
           <div className="relative flex items-center gap-1">
             <button
               type="button"
@@ -101,8 +106,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="flex-1 w-full max-w-[1180px] mx-auto px-4 py-6 pb-28 md:pb-10">{children}</main>
-      <nav className="tabbar md:hidden" aria-label="Main">
+      <main className="flex-1 w-full max-w-[1180px] mx-auto px-4 py-6 pb-28 lg:pb-10">{children}</main>
+      <nav className={`tabbar lg:hidden ${inQuiz ? 'hidden' : ''}`} aria-label="Main">
         {nav.map((item) => (
           <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => `tab ${isActive ? 'tab-active' : ''}`}>
             <span className="tab-icon"><NavIcon name={item.icon} size={24} /></span>
