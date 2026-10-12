@@ -399,6 +399,30 @@
         "Ask questions whose answers change the design; skip the ones that don't.",
         "Always close by naming bottlenecks and what you would do at 10× scale."
       ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What comes at minute 10?",
+      "prompt": "You have agreed the requirements and done the estimates. Ten minutes have gone. What should you do next?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Sketch the two or three key endpoints: the API stage",
+          "feedback": "Agreeing the endpoints fixes what the design has to serve before you draw boxes."
+        },
+        {
+          "id": "b",
+          "label": "Go straight into a deep dive on the database",
+          "feedback": "Too early: without an end-to-end design there is nothing to go deep on yet."
+        },
+        {
+          "id": "c",
+          "label": "Draw the full microservice architecture with every component",
+          "feedback": "Drawing everything at once skips the API and burns the time you need for depth."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "The plan is six stages: requirements 0–5, estimation 5–10, API 10–15, high-level design 15–25, deep dive 25–40, wrap-up 40–45. API comes before the boxes because it tells you which reads and writes the design must handle."
     }
   },
   {
@@ -756,6 +780,26 @@
         "Storage = objects per day × size × retention × replication.",
         "Keep one significant figure and say your assumptions out loud."
       ]
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "Find the peak your fleet can take",
+      "prompt": "A chat app has 50M daily users sending 40 messages each. Your fleet handles 100K writes per second. Raise the peak factor: where does the fleet run out?",
+      "model": "peak-qps",
+      "params": {
+        "dau": 50000000,
+        "actions": 40,
+        "capacity": 100000
+      },
+      "control": {
+        "label": "Peak factor (assumed)",
+        "min": 1,
+        "max": 10,
+        "step": 0.5,
+        "initial": 1,
+        "unit": "×"
+      },
+      "takeaway": "The average stays near 23K/s whatever you assume; the peak factor decides the capacity. Above about 4.3× the 100K/s fleet runs out, so state the factor you are assuming and ask whether events spike higher."
     }
   },
   {
@@ -1157,6 +1201,27 @@
         "Size servers from measured per-node throughput plus headroom for losing a zone.",
         "Scale the app tier first; the database is the hard part and comes last."
       ]
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "How much peak can 40 servers take?",
+      "prompt": "One stateless app server safely handles 2,000 requests per second. You can run 40 servers and want 30% headroom plus one spare. Find the highest peak you can serve.",
+      "model": "servers",
+      "params": {
+        "perServer": 2000,
+        "headroomPct": 30,
+        "spares": 1,
+        "budget": 40
+      },
+      "control": {
+        "label": "Peak load",
+        "min": 2000,
+        "max": 100000,
+        "step": 2000,
+        "initial": 20000,
+        "unit": "req/s"
+      },
+      "takeaway": "About 60,000 requests per second fits: 30 servers of raw capacity, 39 with headroom, 40 with the spare. Scaling out is this linear only when servers are stateless and the database behind them keeps up."
     }
   },
   {
@@ -1505,6 +1570,25 @@
         "A cold HTTPS request costs about 3 round trips (TCP, TLS 1.3, request) before the first byte.",
         "Latency is mostly distance × round trips, so serve users from nearby regions and reuse connections."
       ]
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "How far away can the server be?",
+      "prompt": "A cold HTTPS request needs about three round trips before the first byte: TCP, the TLS 1.3 handshake, then the request itself. Keep that under 300 ms. Move the round-trip time.",
+      "model": "rtt-handshake",
+      "params": {
+        "roundTrips": 3,
+        "budgetMs": 300
+      },
+      "control": {
+        "label": "Round-trip time",
+        "min": 10,
+        "max": 250,
+        "step": 10,
+        "initial": 200,
+        "unit": "ms"
+      },
+      "takeaway": "At 200 ms (roughly Mumbai to the US east coast) the user waits about 600 ms before any data arrives. At 100 ms or less you are inside the budget. Distance, not bandwidth, sets this, which is why edges and connection reuse matter."
     }
   },
   {
@@ -1913,6 +1997,30 @@
         "QUIC gives TCP-like reliability per stream over UDP with a 1-RTT handshake that includes TLS.",
         "Choose by what late or lost data means for the user, not by 'speed'."
       ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "A lost packet on a live score feed",
+      "prompt": "Live cricket scores stream to a phone over TCP. Update #41 is lost in the network; update #42 has already arrived. What does the app see?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Nothing new until #41 is retransmitted, then both arrive in order",
+          "feedback": "Right: TCP hands bytes to the app strictly in order, so #42 waits behind the gap."
+        },
+        {
+          "id": "b",
+          "label": "#42 straight away; #41 is quietly dropped",
+          "feedback": "That is what a UDP-based design could choose to do, not TCP."
+        },
+        {
+          "id": "c",
+          "label": "The connection resets and reconnects",
+          "feedback": "A single loss triggers a retransmission, not a reset."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "This is head-of-line blocking. For data where only the newest value matters, UDP (or separate QUIC streams) lets the app show #42 and skip #41, at the cost of handling loss yourself."
     }
   },
   {
@@ -2309,6 +2417,25 @@
         "Average stuck time after a failure is about half the TTL; the worst case is the full TTL plus stragglers.",
         "DNS can route by geography and health, but it is a slow lever; pair it with retries or anycast."
       ]
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "Pick a TTL for failover",
+      "prompt": "Health checks take about 60 s to notice a dead region; then DNS points to the healthy one. You want everyone moved within 5 minutes. Find the longest TTL you can afford.",
+      "model": "dns-ttl",
+      "params": {
+        "detectS": 60,
+        "budgetS": 300
+      },
+      "control": {
+        "label": "TTL",
+        "min": 30,
+        "max": 3600,
+        "step": 30,
+        "initial": 3600,
+        "unit": "s"
+      },
+      "takeaway": "A TTL of up to about 240 s meets a 5-minute target in the worst case. Shorter TTLs fail over faster but send more queries to resolvers, and some resolvers and clients hold records longer than the TTL, so do not rely on DNS alone for sub-minute failover."
     }
   },
   {
@@ -2659,6 +2786,25 @@
         "0-RTT data can be replayed, so only idempotent requests should use it.",
         "Decide and say where TLS terminates; HTTPS alone does not authorise anything."
       ]
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "First byte from Chennai",
+      "prompt": "A user in Chennai reaches a Singapore origin over a fresh TLS 1.3 connection: one round trip for TCP, one for TLS, one for the request. Keep the first byte under 200 ms.",
+      "model": "rtt-handshake",
+      "params": {
+        "roundTrips": 3,
+        "budgetMs": 200
+      },
+      "control": {
+        "label": "Round-trip time",
+        "min": 10,
+        "max": 150,
+        "step": 10,
+        "initial": 60,
+        "unit": "ms"
+      },
+      "takeaway": "At 60 ms the first byte arrives after about 180 ms. TLS 1.3 needs one handshake round trip (TLS 1.2 needed two); terminating TLS at a nearby edge shortens every round trip, and session resumption saves work on repeat visits."
     }
   },
   {
@@ -3014,6 +3160,30 @@
         "Prefer cursor pagination for large or changing lists.",
         "Version the API and keep changes additive within a version."
       ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "A retried payment",
+      "prompt": "A POST /v1/payments call times out on a phone, and the app retries. Which design stops a double charge?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The client sends an Idempotency-Key; the server stores it with the result and returns the stored result on a retry",
+          "feedback": "Right: the retry is recognised and answered from the stored result."
+        },
+        {
+          "id": "b",
+          "label": "Switch the call to PUT, because PUT is idempotent",
+          "feedback": "PUT is idempotent only when the client names the resource and the server enforces it; changing the verb alone stops nothing."
+        },
+        {
+          "id": "c",
+          "label": "Tell the client never to retry",
+          "feedback": "Timeouts are ambiguous: the first call may or may not have worked, so the user is left guessing."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "A timeout does not tell the client whether the charge happened. Idempotency keys make the retry safe: the server records the key and the outcome atomically and replays the outcome for repeats."
     }
   },
   {
@@ -3397,6 +3567,35 @@
         "GraphQL: clients choose fields; best when many frontends need different shapes.",
         "Fix GraphQL's N+1 with batching, and cap query depth and cost.",
         "A common combination is GraphQL or REST at the edge and gRPC inside."
+      ]
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "GraphQL, gRPC, or both?",
+      "prompt": "Pick the best fit for these constraints.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "GraphQL at the edge for the apps, gRPC between internal services",
+          "feedback": "Right: each fits the side it is good at."
+        },
+        {
+          "id": "b",
+          "label": "gRPC from the mobile app directly to every service",
+          "feedback": "Works, but each screen then makes several calls and the apps couple to every internal service."
+        },
+        {
+          "id": "c",
+          "label": "GraphQL for every internal service-to-service call too",
+          "feedback": "Flexible queries add parsing and cost-control overhead to high-volume internal calls that have fixed shapes."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "GraphQL lets each screen fetch exactly the fields it needs in one round trip (with query-cost limits to prevent fan-out storms); gRPC's binary, schema-first calls suit high-volume service-to-service traffic.",
+      "setup": [
+        "Mobile home screen needs data from five services",
+        "Each screen wants a different shape",
+        "Internal services call each other thousands of times a second"
       ]
     }
   },
@@ -3805,6 +4004,30 @@
         "At scale, sockets need dedicated gateways, a user-to-gateway registry and pub/sub routing.",
         "Always design reconnection and catch-up for missed messages."
       ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "One-way live updates",
+      "prompt": "One million users keep an order-status screen open. Updates flow only from server to client, about once every 10 seconds. What is the simplest fit?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Server-Sent Events (SSE) over HTTP",
+          "feedback": "Right: a one-way stream over plain HTTP, with automatic reconnects."
+        },
+        {
+          "id": "b",
+          "label": "WebSockets",
+          "feedback": "They work, but you pay for full-duplex connections and custom framing you don't need."
+        },
+        {
+          "id": "c",
+          "label": "Short polling every second",
+          "feedback": "That is about a million requests a second, almost all returning 'no change'."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Match the channel to the direction of traffic. SSE covers server-to-client pushes; WebSockets earn their extra complexity when the client also sends a steady stream (chat, games). Either way, a million open connections need dedicated gateway servers."
     }
   },
   {
@@ -4204,6 +4427,30 @@
         "Hashing gives key affinity; use consistent hashing so a resize moves about 1/N of keys, not most of them.",
         "Watch for hot keys whenever you hash."
       ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Round robin with uneven requests",
+      "prompt": "Four servers sit behind round robin. Most requests take 5 ms, but report exports take 5 seconds. What happens under load?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Servers that drew several exports pile up queued work while others sit idle",
+          "feedback": "Right: round robin counts requests, not work."
+        },
+        {
+          "id": "b",
+          "label": "Load evens out because every server gets the same number of requests",
+          "feedback": "Equal counts are not equal work when durations differ by 1,000×."
+        },
+        {
+          "id": "c",
+          "label": "Round robin automatically skips servers that are busy",
+          "feedback": "Plain round robin does not look at load."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "When request cost varies widely, least-connections (or least outstanding requests) sends new work to the server with the least in flight. Better still, move 5-second exports to a background queue."
     }
   },
   {
@@ -4597,6 +4844,35 @@
         "Detection time = check interval × failure threshold; shorten it and add passive checks.",
         "Keep health checks shallow and drain connections during deploys."
       ]
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "Which layer can do this?",
+      "prompt": "Pick the load balancer that meets all three requirements.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "An L7 (HTTP) load balancer",
+          "feedback": "Right: only something that parses HTTP can see paths and headers."
+        },
+        {
+          "id": "b",
+          "label": "An L4 (TCP) load balancer",
+          "feedback": "L4 sees IP addresses and ports, not paths or headers."
+        },
+        {
+          "id": "c",
+          "label": "DNS round robin",
+          "feedback": "DNS picks an address per lookup; it cannot route by path or split traffic by header."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Path- and header-based routing, canaries and TLS termination need L7. L4 is still useful in front for raw connection spreading and non-HTTP protocols.",
+      "setup": [
+        "/api goes to one pool, /static to another",
+        "5% of requests with header X-Canary: 1 go to a new version",
+        "Terminate TLS once at the edge"
+      ]
     }
   },
   {
@@ -4983,6 +5259,30 @@
         "CDNs and API gateways are specialised reverse proxies.",
         "Never cache personalised data in a shared proxy, and trust forwarded-IP headers only from your own proxy."
       ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Forward or reverse?",
+      "prompt": "A company sends every employee's web traffic through a box that blocks some sites and logs the rest. What is that box?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "A forward proxy",
+          "feedback": "Right: it acts on behalf of the clients."
+        },
+        {
+          "id": "b",
+          "label": "A reverse proxy",
+          "feedback": "A reverse proxy sits in front of servers, acting on their behalf."
+        },
+        {
+          "id": "c",
+          "label": "An API gateway",
+          "feedback": "A gateway fronts your own APIs; it does not filter employees' browsing."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Forward proxies sit on the client side (filtering, anonymising). Reverse proxies such as Nginx or Envoy sit on the server side (TLS, caching, routing, hiding backends)."
     }
   },
   {
@@ -5378,6 +5678,30 @@
         "Sticky sessions are a stopgap: uneven load and lost sessions on failure.",
         "Signed tokens remove lookups but make revocation hard; keep them short-lived."
       ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Carts in server memory",
+      "prompt": "Shopping carts live in each server's memory. You add a second server behind round robin. What does a shopper see?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Their cart seems to empty and refill as requests alternate between servers",
+          "feedback": "Right: each server only knows the carts it created."
+        },
+        {
+          "id": "b",
+          "label": "Nothing changes",
+          "feedback": "Each request may land on a server that has never seen this cart."
+        },
+        {
+          "id": "c",
+          "label": "The load balancer copies carts between servers",
+          "feedback": "Load balancers route requests; they do not move application state."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Move session state to a shared store such as Redis so any instance can serve any request. Sticky sessions hide the symptom but lose carts whenever a server dies or is replaced."
     }
   },
   {
@@ -5744,6 +6068,25 @@
         "Cache what is read often, changes rarely and is expensive to build.",
         "Never approve money or inventory from a cache."
       ]
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "Find the hit rate the database survives",
+      "prompt": "20,000 reads per second arrive; the database can take about 3,000 per second. Find the lowest cache hit rate that keeps it alive.",
+      "model": "cache-hit",
+      "params": {
+        "reads": 20000,
+        "dbCapacity": 3000
+      },
+      "control": {
+        "label": "Cache hit rate",
+        "min": 50,
+        "max": 99,
+        "step": 1,
+        "initial": 70,
+        "unit": "%"
+      },
+      "takeaway": "You need at least 85%. Every extra percent removes 200 reads per second from the database, so the last few percent matter most, and a cold cache after a restart can take the database down."
     }
   },
   {
@@ -6138,6 +6481,35 @@
         "Write-behind gives fast writes but can lose data; use it only where loss is tolerable.",
         "Prefer deleting keys over updating them to avoid races."
       ]
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "Strategy for a like counter",
+      "prompt": "Choose the caching strategy for these constraints.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Write-behind: increment in the cache and flush to the database in batches",
+          "feedback": "Right: batching absorbs the write rate, and a few lost seconds are acceptable here."
+        },
+        {
+          "id": "b",
+          "label": "Write-through: update cache and database synchronously on every like",
+          "feedback": "Safe, but every like still costs a database write, which is the load you wanted to avoid."
+        },
+        {
+          "id": "c",
+          "label": "Cache-aside: write the database and delete the cache key on every like",
+          "feedback": "Each like evicts a hot key and forces a reload: heavy churn on the most-read data."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Write-behind trades durability for write throughput. That is fine for likes and views, never for money: a crash loses whatever has not been flushed.",
+      "setup": [
+        "Thousands of likes per second on popular posts",
+        "Counts are read far more than written",
+        "Losing a few seconds of likes in a crash is acceptable"
+      ]
     }
   },
   {
@@ -6510,6 +6882,30 @@
         "Size the cache for the hot set; skew means a small cache can give a high hit rate.",
         "Real caches approximate LRU and LFU by sampling."
       ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "A nightly scan meets the cache",
+      "prompt": "A product cache holds a stable set of best-sellers. Each night a batch job reads every product once. Which eviction policy keeps the best-sellers cached?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "LFU (least frequently used)",
+          "feedback": "Right: one read per product cannot outrank items read thousands of times."
+        },
+        {
+          "id": "b",
+          "label": "LRU (least recently used)",
+          "feedback": "The scan makes every product 'recently used' and pushes the best-sellers out."
+        },
+        {
+          "id": "c",
+          "label": "TTL only",
+          "feedback": "TTL removes items by age; it does not protect hot items from a scan."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "One-pass scans pollute LRU. LFU (Redis implements an approximate LFU with decay) keeps a stable hot set. Another fix is to have batch jobs bypass the cache."
     }
   },
   {
@@ -6904,6 +7300,30 @@
         "Penetration: lookups for keys that don't exist; fix with negative caching and Bloom filters.",
         "Always protect the database behind the cache with limits."
       ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "A hot key expires",
+      "prompt": "A key read 10,000 times a second expires, and rebuilding it takes 50 ms. With no protection, how many database reads hit during that window?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "About 500",
+          "feedback": "Right: 10,000 per second × 0.05 s."
+        },
+        {
+          "id": "b",
+          "label": "Exactly 1",
+          "feedback": "Only with request coalescing (single-flight) or a lock."
+        },
+        {
+          "id": "c",
+          "label": "About 10,000",
+          "feedback": "That would be a full second of misses; the window is 50 ms."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Every request that misses during the rebuild goes to the database. Single-flight lets one request rebuild while the others wait; early refresh and TTL jitter stop many keys expiring together."
     }
   },
   {
@@ -7252,6 +7672,25 @@
         "Use signed URLs or cookies for private content.",
         "For big live events, the edge carries terabits while the origin sends each segment once per rendition."
       ]
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "How much must the edge absorb?",
+      "prompt": "A live event pushes 2 Tbps (2,000 Gbps) to viewers. Your origin can send at most 100 Gbps. Find the edge hit ratio you need.",
+      "model": "cdn-offload",
+      "params": {
+        "totalGbps": 2000,
+        "originGbps": 100
+      },
+      "control": {
+        "label": "Edge hit ratio",
+        "min": 80,
+        "max": 99.9,
+        "step": 0.1,
+        "initial": 90,
+        "unit": "%"
+      },
+      "takeaway": "You need at least 95%: at 90% the origin would have to push 200 Gbps. Live streams pre-warm edges and often add an origin shield tier so that misses from many edges collapse into one request."
     }
   },
   {
@@ -7646,6 +8085,30 @@
         "Replication is asynchronous; persistence is optional. Don't make Redis your only copy of critical data.",
         "Redis Cluster shards keys over 16,384 slots; use hash tags to co-locate related keys."
       ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Which Redis structure?",
+      "prompt": "A live leaderboard shows the top 10 of 5 million players, and scores change thousands of times a second. Which Redis structure fits?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "A sorted set: ZADD to update, ZREVRANGE for the top 10",
+          "feedback": "Right: updates and rank queries are both O(log N)."
+        },
+        {
+          "id": "b",
+          "label": "A hash of player → score, sorted in the app on each read",
+          "feedback": "Sorting 5 million entries per read is far too slow."
+        },
+        {
+          "id": "c",
+          "label": "A list, re-ordered on every update",
+          "feedback": "Lists keep insertion order; re-ordering costs O(N) per update."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Sorted sets keep members ordered by score, so rank and range queries stay fast as the board grows. For very large contests, shard by contest, not by player."
     }
   },
   {
@@ -8045,6 +8508,35 @@
         "Mixed workloads often deserve two or three stores, each with a clear job."
       ],
       "diagram": "access patterns --> need multi-row ACID or joins? --yes--> SQL (+ replicas, cache)\n                         |\n                         no --> lookup by key? -> key-value\n                                nested record? -> document\n                                huge writes by key? -> wide-column\n                                many hops? -> graph"
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "SQL or NoSQL for orders?",
+      "prompt": "Choose a store for these constraints.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "A relational database such as Postgres",
+          "feedback": "Right: relational data, multi-row transactions and joins, at a write rate one well-tuned primary can often handle."
+        },
+        {
+          "id": "b",
+          "label": "A key-value store, with joins done in the app",
+          "feedback": "You'd rebuild transactions and joins by hand for data that is naturally relational."
+        },
+        {
+          "id": "c",
+          "label": "A graph database",
+          "feedback": "Nothing here is a deep relationship traversal; graphs fit social or fraud networks."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Choose by access pattern. Orders, items, payments and refunds need atomic multi-row changes and ad-hoc reports. Measure before assuming 2,000 writes/s is too much for one primary; add replicas and partitioning when numbers demand it.",
+      "setup": [
+        "Orders with line items, payments and refunds",
+        "Finance runs reports joining all four",
+        "About 2,000 writes per second at peak"
+      ]
     }
   },
   {
@@ -8423,6 +8915,30 @@
         "Bucket keys that grow without limit or get hot."
       ],
       "diagram": "partition key (conversation_id, month) -> one node\n  sort key: message_ts DESC\n  [m_500][m_499][m_498] ... read newest 50 = one contiguous slice"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Keys for a chat table",
+      "prompt": "In Cassandra, the main query is 'the latest 50 messages in conversation X'. Which keys fit?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Partition by conversation_id, cluster by message time descending",
+          "feedback": "Right: one partition per conversation, already in the order you read."
+        },
+        {
+          "id": "b",
+          "label": "Partition by message_id",
+          "feedback": "Every message lands in a different partition, so one conversation is scattered everywhere."
+        },
+        {
+          "id": "c",
+          "label": "Partition by date",
+          "feedback": "All of today's messages crowd into one hot partition."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Model NoSQL tables around the query. Very busy group chats may also need a time bucket in the partition key so no single partition grows without bound."
     }
   },
   {
@@ -8778,6 +9294,24 @@
         "Every index is a tax on writes; index for the queries you actually run."
       ],
       "diagram": "B-tree:  [root] -> [internal] -> [leaf: keys + row pointers]   (3-4 levels)\nLSM:     write -> WAL + memtable -> flush -> SSTable L0 -> compaction -> L1, L2 ..."
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "How deep does a B-tree grow?",
+      "prompt": "Grow the table and watch the depth of a B-tree with fan-out 100.",
+      "model": "btree-levels",
+      "params": {
+        "fanout": 100
+      },
+      "control": {
+        "label": "Table size (rows)",
+        "min": 3,
+        "max": 10,
+        "step": 1,
+        "initial": 6,
+        "log10": true
+      },
+      "takeaway": "From a thousand rows to ten billion, depth only goes from 2 to 5 levels. An indexed lookup stays a handful of page reads, and the top levels usually sit in memory, while a full scan grows with every row."
     }
   },
   {
@@ -9150,6 +9684,35 @@
         "Measure before denormalising."
       ],
       "diagram": "normalised:   orders(customer_id) --join--> customers(name)\ndenormalised: order_summary(customer_name_at_order, restaurant_name, total)"
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "Copy the seller name?",
+      "prompt": "Choose the data model for this read path.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Copy the seller name into each order row, and update copies when a seller renames",
+          "feedback": "Right: the hot read becomes one row, and the rare rename pays the cost."
+        },
+        {
+          "id": "b",
+          "label": "Keep it normalized and join three tables on every page view",
+          "feedback": "Correct but costly on the hottest path; fine until measurements say otherwise."
+        },
+        {
+          "id": "c",
+          "label": "Denormalize every table up front",
+          "feedback": "Copies everywhere make every write harder to keep consistent, for paths that may never be hot."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Start normalized, then denormalize the measured hot path and decide how copies stay in sync (same transaction, or an async update with a short staleness window).",
+      "setup": [
+        "The order page shows the seller's name",
+        "Sellers rename themselves rarely",
+        "The order page is read about 50,000 times a second"
+      ]
     }
   },
   {
@@ -9523,6 +10086,30 @@
         "Keep transactions short and local; use sagas or outboxes across services."
       ],
       "diagram": "BEGIN -> writes in memory + WAL records -> constraints ok? -> COMMIT record -> fsync WAL -> ack client\n crash before fsync: replay log, discard   |   crash after fsync: replay log, keep"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "A crash in the middle of a transfer",
+      "prompt": "A transfer runs as two auto-committed statements: debit account A, then credit account B. The server crashes between them. What is the result?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "A was debited and B never credited: money vanished",
+          "feedback": "Right: each statement committed on its own."
+        },
+        {
+          "id": "b",
+          "label": "Both statements roll back",
+          "feedback": "Only if they were inside one transaction."
+        },
+        {
+          "id": "c",
+          "label": "B is credited twice on restart",
+          "feedback": "Nothing replays the credit; it simply never ran."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Wrap related writes in one transaction (BEGIN … COMMIT) so they commit together or not at all. Keep transactions short: never hold one open across a network call."
     }
   },
   {
@@ -9905,6 +10492,30 @@
         "Prefer conditional writes and unique constraints for booking invariants."
       ],
       "diagram": "T1: read on_call=2 ----- set Alice off ----- commit\nT2:   read on_call=2 ----- set Bob off ----- commit\nresult: on_call=0  (write skew under snapshot isolation)"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Two doctors go off call",
+      "prompt": "A rule says at least one doctor must be on call. Two doctors are on call. Each, in their own transaction, checks 'are at least 2 on call?' and removes themselves. Under snapshot isolation (Postgres REPEATABLE READ), what happens?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Both commit, leaving nobody on call",
+          "feedback": "Right: each saw two doctors in its snapshot, and they wrote different rows."
+        },
+        {
+          "id": "b",
+          "label": "The second transaction blocks until the first finishes, then sees one doctor",
+          "feedback": "Snapshot isolation doesn't block on reads; each transaction keeps its own snapshot."
+        },
+        {
+          "id": "c",
+          "label": "Both transactions abort",
+          "feedback": "Snapshot isolation only aborts write-write conflicts on the same row."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "This is write skew. SERIALIZABLE isolation detects it and aborts one transaction; alternatives are SELECT … FOR UPDATE on the rows you checked, or a constraint the database can enforce."
     }
   },
   {
@@ -10291,6 +10902,30 @@
         "Keep money and inventory off eventually consistent paths."
       ],
       "diagram": "client -> replica A (ack) --async--> replica B, replica C\nread from C before arrival -> old value; after -> converged"
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "Where is eventual consistency fine?",
+      "prompt": "Which of these can safely be eventually consistent?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The like count on a post",
+          "feedback": "Right: a count that is briefly off by a few hurts nobody."
+        },
+        {
+          "id": "b",
+          "label": "A wallet balance checked before a spend",
+          "feedback": "Two replicas could both approve spends from the same money."
+        },
+        {
+          "id": "c",
+          "label": "Inventory for the last few seats in a show",
+          "feedback": "Stale reads oversell the last seats."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Spend strong consistency where a stale read causes real harm (money, inventory, uniqueness) and accept eventual consistency where it doesn't (counts, feeds, recommendations)."
     }
   },
   {
@@ -10676,6 +11311,30 @@
         "Failover must promote the freshest follower and fence the old leader."
       ],
       "diagram": "client --write--> LEADER --log--> follower 1 (sync ack)\n                        \\--log--> follower 2 (async)\nreads --> followers (may lag) | own recent writes --> leader"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Acknowledged, then lost?",
+      "prompt": "With asynchronous replication, the leader acknowledges a write and crashes 200 ms later, before shipping it. A replica is promoted. What happened to the write?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "It is lost, even though the client was told it succeeded",
+          "feedback": "Right: it existed only on the old leader."
+        },
+        {
+          "id": "b",
+          "label": "The replica has it, because the client got an acknowledgement",
+          "feedback": "With async replication the acknowledgement comes before the replica has the data."
+        },
+        {
+          "id": "c",
+          "label": "The client receives an error later",
+          "feedback": "Nothing notifies the client after the fact."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Async replication risks losing the last moments of writes on failover (the RPO is not zero). Synchronous or semi-synchronous replication closes the gap at the cost of write latency."
     }
   },
   {
@@ -11021,6 +11680,24 @@
         "Quorums are not linearizability; use conditional writes for invariants."
       ],
       "diagram": "N=3:  [r1][r2][r3]\nwrite W=2 -> r1, r2 ack\nread  R=2 -> r2, r3 reply -> r2 has newest -> return it, repair r3"
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "Find the smallest safe R",
+      "prompt": "Five replicas (N = 5); every write waits for three of them (W = 3). Find the smallest number of replicas a read must hear from (R) to be sure it overlaps the latest write.",
+      "model": "quorum",
+      "params": {
+        "n": 5,
+        "w": 3
+      },
+      "control": {
+        "label": "Read quorum R",
+        "min": 1,
+        "max": 5,
+        "step": 1,
+        "initial": 1
+      },
+      "takeaway": "R = 3, because 3 + 3 > 5. A smaller R reads faster but can miss the newest write. Even with overlap, sloppy quorums and concurrent writes can still return surprising results, so overlap is not the same as linearizability."
     }
   },
   {
@@ -11421,6 +12098,30 @@
         "Pre-split into many logical shards to make resharding cheap."
       ],
       "diagram": "key -> hash(key) mod 64 logical shards -> routing map -> 12 physical nodes\n user 42 -> shard 17 -> node 5  (orders co-located with user)"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Shard by country?",
+      "prompt": "An India-first app shards its orders table by country. What goes wrong?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Almost all traffic lands on the India shard: one hot shard",
+          "feedback": "Right: the key has few values and is badly skewed."
+        },
+        {
+          "id": "b",
+          "label": "Range queries on order time stop working",
+          "feedback": "They still work within each shard; the real problem is the skew."
+        },
+        {
+          "id": "c",
+          "label": "Nothing: country is a natural shard key",
+          "feedback": "Natural, but it does not spread load when one value dominates."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "A good shard key has many values and even access, such as a hash of user_id or order_id. Check the key against both the hottest query and the data distribution."
     }
   },
   {
@@ -11766,6 +12467,21 @@
         "Hot single keys need replication or splitting, not just hashing."
       ],
       "diagram": "        n1\n   k3 /    \\ k1 -> n2\n    n4      n2\n      \\    /\n        n3  <- k2\nadd n5 between n2 and n3: only keys in that arc move"
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "Add one node: how many keys move?",
+      "prompt": "Change the cluster size and compare a hash ring with hash mod N when one node joins.",
+      "model": "ring-moves",
+      "params": {},
+      "control": {
+        "label": "Nodes before the new one joins",
+        "min": 2,
+        "max": 50,
+        "step": 1,
+        "initial": 4
+      },
+      "takeaway": "On a ring only about 1/(N+1) of keys move to the new node. With hash mod N almost every key changes owner, which empties a cache cluster at the moment you added capacity. Virtual nodes keep the ring's arcs even."
     }
   },
   {
@@ -12148,6 +12864,30 @@
         "'CA' is not a real option for a distributed system."
       ],
       "diagram": "  side A  ==X== side B\nwrite x=2 at A | read x at B -> CP: error/wait  |  AP: return x=1 (stale)"
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "A partition during the last seats",
+      "prompt": "A network partition splits the Mumbai and Chennai replicas. Ten seats are left for a show. What should the minority side do?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Refuse bookings until the partition heals (choose consistency)",
+          "feedback": "Right: an error is better than selling a seat twice."
+        },
+        {
+          "id": "b",
+          "label": "Keep booking on both sides and reconcile later (choose availability)",
+          "feedback": "Reconciling means cancelling tickets people already paid for."
+        },
+        {
+          "id": "c",
+          "label": "Nothing; partitions don't happen within one country",
+          "feedback": "Partitions happen anywhere networks do: links, switches, misconfigurations."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "CAP is a choice made during a partition. For scarce inventory and money, refuse on one side (CP). For a news feed or likes, keep serving and reconcile (AP)."
     }
   },
   {
@@ -12502,6 +13242,30 @@
         "Labels are defaults; choose per operation."
       ],
       "diagram": "Partition?  yes -> choose A or C\n            no  -> choose L (answer locally) or C (wait for quorum)"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Name the choice",
+      "prompt": "No partition. A Mumbai user reads a product price. The leader is in Singapore (about 60 ms away); a local replica answers in 2 ms but may be a little stale. You choose the local replica. Which PACELC letters describe that?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "EL: else (no partition), favour latency",
+          "feedback": "Right: in normal operation you traded freshness for speed."
+        },
+        {
+          "id": "b",
+          "label": "PC: during a partition, favour consistency",
+          "feedback": "There is no partition in this scenario."
+        },
+        {
+          "id": "c",
+          "label": "EC: else, favour consistency",
+          "feedback": "That would be reading from the Singapore leader."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "PACELC adds the everyday trade-off CAP leaves out: even without partitions, consistency costs latency. Choose per feature: catalogue reads EL, checkout EC."
     }
   },
   {
@@ -12893,6 +13657,30 @@
         "Reserve linearizability for invariants like uniqueness and balances."
       ],
       "diagram": "eventual < monotonic reads < read-your-writes < causal < linearizable\ncheap, fast, available  ---------------------------->  costly, slower"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The old photo comes back",
+      "prompt": "A user changes their profile photo, refreshes, and sees the old one. What is the minimum guarantee that would prevent this?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Read-your-writes",
+          "feedback": "Right: this user's reads must see this user's writes."
+        },
+        {
+          "id": "b",
+          "label": "Durability",
+          "feedback": "The write was saved; the read simply went to a lagging replica."
+        },
+        {
+          "id": "c",
+          "label": "Strong consistency for every user's reads",
+          "feedback": "That would fix it, but it costs far more than this feature needs."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Route a user's reads to the primary for a short time after they write (or track their last write position). Other users can keep reading replicas."
     }
   },
   {
@@ -13297,6 +14085,30 @@
         "Project growth to decide when to shard."
       ],
       "diagram": "1 primary -> + cache/CDN -> + read replicas -> + bigger box -> + specialised stores -> shard\n(climb a rung only when a measured number forces it)"
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "First step for a struggling database",
+      "prompt": "A Postgres primary sits at 70% CPU, mostly from a few slow, unindexed read queries. Writes are fine. What do you do first?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Add the missing indexes and fix the slow queries",
+          "feedback": "Right: the cheapest fix for the actual cause."
+        },
+        {
+          "id": "b",
+          "label": "Shard the database now",
+          "feedback": "Sharding is expensive to build and undo, and doesn't fix bad queries."
+        },
+        {
+          "id": "c",
+          "label": "Migrate to Cassandra",
+          "feedback": "A rewrite for a problem an index solves."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Climb the ladder in order: fix queries and indexes, add a cache, add read replicas, move to a bigger instance, and partition only when writes or data size demand it."
     }
   },
   {
@@ -13657,6 +14469,25 @@
         "Always configure retries with backoff and a dead-letter queue."
       ],
       "diagram": "producer -> [ queue | m1 m2 m3 ... ] -> worker (ack) \n                        |  after 5 failures\n                        v\n                      [ DLQ ] -> alert, inspect, replay"
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "How many workers for the spike?",
+      "prompt": "During a sale, 6,000 jobs per minute arrive for 15 minutes. Each worker finishes 2,000 per minute. Find how many workers stop the backlog growing.",
+      "model": "queue-backlog",
+      "params": {
+        "arrivalsPerMin": 6000,
+        "perWorkerPerMin": 2000,
+        "minutes": 15
+      },
+      "control": {
+        "label": "Workers",
+        "min": 1,
+        "max": 5,
+        "step": 1,
+        "initial": 2
+      },
+      "takeaway": "Three workers keep up. With two, 30,000 jobs pile up in 15 minutes and drain only after the spike ends. That is fine for emails that can wait, not for work a user is waiting on."
     }
   },
   {
@@ -14029,6 +14860,30 @@
         "acks=all with replication factor 3 and min.insync.replicas 2 survives one broker failure."
       ],
       "diagram": "producer --key=order_id--> topic orders\n  P0: [0][1][2][3]... -> consumer A (group: notify)\n  P1: [0][1][2]...    -> consumer B (group: notify)\n  same partitions also read by group: analytics (own offsets)"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "More consumers than partitions",
+      "prompt": "A Kafka topic has 6 partitions. You start 10 consumers in one consumer group. How many do work?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "6; the other 4 sit idle",
+          "feedback": "Right: each partition goes to one consumer in a group."
+        },
+        {
+          "id": "b",
+          "label": "All 10, sharing partitions",
+          "feedback": "Within one group a partition is never split between consumers."
+        },
+        {
+          "id": "c",
+          "label": "Only 1; the others are standby",
+          "feedback": "The group spreads partitions across consumers, up to one each."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Partitions cap a group's parallelism. Pick a partition count for the peak consumer throughput you need, with room to grow; idle consumers are useful only as hot spares."
     }
   },
   {
@@ -14412,6 +15267,30 @@
         "Quantify fan-out as followers divided by worker throughput."
       ],
       "diagram": "post by normal user -> fan-out workers -> follower timelines (push)\npost by celebrity   -> stored once\nfeed open -> read own timeline + fetch celebrity posts -> merge by time"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "A celebrity posts",
+      "prompt": "An account with 50 million followers posts. With fan-out on write for everyone, how many feed writes does that one post cause?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "About 50 million",
+          "feedback": "Right: one insert into each follower's precomputed feed."
+        },
+        {
+          "id": "b",
+          "label": "One",
+          "feedback": "That is fan-out on read: store once, merge when feeds are read."
+        },
+        {
+          "id": "c",
+          "label": "About 50,000",
+          "feedback": "Off by a factor of 1,000."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Hybrid feeds push posts from normal accounts at write time and merge celebrity posts at read time, so one post doesn't cause millions of writes."
     }
   },
   {
@@ -14776,6 +15655,30 @@
         "Use exponential backoff with jitter and a DLQ."
       ],
       "diagram": "process -> crash before ack -> redelivered -> process again\n            (at least once)        dedup table: event_id UNIQUE -> second time = no-op"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Crash before the commit",
+      "prompt": "A consumer writes a message's result to the database, then crashes before committing its offset. What happens on restart?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The message is delivered again",
+          "feedback": "Right: the committed offset is still before it."
+        },
+        {
+          "id": "b",
+          "label": "The message is lost",
+          "feedback": "At-least-once delivery doesn't lose it; it repeats it."
+        },
+        {
+          "id": "c",
+          "label": "The consumer skips ahead to the next message",
+          "feedback": "It resumes from the last committed offset."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "At-least-once delivery means duplicates after crashes. Make processing idempotent (upserts, dedup keys) so a replay changes nothing."
     }
   },
   {
@@ -15126,6 +16029,30 @@
         "Prefer natural keys and upserts when the business id already exists."
       ],
       "diagram": "client --(key K)--> server: INSERT key K (unique) -> do work -> save response\nretry  --(key K)--> server: key exists -> return saved response (no second charge)"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Check, then charge",
+      "prompt": "A server handles retries like this: check whether key K was seen; if not, charge the card and then store K. Two retries arrive at the same moment. What can happen?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Both pass the check and the card is charged twice",
+          "feedback": "Right: the check and the store are separate steps."
+        },
+        {
+          "id": "b",
+          "label": "The second request waits automatically",
+          "feedback": "Nothing makes them wait unless you add a lock or constraint."
+        },
+        {
+          "id": "c",
+          "label": "Nothing; idempotency keys prevent duplicates by definition",
+          "feedback": "Only if recording the key is atomic with claiming the work."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Insert the key first under a unique constraint (or take a lock), then do the work. The loser of the race gets the stored result instead of a second charge."
     }
   },
   {
@@ -15491,6 +16418,25 @@
         "Choose the key carefully: user, API key or phone beats IP alone."
       ],
       "diagram": "token bucket (B=3, R=1 per 30 s)\n [o o o] -> req -> [o o .] -> req -> [o . .] -> req -> [. . .] -> req: 429\n           +1 token every 30 s"
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "Size the burst",
+      "prompt": "A partner API refills 5 tokens per second. Partners send batches of 20 requests at once. Find a bucket capacity that lets a batch through, and see how many requests pass in the first 4 seconds.",
+      "model": "token-bucket",
+      "params": {
+        "rate": 5,
+        "seconds": 4,
+        "burst": 20
+      },
+      "control": {
+        "label": "Bucket capacity",
+        "min": 0,
+        "max": 40,
+        "step": 5,
+        "initial": 5
+      },
+      "takeaway": "Capacity sets the burst and the refill rate sets the sustained limit. With capacity 20, a full bucket allows 20 + 5 × 4 = 40 requests in the first 4 seconds, then 5 per second."
     }
   },
   {
@@ -15867,6 +16813,30 @@
         "UUIDv4 for unguessable ids, UUIDv7 or Snowflake for ordered ones."
       ],
       "diagram": "| 0 | 41 bits: ms since epoch | 10 bits: machine | 12 bits: sequence |\n  sign   ~69 years                1,024 nodes        4,096 per ms"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Auto-increment IDs in URLs",
+      "prompt": "Why avoid exposing database auto-increment IDs in public order URLs?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "They leak how many orders you get and let anyone try neighbouring IDs",
+          "feedback": "Right: sequential IDs are guessable and reveal volume."
+        },
+        {
+          "id": "b",
+          "label": "Auto-increment IDs run out at about 2 billion",
+          "feedback": "A 64-bit column lasts effectively forever."
+        },
+        {
+          "id": "c",
+          "label": "Two orders can get the same ID",
+          "feedback": "A single database sequence doesn't produce duplicates."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Use non-guessable public IDs (UUIDv4, or a random token) and still enforce authorization on every lookup. Snowflake or UUIDv7 IDs add time ordering for indexes."
     }
   },
   {
@@ -16257,6 +17227,30 @@
         "Orchestration is easier to debug than choreography for long flows."
       ],
       "diagram": "saga: [create order] -> [reserve stock] -> [charge] -> [assign rider]\n fail at charge:        <- release stock <- cancel order (compensate in reverse)"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Payment fails mid-saga",
+      "prompt": "A trip-booking saga reserved a flight, then a hotel, then the payment fails. What happens?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Compensating steps cancel the hotel, then the flight",
+          "feedback": "Right: a saga undoes completed steps in reverse order."
+        },
+        {
+          "id": "b",
+          "label": "Two-phase commit rolls everything back atomically",
+          "feedback": "A saga has no global atomic rollback; that is what 2PC would try to provide."
+        },
+        {
+          "id": "c",
+          "label": "Nothing; the user keeps both reservations",
+          "feedback": "Then the user holds unpaid bookings."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Sagas trade atomicity for availability: each step commits locally and has a compensating action. Design compensations to be idempotent, because they may be retried."
     }
   },
   {
@@ -16634,6 +17628,30 @@
         "Publish curated events, not raw table changes, as contracts."
       ],
       "diagram": "BEGIN; UPDATE orders SET paid; INSERT outbox(event); COMMIT\n relay/CDC --> Kafka --> warehouse, notifications (dedupe by event_id)"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Save, then publish",
+      "prompt": "A service saves an order and then publishes OrderPlaced to Kafka, with no outbox. It crashes between the two. What is the state?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The order exists, but no event was ever published",
+          "feedback": "Right: the two writes were not atomic."
+        },
+        {
+          "id": "b",
+          "label": "Both are rolled back",
+          "feedback": "The database committed before the crash."
+        },
+        {
+          "id": "c",
+          "label": "The event is published twice",
+          "feedback": "It was never published once."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "The outbox pattern writes the order and the event row in one transaction; a relay publishes the row later. The relay delivers at least once, so consumers must handle duplicates."
     }
   },
   {
@@ -16994,6 +18012,21 @@
         "Terms ensure an old leader steps down when it returns."
       ],
       "diagram": "client -> LEADER (term 7) --AppendEntries--> F1 ack\n                         \\--AppendEntries--> F2 (slow)\n majority (leader + F1) stored -> commit -> apply -> reply"
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "How many nodes to survive f failures?",
+      "prompt": "A majority-quorum cluster (Raft, etcd, ZooKeeper) must keep working when some nodes fail. Change how many failures it must survive.",
+      "model": "raft-majority",
+      "params": {},
+      "control": {
+        "label": "Failures to survive",
+        "min": 1,
+        "max": 4,
+        "step": 1,
+        "initial": 1
+      },
+      "takeaway": "You need 2f + 1 nodes: 3 survive one failure, 5 survive two. A fourth node adds cost without extra tolerance, and every extra node is one more acknowledgement on the write path, so most clusters run 3 or 5."
     }
   },
   {
@@ -17380,6 +18413,30 @@
         "Prefer constraints and conditional writes when they suffice."
       ],
       "diagram": "A gets lock (token 33) ... long GC pause ...   lease expires\nB gets lock (token 34) -> write(34) accepted\nA wakes -> write(33) -> storage: 33 < 34 -> REJECTED"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "A pause longer than the lease",
+      "prompt": "A lock's lease is 10 seconds. The holder pauses for 12 seconds (a long GC pause), then writes. Another client took the lock at second 10. Without fencing tokens, what happens?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Both clients write as the owner, and the storage accepts the stale write",
+          "feedback": "Right: nothing tells the storage that the first client's lease ended."
+        },
+        {
+          "id": "b",
+          "label": "The paused client's write is rejected automatically",
+          "feedback": "Only if the storage checks a fencing token."
+        },
+        {
+          "id": "c",
+          "label": "The lease extends itself during the pause",
+          "feedback": "Leases expire on the lock service's clock regardless of the holder."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Hand out a fencing token that increases with each lock grant and have the storage reject writes with an older token. A lock alone cannot protect data from paused clients."
     }
   },
   {
@@ -17746,6 +18803,30 @@
         "Detecting a conflict is separate from resolving it."
       ],
       "diagram": "P: [1] --send m(2)--> \nQ: [1] [2] --recv m--> max(2,2)+1 = [3]\nvectors: {P:1,Q:0} vs {P:0,Q:1} -> neither dominates -> concurrent"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Lamport receive rule",
+      "prompt": "Node A, with counter 5, sends a message to node B, whose counter is 3. What is B's counter after receiving it?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "6",
+          "feedback": "Right: max(3, 5) + 1."
+        },
+        {
+          "id": "b",
+          "label": "4",
+          "feedback": "That ignores A's timestamp; causes must sort before effects."
+        },
+        {
+          "id": "c",
+          "label": "8",
+          "feedback": "Counters take the maximum, they don't add."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "On receive, a Lamport clock jumps to max(local, received) + 1, so a message's send always sorts before its receipt. Vector clocks go further and can tell when two events were concurrent."
     }
   },
   {
@@ -18097,6 +19178,22 @@
         "Indirect probes reduce false failure detections."
       ],
       "diagram": "round 1: A -> B, C\nround 2: A, B, C -> 6 more\nround 3: ... ~3x per round -> all 1,000 nodes in ~7-10 rounds"
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "How fast does gossip spread?",
+      "prompt": "Each round, everyone who knows the news tells one random peer, so the number who know roughly doubles. Grow the cluster.",
+      "model": "gossip-rounds",
+      "params": {},
+      "control": {
+        "label": "Cluster size (nodes)",
+        "min": 1,
+        "max": 6,
+        "step": 1,
+        "initial": 2,
+        "log10": true
+      },
+      "takeaway": "Rounds grow with log₂ N: about 10 rounds for 1,000 nodes, 20 for a million. Real protocols need a few extra rounds because random peers overlap, but growth stays logarithmic, which is why gossip scales."
     }
   },
   {
@@ -18456,6 +19553,30 @@
         "Count-Min overestimates frequencies; never use sketches for billing."
       ],
       "diagram": "Bloom (m bits, k=3): add 'ravi' -> set bits 3, 9, 14\nquery 'anu' -> bits 3, 7, 14 -> bit 7 is 0 -> definitely absent\nquery 'om'  -> bits 3, 9, 14 all 1 -> probably present (check DB)"
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "A job for a Bloom filter",
+      "prompt": "Which job suits a Bloom filter on its own?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "A crawler skipping URLs it has probably already fetched",
+          "feedback": "Right: an occasional skipped new URL is harmless."
+        },
+        {
+          "id": "b",
+          "label": "Telling a user at sign-up that their username is taken, with no second check",
+          "feedback": "A false positive would block a real, available username."
+        },
+        {
+          "id": "c",
+          "label": "Counting unique visitors exactly",
+          "feedback": "Bloom filters answer membership, not counts; HyperLogLog estimates counts."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Bloom filters never give false negatives but sometimes give false positives. Use them where a false positive is cheap, or confirm a positive against the real store."
     }
   },
   {
@@ -18848,6 +19969,35 @@
         "Split by business capability, and give each service its own data."
       ],
       "diagram": "[ monolith: orders | payments | catalogue | users ]  (one deploy, one DB, clear modules)\n            | extract under pressure\n            v\n[ monolith: orders | payments | users ] --events/API--> [ catalogue service + own DB ]"
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "Architecture for a small team",
+      "prompt": "Choose an architecture for these constraints.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "A modular monolith with clear internal boundaries",
+          "feedback": "Right: boundaries without the network, deployment and data costs."
+        },
+        {
+          "id": "b",
+          "label": "Twelve microservices from day one",
+          "feedback": "Four people can't run twelve services, pipelines and on-call rotations well."
+        },
+        {
+          "id": "c",
+          "label": "One microservice per database table",
+          "feedback": "Splits along tables, not business capabilities, so every feature crosses services."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Microservices pay off when teams and scaling needs diverge. Start modular, then extract a service when a boundary is proven and the team or load justifies it.",
+      "setup": [
+        "A team of four engineers",
+        "One product, with domain boundaries still unclear",
+        "Moderate traffic"
+      ]
     }
   },
   {
@@ -19240,6 +20390,30 @@
         "Services still enforce fine-grained authorisation."
       ],
       "diagram": "client -> [ API gateway: TLS | auth | rate limit | route | trace ] -> BFF -> (profile || offers || orders) in parallel\n                                                                  -> services"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Where does discount logic go?",
+      "prompt": "A festival rule gives 10% off for some users. Where should that logic live?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "In the pricing service",
+          "feedback": "Right: business rules belong in the service that owns the domain."
+        },
+        {
+          "id": "b",
+          "label": "In the API gateway",
+          "feedback": "Gateways handle cross-cutting concerns such as auth, rate limits and routing; business logic there becomes a bottleneck."
+        },
+        {
+          "id": "c",
+          "label": "In the CDN",
+          "feedback": "CDNs cache and deliver; they shouldn't compute prices."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Keep gateways thin: authenticate, apply quotas, route, maybe aggregate. Rules that change with the business go in services that own them and can be tested and deployed on their own."
     }
   },
   {
@@ -19618,6 +20792,30 @@
         "Detection delay plus cache refresh decides how long dead instances get traffic."
       ],
       "diagram": "pod -> registers/ready -> [ registry / k8s endpoints ]\ncaller -> payments.svc (DNS/VIP) -> kube-proxy -> ready pod"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "A crashed instance in the registry",
+      "prompt": "An instance crashes without deregistering. It heartbeats every 5 seconds and entries expire after 15 seconds without one. How long can callers still be sent to it?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Up to about 15 seconds, plus any time callers cache the list",
+          "feedback": "Right: until the entry expires and callers refresh."
+        },
+        {
+          "id": "b",
+          "label": "Never: the registry notices instantly",
+          "feedback": "A silent crash sends no signal; only missing heartbeats reveal it."
+        },
+        {
+          "id": "c",
+          "label": "Forever, until someone removes it by hand",
+          "feedback": "The expiry removes it automatically."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Discovery is eventually correct. Cover the gap with client timeouts and a retry against a different instance."
     }
   },
   {
@@ -19989,6 +21187,24 @@
         "Bulkheads stop one slow dependency from starving the rest."
       ],
       "diagram": "CLOSED --errors > 50%--> OPEN (fail fast / fallback) --cool-down--> HALF-OPEN\n   ^                                                                |\n   +-------------------- trial calls succeed -----------------------+"
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "How many layers can retry?",
+      "prompt": "Each layer makes up to 3 attempts. Find how many layers can retry before one user request can turn into more than 10 calls at the bottom.",
+      "model": "retry-amplification",
+      "params": {
+        "attempts": 3,
+        "limit": 10
+      },
+      "control": {
+        "label": "Layers that retry",
+        "min": 1,
+        "max": 4,
+        "step": 1,
+        "initial": 1
+      },
+      "takeaway": "Two layers already give 9 calls; three give 27. Retry at one layer (usually the edge), with exponential backoff, jitter and a retry budget, so an outage below isn't multiplied into a retry storm."
     }
   },
   {
@@ -20357,6 +21573,30 @@
         "Control cost with sampling and low-cardinality labels; never log secrets."
       ],
       "diagram": "gateway (trace 7f3a) -> orders [span 120 ms] -> payments [span 3.2 s] -> bank API (timeout, retry)\n alert on p99 metric -> open trace 7f3a -> grep logs trace_id=7f3a"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Which signal finds the slow call?",
+      "prompt": "Checkout p99 latency jumped. Which signal shows which downstream call got slow for those requests?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Distributed traces",
+          "feedback": "Right: a trace shows each hop's time for one request."
+        },
+        {
+          "id": "b",
+          "label": "Average CPU across the fleet",
+          "feedback": "CPU can look normal while one dependency is slow."
+        },
+        {
+          "id": "c",
+          "label": "Total log volume per day",
+          "feedback": "Volume says nothing about which call was slow."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Metrics tell you that something is wrong (RED: rate, errors, duration); traces tell you where; logs, joined by trace ID, tell you why."
     }
   },
   {
@@ -20709,6 +21949,24 @@
         "SLO plus error budget guides how fast to ship; SLA is the contract."
       ],
       "diagram": "series:   [LB 99.99] -> [app 99.9] -> [DB 99.9]   = ~99.8%\nparallel: [DB 99.9] || [standby 99.9]          = ~99.9999%"
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "How many replicas for 99.99%?",
+      "prompt": "Each replica is available 99% of the time. Add replicas in parallel and find how many reach 99.99% on paper.",
+      "model": "availability",
+      "params": {
+        "nodePct": 99,
+        "targetPct": 99.99
+      },
+      "control": {
+        "label": "Replicas",
+        "min": 1,
+        "max": 4,
+        "step": 1,
+        "initial": 1
+      },
+      "takeaway": "Two 99% replicas give 99.99% only if they fail independently. Shared zones, bad deploys and config errors fail them together, so real systems spread replicas across zones and still land below the paper number."
     }
   },
   {
@@ -21106,6 +22364,35 @@
         "Rehearse failover; untested DR is a guess."
       ],
       "diagram": "region A (primary) --async replication (lag ~5 s)--> region B (warm standby)\n failure: detect -> decide -> promote DB in B -> shift DNS/GSLB -> verify -> reconcile"
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "Disaster recovery for an internal tool",
+      "prompt": "Choose a disaster-recovery strategy for these constraints.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Regular backups to another region, restored when needed",
+          "feedback": "Right: cheapest option that meets an hour of data loss and hours of downtime."
+        },
+        {
+          "id": "b",
+          "label": "Active-active in two regions",
+          "feedback": "Far more cost and complexity than these targets need."
+        },
+        {
+          "id": "c",
+          "label": "No backups; rebuild from scratch",
+          "feedback": "That would lose all the data, breaking the one-hour RPO."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Match the strategy to RPO and RTO: backup and restore, pilot light, warm standby, active-active cost more as the targets tighten. Whatever you choose, rehearse the restore.",
+      "setup": [
+        "Internal analytics tool",
+        "Losing up to 1 hour of data is acceptable (RPO)",
+        "Up to 4 hours to recover is acceptable (RTO)"
+      ]
     }
   },
   {
@@ -21481,6 +22768,30 @@
         "Step-up authentication protects high-risk actions."
       ],
       "diagram": "login (password + OTP) -> issue session cookie / JWT\nrequest -> authenticate credential -> authorise (role? owner? scope?) -> allow / 403"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Someone else's order",
+      "prompt": "A logged-in user changes /orders/42 to /orders/43 and sees another customer's order. What failed?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Authorization",
+          "feedback": "Right: the system knew who they were but didn't check they own order 43."
+        },
+        {
+          "id": "b",
+          "label": "Authentication",
+          "feedback": "They were correctly identified; the identity check worked."
+        },
+        {
+          "id": "c",
+          "label": "TLS",
+          "feedback": "Encryption in transit was fine; the server handed the data to the wrong person."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Check ownership or permission on every object access (object-level authorization). This is one of the most common API vulnerabilities."
     }
   },
   {
@@ -21867,6 +23178,30 @@
         "Validate ID tokens: signature, issuer, audience, expiry, nonce."
       ],
       "diagram": "app --(challenge, scopes, state)--> auth server --login + consent--> redirect ?code&state\napp --(code + verifier)--> token endpoint --> access token, refresh token, ID token"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Access token as identity?",
+      "prompt": "After 'Sign in with Google', your app holds an OAuth access token. Should it treat that token as proof of who the user is?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "No: verify the OIDC ID token for identity",
+          "feedback": "Right: the ID token is issued to your app and says who logged in."
+        },
+        {
+          "id": "b",
+          "label": "Yes: a valid access token proves identity",
+          "feedback": "An access token says what may be accessed, and may not even be meant for your app."
+        },
+        {
+          "id": "c",
+          "label": "Only if the access token is a JWT",
+          "feedback": "Format doesn't change its purpose."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "OAuth 2.0 is for delegated access; OpenID Connect adds the ID token for login. Check its signature, issuer, audience and expiry."
     }
   },
   {
@@ -22228,6 +23563,30 @@
         "Short lifetimes plus refresh tokens make revocation workable."
       ],
       "diagram": "base64url(header).base64url(payload).signature\n verify: alg allow-listed -> key by kid (JWKS) -> signature ok -> exp/iss/aud ok -> trust sub, scopes"
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "Token lifetime for a bank",
+      "prompt": "Pick the access-token lifetime for a banking app.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "5–15 minutes, with revocable refresh tokens",
+          "feedback": "Right: a stolen token is useful only briefly, and refresh tokens can be revoked."
+        },
+        {
+          "id": "b",
+          "label": "7 days, so users rarely log in",
+          "feedback": "A stolen token would work for a week and can't easily be revoked."
+        },
+        {
+          "id": "c",
+          "label": "No expiry; rely on logout",
+          "feedback": "A stateless token keeps working after logout unless every service checks a deny list."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Self-contained JWTs are hard to revoke, so keep them short-lived. Put revocation on the refresh path, where the server checks state anyway."
     }
   },
   {
@@ -22606,6 +23965,30 @@
         "Secrets belong in a vault, never in code or logs."
       ],
       "diagram": "internet -> [WAF + rate limit] -> [gateway: TLS, authn] -> [service: validate, authz] -> [DB user: least privilege]\n secrets from vault | logs masked | audit + alerts"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What stops SQL injection?",
+      "prompt": "Which control actually prevents SQL injection?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Parameterised queries",
+          "feedback": "Right: user input is sent as data, never as SQL."
+        },
+        {
+          "id": "b",
+          "label": "HTTPS",
+          "feedback": "HTTPS protects data in transit; the malicious input still arrives intact."
+        },
+        {
+          "id": "c",
+          "label": "A web application firewall on its own",
+          "feedback": "A WAF catches some patterns but can be bypassed; it is a backstop, not the fix."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Defence in depth: parameterise queries, validate input, run with least privilege, and keep a WAF as an extra layer, not the only one."
     }
   },
   {
@@ -22962,6 +24345,30 @@
         "Keep buckets private; serve through presigned URLs or a CDN."
       ],
       "diagram": "client --1. request upload--> app (authz, metadata 'pending') --2. presigned URL--> client\nclient --3. PUT bytes--> object storage --4. event--> worker (scan, thumbnail) --> metadata 'ready'"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What presigned uploads save",
+      "prompt": "Users upload 2 MB photos at 1,000 uploads per second through your app servers. You switch to presigned URLs. What changes?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "About 2 GB/s of upload traffic stops flowing through your servers; they only sign URLs",
+          "feedback": "Right: 1,000 × 2 MB per second now goes straight to the bucket."
+        },
+        {
+          "id": "b",
+          "label": "The photos become public",
+          "feedback": "A presigned URL grants one time-limited operation; the bucket can stay private."
+        },
+        {
+          "id": "c",
+          "label": "Nothing much",
+          "feedback": "The bytes no longer touch your servers at all."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Clients upload directly to object storage with a short-lived signed URL; an event then triggers processing. Your servers handle metadata and authorization, not bytes."
     }
   },
   {
@@ -23300,6 +24707,30 @@
         "Best for large, write-once, sequentially read files."
       ],
       "diagram": "NameNode: /logs/day1 -> [b1: DN1, DN4, DN5] [b2: DN2, DN6, DN7] ...\nwrite pipeline: client -> DN1 (rack A) -> DN4 (rack B) -> DN5 (rack B)"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Small files in HDFS",
+      "prompt": "Why is HDFS a poor fit for 500 million files of 10 KB each?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Every file costs NameNode memory, so metadata becomes the bottleneck",
+          "feedback": "Right: HDFS keeps the whole namespace in one NameNode's memory."
+        },
+        {
+          "id": "b",
+          "label": "HDFS can't store files smaller than one block",
+          "feedback": "It can; a small file just occupies a partial block."
+        },
+        {
+          "id": "c",
+          "label": "Replication fails for small files",
+          "feedback": "Replication works the same at any size."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "HDFS is built for large files read sequentially. Pack small files into larger container files, or use object storage or a database for many small objects."
     }
   },
   {
@@ -23662,6 +25093,30 @@
         "Keep the database as source of truth; sync the index by CDC or events."
       ],
       "diagram": "doc 7: 'Fresh Paneer 200g' -> analyse -> [fresh, paneer, 200g]\nindex: paneer -> [3, 7, 19]   fresh -> [7, 11]\nquery 'panner' -> fuzzy -> paneer -> [3, 7, 19] -> score (BM25) -> top 10"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Why LIKE is slow",
+      "prompt": "Product search runs WHERE name LIKE '%phone%' on 10 million rows. Why is it slow?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "A leading wildcard can't use a B-tree index, so every row is scanned",
+          "feedback": "Right: the index is sorted by prefix, and there is no fixed prefix."
+        },
+        {
+          "id": "b",
+          "label": "LIKE is case-sensitive",
+          "feedback": "That changes results, not speed."
+        },
+        {
+          "id": "c",
+          "label": "The table has too many columns",
+          "feedback": "Columns affect row size, not the need to scan every row."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "An inverted index maps each term to the documents containing it, so a search reads a few posting lists. Keep the database as the source of truth and sync the search index with CDC."
     }
   },
   {
@@ -24061,6 +25516,30 @@
         "Skewed keys dominate job time; salt them."
       ],
       "diagram": "input splits -> map (merchant, amt) -> shuffle by key -> reduce (sum per merchant) -> output\n hot key 'M1' -> salt: M1#0..M1#19 -> partial sums -> combine"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Which step moves the most data?",
+      "prompt": "In a MapReduce word count over terabytes, which step usually sends the most data across the network?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The shuffle",
+          "feedback": "Right: every (word, count) pair travels to the reducer that owns its word."
+        },
+        {
+          "id": "b",
+          "label": "The map",
+          "feedback": "Maps usually run where the data already sits."
+        },
+        {
+          "id": "c",
+          "label": "Writing the final result",
+          "feedback": "Reduced output is far smaller than the shuffled pairs."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Shuffles dominate cost, so combine early: a combiner sums counts on each mapper before the shuffle. Spark has the same rule for wide transformations."
     }
   },
   {
@@ -24425,6 +25904,30 @@
         "Checkpoints plus replay need idempotent or transactional sinks."
       ],
       "diagram": "Kafka (keyed) -> operator (state per key, checkpoints) -> window [12:00-12:01) closes when watermark > 12:01 -> sink\n late event 12:00:40 arriving at 12:03 -> side output / update"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "A late click",
+      "prompt": "Clicks are counted per minute by event time, with a 30-second watermark delay. A click from 12:00:50 arrives at 12:02:10 because the phone was offline. What happens?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "It is late: dropped, or sent to a correction path if you allow lateness",
+          "feedback": "Right: its window closed at about 12:01:30."
+        },
+        {
+          "id": "b",
+          "label": "It is counted in the 12:02 window",
+          "feedback": "Event-time windows place it by when it happened, not when it arrived."
+        },
+        {
+          "id": "c",
+          "label": "The whole stream restarts",
+          "feedback": "Late events are handled per window, not by restarting."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Watermarks trade completeness for latency. Pick an allowed lateness from real data, and send very late events to a correction job if exact counts matter (billing)."
     }
   },
   {
@@ -24796,6 +26299,30 @@
         "Model analytics as facts and dimensions."
       ],
       "diagram": "OLTP (Postgres) --CDC--> lake (Parquet) --transform (dbt)--> warehouse (facts + dims) --> dashboards\n          app traffic stays here           analytics traffic stays here"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Why the column store wins",
+      "prompt": "'Average order value by city' runs over 1 billion rows in a 40-column table. Why is a column store much faster?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "It reads only the two columns it needs, compressed, instead of all 40",
+          "feedback": "Right: much less data comes off disk."
+        },
+        {
+          "id": "b",
+          "label": "Column stores always have more memory",
+          "feedback": "Hardware isn't the difference; the layout is."
+        },
+        {
+          "id": "c",
+          "label": "It caches the query result",
+          "feedback": "The first run is fast too."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Row stores suit point reads and writes (OLTP). Column stores suit scans and aggregates (OLAP). Copy data from one to the other with CDC or ETL."
     }
   },
   {
@@ -25180,6 +26707,30 @@
         "Quadtrees and H3 adapt better to density and geometry."
       ],
       "diagram": "+----+----+----+\n| NW | N  | NE |\n+----+----+----+\n| W  | ME | E  |   query = my cell + 8 neighbours -> filter by exact distance\n+----+----+----+\n| SW | S  | SE |\n+----+----+----+"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Searching one cell",
+      "prompt": "A user stands 50 m from the edge of their geohash cell. You search only that cell for restaurants within 1 km. What is the risk?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Nearby restaurants just across the cell boundary are missed",
+          "feedback": "Right: closeness doesn't respect cell borders."
+        },
+        {
+          "id": "b",
+          "label": "Duplicate results",
+          "feedback": "Searching one cell can't produce duplicates from other cells."
+        },
+        {
+          "id": "c",
+          "label": "It's too slow",
+          "feedback": "One cell is the fastest option; the problem is wrong results."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Search the user's cell plus its eight neighbours, at a precision where cells are at least as large as the search radius, then filter by exact distance and sort."
     }
   },
   {
@@ -25521,6 +27072,30 @@
         "Per-entity detail belongs in logs and traces, not labels."
       ],
       "diagram": "series = name + labels  -> [t1,v1][t2,v2]... (delta-of-delta + XOR, ~1.5 bytes/sample)\nraw 15 s (15 d) -> 5 min rollup (90 d) -> 1 h rollup (2 y)"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "A user_id label",
+      "prompt": "You add a user_id label (5 million users) to a request-latency metric. What happens?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The number of series explodes, and memory and ingestion suffer",
+          "feedback": "Right: each label value combination is a separate series."
+        },
+        {
+          "id": "b",
+          "label": "Queries become more precise at no extra cost",
+          "feedback": "Precision comes at the cost of millions of new series."
+        },
+        {
+          "id": "c",
+          "label": "Nothing changes",
+          "feedback": "Every new value creates a new series to store and index."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Keep labels to bounded sets (service, endpoint, status). Put per-user detail in logs or traces, which are built for high cardinality."
     }
   },
   {
@@ -25892,6 +27467,30 @@
         "Use expand and contract for schema changes."
       ],
       "diagram": "deploy v2 dark --> flag on: staff --> 1% --> 5% --> 25% --> 100% --> delete flag\n          metrics guardrails breached at any step --> flag off / shift traffic back"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Canary results are in",
+      "prompt": "A canary takes 1% of traffic. Its error rate is 0.5%; the old version's is 0.1%. What next?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Roll back and investigate",
+          "feedback": "Right: five times the error rate is a regression."
+        },
+        {
+          "id": "b",
+          "label": "Go to 100%: only 1% of users were affected",
+          "feedback": "The canary exists to stop this before 100% of users see it."
+        },
+        {
+          "id": "c",
+          "label": "Leave it at 1% for a week",
+          "feedback": "Users on the canary keep hitting errors while you wait."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Define success metrics before the rollout and automate the comparison. Roll back fast, keep schema changes backward compatible so a rollback is always possible."
     }
   },
   {
@@ -26254,6 +27853,30 @@
         "Size replicas from per-pod throughput plus headroom."
       ],
       "diagram": "Deployment (replicas: 14, image: v2) -> ReplicaSet -> pods\ncontroller loop: desired 14 vs actual 13 -> create 1\nrolling: +4 new (ready?) -> remove old -> repeat"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Liveness checks the database",
+      "prompt": "Every pod's liveness probe checks the database. The database blips for 20 seconds. What happens?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Every pod fails liveness and is restarted at once",
+          "feedback": "Right: the restarts turn a blip into an outage."
+        },
+        {
+          "id": "b",
+          "label": "Pods are marked not ready and stop receiving traffic",
+          "feedback": "That's what a readiness probe does; liveness restarts the container."
+        },
+        {
+          "id": "c",
+          "label": "Nothing",
+          "feedback": "Repeated failed liveness checks restart the pod."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Liveness should answer 'is this process stuck?' Dependency checks belong in readiness, which takes a pod out of rotation without killing it."
     }
   },
   {
@@ -26645,6 +28268,30 @@
         "Offset is fine for small admin tables with page jumps."
       ],
       "diagram": "offset: [skip skip skip ... 99,980 rows][read 20]\ncursor: index seek -> (ts, id) < cursor -> [read 20]"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "OFFSET on a live feed",
+      "prompt": "An infinite feed pages with OFFSET 10000 LIMIT 20 while new posts keep arriving. What goes wrong?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Deep pages slow down, and new posts shift items so users see duplicates",
+          "feedback": "Right: OFFSET still walks the skipped rows, and positions move."
+        },
+        {
+          "id": "b",
+          "label": "Cursors expire",
+          "feedback": "There is no cursor in offset pagination."
+        },
+        {
+          "id": "c",
+          "label": "Nothing, as long as there's an index",
+          "feedback": "The index still walks past every skipped row."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Cursor pagination seeks past the last item seen (WHERE created_at < ? ORDER BY created_at DESC LIMIT 20) using the index, so pages stay fast and stable."
     }
   },
   {
@@ -27023,6 +28670,35 @@
         "Never hold locks across user think time or external calls."
       ],
       "diagram": "optimistic: read (v=7) -> compute -> UPDATE ... WHERE version=7 -> 1 row: ok | 0 rows: retry\npessimistic: SELECT ... FOR UPDATE (others wait) -> compute -> UPDATE -> COMMIT (release)"
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "Locking for wiki edits",
+      "prompt": "Choose a concurrency control for these constraints.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Optimistic: a version column, and reject the save if it changed",
+          "feedback": "Right: rare conflicts make retries cheap, and nobody holds a lock."
+        },
+        {
+          "id": "b",
+          "label": "Pessimistic: lock the page while someone edits for ten minutes",
+          "feedback": "Everyone else waits, and abandoned edits hold locks."
+        },
+        {
+          "id": "c",
+          "label": "No control: last write wins",
+          "feedback": "One person's edit silently disappears."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Optimistic locking suits low contention; pessimistic suits high contention on short operations. Never hold a lock across user think time or external calls.",
+      "setup": [
+        "Wiki pages, edited occasionally",
+        "Two people rarely edit the same page at once",
+        "An edit can take minutes"
+      ]
     }
   },
   {
@@ -27405,6 +29081,35 @@
         "Last-writer-wins on documents loses work."
       ],
       "diagram": "text 'abcd'\nAlice: insert X at 0 -> 'Xabcd'      Bob: delete pos 3 ('d') -> 'abc'\nOT: Bob's delete transformed to pos 4 -> 'Xabc'   CRDT: delete id(d) -> 'Xabc'"
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "Peer-to-peer notes",
+      "prompt": "Choose a merge approach for these constraints.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "CRDTs",
+          "feedback": "Right: replicas merge in any order without a central server."
+        },
+        {
+          "id": "b",
+          "label": "Operational transformation (OT)",
+          "feedback": "OT typically relies on a central server to order operations."
+        },
+        {
+          "id": "c",
+          "label": "Last-write-wins on the whole document",
+          "feedback": "One device's offline edits would vanish."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "CRDTs are designed to converge whatever order updates arrive in, which suits offline and peer-to-peer sync. OT is the classic choice behind server-centred editors.",
+      "setup": [
+        "Notes app that works offline",
+        "Devices sync peer to peer, with no central server",
+        "Edits made offline on two devices must both survive"
+      ]
     }
   },
   {
@@ -27681,7 +29386,31 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "interactive": {
+      "kind": "predict",
+      "title": "Where should you be at minute 25?",
+      "prompt": "You are 25 minutes into a 45-minute interview. Where should you be?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "High-level design done, starting the deep dive",
+          "feedback": "Right: requirements, estimation and API take 15 minutes, the design 10."
+        },
+        {
+          "id": "b",
+          "label": "Still estimating",
+          "feedback": "Estimation should have ended at minute 10."
+        },
+        {
+          "id": "c",
+          "label": "Wrapping up",
+          "feedback": "Wrap-up is the last 5 minutes; the deep dive gets 15 before it."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "The six-stage clock: requirements 0–5, estimation 5–10, API 10–15, high-level design 15–25, deep dive 25–40, wrap-up 40–45. If you're behind at minute 25, say so and simplify."
+    }
   },
   {
     "id": 75,
@@ -63487,6 +65216,30 @@
         "Use the numbers to choose where to deep-dive."
       ],
       "diagram": "restate -> functional (in/out) -> non-functional (scale, latency, consistency, availability)\n -> assumptions -> anchor numbers -> agreed focus"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The question that matters most",
+      "prompt": "'Design a food-delivery app.' Which question changes the design most?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Is live rider tracking in scope, and for how many concurrent orders?",
+          "feedback": "Right: it adds a high-rate location stream and real-time push."
+        },
+        {
+          "id": "b",
+          "label": "Which programming language should we use?",
+          "feedback": "It rarely changes the architecture."
+        },
+        {
+          "id": "c",
+          "label": "What colour is the logo?",
+          "feedback": "Irrelevant to the design."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Ask questions whose answers change components or scale, then state assumptions out loud ('I'll assume 1M concurrent orders at dinner peak') so the interviewer can correct them."
     }
   },
   {
@@ -63858,6 +65611,30 @@
         "Say what would make you change your mind."
       ],
       "diagram": "pick hardest part -> state problem -> 2-3 options -> trade-off template -> deeper on choice -> 'switch if ...'"
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "The sentence that earns the point",
+      "prompt": "Which sentence earns the trade-off point?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "'Async replication keeps writes fast, but failover can lose about a second of data: fine for likes, not for payments.'",
+          "feedback": "Right: a choice, its cost, and when the cost is acceptable."
+        },
+        {
+          "id": "b",
+          "label": "'Async replication is always better.'",
+          "feedback": "An absolute with no cost named invites pushback."
+        },
+        {
+          "id": "c",
+          "label": "'We'll use Kafka because it scales.'",
+          "feedback": "A tool name is not a trade-off; what does it cost, and why here?"
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Name the option, what it buys, what it costs, and why the cost is acceptable for this requirement. Interviewers push until you do; doing it first earns the point."
     }
   },
   {
@@ -64240,6 +66017,30 @@
         "Recover openly; self-correction is a strength."
       ],
       "diagram": "every ~10 min: scope agreed? -> numbers used? -> talking aloud? -> hints followed?\n off track -> name it -> simplify -> continue"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Your design ignores your own number",
+      "prompt": "Mid-design, you notice your architecture ignores the 10× spike you estimated earlier. What is the best move?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Say so, and add what the number calls for, such as an admission queue or pre-scaling",
+          "feedback": "Right: using your numbers is exactly what is being graded."
+        },
+        {
+          "id": "b",
+          "label": "Keep going and hope the interviewer doesn't notice",
+          "feedback": "Unused numbers are a classic mistake; noticing it yourself is a strength."
+        },
+        {
+          "id": "c",
+          "label": "Start over from scratch",
+          "feedback": "Adjust the design; a restart wastes the time you have."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Estimates exist to drive decisions. Tie each major component back to a number ('the 10× spike is why the queue is here')."
     }
   },
   {
@@ -64624,6 +66425,30 @@
         "Keep time for failures and a summary."
       ],
       "diagram": "0-5 reqs | 5-10 estimates | 10-15 API | 15-25 simple design | 25-40 deep dive + failures | 40-45 summary"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "A question you hadn't considered",
+      "prompt": "The interviewer asks, 'What if the cache cluster dies?' You hadn't thought about it. Best response?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Think aloud: what breaks, how the database is protected, how the cache refills",
+          "feedback": "Right: reasoning in the open is the signal."
+        },
+        {
+          "id": "b",
+          "label": "'It won't die; it's replicated.'",
+          "feedback": "Dismissing the scenario misses the point of the question."
+        },
+        {
+          "id": "c",
+          "label": "Think silently for two minutes, then answer",
+          "feedback": "Silence hides your reasoning, which is what is graded."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Narrate: 'Without the cache, reads hit the database at about 10×. I'd rate-limit, serve stale data where allowed, and warm hot keys first.' Collaboration beats a perfect answer."
     }
   },
   {
@@ -64980,6 +66805,27 @@
         "Round to one significant figure and let the result pick the architecture."
       ],
       "diagram": "ns: L1 (1) -> RAM (100)\nµs: SSD read (100)\nms: zone RTT (0.5) -> disk seek (10) -> India-US RTT (~200+)\n day = 86,400 s | 1M/day ≈ 12/s | 1B/day ≈ 11,600/s"
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "Size the fleet",
+      "prompt": "Each server handles 5,000 requests per second. You have a budget of 20 servers and want 30% headroom plus one spare. Find the highest peak you can cover.",
+      "model": "servers",
+      "params": {
+        "perServer": 5000,
+        "headroomPct": 30,
+        "spares": 1,
+        "budget": 20
+      },
+      "control": {
+        "label": "Peak load",
+        "min": 5000,
+        "max": 100000,
+        "step": 5000,
+        "initial": 60000,
+        "unit": "req/s"
+      },
+      "takeaway": "About 70,000 requests per second: 14 servers of raw capacity, 19 with headroom, 20 with the spare. Per-server capacity is an assumption to confirm with a load test, not a constant."
     }
   },
   {
@@ -65377,6 +67223,30 @@
         "Correctness-critical paths never rely on caches."
       ],
       "diagram": "requirement -> pattern -> component\nread-heavy -> cache/CDN -> Redis\nwrite-heavy -> log/LSM -> Kafka/Cassandra\ncorrectness -> txn/idempotency -> Postgres\nreal-time -> push -> WebSockets\nsearch/geo -> index/cells -> Elasticsearch/H3"
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "First pattern for product pages",
+      "prompt": "Product pages: 100 reads for every write, and a few seconds of staleness is fine. What do you reach for first?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "A cache (plus a CDN for images) and read replicas",
+          "feedback": "Right: the classic read-heavy pattern."
+        },
+        {
+          "id": "b",
+          "label": "Sharding the write path",
+          "feedback": "Writes are the small part of this load."
+        },
+        {
+          "id": "c",
+          "label": "Two-phase commit across services",
+          "feedback": "Nothing here needs cross-service atomic writes."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Map the shape of the load to a pattern: read-heavy → caches and replicas; write-heavy and spiky → queues and partitioning; real-time → push channels; correctness-first → transactions and idempotency."
     }
   }
 ]

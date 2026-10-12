@@ -20,6 +20,7 @@ test('lesson cards: specific headings, and card 2 is no longer a repeat of the i
     const n = await page.getByRole('button', { name: /^Go to card/ }).count()
     for (let i = 1; i <= n; i++) {
       await page.getByRole('button', { name: `Go to card ${i}`, exact: true }).click()
+      if (await page.getByTestId('interactive').count()) continue // the try-it card has its own checks
       const h = page.locator('.panel h3').first()
       await expect(h).not.toHaveText(/^(Key idea|The core idea|How a request flows|Watch out for|Common trap)$/)
       expect((await page.locator('.panel p.text-\\[1\\.125rem\\]').first().innerText()).trim()).not.toBe(intro)

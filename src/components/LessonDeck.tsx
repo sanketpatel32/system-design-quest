@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { LessonCard } from '../content/types'
+import type { Interactive, LessonCard } from '../content/types'
+import { InteractiveBlock } from './InteractiveBlock'
 import { MascotSays } from './art/Mascot'
 
 /** Some imported cards carry their kind ('text', 'diagram') as a placeholder title; don't render those. */
@@ -18,7 +19,8 @@ function lightDiagram(svg: string) {
 }
 
 export function LessonDeck({
-  cards,
+  cards: baseCards,
+  interactive,
   accent = 'var(--color-amber)',
   finalAction,
   initialIndex = 0,
@@ -28,10 +30,15 @@ export function LessonDeck({
   accent?: string
   /** Rendered instead of the Next button on the last card */
   finalAction?: ReactNode
+  /** Optional experiment or decision, added as the last step before the quiz */
+  interactive?: Interactive
   /** Card to open on (resume) */
   initialIndex?: number
   onIndexChange?: (index: number) => void
 }) {
+  const cards: LessonCard[] = interactive
+    ? [...baseCards, { id: 'try-it', kind: 'text', title: interactive.title, body: '', accent: interactive.kind === 'slider' ? 'Try it' : interactive.kind === 'tradeoff' ? 'Your call' : 'Predict' }]
+    : baseCards
   const [index, setIndex] = useState(() => Math.min(Math.max(0, initialIndex), Math.max(0, cards.length - 1)))
   useEffect(() => {
     onIndexChange?.(index)
@@ -82,7 +89,11 @@ export function LessonDeck({
           ))}
         </div>
         {hasRealTitle(card) && <h3 className="font-display text-2xl sm:text-3xl text-chalk mb-3">{card.title}</h3>}
-        <p className="text-chalk leading-relaxed text-[1.125rem] font-semibold">{card.body}</p>
+        {card.id === 'try-it' && interactive ? (
+          <InteractiveBlock key={interactive.title} item={interactive} />
+        ) : (
+          <p className="text-chalk leading-relaxed text-[1.125rem] font-semibold">{card.body}</p>
+        )}
         {card.steps && card.steps.length > 0 && (
           <ol className="flow mt-5" aria-label="Steps">
             {card.steps.map((step, i) => (

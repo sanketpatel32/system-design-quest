@@ -33,6 +33,33 @@ export interface LessonCard {
   source?: 'deep-numbers'
 }
 
+/** A small in-lesson experiment or decision, shown as the last step before the quiz */
+export type Interactive = InteractiveSlider | InteractivePredict
+
+export interface InteractiveSlider {
+  kind: 'slider'
+  title: string
+  /** What to try, e.g. "Find the lowest hit rate the database survives" */
+  prompt: string
+  model: import('../lib/interactive/models').ModelId
+  params: Record<string, number>
+  control: { label: string; min: number; max: number; step: number; initial: number; unit?: string; /** Show 10^x instead of x */ log10?: boolean }
+  /** Shown once the learner has moved the slider */
+  takeaway: string
+}
+
+export interface InteractivePredict {
+  kind: 'predict' | 'tradeoff'
+  title: string
+  prompt: string
+  /** Optional facts to reason from */
+  setup?: string[]
+  choices: { id: string; label: string; feedback: string }[]
+  correctId: string
+  /** The reasoning, shown after any answer */
+  reveal: string
+}
+
 export interface SourceRef {
   title: string
   url: string
@@ -214,6 +241,7 @@ export interface BossDeep {
 }
 
 export interface Topic {
+  interactive?: Interactive
   id: number
   slug: string
   region: RegionId
