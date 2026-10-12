@@ -40,7 +40,18 @@ export interface CanvasSnapshot {
 interface Props {
   initial?: CanvasSnapshot
   onChange: (snap: CanvasSnapshot) => void
+  /** Components suggested for this scenario, shown first */
+  suggested?: CanvasComponentType[]
 }
+
+/** "Service", then "Service 2" … so wiring lists read like a diagram, not ids */
+function readableName(type: CanvasComponentType, nodes: Node[]) {
+  const base = PALETTE.find((p) => p.type === type)?.label ?? type
+  const n = nodes.filter((x) => (x.data as { componentType?: string }).componentType === type).length
+  return n === 0 ? base : `${base} ${n + 1}`
+}
+
+const nodeName = (n: Node) => String((n.data as { label?: string }).label)
 
 /** Next free id; a module counter would restart at n1 after reload and collide with a restored draft. */
 function nextNodeId(nodes: Node[]) {
@@ -50,7 +61,7 @@ function nextNodeId(nodes: Node[]) {
 
 const nodeTypes = { arch: ArchNode }
 
-export function BossCanvas({ initial, onChange }: Props) {
+export function BossCanvas({ initial, onChange, suggested }: Props) {
   const initialNodes: Node[] = useMemo(
     () =>
       (initial?.nodes ?? []).map((n) => ({
@@ -72,6 +83,9 @@ export function BossCanvas({ initial, onChange }: Props) {
     [initial],
   )
 
+  const suggestedSet = new Set(suggested ?? [])
+  const ordered = [...PALETTE.filter((p) => suggestedSet.has(p.type)), ...PALETTE.filter((p) => !suggestedSet.has(p.type))]
+  const suggestedCount = PALETTE.filter((p) => suggestedSet.has(p.type)).length
   const srcRef = useRef<HTMLSelectElement>(null)
   const tgtRef = useRef<HTMLSelectElement>(null)
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
@@ -115,7 +129,7 @@ export function BossCanvas({ initial, onChange }: Props) {
       id,
       position: { x: 80 + (nodes.length % 4) * 140, y: 60 + Math.floor(nodes.length / 4) * 90 },
       type: 'arch',
-      data: { label: type.replace(/_/g, ' '), componentType: type },
+      data: { label: readableName(type, nodes), componentType: type },
     }
     setNodes((ns) => [...ns, node])
   }
@@ -129,19 +143,23 @@ export function BossCanvas({ initial, onChange }: Props) {
     <div className="grid lg:grid-cols-[200px_1fr] gap-3">
       <aside className="panel-slab p-3 space-y-3" aria-label="Canvas tools">
         <div>
-          <p className="text-sm font-semibold text-chalk mb-2">Add a component</p>
+          <p className="text-sm font-semibold text-chalk mb-2">{suggested?.length ? 'Suggested for this scenario' : 'Add a component'}</p>
           <div className="grid grid-cols-2 lg:grid-cols-1 gap-1">
-            {PALETTE.map((p) => (
+            {ordered.map((p, i) => (
+              <span key={p.type} className="contents">
+                {suggested?.length && i === suggestedCount && (
+                  <span className="col-span-2 lg:col-span-1 text-xs text-dim pt-2">More components</span>
+                )}
               <button
-                key={p.type}
                 type="button"
-                className="palette-btn"
+                className={`palette-btn ${suggestedSet.has(p.type) ? 'palette-btn-suggested' : ''}`}
                 onClick={() => addComponent(p.type)}
               >
                 <span aria-hidden className="text-[var(--color-amber)]">+</span>
                 <span className="sr-only">+ </span>
                 {p.label}
               </button>
+              </span>
             ))}
           </div>
         </div>
@@ -151,7 +169,7 @@ export function BossCanvas({ initial, onChange }: Props) {
             From
             <select ref={srcRef} className="mt-0.5 w-full field text-xs" disabled={nodes.length < 2}>
               {nodes.map((n) => (
-                <option key={n.id} value={n.id}>{String((n.data as { label?: string }).label)} ({n.id})</option>
+                <option key={n.id} value={n.id}>{nodeName(n)}</option>
               ))}
             </select>
           </label>
@@ -159,7 +177,7 @@ export function BossCanvas({ initial, onChange }: Props) {
             To
             <select ref={tgtRef} className="mt-0.5 w-full field text-xs" disabled={nodes.length < 2}>
               {nodes.map((n) => (
-                <option key={n.id} value={n.id}>{String((n.data as { label?: string }).label)} ({n.id})</option>
+                <option key={n.id} value={n.id}>{nodeName(n)}</option>
               ))}
             </select>
           </label>

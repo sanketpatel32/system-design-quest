@@ -50,6 +50,8 @@ export interface InterviewSession {
   stageStartedAt: number
   finished: boolean
   notes: string
+  /** Notes per stage (Requirements, Estimation, …); `notes` mirrors them joined for older exports */
+  stageNotes?: string[]
   draft?: BossDraft
   selfAssessment?: Record<string, number>
 }

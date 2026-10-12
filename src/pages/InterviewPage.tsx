@@ -1,34 +1,55 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { allTopics } from '../content/catalog'
+import type { CanvasComponentType } from '../content/types'
 import { BossCanvas, type CanvasSnapshot } from '../components/BossCanvas'
-import {
-  INTERVIEW_STAGE_MINUTES,
-  overallDeadlineMs,
-  remainingMs,
-  stageDeadlineMs,
-} from '../lib/interview/timer'
+import { INTERVIEW_STAGE_MINUTES, overallDeadlineMs, remainingMs, stageDeadlineMs } from '../lib/interview/timer'
 import { badgeAfterMock } from '../lib/progression/badges'
 import { useGameStore } from '../stores/gameStore'
 
-const STAGE_LABELS = ['Requirements', 'Estimation', 'API', 'HLD', 'Deep dive', 'Wrap-up']
+const STAGES = [
+  { label: 'Requirements', ask: 'Ask clarifying questions. Who uses it, which flows matter, what scale, what is out of scope?' },
+  { label: 'Estimation', ask: 'Turn the scale into numbers: requests per second at peak, storage per year, bandwidth.' },
+  { label: 'API', ask: 'Sketch the main endpoints, their inputs and outputs, and how retries stay safe.' },
+  { label: 'High-level design', ask: 'Draw the request path on the canvas: clients, services, stores, queues.' },
+  { label: 'Deep dive', ask: 'Pick the riskiest part and go deep: hot keys, failure modes, consistency.' },
+  { label: 'Wrap-up', ask: 'Summarise the design, the main trade-off and what you would do next.' },
+] as const
+
+const RUBRIC = [
+  { key: 'requirements', label: 'Requirements', def: '5: scoped core flows, scale and exclusions before designing. 1: started drawing immediately.' },
+  { key: 'estimation', label: 'Estimation', def: '5: clear assumptions, right order of magnitude, used the numbers later. 1: no numbers.' },
+  { key: 'design', label: 'Design', def: '5: complete request path with sensible stores, caches and queues. 1: boxes without data flow.' },
+  { key: 'depth', label: 'Deep dive', def: '5: found the real bottleneck and handled failure. 1: stayed at the surface.' },
+  { key: 'communication', label: 'Communication', def: '5: narrated decisions and trade-offs, managed time. 1: silent or rambling.' },
+] as const
+
+const fmt = (ms: number) => {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
 
 export function InterviewPage() {
   const bosses = allTopics.filter((t) => t.kind === 'boss')
-  const [bossId, setBossId] = useState(bosses[0]?.id ?? 75)
-  const upsertInterview = useGameStore((s) => s.upsertInterview)
   const interviews = useGameStore((s) => s.interviews)
+  const upsertInterview = useGameStore((s) => s.upsertInterview)
   const setPrefs = useGameStore((s) => s.setPreferences)
 
+  const latest = [...interviews].sort((a, b) => b.startedAt - a.startedAt)[0]
+  const [bossId, setBossId] = useState(latest?.bossId ?? bosses[0]?.id ?? 75)
+  const existing = interviews.find((i) => i.id === `mock-${bossId}`)
   const sessionId = `mock-${bossId}`
-  const existing = interviews.find((i) => i.id === sessionId && !i.finished)
+  const boss = bosses.find((b) => b.id === bossId)
 
   const [startedAt, setStartedAt] = useState(existing?.startedAt ?? 0)
   const [stageIndex, setStageIndex] = useState(existing?.stageIndex ?? 0)
   const [stageStartedAt, setStageStartedAt] = useState(existing?.stageStartedAt ?? 0)
-  const [notes, setNotes] = useState(existing?.notes ?? '')
+  const [stageNotes, setStageNotes] = useState<string[]>(
+    existing?.stageNotes ?? (existing?.notes ? [existing.notes] : []),
+  )
   const [canvas, setCanvas] = useState<CanvasSnapshot | undefined>(existing?.draft as CanvasSnapshot | undefined)
-  const [finished, setFinished] = useState(false)
+  const [finished, setFinished] = useState(existing?.finished ?? false)
+  const [ratings, setRatings] = useState<Record<string, number>>(existing?.selfAssessment ?? {})
   const [now, setNow] = useState(Date.now())
 
   useEffect(() => {
@@ -36,7 +57,17 @@ export function InterviewPage() {
     return () => clearInterval(t)
   }, [])
 
-  const boss = bosses.find((b) => b.id === bossId)
+  const switchScenario = (id: number) => {
+    const s = interviews.find((i) => i.id === `mock-${id}`)
+    setBossId(id)
+    setStartedAt(s?.startedAt ?? 0)
+    setStageIndex(s?.stageIndex ?? 0)
+    setStageStartedAt(s?.stageStartedAt ?? 0)
+    setStageNotes(s?.stageNotes ?? [])
+    setCanvas(s?.draft as CanvasSnapshot | undefined)
+    setFinished(s?.finished ?? false)
+    setRatings(s?.selfAssessment ?? {})
+  }
 
   const start = () => {
     const ts = Date.now()
@@ -44,8 +75,9 @@ export function InterviewPage() {
     setStageStartedAt(ts)
     setStageIndex(0)
     setFinished(false)
-    setNotes('')
+    setStageNotes([])
     setCanvas(undefined)
+    setRatings({})
     setPrefs({ hasGestureForSound: true })
   }
 
@@ -58,181 +90,205 @@ export function InterviewPage() {
       stageIndex,
       stageStartedAt,
       finished,
-      notes,
-      draft: canvas
-        ? { nodes: canvas.nodes, edges: canvas.edges, stageAnswers: {}, updatedAt: new Date().toISOString() }
-        : undefined,
+      notes: stageNotes.filter(Boolean).join('\n\n'),
+      stageNotes,
+      selfAssessment: ratings,
+      draft: canvas ? { nodes: canvas.nodes, edges: canvas.edges, stageAnswers: {}, updatedAt: new Date().toISOString() } : undefined,
     })
-  }, [startedAt, stageIndex, stageStartedAt, finished, notes, canvas, bossId, sessionId, upsertInterview])
+  }, [startedAt, stageIndex, stageStartedAt, finished, stageNotes, ratings, canvas, bossId, sessionId, upsertInterview])
 
   const overallLeft = startedAt ? remainingMs(overallDeadlineMs(startedAt), now) : 0
   const stageLeft = startedAt ? remainingMs(stageDeadlineMs(startedAt, stageIndex, stageStartedAt), now) : 0
 
   useEffect(() => {
     if (!startedAt || finished) return
-    if (stageLeft <= 0 && stageIndex < STAGE_LABELS.length - 1) {
-      const ts = Date.now()
+    if (stageLeft <= 0 && stageIndex < STAGES.length - 1) {
       setStageIndex((i) => i + 1)
-      setStageStartedAt(ts)
+      setStageStartedAt(Date.now())
     }
     if (overallLeft <= 0) setFinished(true)
   }, [stageLeft, overallLeft, startedAt, finished, stageIndex])
 
-  const fmt = (ms: number) => {
-    const s = Math.floor(ms / 1000)
-    const m = Math.floor(s / 60)
-    return `${m}:${String(s % 60).padStart(2, '0')}`
-  }
-
-  const finishEarly = () => {
+  const finish = () => {
     setFinished(true)
-    const badges = badgeAfterMock(useGameStore.getState().badges)
-    useGameStore.setState({ badges: [...new Set(badges)] })
+    useGameStore.setState({ badges: [...new Set(badgeAfterMock(useGameStore.getState().badges))] })
     useGameStore.getState().recordActivity()
   }
 
-  const summary = useMemo(() => {
-    if (!finished) return null
-    return {
-      auto: 'Structured stages captured locally. Review your notes and canvas against the boss rubric after the mock.',
-      self: {
-        requirements: 3,
-        estimation: 3,
-        communication: 3,
-      },
-    }
-  }, [finished])
+  const goToStage = (i: number) => {
+    setStageIndex(i)
+    setStageStartedAt(Date.now())
+  }
+
+  const suggested = useMemo(
+    () => (boss?.boss?.rubric.requiredCapabilities ?? []) as CanvasComponentType[],
+    [boss],
+  )
+  const running = Boolean(startedAt) && !finished
+  const scenario = boss?.boss
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <header className="border-b border-[var(--color-rail)] pb-4">
         <p className="text-sm font-semibold text-[var(--color-amber)]">Mock interview · 45 minutes</p>
         <h1 className="font-display text-4xl font-extrabold text-chalk mt-1">Interview mode</h1>
         <p className="text-[15px] text-dim mt-2 max-w-2xl">
-          One scenario, six timed stages, no hints and no reference answer. The clock runs on wall time, so a refresh will not reset it.
+          One scenario, six timed stages, no hints. The reference answer appears only after you finish.
         </p>
       </header>
 
-      <div className="flex flex-wrap gap-3 items-end">
-        <label className="text-sm text-dim">
-          Scenario
-          <select
-            className="field mt-1 block min-w-[240px]"
-            value={bossId}
-            onChange={(e) => setBossId(Number(e.target.value))}
-            disabled={Boolean(startedAt && !finished)}
-          >
-            {bosses.map((b) => (
-              <option key={b.id} value={b.id}>{b.title}</option>
-            ))}
-          </select>
-        </label>
-        {!startedAt && (
-          <button type="button" onClick={start} className="btn-cta">
-            Start mock
-          </button>
-        )}
-        {startedAt && !finished && (
-          <button type="button" onClick={finishEarly} className="btn-quiet">
-            Finish early
-          </button>
-        )}
-      </div>
+      {!running && (
+        <div className="flex flex-wrap gap-3 items-end">
+          <label className="text-sm text-dim">
+            Scenario
+            <select className="field mt-1 block min-w-[260px]" value={bossId} onChange={(e) => switchScenario(Number(e.target.value))}>
+              {bosses.map((b) => (
+                <option key={b.id} value={b.id}>{b.title}</option>
+              ))}
+            </select>
+          </label>
+          {!startedAt && (
+            <button type="button" onClick={start} className="btn-cta">Start mock</button>
+          )}
+        </div>
+      )}
 
-      {!startedAt && (
-        <section className="panel p-5" aria-labelledby="mock-plan">
-          <h2 id="mock-plan" className="font-display text-lg font-bold text-chalk">How the 45 minutes split</h2>
-          <ol className="mt-3 grid gap-2 sm:grid-cols-3">
-            {STAGE_LABELS.map((label, i) => (
-              <li key={label} className="flex items-center gap-3 rounded-md border border-[var(--color-rail)] bg-[var(--color-ink)] px-3 py-2">
+      {!startedAt && scenario && (
+        <section className="panel p-5 space-y-4" aria-labelledby="brief">
+          <div>
+            <h2 id="brief" className="font-display text-xl font-bold text-chalk">Brief: {boss.title}</h2>
+            <p className="text-[15px] text-[#d6d0c2] mt-1">
+              Your interviewer says: “Design {boss.title}.” Treat the details below as what you would learn by asking.
+            </p>
+          </div>
+          <dl className="grid gap-3 sm:grid-cols-3 text-sm">
+            <div><dt className="text-dim">Users want to</dt><dd className="text-chalk mt-0.5">{scenario.functionalRequirements.join('; ')}</dd></div>
+            <div><dt className="text-dim">It must</dt><dd className="text-chalk mt-0.5">{scenario.nonFunctionalRequirements.join('; ')}</dd></div>
+            <div><dt className="text-dim">Out of scope</dt><dd className="text-chalk mt-0.5">{scenario.exclusions.join('; ')}</dd></div>
+          </dl>
+          <ol className="grid gap-2 sm:grid-cols-3">
+            {STAGES.map((s, i) => (
+              <li key={s.label} className="flex items-center gap-3 rounded-md border border-[var(--color-rail)] bg-[var(--color-ink)] px-3 py-2">
                 <span className="order-num tabular-nums" aria-hidden>{i + 1}</span>
-                <span className="text-sm text-chalk flex-1">{label}</span>
+                <span className="text-sm text-chalk flex-1">{s.label}</span>
                 <span className="text-sm text-dim tabular-nums">{INTERVIEW_STAGE_MINUTES[i]} min</span>
               </li>
             ))}
           </ol>
-          <p className="text-sm text-dim mt-3">You get a notes pad and the same architecture canvas as the bosses. Talk through it out loud as you would with an interviewer.</p>
         </section>
       )}
 
-      {startedAt && !finished && (
-        <section className="panel p-5 space-y-4" aria-label="Interview clock">
-          <div className="flex flex-wrap items-end gap-x-10 gap-y-3">
-            <div>
-              <p className="text-xs text-dim">Time left overall</p>
-              <p className="font-display text-5xl font-extrabold tabular-nums text-chalk leading-none mt-1" data-testid="interview-overall-timer">
-                {fmt(overallLeft)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-dim">
-                Stage {stageIndex + 1} of {STAGE_LABELS.length} · {STAGE_LABELS[stageIndex]}
-              </p>
-              <p
-                className={`font-display text-3xl font-bold tabular-nums leading-none mt-1 ${stageLeft < 60_000 ? 'text-[var(--color-fault)]' : 'text-[var(--color-amber)]'}`}
-                aria-live={stageLeft < 60_000 ? 'polite' : 'off'}
-              >
-                {fmt(stageLeft)}
-              </p>
-            </div>
-          </div>
-          <ol className="flex gap-1" aria-label="Stages">
-            {STAGE_LABELS.map((label, i) => (
-              <li key={label} className="flex-1" style={{ flexGrow: INTERVIEW_STAGE_MINUTES[i] }} aria-current={i === stageIndex ? 'step' : undefined}>
-                <div
-                  className="h-1.5 rounded-full"
-                  style={{ background: i < stageIndex ? 'var(--color-clear)' : i === stageIndex ? 'var(--color-amber)' : 'var(--color-rail)' }}
-                />
-                <p className={`mt-1 text-[11px] truncate ${i === stageIndex ? 'text-chalk' : 'text-dim'}`}>{label}</p>
-              </li>
-            ))}
-          </ol>
-          <p className="text-sm text-[#d6d0c2] border-t border-[var(--color-rail)] pt-3">
-            <span className="text-chalk font-semibold">Prompt: </span>
-            {boss?.boss?.apiPrompt ?? 'Clarify users, scale, and constraints.'}
-          </p>
-        </section>
-      )}
-
-      {startedAt && !finished && (
+      {running && (
         <>
-          <label htmlFor="mock-notes" className="block text-sm font-semibold text-chalk -mb-2">Your notes</label>
-          <textarea
-            id="mock-notes"
-            className="field w-full min-h-[140px] text-[15px] leading-relaxed"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Requirements, numbers, API sketch… saved as you type."
-          />
-          <BossCanvas initial={canvas} onChange={setCanvas} />
+          <section className="panel p-5 space-y-4" aria-label="Interview clock">
+            <div className="flex flex-wrap items-end gap-x-10 gap-y-3">
+              <div>
+                <p className="text-xs text-dim">{boss?.title} · time left</p>
+                <p className="font-display text-5xl font-extrabold tabular-nums text-chalk leading-none mt-1" data-testid="interview-overall-timer">
+                  {fmt(overallLeft)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-dim">Stage {stageIndex + 1} of {STAGES.length} · {STAGES[stageIndex]!.label}</p>
+                <p className={`font-display text-3xl font-bold tabular-nums leading-none mt-1 ${stageLeft < 60_000 ? 'text-[var(--color-fault)]' : 'text-[var(--color-amber)]'}`}>
+                  {fmt(stageLeft)}
+                </p>
+              </div>
+              <div className="ml-auto flex gap-2">
+                {stageIndex < STAGES.length - 1 && (
+                  <button type="button" className="btn-quiet" onClick={() => goToStage(stageIndex + 1)}>Next stage</button>
+                )}
+                <button type="button" onClick={finish} className="btn-quiet">Finish early</button>
+              </div>
+            </div>
+            <ol className="flex gap-1" aria-label="Stages">
+              {STAGES.map((s, i) => (
+                <li key={s.label} className="flex-1" style={{ flexGrow: INTERVIEW_STAGE_MINUTES[i] }} aria-current={i === stageIndex ? 'step' : undefined}>
+                  <div className="h-1.5 rounded-full" style={{ background: i < stageIndex ? 'var(--color-clear)' : i === stageIndex ? 'var(--color-amber)' : 'var(--color-rail)' }} />
+                  <p className={`mt-1 text-[11px] truncate ${i === stageIndex ? 'text-chalk' : 'text-dim'}`}>{s.label}</p>
+                </li>
+              ))}
+            </ol>
+            <p className="text-[15px] text-chalk border-t border-[var(--color-rail)] pt-3">{STAGES[stageIndex]!.ask}</p>
+          </section>
+          <div>
+            <label htmlFor="mock-notes" className="block text-sm font-semibold text-chalk mb-1">
+              Notes for {STAGES[stageIndex]!.label.toLowerCase()}
+            </label>
+            <textarea
+              id="mock-notes"
+              className="field w-full min-h-[130px] text-[15px] leading-relaxed"
+              value={stageNotes[stageIndex] ?? ''}
+              onChange={(e) => {
+                const next = [...stageNotes]
+                next[stageIndex] = e.target.value
+                setStageNotes(next)
+              }}
+              placeholder="Saved as you type."
+            />
+          </div>
+          {stageIndex >= 3 && <BossCanvas key={sessionId} initial={canvas} onChange={setCanvas} suggested={suggested} />}
         </>
       )}
 
-      {summary && (
-        <section className="panel p-5 space-y-4" aria-labelledby="mock-summary">
-          <div>
+      {startedAt > 0 && finished && boss && (
+        <section className="space-y-4" aria-labelledby="mock-summary">
+          <div className="panel p-5">
             <p className="text-sm font-semibold text-[var(--color-clear)]">Mock finished</p>
-            <h2 id="mock-summary" className="font-display text-2xl font-bold text-chalk mt-1">How did it go?</h2>
-            <p className="text-sm text-dim mt-1">{summary.auto}</p>
+            <h2 id="mock-summary" className="font-display text-2xl font-bold text-chalk mt-1">{boss.title}: your answers</h2>
+            <ol className="mt-3 space-y-2">
+              {STAGES.map((s, i) => (
+                <li key={s.label} className="rounded-md border border-[var(--color-rail)] bg-[var(--color-ink)] p-3">
+                  <p className="text-xs text-dim">{s.label}</p>
+                  <p className="text-sm text-chalk whitespace-pre-wrap mt-0.5">{stageNotes[i]?.trim() || 'No notes for this stage.'}</p>
+                </li>
+              ))}
+            </ol>
+            <p className="text-sm text-dim mt-3">
+              Canvas: {canvas?.nodes.length ? `${canvas.nodes.map((n) => n.label).join(', ')}; ${canvas.edges.length} connection${canvas.edges.length === 1 ? '' : 's'}.` : 'nothing drawn.'}
+            </p>
           </div>
-          {notes.trim() && (
-            <div className="rounded-md border border-[var(--color-rail)] bg-[var(--color-ink)] p-3">
-              <p className="text-xs text-dim mb-1">Your notes</p>
-              <p className="text-sm text-chalk whitespace-pre-wrap">{notes}</p>
+
+          <fieldset className="panel p-5 space-y-3">
+            <legend className="font-display text-lg font-bold text-chalk px-1">Rate yourself, 1 to 5</legend>
+            {RUBRIC.map((r) => (
+              <div key={r.key} className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center border-b border-[var(--color-rail)] pb-3 last:border-0">
+                <div>
+                  <p className="text-chalk">{r.label}</p>
+                  <p className="text-xs text-dim">{r.def}</p>
+                </div>
+                <div className="flex gap-1" role="radiogroup" aria-label={`${r.label} rating`}>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      role="radio"
+                      aria-checked={ratings[r.key] === n}
+                      className={`rating-btn ${ratings[r.key] === n ? 'rating-btn-on' : ''}`}
+                      onClick={() => setRatings({ ...ratings, [r.key]: n })}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </fieldset>
+
+          <details className="panel p-5" open>
+            <summary className="cursor-pointer font-display text-lg font-bold text-chalk">Reference solution</summary>
+            <div className="mt-3 space-y-2 text-sm text-[#d6d0c2] leading-relaxed">
+              <p>{boss.boss?.referenceNotes}</p>
+              <p><span className="text-chalk font-semibold">Estimate: </span>{boss.boss?.workedEstimate}</p>
+              <pre className="whitespace-pre-wrap rounded-md border border-[var(--color-rail)] bg-[#0a1624] p-3 text-[13px] text-chalk">{boss.boss?.exampleApi}</pre>
+              <p><span className="text-chalk font-semibold">Trade-offs: </span>{boss.boss?.tradeoffAnalysis}</p>
             </div>
-          )}
-          <p className="text-sm text-dim">
-            Rate yourself 1 to 5 on requirements clarity, estimation and communication. This is self-assessed, nothing is auto-graded.
-          </p>
+          </details>
+
           <div className="flex flex-wrap gap-2">
-            {boss && (
-              <Link to={`/topic/${boss.slug}`} className="btn-cta">
-                Compare with the {boss.title} boss
-              </Link>
-            )}
-            <button type="button" className="btn-quiet" onClick={start}>
-              Start a new mock
-            </button>
+            <button type="button" className="btn-cta" onClick={start}>Retry this scenario</button>
+            <button type="button" className="btn-quiet" onClick={() => { setStartedAt(0); setFinished(false) }}>New mock</button>
+            <Link to={`/topic/${boss.slug}`} className="btn-quiet">Open the {boss.title} boss</Link>
           </div>
         </section>
       )}
