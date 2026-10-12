@@ -6,10 +6,10 @@ import { HelpShortcuts } from './HelpShortcuts'
 
 const nav = [
   { to: '/', label: 'Map' },
-  { to: '/revision', label: 'Revision' },
-  { to: '/cheat-sheet', label: 'Cheat' },
-  { to: '/interview', label: 'Mock' },
-  { to: '/settings', label: 'Data' },
+  { to: '/revision', label: 'Review' },
+  { to: '/cheat-sheet', label: 'Cheat sheet' },
+  { to: '/interview', label: 'Interview' },
+  { to: '/settings', label: 'Settings' },
 ]
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -23,10 +23,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-full flex flex-col">
       <div className="app-bg" aria-hidden />
       <header className="shell-header sticky top-0 z-50">
-        <div className="max-w-[1180px] mx-auto px-4 py-2.5 flex flex-wrap items-end justify-between gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-8">
-            <Link to="/" className="font-display text-base font-extrabold tracking-tight text-[#f8fafc]">
-              SD<span className="text-[var(--color-teal)]">Q</span>
+        <div className="max-w-[1180px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-8">
+            <Link to="/" className="font-display text-lg font-extrabold tracking-tight text-chalk flex items-center gap-2" aria-label="System Design Quest, back to map">
+              <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
+                <path d="M2 15h7l4-8h7" fill="none" stroke="var(--color-amber)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="11" cy="11" r="3.5" fill="var(--color-ink)" stroke="var(--color-chalk)" strokeWidth="2" />
+              </svg>
+              <span>
+                Design<span className="text-[var(--color-amber)]">Quest</span>
+              </span>
             </Link>
             <nav className="flex flex-wrap gap-4 sm:gap-5" aria-label="Main">
               {nav.map((item) => (
@@ -42,17 +48,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </nav>
           </div>
           <div className="flex items-stretch gap-2 text-xs">
-            <div className="hud-block min-w-[130px]">
-              <div className="flex justify-between text-[10px] uppercase tracking-widest text-[var(--color-muted)]">
-                <span>Lv</span>
-                <span className="text-chalk font-bold tabular-nums">{level}</span>
+            <div className="hud-block min-w-[150px]">
+              <div className="flex justify-between items-baseline gap-3">
+                <span className="font-display font-semibold text-chalk">Level {level}</span>
+                <span className="tabular-nums text-dim">{xp} xp</span>
               </div>
-              <div className="xp-track mt-1">
-                <div className="xp-fill" style={{ width: `${pct}%` }} role="progressbar" aria-valuenow={xp % 500} aria-valuemin={0} aria-valuemax={500} />
+              <div className="xp-track mt-1.5">
+                <div
+                  className="xp-fill"
+                  style={{ width: `${pct}%` }}
+                  role="progressbar"
+                  aria-label="XP to next level"
+                  aria-valuenow={xp % 500}
+                  aria-valuemin={0}
+                  aria-valuemax={500}
+                />
               </div>
-              <div className="mt-0.5 tabular-nums text-[10px] text-[var(--color-muted)]">{xp} xp</div>
             </div>
-            <div className="hud-block flex items-center gap-1.5">
+            <div className="hud-block flex items-center gap-1.5" title={`${streak}-day streak`} aria-label={`${streak}-day streak`}>
               <IconFlame />
               <span className="font-bold tabular-nums">{streak}</span>
             </div>
@@ -64,7 +77,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             )}
             <button
               type="button"
-              className="hud-block px-2 font-bold text-[var(--color-teal)]"
+              className="hud-block px-3 font-display font-bold text-chalk hover:border-[var(--color-dim)]"
               data-testid="help-shortcuts-trigger"
               aria-label="Keyboard shortcuts"
               onClick={() => document.dispatchEvent(new CustomEvent('sdq-toggle-help'))}
