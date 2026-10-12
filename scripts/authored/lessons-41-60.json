@@ -7,8 +7,9 @@
     "title": "Rate Limiting Algorithms",
     "kind": "lesson",
     "objectives": [
-      "Explain Rate Limiting Algorithms with measurable requirements and failure modes",
-      "Protect services by capping requests per key using token bucket, leaky bucket or sliding windows."
+      "Protect services by capping requests per key using token bucket, leaky bucket or sliding windows.",
+      "Answer: HTTP status for rate limited?",
+      "Answer: Distributed rate limit store?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -16,35 +17,35 @@
     "cards": [
       {
         "id": "t41-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "Token bucket: tokens refill at rate r up to capacity b; each request spends one — allows bursts. Sliding window counters smooth boundary spikes. Store counters in Redis for a shared limit.",
         "accent": "Interview lens"
       },
       {
         "id": "t41-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "Protect services by capping requests per key using token bucket, leaky bucket or sliding windows."
       },
       {
         "id": "t41-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Request arrives → Lookup key bucket → Token available? → Yes: allow & spend → No: 429 Too Many Requests"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Request arrives” to “No: 429 Too Many Requests”, via “Lookup key bucket”.",
+        "steps": [
+          "Request arrives",
+          "Lookup key bucket",
+          "Token available?",
+          "Yes: allow & spend",
+          "No: 429 Too Many Requests"
+        ]
       },
       {
         "id": "t41-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Fixed windows let 2× traffic through at window boundaries. Mention sliding windows or token buckets."
-      },
-      {
-        "id": "t41-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for Rate Limiting Algorithms. Protect services by capping requests per key using token bucket, leaky bucket or sliding windows.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -53,10 +54,6 @@
         "type": "multiple_choice",
         "prompt": "Which algorithm naturally allows short bursts?",
         "choices": [
-          {
-            "id": "a",
-            "label": "Fixed window"
-          },
           {
             "id": "b",
             "label": "Token bucket"
@@ -68,6 +65,10 @@
           {
             "id": "d",
             "label": "Round robin"
+          },
+          {
+            "id": "a",
+            "label": "Fixed window"
           }
         ],
         "correctChoiceIds": [
@@ -80,7 +81,7 @@
         "type": "estimation",
         "prompt": "Token bucket refills 5 tokens/s with capacity 20, starting full. Max requests allowed in the first 4 seconds?",
         "unit": "count",
-        "target": 40.0,
+        "target": 40,
         "assumptions": [
           "Use rounded daily volume ÷ 86,400 unless stated otherwise."
         ],
@@ -89,125 +90,31 @@
         "explanation": "20 initial + 5 × 4 refilled = 40."
       },
       {
-        "id": "t41-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «Rate Limiting Algorithms» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t41-q4",
-        "type": "estimation",
-        "prompt": "«Rate Limiting Algorithms»: about 7,856,539 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 78.0,
-        "assumptions": [
-          "86400 s/day",
-          "7800000 / 86400 ≈ 78 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 78 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t41-q5",
-        "type": "tradeoff",
-        "prompt": "«Rate Limiting Algorithms»: pick a scaling posture for a 3× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t41-q6",
+        "id": "t41-r1",
         "type": "multiple_choice",
-        "prompt": "«Rate Limiting Algorithms»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "HTTP status for rate limited?",
         "choices": [
           {
-            "id": "a",
-            "label": "IDE theme"
-          },
-          {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
-          },
-          {
-            "id": "c",
-            "label": "Logo color palette"
+            "label": "Deliberately dropping low-priority work."
           },
           {
             "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Fast feed reads for accounts with modest follower counts."
+          },
+          {
+            "id": "a",
+            "label": "429 Too Many Requests."
+          },
+          {
+            "id": "c",
+            "label": "Make the key insert atomic, e.g. a unique constraint in the same transaction."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: 429 Too Many Requests."
       }
     ],
     "flashcards": [
@@ -241,8 +148,9 @@
     "title": "Distributed Unique IDs",
     "kind": "lesson",
     "objectives": [
-      "Explain Distributed Unique IDs with measurable requirements and failure modes",
-      "Generate unique IDs at scale: UUIDs, DB sequences, Snowflake, or ticket servers."
+      "Generate unique IDs at scale: UUIDs, DB sequences, Snowflake, or ticket servers.",
+      "Answer: UUIDv7?",
+      "Answer: Why not public auto-increment IDs?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -250,35 +158,35 @@
     "cards": [
       {
         "id": "t42-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "UUIDv4 is random and needs no coordination but indexes poorly. Snowflake 64-bit IDs (timestamp + worker + sequence) are sortable. UUIDv7 adds time ordering.",
         "accent": "Interview lens"
       },
       {
         "id": "t42-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "Generate unique IDs at scale: UUIDs, DB sequences, Snowflake, or ticket servers."
       },
       {
         "id": "t42-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Timestamp bits → Worker ID bits → Sequence bits → Combine → Sortable 64-bit ID"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Timestamp bits” to “Sortable 64-bit ID”, via “Worker ID bits”.",
+        "steps": [
+          "Timestamp bits",
+          "Worker ID bits",
+          "Sequence bits",
+          "Combine",
+          "Sortable 64-bit ID"
+        ]
       },
       {
         "id": "t42-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Using auto-increment IDs exposed publicly — leaks volume and enables enumeration."
-      },
-      {
-        "id": "t42-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for Distributed Unique IDs. Generate unique IDs at scale: UUIDs, DB sequences, Snowflake, or ticket servers.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -292,16 +200,16 @@
             "label": "UUIDv4"
           },
           {
-            "id": "b",
-            "label": "Snowflake"
-          },
-          {
             "id": "c",
             "label": "MD5 of email"
           },
           {
             "id": "d",
             "label": "Random int"
+          },
+          {
+            "id": "b",
+            "label": "Snowflake"
           }
         ],
         "correctChoiceIds": [
@@ -314,7 +222,7 @@
         "type": "estimation",
         "prompt": "Snowflake uses a 12-bit sequence per ms per worker. Max IDs per worker per second (approx)?",
         "unit": "count",
-        "target": 4096000.0,
+        "target": 4096000,
         "assumptions": [
           "Use rounded daily volume ÷ 86,400 unless stated otherwise."
         ],
@@ -323,125 +231,31 @@
         "explanation": "4096 per ms × 1000 ms."
       },
       {
-        "id": "t42-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «Distributed Unique IDs» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t42-q4",
-        "type": "estimation",
-        "prompt": "«Distributed Unique IDs»: about 9,557,918 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 95.0,
-        "assumptions": [
-          "86400 s/day",
-          "9500000 / 86400 ≈ 95 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 95 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t42-q5",
-        "type": "tradeoff",
-        "prompt": "«Distributed Unique IDs»: pick a scaling posture for a 4× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t42-q6",
+        "id": "t42-r1",
         "type": "multiple_choice",
-        "prompt": "«Distributed Unique IDs»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "UUIDv7?",
         "choices": [
           {
-            "id": "a",
-            "label": "IDE theme"
-          },
-          {
-            "id": "b",
-            "label": "Correctness under retries and partial failures"
-          },
-          {
             "id": "c",
-            "label": "Logo color palette"
+            "label": "Make retries of non-idempotent operations safe."
+          },
+          {
+            "id": "a",
+            "label": "Time-ordered UUID."
           },
           {
             "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Lets the server return the stored result for a retried request instead of repeating it."
+          },
+          {
+            "id": "b",
+            "label": "Wait 1s, 2s, 4s… plus random jitter."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: Time-ordered UUID."
       }
     ],
     "flashcards": [
@@ -475,8 +289,9 @@
     "title": "2PC & Saga",
     "kind": "lesson",
     "objectives": [
-      "Explain 2PC & Saga with measurable requirements and failure modes",
-      "When overloaded, slow producers or drop low-priority work to keep core flows alive."
+      "When overloaded, slow producers or drop low-priority work to keep core flows alive.",
+      "Answer: Consumer lag?",
+      "Answer: Load shedding?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -484,35 +299,35 @@
     "cards": [
       {
         "id": "t43-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "Bounded queues, 429s, and priority shedding protect a system. Shed analytics before checkout. Monitor consumer lag.",
         "accent": "Interview lens"
       },
       {
         "id": "t43-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "When overloaded, slow producers or drop low-priority work to keep core flows alive."
       },
       {
         "id": "t43-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Load rises → Queue fills → Signal backpressure → Shed low priority → Core path protected"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Load rises” to “Core path protected”, via “Queue fills”.",
+        "steps": [
+          "Load rises",
+          "Queue fills",
+          "Signal backpressure",
+          "Shed low priority",
+          "Core path protected"
+        ]
       },
       {
         "id": "t43-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Unbounded queues that grow until memory runs out."
-      },
-      {
-        "id": "t43-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for 2PC & Saga. When overloaded, slow producers or drop low-priority work to keep core flows alive.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -522,20 +337,20 @@
         "prompt": "Under overload, what should a shopping app shed first?",
         "choices": [
           {
-            "id": "a",
-            "label": "Payment"
-          },
-          {
             "id": "b",
             "label": "Checkout"
           },
           {
-            "id": "c",
-            "label": "Recommendation widgets"
+            "id": "a",
+            "label": "Payment"
           },
           {
             "id": "d",
             "label": "Login"
+          },
+          {
+            "id": "c",
+            "label": "Recommendation widgets"
           }
         ],
         "correctChoiceIds": [
@@ -553,16 +368,16 @@
             "label": "Bounded queues"
           },
           {
-            "id": "b",
-            "label": "Return 429/503 with Retry-After"
-          },
-          {
             "id": "c",
             "label": "Infinite in-memory buffers"
           },
           {
             "id": "d",
             "label": "Priority-based shedding"
+          },
+          {
+            "id": "b",
+            "label": "Return 429/503 with Retry-After"
           }
         ],
         "correctChoiceIds": [
@@ -573,125 +388,31 @@
         "explanation": "Unbounded buffers hide overload until crash."
       },
       {
-        "id": "t43-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «2PC & Saga» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t43-q4",
-        "type": "estimation",
-        "prompt": "«2PC & Saga»: about 2,259,297 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 22.0,
-        "assumptions": [
-          "86400 s/day",
-          "2200000 / 86400 ≈ 22 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 22 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t43-q5",
-        "type": "tradeoff",
-        "prompt": "«2PC & Saga»: pick a scaling posture for a 5× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t43-q6",
+        "id": "t43-r1",
         "type": "multiple_choice",
-        "prompt": "«2PC & Saga»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "Consumer lag?",
         "choices": [
           {
-            "id": "a",
-            "label": "IDE theme"
+            "id": "c",
+            "label": "Decoupling and load levelling."
           },
           {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
-          },
-          {
-            "id": "c",
-            "label": "Logo color palette"
+            "label": "Redis with atomic INCR/Lua."
           },
           {
             "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Prevent resource exhaustion from slow calls."
+          },
+          {
+            "id": "a",
+            "label": "How far consumers are behind producers."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: How far consumers are behind producers."
       }
     ],
     "flashcards": [
@@ -725,8 +446,9 @@
     "title": "Outbox Pattern & CDC",
     "kind": "lesson",
     "objectives": [
-      "Explain Outbox Pattern & CDC with measurable requirements and failure modes",
-      "Fail fast when a dependency is unhealthy; always set timeouts."
+      "Fail fast when a dependency is unhealthy; always set timeouts.",
+      "Answer: Bulkhead?",
+      "Answer: Why timeouts?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -734,35 +456,35 @@
     "cards": [
       {
         "id": "t44-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "States: closed (normal), open (fail fast), half-open (probe). Timeouts bound waiting; bulkheads isolate thread pools so one slow dependency can’t exhaust everything.",
         "accent": "Interview lens"
       },
       {
         "id": "t44-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "Fail fast when a dependency is unhealthy; always set timeouts."
       },
       {
         "id": "t44-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Closed → Failures exceed threshold → Open: fail fast → Half-open probe → Close on success"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Closed” to “Close on success”, via “Failures exceed threshold”.",
+        "steps": [
+          "Closed",
+          "Failures exceed threshold",
+          "Open: fail fast",
+          "Half-open probe",
+          "Close on success"
+        ]
       },
       {
         "id": "t44-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "No timeouts on outbound calls — threads pile up waiting forever."
-      },
-      {
-        "id": "t44-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for Outbox Pattern & CDC. Fail fast when a dependency is unhealthy; always set timeouts.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -772,12 +494,12 @@
         "prompt": "After cooldown, a circuit breaker enters:",
         "choices": [
           {
-            "id": "a",
-            "label": "Closed"
-          },
-          {
             "id": "b",
             "label": "Half-open"
+          },
+          {
+            "id": "a",
+            "label": "Closed"
           },
           {
             "id": "c",
@@ -824,125 +546,31 @@
         "explanation": "Normal → tripped → probing → recovered."
       },
       {
-        "id": "t44-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «Outbox Pattern & CDC» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t44-q4",
-        "type": "estimation",
-        "prompt": "«Outbox Pattern & CDC»: about 3,960,676 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 39.0,
-        "assumptions": [
-          "86400 s/day",
-          "3900000 / 86400 ≈ 39 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 39 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t44-q5",
-        "type": "tradeoff",
-        "prompt": "«Outbox Pattern & CDC»: pick a scaling posture for a 6× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t44-q6",
+        "id": "t44-r1",
         "type": "multiple_choice",
-        "prompt": "«Outbox Pattern & CDC»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "Bulkhead?",
         "choices": [
           {
-            "id": "a",
-            "label": "IDE theme"
+            "id": "c",
+            "label": "Number of partitions."
           },
           {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
+            "label": "Skip write fan-out for them and merge their posts at read time."
           },
           {
-            "id": "c",
-            "label": "Logo color palette"
+            "id": "a",
+            "label": "Isolate resources per dependency."
           },
           {
             "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Per partition only."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: Isolate resources per dependency."
       }
     ],
     "flashcards": [
@@ -976,8 +604,9 @@
     "title": "Consensus & Raft",
     "kind": "lesson",
     "objectives": [
-      "Explain Consensus & Raft with measurable requirements and failure modes",
-      "Services react to events; sagas coordinate multi-step transactions with compensations."
+      "Services react to events; sagas coordinate multi-step transactions with compensations.",
+      "Answer: Saga?",
+      "Answer: Orchestration vs choreography?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -985,35 +614,35 @@
     "cards": [
       {
         "id": "t45-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "Instead of a distributed 2PC, a saga runs local transactions and compensates on failure. Choreography = services react to events; orchestration = a coordinator directs steps.",
         "accent": "Interview lens"
       },
       {
         "id": "t45-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "Services react to events; sagas coordinate multi-step transactions with compensations."
       },
       {
         "id": "t45-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Reserve flight → Reserve hotel → Charge payment → Failure? → Run compensations"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Reserve flight” to “Run compensations”, via “Reserve hotel”.",
+        "steps": [
+          "Reserve flight",
+          "Reserve hotel",
+          "Charge payment",
+          "Failure?",
+          "Run compensations"
+        ]
       },
       {
         "id": "t45-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Forgetting compensations — partial failures leave money charged without a booking."
-      },
-      {
-        "id": "t45-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for Consensus & Raft. Services react to events; sagas coordinate multi-step transactions with compensations.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -1022,6 +651,10 @@
         "type": "multiple_choice",
         "prompt": "A saga handles failure by:",
         "choices": [
+          {
+            "id": "d",
+            "label": "Restarting the DB"
+          },
           {
             "id": "a",
             "label": "Global locks"
@@ -1033,10 +666,6 @@
           {
             "id": "c",
             "label": "Ignoring errors"
-          },
-          {
-            "id": "d",
-            "label": "Restarting the DB"
           }
         ],
         "correctChoiceIds": [
@@ -1047,15 +676,19 @@
       {
         "id": "t45-q2",
         "type": "multiple_choice",
-        "prompt": "Topic 45: Match term to meaning.",
+        "prompt": "Choreography vs Orchestration: which pairing is correct?",
         "choices": [
+          {
+            "id": "d",
+            "label": "Orchestration → Services react to events"
+          },
+          {
+            "id": "c",
+            "label": "Choreography → Central coordinator"
+          },
           {
             "id": "a",
             "label": "Choreography → Services react to events"
-          },
-          {
-            "id": "b",
-            "label": "Orchestration → Central coordinator"
           }
         ],
         "correctChoiceIds": [
@@ -1064,125 +697,31 @@
         "explanation": "Sagas trade atomicity for availability."
       },
       {
-        "id": "t45-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «Consensus & Raft» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t45-q4",
-        "type": "estimation",
-        "prompt": "«Consensus & Raft»: about 5,662,055 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 56.0,
-        "assumptions": [
-          "86400 s/day",
-          "5600000 / 86400 ≈ 56 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 56 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t45-q5",
-        "type": "tradeoff",
-        "prompt": "«Consensus & Raft»: pick a scaling posture for a 2× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t45-q6",
+        "id": "t45-r1",
         "type": "multiple_choice",
-        "prompt": "«Consensus & Raft»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "Saga?",
         "choices": [
           {
-            "id": "a",
-            "label": "IDE theme"
-          },
-          {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
-          },
-          {
-            "id": "c",
-            "label": "Logo color palette"
+            "label": "Timestamp + machine ID + sequence."
           },
           {
             "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Wrong ordering for last-write-wins."
+          },
+          {
+            "id": "c",
+            "label": "Connect user journeys to SLOs, then justify components and trade-offs for Bloom Filters/HyperLogLog/Count-Min."
+          },
+          {
+            "id": "a",
+            "label": "Sequence of local transactions with compensations."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: Sequence of local transactions with compensations."
       }
     ],
     "flashcards": [
@@ -1220,8 +759,9 @@
     "title": "Leader Election & Distributed Locks",
     "kind": "lesson",
     "objectives": [
-      "Explain Leader Election & Distributed Locks with measurable requirements and failure modes",
-      "Coordinate exclusive access across services with leases, fencing, and caution."
+      "Coordinate exclusive access across services with leases, fencing, and caution.",
+      "Answer: Redis lock command?",
+      "Answer: Compare-and-set?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -1229,35 +769,35 @@
     "cards": [
       {
         "id": "t46-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "Redis SET NX PX gives a simple lock with TTL; ZooKeeper/etcd give safer locks. Always bound locks with TTLs and design for lock loss.",
         "accent": "Interview lens"
       },
       {
         "id": "t46-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "Coordinate exclusive access across services with leases, fencing, and caution."
       },
       {
         "id": "t46-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Request lock → SET key NX PX → Got it? do work → Release → TTL auto-expires on crash"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Request lock” to “TTL auto-expires on crash”, via “SET key NX PX”.",
+        "steps": [
+          "Request lock",
+          "SET key NX PX",
+          "Got it? do work",
+          "Release",
+          "TTL auto-expires on crash"
+        ]
       },
       {
         "id": "t46-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Holding a lock without a TTL — a crashed holder blocks everyone forever."
-      },
-      {
-        "id": "t46-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for Leader Election & Distributed Locks. Coordinate exclusive access across services with leases, fencing, and caution.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -1267,8 +807,8 @@
         "prompt": "Why must a distributed lock have a TTL?",
         "choices": [
           {
-            "id": "a",
-            "label": "To speed up Redis"
+            "id": "d",
+            "label": "For pagination"
           },
           {
             "id": "b",
@@ -1279,8 +819,8 @@
             "label": "To encrypt keys"
           },
           {
-            "id": "d",
-            "label": "For pagination"
+            "id": "a",
+            "label": "To speed up Redis"
           }
         ],
         "correctChoiceIds": [
@@ -1298,12 +838,12 @@
             "label": "Fencing tokens"
           },
           {
-            "id": "b",
-            "label": "Conditional DB update (compare-and-set)"
-          },
-          {
             "id": "c",
             "label": "Consensus-backed locks (etcd)"
+          },
+          {
+            "id": "b",
+            "label": "Conditional DB update (compare-and-set)"
           },
           {
             "id": "d",
@@ -1352,7 +892,7 @@
         "type": "estimation",
         "prompt": "Lease TTL 10s, GC pause 12s. How many active writers could exist without fencing?",
         "unit": "writers",
-        "target": 2.0,
+        "target": 2,
         "assumptions": [
           "Old holder resumes",
           "New holder acquired after TTL"
@@ -1372,9 +912,9 @@
         ],
         "approaches": [
           {
-            "id": "db",
-            "label": "Transactional DB advisory lock/lease row",
-            "description": "Slower but strongly guarded"
+            "id": "none",
+            "label": "Run everywhere",
+            "description": "Duplicates"
           },
           {
             "id": "ttl",
@@ -1382,17 +922,13 @@
             "description": "Simple but GC-risk"
           },
           {
-            "id": "none",
-            "label": "Run everywhere",
-            "description": "Duplicates"
+            "id": "db",
+            "label": "Transactional DB advisory lock/lease row",
+            "description": "Slower but strongly guarded"
           }
         ],
         "correctApproachId": "db",
         "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "DB compares fencing version on writes"
-          },
           {
             "id": "r2",
             "label": "Survives process pause better than naive TTL"
@@ -1400,6 +936,10 @@
           {
             "id": "bad",
             "label": "TTL-only locks risk double execution"
+          },
+          {
+            "id": "r1",
+            "label": "DB compares fencing version on writes"
           }
         ],
         "correctRationaleIds": [
@@ -1417,12 +957,12 @@
         "prompt": "Leader election differs from a lock because:",
         "choices": [
           {
-            "id": "a",
-            "label": "Leaders never fail"
-          },
-          {
             "id": "b",
             "label": "Leader role is sticky and drives writes; locks guard short sections"
+          },
+          {
+            "id": "a",
+            "label": "Leaders never fail"
           },
           {
             "id": "c",
@@ -1474,8 +1014,9 @@
     "title": "Lamport & Vector Clocks",
     "kind": "lesson",
     "objectives": [
-      "Explain Lamport & Vector Clocks with measurable requirements and failure modes",
-      "Wall clocks drift; use logical clocks (Lamport, vector) or hybrid clocks for ordering."
+      "Wall clocks drift; use logical clocks (Lamport, vector) or hybrid clocks for ordering.",
+      "Answer: Snowflake ID parts?",
+      "Answer: Clock skew risk?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -1483,35 +1024,35 @@
     "cards": [
       {
         "id": "t47-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "NTP-synced clocks can skew by milliseconds. Lamport clocks give a causal total order; vector clocks detect concurrency. Snowflake-style IDs combine time + machine + sequence.",
         "accent": "Interview lens"
       },
       {
         "id": "t47-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "Wall clocks drift; use logical clocks (Lamport, vector) or hybrid clocks for ordering."
       },
       {
         "id": "t47-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Event on A → Increment counter → Send with timestamp → B takes max+1 → Causal order preserved"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Event on A” to “Causal order preserved”, via “Increment counter”.",
+        "steps": [
+          "Event on A",
+          "Increment counter",
+          "Send with timestamp",
+          "B takes max+1",
+          "Causal order preserved"
+        ]
       },
       {
         "id": "t47-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Using server timestamps to decide \"last write wins\" across regions without accounting for skew."
-      },
-      {
-        "id": "t47-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for Lamport & Vector Clocks. Wall clocks drift; use logical clocks (Lamport, vector) or hybrid clocks for ordering.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -1521,20 +1062,20 @@
         "prompt": "Which detects concurrent updates?",
         "choices": [
           {
-            "id": "a",
-            "label": "Wall clock"
+            "id": "c",
+            "label": "Vector clock"
           },
           {
             "id": "b",
             "label": "Lamport clock"
           },
           {
-            "id": "c",
-            "label": "Vector clock"
-          },
-          {
             "id": "d",
             "label": "Cron"
+          },
+          {
+            "id": "a",
+            "label": "Wall clock"
           }
         ],
         "correctChoiceIds": [
@@ -1545,15 +1086,19 @@
       {
         "id": "t47-q2",
         "type": "multiple_choice",
-        "prompt": "Topic 47: Match concept.",
+        "prompt": "Lamport clock vs Vector clock: which pairing is correct?",
         "choices": [
           {
             "id": "a",
             "label": "Lamport clock → Logical counter"
           },
           {
-            "id": "b",
-            "label": "Vector clock → Detects concurrency"
+            "id": "c",
+            "label": "Lamport clock → Detects concurrency"
+          },
+          {
+            "id": "d",
+            "label": "Vector clock → Logical counter"
           }
         ],
         "correctChoiceIds": [
@@ -1562,125 +1107,31 @@
         "explanation": "Ordering needs more than wall time."
       },
       {
-        "id": "t47-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «Lamport & Vector Clocks» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t47-q4",
-        "type": "estimation",
-        "prompt": "«Lamport & Vector Clocks»: about 9,064,813 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 90.0,
-        "assumptions": [
-          "86400 s/day",
-          "9000000 / 86400 ≈ 90 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 90 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t47-q5",
-        "type": "tradeoff",
-        "prompt": "«Lamport & Vector Clocks»: pick a scaling posture for a 4× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t47-q6",
+        "id": "t47-r1",
         "type": "multiple_choice",
-        "prompt": "«Lamport & Vector Clocks»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "Snowflake ID parts?",
         "choices": [
           {
             "id": "a",
-            "label": "IDE theme"
+            "label": "Timestamp + machine ID + sequence."
           },
           {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
-          },
-          {
-            "id": "c",
-            "label": "Logo color palette"
+            "label": "floor(N/2) + 1."
           },
           {
             "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Skipping scale numbers, ignoring retries/idempotency, or mixing AuthN with AuthZ."
+          },
+          {
+            "id": "c",
+            "label": "p95 latency on the hot path plus error rate on writes/reads that affect revenue or safety."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: Timestamp + machine ID + sequence."
       }
     ],
     "flashcards": [
@@ -1714,8 +1165,9 @@
     "title": "Gossip & Failure Detection",
     "kind": "lesson",
     "objectives": [
-      "Explain Gossip & Failure Detection with measurable requirements and failure modes",
-      "Consensus lets a cluster agree on a log despite failures, needing a majority quorum."
+      "Consensus lets a cluster agree on a log despite failures, needing a majority quorum.",
+      "Answer: Quorum size for N nodes?",
+      "Answer: Nodes to tolerate f failures?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -1723,35 +1175,35 @@
     "cards": [
       {
         "id": "t48-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "Raft elects a leader, replicates log entries and commits once a majority acks. A 5-node cluster tolerates 2 failures. Used inside etcd, Consul, CockroachDB.",
         "accent": "Interview lens"
       },
       {
         "id": "t48-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "Consensus lets a cluster agree on a log despite failures, needing a majority quorum."
       },
       {
         "id": "t48-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Leader receives write → Append to log → Replicate to followers → Majority ack → Commit & apply"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Leader receives write” to “Commit & apply”, via “Append to log”.",
+        "steps": [
+          "Leader receives write",
+          "Append to log",
+          "Replicate to followers",
+          "Majority ack",
+          "Commit & apply"
+        ]
       },
       {
         "id": "t48-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Running consensus with 2 nodes — you can’t tolerate any failure and still have a majority."
-      },
-      {
-        "id": "t48-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for Gossip & Failure Detection. Consensus lets a cluster agree on a log despite failures, needing a majority quorum.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -1761,8 +1213,8 @@
         "prompt": "How many failures does a 5-node Raft cluster tolerate?",
         "choices": [
           {
-            "id": "a",
-            "label": "1"
+            "id": "d",
+            "label": "4"
           },
           {
             "id": "b",
@@ -1773,8 +1225,8 @@
             "label": "3"
           },
           {
-            "id": "d",
-            "label": "4"
+            "id": "a",
+            "label": "1"
           }
         ],
         "correctChoiceIds": [
@@ -1787,7 +1239,7 @@
         "type": "estimation",
         "prompt": "Minimum nodes needed to tolerate 3 failures with majority quorum?",
         "unit": "count",
-        "target": 7.0,
+        "target": 7,
         "assumptions": [
           "Use rounded daily volume ÷ 86,400 unless stated otherwise."
         ],
@@ -1796,125 +1248,31 @@
         "explanation": "2f + 1 = 7."
       },
       {
-        "id": "t48-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «Gossip & Failure Detection» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t48-q4",
-        "type": "estimation",
-        "prompt": "«Gossip & Failure Detection»: about 1,766,192 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 17.0,
-        "assumptions": [
-          "86400 s/day",
-          "1700000 / 86400 ≈ 17 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 17 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t48-q5",
-        "type": "tradeoff",
-        "prompt": "«Gossip & Failure Detection»: pick a scaling posture for a 5× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t48-q6",
+        "id": "t48-r1",
         "type": "multiple_choice",
-        "prompt": "«Gossip & Failure Detection»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "Quorum size for N nodes?",
         "choices": [
           {
+            "id": "d",
+            "label": "Timestamp + machine ID + sequence."
+          },
+          {
             "id": "a",
-            "label": "IDE theme"
+            "label": "floor(N/2) + 1."
           },
           {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
+            "label": "p95 latency on the hot path plus error rate on writes/reads that affect revenue or safety."
           },
           {
             "id": "c",
-            "label": "Logo color palette"
-          },
-          {
-            "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Skipping scale numbers, ignoring retries/idempotency, or mixing AuthN with AuthZ."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: floor(N/2) + 1."
       }
     ],
     "flashcards": [
@@ -1948,8 +1306,9 @@
     "title": "Bloom Filters/HyperLogLog/Count-Min",
     "kind": "lesson",
     "objectives": [
-      "Explain Bloom Filters/HyperLogLog/Count-Min with measurable requirements and failure modes",
-      "Apply Bloom Filters/HyperLogLog/Count-Min to a high-traffic India-scale scenario in an interview"
+      "Choose the right probabilistic structure for a question",
+      "State the error each one makes",
+      "Size memory savings at scale"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -1957,241 +1316,133 @@
     "cards": [
       {
         "id": "t49-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
-        "body": "Station 49 — Bloom Filters/HyperLogLog/Count-Min: open with three user journeys, peak traffic, and one non-functional target interviewers can test.",
-        "accent": "Interview lens"
+        "kind": "text",
+        "title": "Answers that are almost right",
+        "body": "At billions of items exact answers get expensive. Probabilistic structures trade a small, known error for tiny memory: kilobytes instead of gigabytes."
       },
       {
         "id": "t49-c2",
-        "kind": "Mental model",
-        "title": "text",
-        "body": "Station 49 — Bloom Filters/HyperLogLog/Count-Min: sketch client → edge → service → store; circle the hop you would deep-dive and why."
+        "kind": "text",
+        "title": "Which one when",
+        "body": "Bloom filter: “have I seen this?” (false positives possible, no false negatives). HyperLogLog: “how many distinct?” (about 1% error in ~12 KB). Count-Min Sketch: “how often?” (may overcount, never undercounts)."
       },
       {
         "id": "t49-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Station 49 — Bloom Filters/HyperLogLog/Count-Min: give an India-scale example (UPI, cricket stream, Tatkal, quick commerce) tied to this concept."
+        "kind": "diagram",
+        "title": "Crawler deduplication",
+        "body": "4 steps from “New URL found” to “Definitely new: fetch and add to filter”, via “Check Bloom filter”.",
+        "steps": [
+          "New URL found",
+          "Check Bloom filter",
+          "Probably seen: skip",
+          "Definitely new: fetch and add to filter"
+        ]
       },
       {
         "id": "t49-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
-        "body": "Station 49 — Bloom Filters/HyperLogLog/Count-Min: name the trap answer (over-engineering, skipping numbers, wrong consistency) and how you recover."
-      },
-      {
-        "id": "t49-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Station 49 — Bloom Filters/HyperLogLog/Count-Min: close aloud with scope, estimate, design, risk — under 30 seconds (salt 0).",
-        "accent": "Say this"
+        "kind": "text",
+        "title": "Common trap",
+        "body": "Using a Bloom filter where a false positive is harmful, such as deciding a username is taken. A false positive there blocks a real user; confirm against the database."
       }
     ],
     "questions": [
       {
         "id": "t49-q1",
         "type": "multiple_choice",
-        "prompt": "For «Bloom Filters/HyperLogLog/Count-Min», which upfront step 1 keeps functional scope and scale targets explicit before you draw components?",
+        "prompt": "You need daily unique visitors across 500M events with little memory. Which structure fits?",
         "choices": [
           {
-            "id": "a",
-            "label": "Pick databases before requirements"
+            "id": "d",
+            "label": "A sorted array of all visitor IDs"
           },
           {
             "id": "b",
-            "label": "List user actions, scale, and latency/durability targets"
+            "label": "Bloom filter"
           },
           {
             "id": "c",
-            "label": "Draw microservices for every feature"
+            "label": "Count-Min Sketch"
           },
           {
-            "id": "d",
-            "label": "Discuss office tooling"
+            "id": "a",
+            "label": "HyperLogLog"
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Strong interviews anchor on requirements and SLOs before components."
+        "explanation": "HyperLogLog estimates cardinality in about 12 KB per counter."
       },
       {
         "id": "t49-q2",
-        "type": "spot_bottleneck",
-        "prompt": "«Bloom Filters/HyperLogLog/Count-Min»: during a sharp traffic spike, which component saturates first on the hot path?",
-        "diagramNodes": [
-          {
-            "id": "n1",
-            "label": "Clients",
-            "x": 20,
-            "y": 50
-          },
-          {
-            "id": "n2",
-            "label": "API tier",
-            "x": 120,
-            "y": 50
-          },
-          {
-            "id": "n3",
-            "label": "Primary database",
-            "x": 220,
-            "y": 50
-          }
-        ],
-        "diagramEdges": [
-          {
-            "from": "n1",
-            "to": "n2"
-          },
-          {
-            "from": "n2",
-            "to": "n3"
-          }
-        ],
-        "correctNodeIds": [
-          "n3"
-        ],
-        "explanation": "Unsharded OLTP primaries usually exhaust connections/IOPS before stateless tiers."
-      },
-      {
-        "id": "t49-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «Bloom Filters/HyperLogLog/Count-Min» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t49-q4",
-        "type": "estimation",
-        "prompt": "«Bloom Filters/HyperLogLog/Count-Min»: about 3,467,571 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 34.0,
-        "assumptions": [
-          "86400 s/day",
-          "3400000 / 86400 ≈ 34 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 34 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t49-q5",
-        "type": "tradeoff",
-        "prompt": "«Bloom Filters/HyperLogLog/Count-Min»: pick a scaling posture for a 6× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t49-q6",
         "type": "multiple_choice",
-        "prompt": "«Bloom Filters/HyperLogLog/Count-Min»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "A Bloom filter says a URL is not present. What do you know?",
         "choices": [
           {
-            "id": "a",
-            "label": "IDE theme"
+            "id": "c",
+            "label": "It is present with 99% probability"
           },
           {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
+            "label": "It is probably present"
           },
           {
-            "id": "c",
-            "label": "Logo color palette"
+            "id": "a",
+            "label": "It is definitely not present"
           },
           {
             "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Nothing"
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "Bloom filters have no false negatives."
+      },
+      {
+        "id": "t49-q3",
+        "type": "multiple_choice",
+        "prompt": "Which use of a Bloom filter is risky without a second check?",
+        "choices": [
+          {
+            "id": "d",
+            "label": "Avoiding cache lookups for absent keys"
+          },
+          {
+            "id": "b",
+            "label": "Skipping a disk read for keys that are definitely absent"
+          },
+          {
+            "id": "a",
+            "label": "Rejecting a signup because the username “may exist”"
+          },
+          {
+            "id": "c",
+            "label": "Skipping crawl of URLs probably seen"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "A false positive would block a real user, so confirm in the database."
       }
     ],
     "flashcards": [
       {
         "id": "t49-f1",
-        "front": "What is the core interview takeaway for Bloom Filters/HyperLogLog/Count-Min?",
-        "back": "Connect user journeys to SLOs, then justify components and trade-offs for Bloom Filters/HyperLogLog/Count-Min."
+        "front": "Which error can a Bloom filter make?",
+        "back": "False positives (says seen when not). Never false negatives."
       },
       {
         "id": "t49-f2",
-        "front": "Name one pitfall when discussing Bloom Filters/HyperLogLog/Count-Min.",
-        "back": "Skipping scale numbers, ignoring retries/idempotency, or mixing AuthN with AuthZ."
+        "front": "What does HyperLogLog estimate?",
+        "back": "The number of distinct items, with about 1% error in kilobytes."
       },
       {
         "id": "t49-f3",
-        "front": "Which metric would you cite first for Bloom Filters/HyperLogLog/Count-Min?",
-        "back": "p95 latency on the hot path plus error rate on writes/reads that affect revenue or safety."
+        "front": "What is Count-Min Sketch for?",
+        "back": "Approximate frequencies; it may overcount but never undercounts."
       }
     ],
     "sources": [
@@ -2213,8 +1464,9 @@
     "title": "Monolith vs Microservices",
     "kind": "lesson",
     "objectives": [
-      "Explain Monolith vs Microservices with measurable requirements and failure modes",
-      "Start with a modular monolith; split services along team and domain boundaries when needed."
+      "Start with a modular monolith; split services along team and domain boundaries when needed.",
+      "Answer: Modular monolith?",
+      "Answer: Database per service?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -2222,35 +1474,35 @@
     "cards": [
       {
         "id": "t50-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "Microservices give independent deploys and scaling but add network calls, distributed data and ops cost. A modular monolith keeps boundaries without the overhead.",
         "accent": "Interview lens"
       },
       {
         "id": "t50-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "Start with a modular monolith; split services along team and domain boundaries when needed."
       },
       {
         "id": "t50-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Monolith → Modular boundaries → Team/scale pressure → Extract service → Own its data"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Monolith” to “Own its data”, via “Modular boundaries”.",
+        "steps": [
+          "Monolith",
+          "Modular boundaries",
+          "Team/scale pressure",
+          "Extract service",
+          "Own its data"
+        ]
       },
       {
         "id": "t50-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Splitting a 3-person team’s app into 15 services."
-      },
-      {
-        "id": "t50-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for Monolith vs Microservices. Start with a modular monolith; split services along team and domain boundaries when needed.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -2260,20 +1512,20 @@
         "prompt": "Strongest reason to extract a microservice?",
         "choices": [
           {
-            "id": "a",
-            "label": "It is trendy"
-          },
-          {
             "id": "b",
             "label": "A domain needs independent scaling and team ownership"
+          },
+          {
+            "id": "d",
+            "label": "To share one database"
           },
           {
             "id": "c",
             "label": "To add network calls"
           },
           {
-            "id": "d",
-            "label": "To share one database"
+            "id": "a",
+            "label": "It is trendy"
           }
         ],
         "correctChoiceIds": [
@@ -2287,16 +1539,16 @@
         "prompt": "Select costs of microservices.",
         "choices": [
           {
-            "id": "a",
-            "label": "Network latency"
+            "id": "c",
+            "label": "Independent deploys"
           },
           {
             "id": "b",
             "label": "Distributed debugging"
           },
           {
-            "id": "c",
-            "label": "Independent deploys"
+            "id": "a",
+            "label": "Network latency"
           },
           {
             "id": "d",
@@ -2311,125 +1563,31 @@
         "explanation": "Independent deploys is a benefit."
       },
       {
-        "id": "t50-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «Monolith vs Microservices» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t50-q4",
-        "type": "estimation",
-        "prompt": "«Monolith vs Microservices»: about 5,168,950 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 51.0,
-        "assumptions": [
-          "86400 s/day",
-          "5100000 / 86400 ≈ 51 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 51 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t50-q5",
-        "type": "tradeoff",
-        "prompt": "«Monolith vs Microservices»: pick a scaling posture for a 2× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t50-q6",
+        "id": "t50-r1",
         "type": "multiple_choice",
-        "prompt": "«Monolith vs Microservices»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "Modular monolith?",
         "choices": [
           {
-            "id": "a",
-            "label": "IDE theme"
-          },
-          {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
-          },
-          {
-            "id": "c",
-            "label": "Logo color palette"
+            "label": "About log N rounds."
           },
           {
             "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Horizontal Pod Autoscaler."
+          },
+          {
+            "id": "a",
+            "label": "One deployable with strict internal module boundaries."
+          },
+          {
+            "id": "c",
+            "label": "Putting business logic in it."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: One deployable with strict internal module boundaries."
       }
     ],
     "flashcards": [
@@ -2463,8 +1621,9 @@
     "title": "API Gateway",
     "kind": "lesson",
     "objectives": [
-      "Explain API Gateway with measurable requirements and failure modes",
-      "A single entry point that handles auth, rate limiting, routing, and request aggregation."
+      "A single entry point that handles auth, rate limiting, routing, and request aggregation.",
+      "Answer: Gateway anti-pattern?",
+      "Answer: BFF?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -2472,35 +1631,35 @@
     "cards": [
       {
         "id": "t51-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "The gateway terminates client traffic, verifies tokens, applies quotas, routes to services and can aggregate responses. It keeps cross-cutting concerns out of each service.",
         "accent": "Interview lens"
       },
       {
         "id": "t51-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "A single entry point that handles auth, rate limiting, routing, and request aggregation."
       },
       {
         "id": "t51-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Mobile client → API gateway → Auth + rate limit → Route → Microservice"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Mobile client” to “Microservice”, via “API gateway”.",
+        "steps": [
+          "Mobile client",
+          "API gateway",
+          "Auth + rate limit",
+          "Route",
+          "Microservice"
+        ]
       },
       {
         "id": "t51-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Putting business logic in the gateway. It becomes a bottleneck and a deployment choke point."
-      },
-      {
-        "id": "t51-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for API Gateway. A single entry point that handles auth, rate limiting, routing, and request aggregation.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -2510,20 +1669,20 @@
         "prompt": "Which belongs in an API gateway?",
         "choices": [
           {
-            "id": "a",
-            "label": "Order pricing logic"
+            "id": "d",
+            "label": "Inventory reservation"
           },
           {
             "id": "b",
             "label": "Token validation and rate limiting"
           },
           {
-            "id": "c",
-            "label": "Database migrations"
+            "id": "a",
+            "label": "Order pricing logic"
           },
           {
-            "id": "d",
-            "label": "Inventory reservation"
+            "id": "c",
+            "label": "Database migrations"
           }
         ],
         "correctChoiceIds": [
@@ -2537,20 +1696,20 @@
         "prompt": "Select common gateway responsibilities.",
         "choices": [
           {
-            "id": "a",
-            "label": "Authentication"
-          },
-          {
-            "id": "b",
-            "label": "Request routing"
-          },
-          {
             "id": "c",
             "label": "Running SQL joins for orders"
           },
           {
             "id": "d",
             "label": "Rate limiting"
+          },
+          {
+            "id": "a",
+            "label": "Authentication"
+          },
+          {
+            "id": "b",
+            "label": "Request routing"
           }
         ],
         "correctChoiceIds": [
@@ -2561,125 +1720,31 @@
         "explanation": "Data logic belongs in the owning service."
       },
       {
-        "id": "t51-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «API Gateway» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t51-q4",
-        "type": "estimation",
-        "prompt": "«API Gateway»: about 6,870,329 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 68.0,
-        "assumptions": [
-          "86400 s/day",
-          "6800000 / 86400 ≈ 68 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 68 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t51-q5",
-        "type": "tradeoff",
-        "prompt": "«API Gateway»: pick a scaling posture for a 3× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t51-q6",
+        "id": "t51-r1",
         "type": "multiple_choice",
-        "prompt": "«API Gateway»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "Gateway anti-pattern?",
         "choices": [
           {
-            "id": "a",
-            "label": "IDE theme"
+            "id": "d",
+            "label": "Controllers drive actual state to desired state."
           },
           {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
+            "label": "About log N rounds."
           },
           {
             "id": "c",
-            "label": "Logo color palette"
+            "label": "99% of requests are faster than this."
           },
           {
-            "id": "d",
-            "label": "Number of standup meetings"
+            "id": "a",
+            "label": "Putting business logic in it."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: Putting business logic in it."
       }
     ],
     "flashcards": [
@@ -2713,8 +1778,9 @@
     "title": "Service Discovery",
     "kind": "lesson",
     "objectives": [
-      "Explain Service Discovery with measurable requirements and failure modes",
-      "Two-phase commit gives atomicity across nodes but blocks if the coordinator fails."
+      "Two-phase commit gives atomicity across nodes but blocks if the coordinator fails.",
+      "Answer: 2PC phases?",
+      "Answer: Alternative to 2PC?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -2722,35 +1788,35 @@
     "cards": [
       {
         "id": "t52-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "Phase 1: prepare (participants vote). Phase 2: commit/abort. It is safe but blocking and slow. Prefer sagas, outbox, or single-database designs when possible.",
         "accent": "Interview lens"
       },
       {
         "id": "t52-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "Two-phase commit gives atomicity across nodes but blocks if the coordinator fails."
       },
       {
         "id": "t52-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Coordinator: prepare → Participants vote → All yes? → Commit → Else abort"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Coordinator: prepare” to “Else abort”, via “Participants vote”.",
+        "steps": [
+          "Coordinator: prepare",
+          "Participants vote",
+          "All yes?",
+          "Commit",
+          "Else abort"
+        ]
       },
       {
         "id": "t52-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Defaulting to 2PC across microservices; it couples availability of all participants."
-      },
-      {
-        "id": "t52-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for Service Discovery. Two-phase commit gives atomicity across nodes but blocks if the coordinator fails.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -2760,12 +1826,12 @@
         "prompt": "Main drawback of 2PC?",
         "choices": [
           {
-            "id": "a",
-            "label": "Not atomic"
-          },
-          {
             "id": "b",
             "label": "Blocking when coordinator fails"
+          },
+          {
+            "id": "a",
+            "label": "Not atomic"
           },
           {
             "id": "c",
@@ -2812,125 +1878,31 @@
         "explanation": "Two round trips with locks held between them."
       },
       {
-        "id": "t52-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «Service Discovery» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t52-q4",
-        "type": "estimation",
-        "prompt": "«Service Discovery»: about 8,571,708 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 85.0,
-        "assumptions": [
-          "86400 s/day",
-          "8500000 / 86400 ≈ 85 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 85 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t52-q5",
-        "type": "tradeoff",
-        "prompt": "«Service Discovery»: pick a scaling posture for a 4× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t52-q6",
+        "id": "t52-r1",
         "type": "multiple_choice",
-        "prompt": "«Service Discovery»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "2PC phases?",
         "choices": [
           {
             "id": "a",
-            "label": "IDE theme"
+            "label": "Prepare/vote, then commit/abort."
           },
           {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
-          },
-          {
-            "id": "c",
-            "label": "Logo color palette"
+            "label": "Connect user journeys to SLOs, then justify components and trade-offs for Containers & Kubernetes."
           },
           {
             "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Show depth on the hardest component."
+          },
+          {
+            "id": "c",
+            "label": "Failure detector outputting suspicion level."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: Prepare/vote, then commit/abort."
       }
     ],
     "flashcards": [
@@ -2964,8 +1936,9 @@
     "title": "Timeouts/Retries/Circuit Breakers",
     "kind": "lesson",
     "objectives": [
-      "Explain Timeouts/Retries/Circuit Breakers with measurable requirements and failure modes",
-      "Nodes spread membership and health info peer-to-peer; detectors use heartbeats and suspicion."
+      "Nodes spread membership and health info peer-to-peer; detectors use heartbeats and suspicion.",
+      "Answer: Phi accrual?",
+      "Answer: Gossip convergence?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -2973,35 +1946,35 @@
     "cards": [
       {
         "id": "t53-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "Gossip protocols scale to thousands of nodes with O(log N) spread. Phi-accrual detectors output suspicion levels instead of binary dead/alive.",
         "accent": "Interview lens"
       },
       {
         "id": "t53-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "Nodes spread membership and health info peer-to-peer; detectors use heartbeats and suspicion."
       },
       {
         "id": "t53-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Node picks random peers → Exchange state → Merge newer info → Repeat each second → Cluster converges"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Node picks random peers” to “Cluster converges”, via “Exchange state”.",
+        "steps": [
+          "Node picks random peers",
+          "Exchange state",
+          "Merge newer info",
+          "Repeat each second",
+          "Cluster converges"
+        ]
       },
       {
         "id": "t53-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Declaring nodes dead on one missed heartbeat — causes flapping during GC pauses."
-      },
-      {
-        "id": "t53-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for Timeouts/Retries/Circuit Breakers. Nodes spread membership and health info peer-to-peer; detectors use heartbeats and suspicion.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -3010,6 +1983,10 @@
         "type": "multiple_choice",
         "prompt": "Gossip spreads information in roughly:",
         "choices": [
+          {
+            "id": "d",
+            "label": "Never"
+          },
           {
             "id": "a",
             "label": "O(1) rounds"
@@ -3021,10 +1998,6 @@
           {
             "id": "c",
             "label": "O(N^2) rounds"
-          },
-          {
-            "id": "d",
-            "label": "Never"
           }
         ],
         "correctChoiceIds": [
@@ -3038,20 +2011,20 @@
         "prompt": "Select properties of gossip.",
         "choices": [
           {
-            "id": "a",
-            "label": "Decentralised"
+            "id": "d",
+            "label": "Scales to large clusters"
           },
           {
-            "id": "b",
-            "label": "Eventually consistent membership"
+            "id": "a",
+            "label": "Decentralised"
           },
           {
             "id": "c",
             "label": "Requires a single master"
           },
           {
-            "id": "d",
-            "label": "Scales to large clusters"
+            "id": "b",
+            "label": "Eventually consistent membership"
           }
         ],
         "correctChoiceIds": [
@@ -3062,125 +2035,31 @@
         "explanation": "Gossip avoids a central coordinator."
       },
       {
-        "id": "t53-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «Timeouts/Retries/Circuit Breakers» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t53-q4",
-        "type": "estimation",
-        "prompt": "«Timeouts/Retries/Circuit Breakers»: about 1,273,087 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 12.0,
-        "assumptions": [
-          "86400 s/day",
-          "1200000 / 86400 ≈ 12 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 12 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t53-q5",
-        "type": "tradeoff",
-        "prompt": "«Timeouts/Retries/Circuit Breakers»: pick a scaling posture for a 5× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t53-q6",
+        "id": "t53-r1",
         "type": "multiple_choice",
-        "prompt": "«Timeouts/Retries/Circuit Breakers»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "Phi accrual?",
         "choices": [
           {
-            "id": "a",
-            "label": "IDE theme"
+            "id": "d",
+            "label": "Show depth on the hardest component."
           },
           {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
+            "label": "Connect user journeys to SLOs, then justify components and trade-offs for Containers & Kubernetes."
           },
           {
             "id": "c",
-            "label": "Logo color palette"
+            "label": "Backend-for-frontend: a gateway tailored to one client type."
           },
           {
-            "id": "d",
-            "label": "Number of standup meetings"
+            "id": "a",
+            "label": "Failure detector outputting suspicion level."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: Failure detector outputting suspicion level."
       }
     ],
     "flashcards": [
@@ -3214,8 +2093,9 @@
     "title": "Logs/Metrics/Traces",
     "kind": "lesson",
     "objectives": [
-      "Explain Logs/Metrics/Traces with measurable requirements and failure modes",
-      "Metrics show what, logs show details, traces show where across services."
+      "Metrics show what, logs show details, traces show where across services.",
+      "Answer: Three pillars?",
+      "Answer: p99 latency?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -3223,35 +2103,35 @@
     "cards": [
       {
         "id": "t54-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "Track RED (rate, errors, duration) for services and USE (utilisation, saturation, errors) for resources. Correlate with a trace ID propagated through every hop.",
         "accent": "Interview lens"
       },
       {
         "id": "t54-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "Metrics show what, logs show details, traces show where across services."
       },
       {
         "id": "t54-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Request gets trace ID → Each service logs it → Spans recorded → Metrics aggregated → Dashboards & alerts"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Request gets trace ID” to “Dashboards & alerts”, via “Each service logs it”.",
+        "steps": [
+          "Request gets trace ID",
+          "Each service logs it",
+          "Spans recorded",
+          "Metrics aggregated",
+          "Dashboards & alerts"
+        ]
       },
       {
         "id": "t54-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Logging everything at DEBUG in production with no structure or sampling."
-      },
-      {
-        "id": "t54-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for Logs/Metrics/Traces. Metrics show what, logs show details, traces show where across services.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -3285,15 +2165,19 @@
       {
         "id": "t54-q2",
         "type": "multiple_choice",
-        "prompt": "Topic 54: Match the RED/USE metric.",
+        "prompt": "Rate vs Errors: which pairing is correct?",
         "choices": [
+          {
+            "id": "d",
+            "label": "Errors → Requests per second"
+          },
           {
             "id": "a",
             "label": "Rate → Requests per second"
           },
           {
-            "id": "b",
-            "label": "Errors → Failed requests"
+            "id": "c",
+            "label": "Rate → Failed requests"
           }
         ],
         "correctChoiceIds": [
@@ -3302,125 +2186,31 @@
         "explanation": "Standard golden signals."
       },
       {
-        "id": "t54-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «Logs/Metrics/Traces» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t54-q4",
-        "type": "estimation",
-        "prompt": "«Logs/Metrics/Traces»: about 2,974,466 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 29.0,
-        "assumptions": [
-          "86400 s/day",
-          "2900000 / 86400 ≈ 29 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 29 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t54-q5",
-        "type": "tradeoff",
-        "prompt": "«Logs/Metrics/Traces»: pick a scaling posture for a 6× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t54-q6",
+        "id": "t54-r1",
         "type": "multiple_choice",
-        "prompt": "«Logs/Metrics/Traces»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "Three pillars?",
         "choices": [
           {
-            "id": "a",
-            "label": "IDE theme"
+            "id": "c",
+            "label": "Saga with compensations, outbox pattern."
           },
           {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
-          },
-          {
-            "id": "c",
-            "label": "Logo color palette"
+            "label": "Skipping scale numbers, ignoring retries/idempotency, or mixing AuthN with AuthZ."
           },
           {
             "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Each service owns its data."
+          },
+          {
+            "id": "a",
+            "label": "Logs, metrics, traces."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: Logs, metrics, traces."
       }
     ],
     "flashcards": [
@@ -3454,8 +2244,9 @@
     "title": "Availability & SLAs",
     "kind": "lesson",
     "objectives": [
-      "Explain Availability & SLAs with measurable requirements and failure modes",
-      "Availability is uptime percentage; each extra nine cuts allowed downtime by 10×."
+      "Availability is uptime percentage; each extra nine cuts allowed downtime by 10×.",
+      "Answer: 99.99% downtime/year?",
+      "Answer: Series vs parallel availability?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -3463,35 +2254,35 @@
     "cards": [
       {
         "id": "t55-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "99.9% ≈ 8.8 h/year down, 99.99% ≈ 53 min/year. Components in series multiply availability (lower); redundant components in parallel raise it. SLO = internal target; SLA = contractual promise.",
         "accent": "Interview lens"
       },
       {
         "id": "t55-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "Availability is uptime percentage; each extra nine cuts allowed downtime by 10×."
       },
       {
         "id": "t55-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Single node → Find SPOFs → Add replicas → Spread across zones → Health checks + failover"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Single node” to “Health checks + failover”, via “Find SPOFs”.",
+        "steps": [
+          "Single node",
+          "Find SPOFs",
+          "Add replicas",
+          "Spread across zones",
+          "Health checks + failover"
+        ]
       },
       {
         "id": "t55-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Claiming five nines without redundancy across zones. Availability comes from removing single points of failure."
-      },
-      {
-        "id": "t55-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for Availability & SLAs. Availability is uptime percentage; each extra nine cuts allowed downtime by 10×.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -3501,20 +2292,20 @@
         "prompt": "Two services in series, each 99.9% available. End-to-end availability?",
         "choices": [
           {
-            "id": "a",
-            "label": "99.99%"
+            "id": "c",
+            "label": "≈99.8%"
           },
           {
             "id": "b",
             "label": "99.9%"
           },
           {
-            "id": "c",
-            "label": "≈99.8%"
-          },
-          {
             "id": "d",
             "label": "≈99.0%"
+          },
+          {
+            "id": "a",
+            "label": "99.99%"
           }
         ],
         "correctChoiceIds": [
@@ -3536,125 +2327,31 @@
         "explanation": "0.1% of 8,760 hours = 8.76 hours."
       },
       {
-        "id": "t55-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «Availability & SLAs» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t55-q4",
-        "type": "estimation",
-        "prompt": "«Availability & SLAs»: about 4,675,845 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 46.0,
-        "assumptions": [
-          "86400 s/day",
-          "4600000 / 86400 ≈ 46 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 46 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t55-q5",
-        "type": "tradeoff",
-        "prompt": "«Availability & SLAs»: pick a scaling posture for a 2× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t55-q6",
+        "id": "t55-r1",
         "type": "multiple_choice",
-        "prompt": "«Availability & SLAs»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "99.99% downtime/year?",
         "choices": [
           {
             "id": "a",
-            "label": "IDE theme"
+            "label": "≈ 52.6 minutes."
           },
           {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
+            "label": "Show depth on the hardest component."
           },
           {
             "id": "c",
-            "label": "Logo color palette"
+            "label": "Horizontal Pod Autoscaler."
           },
           {
             "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Connect user journeys to SLOs, then justify components and trade-offs for Containers & Kubernetes."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: ≈ 52.6 minutes."
       }
     ],
     "flashcards": [
@@ -3688,8 +2385,9 @@
     "title": "Disaster Recovery & Multi-Region",
     "kind": "lesson",
     "objectives": [
-      "Explain Disaster Recovery & Multi-Region with measurable requirements and failure modes",
-      "Containers package apps; Kubernetes schedules, heals and scales them declaratively."
+      "Containers package apps; Kubernetes schedules, heals and scales them declaratively.",
+      "Answer: Reconciliation loop?",
+      "Answer: HPA?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -3697,35 +2395,35 @@
     "cards": [
       {
         "id": "t56-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "Pods run containers; Deployments manage replicas and rollouts; Services expose them; HPA autoscales. You declare desired state; controllers reconcile it.",
         "accent": "Interview lens"
       },
       {
         "id": "t56-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "Containers package apps; Kubernetes schedules, heals and scales them declaratively."
       },
       {
         "id": "t56-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Write manifest → kubectl apply → Scheduler places pods → Controller reconciles → HPA scales"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Write manifest” to “HPA scales”, via “kubectl apply”.",
+        "steps": [
+          "Write manifest",
+          "kubectl apply",
+          "Scheduler places pods",
+          "Controller reconciles",
+          "HPA scales"
+        ]
       },
       {
         "id": "t56-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Treating Kubernetes as a requirement for a simple system design."
-      },
-      {
-        "id": "t56-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for Disaster Recovery & Multi-Region. Containers package apps; Kubernetes schedules, heals and scales them declaratively.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -3734,10 +2432,6 @@
         "type": "multiple_choice",
         "prompt": "Which K8s object keeps N replicas of a pod running and handles rollouts?",
         "choices": [
-          {
-            "id": "a",
-            "label": "ConfigMap"
-          },
           {
             "id": "b",
             "label": "Deployment"
@@ -3749,6 +2443,10 @@
           {
             "id": "d",
             "label": "Namespace"
+          },
+          {
+            "id": "a",
+            "label": "ConfigMap"
           }
         ],
         "correctChoiceIds": [
@@ -3759,15 +2457,19 @@
       {
         "id": "t56-q2",
         "type": "multiple_choice",
-        "prompt": "Topic 56: Match K8s object.",
+        "prompt": "Pod vs Deployment: which pairing is correct?",
         "choices": [
+          {
+            "id": "d",
+            "label": "Deployment → Smallest deployable unit"
+          },
           {
             "id": "a",
             "label": "Pod → Smallest deployable unit"
           },
           {
-            "id": "b",
-            "label": "Deployment → Replicas & rollouts"
+            "id": "c",
+            "label": "Pod → Replicas & rollouts"
           }
         ],
         "correctChoiceIds": [
@@ -3776,125 +2478,31 @@
         "explanation": "Declarative objects reconcile desired state."
       },
       {
-        "id": "t56-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «Disaster Recovery & Multi-Region» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t56-q4",
-        "type": "estimation",
-        "prompt": "«Disaster Recovery & Multi-Region»: about 6,377,224 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 63.0,
-        "assumptions": [
-          "86400 s/day",
-          "6300000 / 86400 ≈ 63 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 63 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t56-q5",
-        "type": "tradeoff",
-        "prompt": "«Disaster Recovery & Multi-Region»: pick a scaling posture for a 3× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t56-q6",
+        "id": "t56-r1",
         "type": "multiple_choice",
-        "prompt": "«Disaster Recovery & Multi-Region»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "Reconciliation loop?",
         "choices": [
           {
-            "id": "a",
-            "label": "IDE theme"
-          },
-          {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
+            "label": "Failure detector outputting suspicion level."
           },
           {
-            "id": "c",
-            "label": "Logo color palette"
+            "id": "a",
+            "label": "Controllers drive actual state to desired state."
           },
           {
             "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Series multiplies (lower); parallel redundancy raises it."
+          },
+          {
+            "id": "c",
+            "label": "Backend-for-frontend: a gateway tailored to one client type."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: Controllers drive actual state to desired state."
       }
     ],
     "flashcards": [
@@ -3928,8 +2536,9 @@
     "title": "AuthN vs AuthZ",
     "kind": "lesson",
     "objectives": [
-      "Explain AuthN vs AuthZ with measurable requirements and failure modes",
-      "Prove who the user is: server sessions, signed tokens, or delegated OAuth/OIDC."
+      "Prove who the user is: server sessions, signed tokens, or delegated OAuth/OIDC.",
+      "Answer: Refresh token?",
+      "Answer: AuthN vs AuthZ?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -3937,35 +2546,35 @@
     "cards": [
       {
         "id": "t57-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "Sessions store state server-side (easy revoke). JWTs are signed, stateless, short-lived with refresh tokens. OAuth 2.0 delegates access; OIDC adds identity.",
         "accent": "Interview lens"
       },
       {
         "id": "t57-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "Prove who the user is: server sessions, signed tokens, or delegated OAuth/OIDC."
       },
       {
         "id": "t57-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Login with OTP → Verify → Issue access + refresh → Call APIs with access → Refresh when expired"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Login with OTP” to “Refresh when expired”, via “Verify”.",
+        "steps": [
+          "Login with OTP",
+          "Verify",
+          "Issue access + refresh",
+          "Call APIs with access",
+          "Refresh when expired"
+        ]
       },
       {
         "id": "t57-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Long-lived JWTs with no revocation path."
-      },
-      {
-        "id": "t57-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for AuthN vs AuthZ. Prove who the user is: server sessions, signed tokens, or delegated OAuth/OIDC.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -3975,20 +2584,20 @@
         "prompt": "Biggest drawback of long-lived stateless JWTs?",
         "choices": [
           {
-            "id": "a",
-            "label": "Too small"
+            "id": "d",
+            "label": "Need SQL"
           },
           {
-            "id": "b",
-            "label": "Hard to revoke before expiry"
+            "id": "a",
+            "label": "Too small"
           },
           {
             "id": "c",
             "label": "Not signed"
           },
           {
-            "id": "d",
-            "label": "Need SQL"
+            "id": "b",
+            "label": "Hard to revoke before expiry"
           }
         ],
         "correctChoiceIds": [
@@ -3999,15 +2608,19 @@
       {
         "id": "t57-q2",
         "type": "multiple_choice",
-        "prompt": "Topic 57: Match concept.",
+        "prompt": "Session cookie vs JWT: which pairing is correct?",
         "choices": [
+          {
+            "id": "d",
+            "label": "JWT → Server-side state"
+          },
+          {
+            "id": "c",
+            "label": "Session cookie → Signed self-contained token"
+          },
           {
             "id": "a",
             "label": "Session cookie → Server-side state"
-          },
-          {
-            "id": "b",
-            "label": "JWT → Signed self-contained token"
           }
         ],
         "correctChoiceIds": [
@@ -4016,125 +2629,31 @@
         "explanation": "Pick by revocation and delegation needs."
       },
       {
-        "id": "t57-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «AuthN vs AuthZ» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t57-q4",
-        "type": "estimation",
-        "prompt": "«AuthN vs AuthZ»: about 8,078,603 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 80.0,
-        "assumptions": [
-          "86400 s/day",
-          "8000000 / 86400 ≈ 80 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 80 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t57-q5",
-        "type": "tradeoff",
-        "prompt": "«AuthN vs AuthZ»: pick a scaling posture for a 4× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t57-q6",
+        "id": "t57-r1",
         "type": "multiple_choice",
-        "prompt": "«AuthN vs AuthZ»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "Refresh token?",
         "choices": [
           {
             "id": "a",
-            "label": "IDE theme"
-          },
-          {
-            "id": "b",
-            "label": "Correctness under retries and partial failures"
+            "label": "Long-lived token to get new short-lived access tokens."
           },
           {
             "id": "c",
-            "label": "Logo color palette"
+            "label": "Reads only needed columns; high compression."
           },
           {
             "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Connect user journeys to SLOs, then justify components and trade-offs for OAuth 2.0 & OIDC."
+          },
+          {
+            "id": "b",
+            "label": "p95 latency on the hot path plus error rate on writes/reads that affect revenue or safety."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: Long-lived token to get new short-lived access tokens."
       }
     ],
     "flashcards": [
@@ -4168,8 +2687,9 @@
     "title": "OAuth 2.0 & OIDC",
     "kind": "lesson",
     "objectives": [
-      "Explain OAuth 2.0 & OIDC with measurable requirements and failure modes",
-      "Apply OAuth 2.0 & OIDC to a high-traffic India-scale scenario in an interview"
+      "Separate OAuth 2.0 (authorization) from OIDC (authentication)",
+      "Walk through the authorization code flow with PKCE",
+      "Choose token types for web and mobile"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -4177,35 +2697,33 @@
     "cards": [
       {
         "id": "t58-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
-        "body": "Station 58 — OAuth 2.0 & OIDC: open with three user journeys, peak traffic, and one non-functional target interviewers can test.",
-        "accent": "Interview lens"
+        "kind": "text",
+        "title": "Two jobs, two specs",
+        "body": "OAuth 2.0 lets an app act on your behalf with limited scopes (“read my Google Drive files”). OpenID Connect adds an ID token on top so the app also learns who you are: “Sign in with Google”."
       },
       {
         "id": "t58-c2",
-        "kind": "Mental model",
-        "title": "text",
-        "body": "Station 58 — OAuth 2.0 & OIDC: sketch client → edge → service → store; circle the hop you would deep-dive and why."
+        "kind": "text",
+        "title": "Code flow with PKCE",
+        "body": "The app redirects to the identity provider, gets a short-lived code back, and exchanges it, plus a PKCE verifier, for tokens over a back channel. PKCE stops a stolen code being redeemed by another app."
       },
       {
         "id": "t58-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Station 58 — OAuth 2.0 & OIDC: give an India-scale example (UPI, cricket stream, Tatkal, quick commerce) tied to this concept."
+        "kind": "diagram",
+        "title": "Sign in with Google",
+        "body": "4 steps from “App redirects to Google with code_challenge” to “App exchanges code + verifier for ID and access tokens”, via “User logs in and consents”.",
+        "steps": [
+          "App redirects to Google with code_challenge",
+          "User logs in and consents",
+          "Google redirects back with a code",
+          "App exchanges code + verifier for ID and access tokens"
+        ]
       },
       {
         "id": "t58-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
-        "body": "Station 58 — OAuth 2.0 & OIDC: name the trap answer (over-engineering, skipping numbers, wrong consistency) and how you recover."
-      },
-      {
-        "id": "t58-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Station 58 — OAuth 2.0 & OIDC: close aloud with scope, estimate, design, risk — under 30 seconds (salt 0).",
-        "accent": "Say this"
+        "kind": "text",
+        "title": "Common trap",
+        "body": "Using an OAuth access token as proof of identity. It says what the app may do, not who the user is. Use the OIDC ID token for login."
       }
     ],
     "questions": [
@@ -4215,16 +2733,16 @@
         "prompt": "In OAuth 2.0 authorization code flow with PKCE, where is the client secret kept for public mobile apps?",
         "choices": [
           {
-            "id": "a",
-            "label": "Embedded in APK"
+            "id": "c",
+            "label": "In the ID token"
           },
           {
             "id": "b",
             "label": "No static secret; PKCE code verifier replaces it"
           },
           {
-            "id": "c",
-            "label": "In the ID token"
+            "id": "a",
+            "label": "Embedded in APK"
           },
           {
             "id": "d",
@@ -4310,7 +2828,7 @@
         "type": "estimation",
         "prompt": "Access token TTL 15 minutes, 10M users refresh hourly on average. Rough auth-server token QPS?",
         "unit": "QPS",
-        "target": 2780.0,
+        "target": 2780,
         "assumptions": [
           "10M refreshes/hour",
           "÷3600"
@@ -4330,6 +2848,11 @@
         ],
         "approaches": [
           {
+            "id": "password",
+            "label": "Resource owner password grant",
+            "description": "Avoid"
+          },
+          {
             "id": "implicit",
             "label": "Implicit flow in browser",
             "description": "Deprecated/insecure"
@@ -4338,15 +2861,14 @@
             "id": "code_pkce",
             "label": "Auth code + PKCE + short-lived access tokens",
             "description": "Industry best practice"
-          },
-          {
-            "id": "password",
-            "label": "Resource owner password grant",
-            "description": "Avoid"
           }
         ],
         "correctApproachId": "code_pkce",
         "rationaleOptions": [
+          {
+            "id": "bad",
+            "label": "Password grant exposes credentials to client"
+          },
           {
             "id": "r1",
             "label": "PKCE protects mobile code exchange"
@@ -4354,10 +2876,6 @@
           {
             "id": "r2",
             "label": "Short TTL limits breach blast radius"
-          },
-          {
-            "id": "bad",
-            "label": "Password grant exposes credentials to client"
           }
         ],
         "correctRationaleIds": [
@@ -4375,12 +2893,12 @@
         "prompt": "OIDC ID token is:",
         "choices": [
           {
-            "id": "a",
-            "label": "A refresh token for databases"
-          },
-          {
             "id": "b",
             "label": "A JWT asserting authentication event claims"
+          },
+          {
+            "id": "a",
+            "label": "A refresh token for databases"
           },
           {
             "id": "c",
@@ -4400,18 +2918,18 @@
     "flashcards": [
       {
         "id": "t58-f1",
-        "front": "What is the core interview takeaway for OAuth 2.0 & OIDC?",
-        "back": "Connect user journeys to SLOs, then justify components and trade-offs for OAuth 2.0 & OIDC."
+        "front": "OAuth 2.0 vs OIDC?",
+        "back": "OAuth grants delegated access; OIDC adds identity via an ID token."
       },
       {
         "id": "t58-f2",
-        "front": "Name one pitfall when discussing OAuth 2.0 & OIDC.",
-        "back": "Skipping scale numbers, ignoring retries/idempotency, or mixing AuthN with AuthZ."
+        "front": "What does PKCE prevent?",
+        "back": "An intercepted authorization code being redeemed by another app."
       },
       {
         "id": "t58-f3",
-        "front": "Which metric would you cite first for OAuth 2.0 & OIDC?",
-        "back": "p95 latency on the hot path plus error rate on writes/reads that affect revenue or safety."
+        "front": "Which token proves who logged in?",
+        "back": "The OIDC ID token."
       }
     ],
     "sources": [
@@ -4441,8 +2959,9 @@
     "title": "JWT",
     "kind": "lesson",
     "objectives": [
-      "Explain JWT with measurable requirements and failure modes",
-      "Apply JWT to a high-traffic India-scale scenario in an interview"
+      "Explain what a JWT contains and who can read it",
+      "Weigh stateless tokens against revocation",
+      "Pick sensible token lifetimes"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -4450,241 +2969,133 @@
     "cards": [
       {
         "id": "t59-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
-        "body": "Station 59 — JWT: open with three user journeys, peak traffic, and one non-functional target interviewers can test.",
-        "accent": "Interview lens"
+        "kind": "text",
+        "title": "Signed, not secret",
+        "body": "A JWT is header.payload.signature, base64-encoded. Anyone holding it can read the claims; the signature only proves they were not changed. Never put secrets in the payload."
       },
       {
         "id": "t59-c2",
-        "kind": "Mental model",
-        "title": "text",
-        "body": "Station 59 — JWT: sketch client → edge → service → store; circle the hop you would deep-dive and why."
+        "kind": "text",
+        "title": "Why services like it",
+        "body": "Any service with the public key can verify a token without calling the auth server, so verification scales horizontally and survives an auth outage."
       },
       {
         "id": "t59-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Station 59 — JWT: give an India-scale example (UPI, cricket stream, Tatkal, quick commerce) tied to this concept."
+        "kind": "diagram",
+        "title": "Verifying a request",
+        "body": "4 steps from “Client sends Authorization: Bearer token” to “Passes user claims to service”, via “Gateway checks signature with public key”.",
+        "steps": [
+          "Client sends Authorization: Bearer token",
+          "Gateway checks signature with public key",
+          "Checks exp, aud, iss",
+          "Passes user claims to service"
+        ]
       },
       {
         "id": "t59-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
-        "body": "Station 59 — JWT: name the trap answer (over-engineering, skipping numbers, wrong consistency) and how you recover."
-      },
-      {
-        "id": "t59-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Station 59 — JWT: close aloud with scope, estimate, design, risk — under 30 seconds (salt 0).",
-        "accent": "Say this"
+        "kind": "text",
+        "title": "Common trap",
+        "body": "Week-long access tokens. A stateless token cannot be easily revoked, so keep access tokens short (minutes) and use refresh tokens, which can be revoked server-side."
       }
     ],
     "questions": [
       {
         "id": "t59-q1",
         "type": "multiple_choice",
-        "prompt": "For «JWT», which upfront step 1 keeps functional scope and scale targets explicit before you draw components?",
+        "prompt": "A teammate wants to put the user’s PAN number in the JWT payload “because it is signed”. What is wrong?",
         "choices": [
           {
             "id": "a",
-            "label": "Pick databases before requirements"
-          },
-          {
-            "id": "b",
-            "label": "List user actions, scale, and latency/durability targets"
-          },
-          {
-            "id": "c",
-            "label": "Draw microservices for every feature"
+            "label": "Signing does not hide data; anyone with the token can decode it"
           },
           {
             "id": "d",
-            "label": "Discuss office tooling"
+            "label": "It makes verification slower"
+          },
+          {
+            "id": "c",
+            "label": "JWTs cannot hold strings"
+          },
+          {
+            "id": "b",
+            "label": "Nothing, signatures encrypt the payload"
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Strong interviews anchor on requirements and SLOs before components."
+        "explanation": "Use opaque IDs in tokens; keep sensitive data server-side."
       },
       {
         "id": "t59-q2",
-        "type": "spot_bottleneck",
-        "prompt": "«JWT»: during a sharp traffic spike, which component saturates first on the hot path?",
-        "diagramNodes": [
-          {
-            "id": "n1",
-            "label": "Clients",
-            "x": 20,
-            "y": 50
-          },
-          {
-            "id": "n2",
-            "label": "API tier",
-            "x": 120,
-            "y": 50
-          },
-          {
-            "id": "n3",
-            "label": "Primary database",
-            "x": 220,
-            "y": 50
-          }
-        ],
-        "diagramEdges": [
-          {
-            "from": "n1",
-            "to": "n2"
-          },
-          {
-            "from": "n2",
-            "to": "n3"
-          }
-        ],
-        "correctNodeIds": [
-          "n3"
-        ],
-        "explanation": "Unsharded OLTP primaries usually exhaust connections/IOPS before stateless tiers."
-      },
-      {
-        "id": "t59-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «JWT» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t59-q4",
-        "type": "estimation",
-        "prompt": "«JWT»: about 2,481,361 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 24.0,
-        "assumptions": [
-          "86400 s/day",
-          "2400000 / 86400 ≈ 24 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 24 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t59-q5",
-        "type": "tradeoff",
-        "prompt": "«JWT»: pick a scaling posture for a 6× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t59-q6",
         "type": "multiple_choice",
-        "prompt": "«JWT»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "A user logs out but their access token is valid for 7 more days. Which design limits this best?",
         "choices": [
           {
-            "id": "a",
-            "label": "IDE theme"
+            "id": "d",
+            "label": "Remove the exp claim"
           },
           {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
+            "label": "Make tokens valid for 30 days instead"
+          },
+          {
+            "id": "a",
+            "label": "5–15 minute access tokens with revocable refresh tokens"
           },
           {
             "id": "c",
-            "label": "Logo color palette"
-          },
-          {
-            "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Store the token in localStorage"
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "Short-lived access tokens bound the damage; refresh tokens can be revoked."
+      },
+      {
+        "id": "t59-q3",
+        "type": "multiple_choice",
+        "prompt": "Why can 20 microservices verify JWTs without overloading the auth server?",
+        "choices": [
+          {
+            "id": "b",
+            "label": "They share one database session table"
+          },
+          {
+            "id": "a",
+            "label": "Each verifies the signature locally with the public key"
+          },
+          {
+            "id": "c",
+            "label": "They call the auth server on every request"
+          },
+          {
+            "id": "d",
+            "label": "JWTs are never verified"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Local verification is the main scaling benefit."
       }
     ],
     "flashcards": [
       {
         "id": "t59-f1",
-        "front": "What is the core interview takeaway for JWT?",
-        "back": "Connect user journeys to SLOs, then justify components and trade-offs for JWT."
+        "front": "Can anyone read a JWT payload?",
+        "back": "Yes. It is signed, not encrypted."
       },
       {
         "id": "t59-f2",
-        "front": "Name one pitfall when discussing JWT.",
-        "back": "Skipping scale numbers, ignoring retries/idempotency, or mixing AuthN with AuthZ."
+        "front": "Why are JWTs easy to scale?",
+        "back": "Services verify them locally with a public key, no auth-server call."
       },
       {
         "id": "t59-f3",
-        "front": "Which metric would you cite first for JWT?",
-        "back": "p95 latency on the hot path plus error rate on writes/reads that affect revenue or safety."
+        "front": "How do you limit damage from a stolen JWT?",
+        "back": "Short expiry plus revocable refresh tokens."
       }
     ],
     "sources": [
@@ -4710,8 +3121,9 @@
     "title": "Security Essentials",
     "kind": "lesson",
     "objectives": [
-      "Explain Security Essentials with measurable requirements and failure modes",
-      "Externalise config, roll flags gradually, and clean them up."
+      "Externalise config, roll flags gradually, and clean them up.",
+      "Answer: Twelve-factor config?",
+      "Answer: Kill switch?"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -4719,35 +3131,35 @@
     "cards": [
       {
         "id": "t60-c1",
-        "kind": "Why this matters in interviews",
-        "title": "text",
+        "kind": "text",
+        "title": "Why this matters in interviews",
         "body": "Config lives outside the binary (env, config service). Flags enable kill switches, A/B tests and staged rollouts. Stale flags become tech debt.",
         "accent": "Interview lens"
       },
       {
         "id": "t60-c2",
-        "kind": "Mental model",
-        "title": "text",
+        "kind": "text",
+        "title": "Mental model",
         "body": "Externalise config, roll flags gradually, and clean them up."
       },
       {
         "id": "t60-c3",
-        "kind": "Request flow sketch",
-        "title": "diagram",
-        "body": "Step through how a request moves.\n\nFlow: Define flag → Evaluate per user → Roll out % → Monitor → Remove flag"
+        "kind": "diagram",
+        "title": "Request flow sketch",
+        "body": "5 steps from “Define flag” to “Remove flag”, via “Evaluate per user”.",
+        "steps": [
+          "Define flag",
+          "Evaluate per user",
+          "Roll out %",
+          "Monitor",
+          "Remove flag"
+        ]
       },
       {
         "id": "t60-c4",
-        "kind": "Trade-off or failure mode",
-        "title": "text",
+        "kind": "text",
+        "title": "Trade-off or failure mode",
         "body": "Never removing old flags — code paths multiply and become untested."
-      },
-      {
-        "id": "t60-c5",
-        "kind": "How to explain it aloud",
-        "title": "animation",
-        "body": "Close by restating scope, numbers, and the main risk for Security Essentials. Externalise config, roll flags gradually, and clean them up.",
-        "accent": "Say this"
       }
     ],
     "questions": [
@@ -4756,6 +3168,10 @@
         "type": "multiple_choice",
         "prompt": "Main use of a kill switch?",
         "choices": [
+          {
+            "id": "d",
+            "label": "Shard DB"
+          },
           {
             "id": "a",
             "label": "Speed up builds"
@@ -4767,10 +3183,6 @@
           {
             "id": "c",
             "label": "Encrypt data"
-          },
-          {
-            "id": "d",
-            "label": "Shard DB"
           }
         ],
         "correctChoiceIds": [
@@ -4788,16 +3200,16 @@
             "label": "Keep secrets out of source code"
           },
           {
-            "id": "b",
-            "label": "Gradual percentage rollouts"
+            "id": "d",
+            "label": "Remove stale flags"
           },
           {
             "id": "c",
             "label": "Hardcode prod endpoints"
           },
           {
-            "id": "d",
-            "label": "Remove stale flags"
+            "id": "b",
+            "label": "Gradual percentage rollouts"
           }
         ],
         "correctChoiceIds": [
@@ -4808,125 +3220,31 @@
         "explanation": "Hardcoding makes environments brittle."
       },
       {
-        "id": "t60-q3",
-        "type": "drag_order",
-        "prompt": "Order the interview narrative for «Security Essentials» from requirements through deep dive.",
-        "items": [
-          {
-            "id": "1",
-            "label": "Clarify functional scope and SLAs"
-          },
-          {
-            "id": "2",
-            "label": "Estimate QPS, storage, and bandwidth"
-          },
-          {
-            "id": "3",
-            "label": "Sketch high-level architecture"
-          },
-          {
-            "id": "4",
-            "label": "Deep dive hot path and failures"
-          }
-        ],
-        "correctOrder": [
-          "1",
-          "2",
-          "3",
-          "4"
-        ],
-        "explanation": "Numbers before boxes keeps trade-offs honest."
-      },
-      {
-        "id": "t60-q4",
-        "type": "estimation",
-        "prompt": "«Security Essentials»: about 4,182,740 uniform reads/day — estimate integer average read QPS.",
-        "unit": "QPS",
-        "target": 41.0,
-        "assumptions": [
-          "86400 s/day",
-          "4100000 / 86400 ≈ 41 QPS"
-        ],
-        "formula": "QPS ≈ requests_per_day / 86400",
-        "workedAnswer": "≈ 41 QPS average before peak multipliers.",
-        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
-      },
-      {
-        "id": "t60-q5",
-        "type": "tradeoff",
-        "prompt": "«Security Essentials»: pick a scaling posture for a 2× lunch peak with multi-AZ survival.",
-        "constraints": [
-          "p95 read < 250ms",
-          "Small SRE team",
-          "Must survive regional AZ loss"
-        ],
-        "approaches": [
-          {
-            "id": "scale_up",
-            "label": "Scale up one giant node",
-            "description": "Simple but single choke point"
-          },
-          {
-            "id": "scale_out",
-            "label": "Horizontally scale stateless API + cache",
-            "description": "Adds LB and cache complexity"
-          },
-          {
-            "id": "nothing",
-            "label": "Disable peak features",
-            "description": "Harms revenue"
-          }
-        ],
-        "correctApproachId": "scale_out",
-        "rationaleOptions": [
-          {
-            "id": "r1",
-            "label": "Stateless tiers absorb burst without one machine ceiling"
-          },
-          {
-            "id": "r2",
-            "label": "Caching shifts read load off the primary"
-          },
-          {
-            "id": "bad",
-            "label": "Vertical scale cannot survive AZ loss by itself"
-          }
-        ],
-        "correctRationaleIds": [
-          "r1",
-          "r2"
-        ],
-        "distractorRationaleIds": [
-          "bad"
-        ],
-        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
-      },
-      {
-        "id": "t60-q6",
+        "id": "t60-r1",
         "type": "multiple_choice",
-        "prompt": "«Security Essentials»: which non-functional property most often dominates revenue or safety risk?",
+        "prompt": "Twelve-factor config?",
         "choices": [
           {
-            "id": "a",
-            "label": "IDE theme"
-          },
-          {
             "id": "b",
-            "label": "Correctness under retries and partial failures"
+            "label": "Transactions vs analytics."
           },
           {
             "id": "c",
-            "label": "Logo color palette"
+            "label": "OAuth grants delegated access; OIDC adds identity via an ID token."
           },
           {
             "id": "d",
-            "label": "Number of standup meetings"
+            "label": "Connect user journeys to SLOs, then justify components and trade-offs for HDFS."
+          },
+          {
+            "id": "a",
+            "label": "Store config in the environment."
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+        "explanation": "From the lesson: Store config in the environment."
       }
     ],
     "flashcards": [

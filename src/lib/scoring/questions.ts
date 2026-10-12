@@ -109,15 +109,21 @@ export function gradeTradeoff(
     rationaleOk = hits.length >= Math.min(2, legacy.rationaleKeywords.length)
   }
   const correct = approachOk && rationaleOk
+  const label = (id: string) => q.rationaleOptions?.find((o) => o.id === id)?.label ?? id
+  const conflicts = selectedRationaleIds.filter((id) => (q.distractorRationaleIds ?? []).includes(id))
+  const missing = (q.correctRationaleIds ?? []).filter((id) => !selectedRationaleIds.includes(id))
+  const approachName = q.approaches.find((a) => a.id === q.correctApproachId)?.label ?? ''
+  const parts: string[] = []
+  if (!approachOk) parts.push(`The approach that fits these constraints is “${approachName}”.`)
+  for (const id of conflicts) {
+    parts.push(`“${label(id)}” does not hold: ${q.rationaleConflicts?.[id] ?? 'it contradicts the stated constraints.'}`)
+  }
+  if (missing.length && q.rationaleOptions?.length) parts.push(`Also true: ${missing.map((id) => `“${label(id)}”`).join(', ')}.`)
   return {
     correct,
     feedback: correct
-      ? 'Approach and structured rationale match the constraints.'
-      : hasDistractor
-        ? 'One selected reason conflicts with the constraints — review the explanation.'
-        : approachOk
-          ? 'Pick the rationale options that directly support this approach under the constraints.'
-          : 'Choose the approach that best fits the non-functional requirements.',
+      ? 'Approach and reasons both fit the constraints.'
+      : parts.join(' ') || 'Choose the approach that best fits the non-functional requirements.',
   }
 }
 

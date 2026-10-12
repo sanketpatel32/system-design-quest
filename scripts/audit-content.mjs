@@ -73,7 +73,8 @@ for (const t of topics) {
   if (t.cards.length < 4 || t.cards.length > 6) {
     errors.push(`Topic ${t.id}: card count ${t.cards.length}`)
   }
-  if (t.questions.length < 5 || t.questions.length > 8) {
+  // Fewer, real questions beat padded templates: 3 to 8 per topic
+  if (t.questions.length < 3 || t.questions.length > 8) {
     errors.push(`Topic ${t.id}: question count ${t.questions.length}`)
   }
   if (t.flashcards.length < 2) errors.push(`Topic ${t.id}: flashcards < 2`)
@@ -81,7 +82,16 @@ for (const t of topics) {
   if (placeholder.test(blob)) errors.push(`Topic ${t.id}: placeholder text`)
   if (fingerprintTok.test(blob)) errors.push(`Topic ${t.id}: fingerprint tok* tokens in content`)
   const types = new Set(t.questions.map((q) => q.type))
-  if (types.size < 3) errors.push(`Topic ${t.id}: < 3 question types`)
+  if (types.size < 2) warnings.push(`Topic ${t.id}: only one question type`)
+  // Regressions of the old template filler
+  for (const q of [...t.questions, ...(t.bossStages ?? []).flatMap((s) => s.questions)]) {
+    if (/«[^»]*»/.test(q.prompt)) errors.push(`Topic ${t.id}: template prompt using the title as a system name`)
+    for (const c of q.choices ?? []) {
+      if (/IDE theme|Logo colou?r|standup meetings|office tooling/i.test(c.label)) errors.push(`Topic ${t.id}: joke distractor "${c.label}"`)
+    }
+  }
+  if (t.objectives.some((o) => /with measurable requirements and failure modes/.test(o))) errors.push(`Topic ${t.id}: generic objective`)
+  if (t.cards.some((c) => ['text', 'diagram', 'animation'].includes(c.title))) errors.push(`Topic ${t.id}: card title is a card kind`)
   for (const q of t.questions) {
     if (q.type === 'estimation' && !(q.target > 0)) {
       errors.push(`Topic ${t.id} estimation target invalid`)
