@@ -91,5 +91,22 @@ export function checkR3(topics, root) {
     }
   }
 
+  // 8. Numeric feedback: 'Why' must add a sanity check or design implication, not repeat the worked answer
+  {
+    const norm = (x) => x.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const seen = new Set()
+    let n = 0
+    for (const t of topics) {
+      for (const q of [...t.questions, ...(t.bossStages ?? []).flatMap((st) => st.questions)]) {
+        if (q.type !== 'estimation' || seen.has(q.id)) continue
+        seen.add(q.id); n++
+        const w = norm(q.workedAnswer), e = norm(q.explanation)
+        if (e === w || e.includes(w) || w.includes(e)) errors.push(`Topic ${t.id} ${q.id}: 'Why' repeats the worked answer`)
+        if (!/^(Sanity check|Design implication)/.test(q.explanation)) errors.push(`Topic ${t.id} ${q.id}: 'Why' should open with a sanity check or design implication`)
+      }
+    }
+    info.push(`Numeric feedback: ${n} estimation questions, each 'Why' is a sanity check or design implication`)
+  }
+
   return { errors, info }
 }
