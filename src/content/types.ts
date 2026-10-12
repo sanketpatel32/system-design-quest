@@ -27,6 +27,10 @@ export interface LessonCard {
   accent?: string
   /** Concepts this card teaches (matched against question.concept by the audit) */
   teaches?: string[]
+  /** Shown after the steps, e.g. the result of a worked example */
+  note?: string
+  /** 'deep-numbers' when the card is the lesson's worked calculation (the deep section then links to it) */
+  source?: 'deep-numbers'
 }
 
 export interface SourceRef {

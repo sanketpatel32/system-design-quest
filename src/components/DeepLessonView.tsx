@@ -3,7 +3,7 @@ import { DiagramFigure } from './DiagramFigure'
 import { SectionNav } from './SectionNav'
 
 /** "Go deeper" material under the card deck: collapsible cards, callouts and a comparison table. */
-export function DeepLessonView({ deep, accent, topicId }: { deep: DeepLesson; accent: string; topicId: number }) {
+export function DeepLessonView({ deep, accent, topicId, numbersInCards = false }: { deep: DeepLesson; accent: string; topicId: number; numbersInCards?: boolean }) {
   return (
     <section aria-labelledby="deep-title" className="space-y-3" style={{ ['--accent' as string]: accent }}>
       <h2 id="deep-title" className="font-display text-2xl text-chalk">Go deeper</h2>
@@ -55,9 +55,10 @@ export function DeepLessonView({ deep, accent, topicId }: { deep: DeepLesson; ac
         </div>
       </details>
 
-      <details id="deep-do-the-maths" className="deep-card" open>
+      <details id="deep-do-the-maths" className="deep-card" open={!numbersInCards}>
         <summary>Do the maths</summary>
         <div className="deep-body">
+          {numbersInCards && <p className="text-sm font-bold text-dim">This calculation is also worked step by step in the lesson cards above.</p>}
           <div className="deep-callout deep-callout-maths">
             <p className="font-extrabold text-chalk">{deep.numbers.title}</p>
             <p className="deep-label mt-2">Assumptions</p>

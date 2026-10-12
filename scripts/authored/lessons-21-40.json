@@ -16,7 +16,7 @@
       {
         "id": "t21-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Choosing by access pattern",
         "body": "SQL (Postgres, MySQL) gives schemas, joins and ACID. NoSQL families: key-value (DynamoDB), document (MongoDB), wide-column (Cassandra), graph (Neo4j). Choose by access pattern.",
         "accent": "Core idea",
         "teaches": [
@@ -25,37 +25,42 @@
         ]
       },
       {
-        "id": "t21-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Relational for joins and transactions; NoSQL for flexible schema and massive horizontal scale.",
-        "teaches": [
-          "sql",
-          "nosql"
-        ]
-      },
-      {
         "id": "t21-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "7 steps from “List access patterns” to “Validate with estimates”, via “Need joins/ACID?”.",
+        "title": "Deciding between SQL and NoSQL",
+        "body": "List the queries first; joins and multi-row transactions point to SQL, a few huge key-based access patterns point to NoSQL, and the estimates confirm it.",
         "steps": [
-          "List access patterns",
-          "Need joins/ACID?",
-          "Yes",
-          "SQL",
-          "Huge write scale/flexible",
-          "NoSQL",
-          "Validate with estimates"
+          "List the access patterns",
+          "Joins or multi-row transactions? Lean SQL",
+          "A few huge key-based patterns? Consider NoSQL",
+          "Check the choice against the estimates"
         ],
         "teaches": [
           "choose"
         ]
       },
       {
+        "id": "t21-c2",
+        "kind": "text",
+        "title": "Worked example: does one SQL primary fit?",
+        "body": "Assume: 10 million users, 20 orders each per year, 2 KB per order row with indexes; Peak 3,000 order writes per second during a sale.",
+        "teaches": [
+          "sql",
+          "nosql"
+        ],
+        "steps": [
+          "Orders per year = 10,000,000 × 20 = 200,000,000.",
+          "Storage per year = 200,000,000 × 2 KB = 400,000,000 KB, which is about 400 GB.",
+          "Five years of orders is about 2 TB: large, but within what one primary with replicas can hold on modern SSDs.",
+          "3,000 writes per second is within reach of one tuned primary with batching and good indexes; reads go to replicas and caches."
+        ],
+        "note": "A single relational primary plus read replicas fits this workload for years. Shard or move a specific table to NoSQL only when measured growth says one machine will not cope.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t21-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: NoSQL 'because it scales'",
         "body": "Choosing NoSQL \"because it scales\" when the data is relational and modest in size.",
         "teaches": [
           "nosql-trap"
@@ -278,7 +283,7 @@
       {
         "id": "t22-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Query-first data modelling",
         "body": "In DynamoDB/Cassandra, design tables per query. Partition key spreads data; clustering/sort key orders within a partition. Duplicate data instead of joining.",
         "accent": "Core idea",
         "teaches": [
@@ -287,20 +292,10 @@
         ]
       },
       {
-        "id": "t22-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Model for your queries: denormalise, pick partition and sort keys, avoid scatter-gather.",
-        "teaches": [
-          "partition-key",
-          "denormalise"
-        ]
-      },
-      {
         "id": "t22-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “List queries” to “Single-partition reads”, via “Choose partition key”.",
+        "title": "Modelling a table around its queries",
+        "body": "Pick a partition key that spreads load, a sort key that orders rows for the query, and duplicate data so each read hits one partition.",
         "steps": [
           "List queries",
           "Choose partition key",
@@ -313,9 +308,27 @@
         ]
       },
       {
+        "id": "t22-c2",
+        "kind": "text",
+        "title": "Worked example: sizing a chat partition",
+        "body": "Assume: Average message row 300 bytes; A busy group sends 2,000 messages a day; Target partition under 100 MB.",
+        "teaches": [
+          "partition-key",
+          "denormalise"
+        ],
+        "steps": [
+          "Bytes per day = 2,000 × 300 = 600,000 bytes, about 0.6 MB.",
+          "Days to reach 100 MB = 100 ÷ 0.6 ≈ 167 days.",
+          "A conversation-only partition key would cross the target in under six months for busy groups and keep growing.",
+          "Bucketing by month, (conversation_id, month), caps a busy partition at about 0.6 × 31 ≈ 18.6 MB."
+        ],
+        "note": "Partition by conversation and month: newest-first reads touch one or two buckets, and no partition grows without bound.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t22-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: modelling NoSQL like SQL",
         "body": "Modelling NoSQL like SQL with normalised tables and app-side joins.",
         "teaches": [
           "denormalise"
@@ -521,7 +534,7 @@
       {
         "id": "t23-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "What an index buys and costs",
         "body": "A B-tree index turns a full scan into a log-time lookup. Composite indexes follow the leftmost-prefix rule. Each index slows inserts and updates.",
         "accent": "Core idea",
         "teaches": [
@@ -531,19 +544,10 @@
         ]
       },
       {
-        "id": "t23-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Indexes (B-trees, hash, inverted) speed reads at the cost of writes and storage.",
-        "teaches": [
-          "btree"
-        ]
-      },
-      {
         "id": "t23-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Query by column” to “Extra write cost”, via “No index: full scan”.",
+        "title": "From full scan to index lookup",
+        "body": "Without an index the database scans every row; a B-tree turns that into a few page reads, paid for with extra work on every write.",
         "steps": [
           "Query by column",
           "No index: full scan",
@@ -556,9 +560,26 @@
         ]
       },
       {
+        "id": "t23-c2",
+        "kind": "text",
+        "title": "Worked example: how few levels a B-tree needs",
+        "body": "Assume: Fan-out of 200 keys per page; 500 million rows.",
+        "teaches": [
+          "btree"
+        ],
+        "steps": [
+          "One level covers 200 keys; two levels cover 200 × 200 = 40,000.",
+          "Three levels cover 40,000 × 200 = 8,000,000.",
+          "Four levels cover 8,000,000 × 200 = 1,600,000,000, which is more than 500 million.",
+          "So any row is at most four page reads away, and with the root and second level cached, about two reads from disk."
+        ],
+        "note": "A B-tree over half a billion rows is only four levels deep, which is why an indexed lookup takes milliseconds while a full scan of 500 million rows takes minutes.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t23-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: indexing every column",
         "body": "Indexing every column. Writes slow down and the planner may still ignore them.",
         "teaches": [
           "write-cost"
@@ -769,7 +790,7 @@
         "id": "t24-c3",
         "kind": "diagram",
         "title": "Read path, before and after",
-        "body": "4 steps from “Order page request” to “Render page”, via “Normalized: join orders + products + sellers”.",
+        "body": "The normalized page joins three tables on every view; the denormalized page reads one row, at the cost of keeping the copies in sync.",
         "steps": [
           "Order page request",
           "Normalized: join orders + products + sellers",
@@ -783,7 +804,7 @@
       {
         "id": "t24-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: denormalising up front",
         "body": "Denormalizing everything up front. Start normalized, measure the hot query, then denormalize that path and decide how copies stay in sync (same transaction, events, or accepted staleness).",
         "teaches": [
           "denormalise-process"
@@ -1023,7 +1044,7 @@
         "id": "t25-c3",
         "kind": "diagram",
         "title": "A transfer transaction",
-        "body": "5 steps from “BEGIN” to “COMMIT (or ROLLBACK on error)”, via “Read both balances”.",
+        "body": "Both balance changes sit inside one transaction, so a crash before COMMIT leaves neither applied.",
         "steps": [
           "BEGIN",
           "Read both balances",
@@ -1047,7 +1068,7 @@
       {
         "id": "t25-c5",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: two auto-committed writes",
         "body": "Running two related writes as separate auto-committed statements. A crash between them leaves half a change. Put them in one transaction, and keep it short.",
         "teaches": [
           "atomicity"
@@ -1276,7 +1297,7 @@
         "id": "t26-c3",
         "kind": "diagram",
         "title": "Two doctors go off call",
-        "body": "4 steps from “Both read: 2 doctors on call” to “Serializable aborts one transaction”, via “Each removes themselves”.",
+        "body": "Under snapshot isolation both transactions see two doctors on call and both commit; serializable isolation detects the conflict and aborts one.",
         "steps": [
           "Both read: 2 doctors on call",
           "Each removes themselves",
@@ -1290,7 +1311,7 @@
       {
         "id": "t26-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: assuming serializable",
         "body": "Assuming the default level is serializable. Most databases default to read committed, so check what you are getting before relying on it for money.",
         "teaches": [
           "default-level"
@@ -1533,7 +1554,7 @@
         "id": "t27-c3",
         "kind": "diagram",
         "title": "A like on a post",
-        "body": "5 steps from “User taps like” to “Replicas converge”, via “Nearest replica accepts the write”.",
+        "body": "The nearest replica accepts the like and replies immediately; other replicas learn about it a moment later and converge.",
         "steps": [
           "User taps like",
           "Nearest replica accepts the write",
@@ -1557,7 +1578,7 @@
       {
         "id": "t27-c5",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: eventual consistency for money",
         "body": "Using eventual consistency for a wallet balance. Two replicas can both approve a spend. Keep money and inventory on strongly consistent paths.",
         "teaches": [
           "base"
@@ -1779,7 +1800,7 @@
       {
         "id": "t28-c1",
         "kind": "text",
-        "title": "The formulas",
+        "title": "Leaders, followers and lag",
         "body": "Leader-follower: writes to leader, replicas serve reads with lag. Sync replication = no loss but slower; async = fast but may lose recent writes on failover. Multi-leader adds conflict resolution.",
         "accent": "Core maths",
         "teaches": [
@@ -1789,19 +1810,10 @@
         ]
       },
       {
-        "id": "t28-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Copies of data on multiple nodes for availability and read scaling; sync vs async trade-offs.",
-        "teaches": [
-          "sync-async"
-        ]
-      },
-      {
         "id": "t28-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Write to leader” to “Reads from replicas”, via “Leader logs change”.",
+        "title": "A write replicating to followers",
+        "body": "The leader records the change in its log and ships it to replicas, which apply it in order; reads from replicas can lag behind.",
         "steps": [
           "Write to leader",
           "Leader logs change",
@@ -1814,9 +1826,25 @@
         ]
       },
       {
+        "id": "t28-c2",
+        "kind": "text",
+        "title": "Worked example: how much data asynchronous failover can lose",
+        "body": "Assume: Leader takes 2,000 writes per second; Replication lag 300 ms at the moment of failure.",
+        "teaches": [
+          "sync-async"
+        ],
+        "steps": [
+          "Unreplicated writes = 2,000 × 0.3 = 600 writes.",
+          "Those 600 writes were acknowledged to clients but exist only on the dead leader.",
+          "With semi-synchronous replication to one follower, the lag for acknowledged writes on that follower is zero, at the cost of about one network round trip per commit (often under 1 ms in the same zone)."
+        ],
+        "note": "Asynchronous replication can lose roughly 'write rate × lag' acknowledged writes on failover; size that number before choosing.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t28-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: reading your write from a lagging replica",
         "body": "Reading your own write from a lagging replica — the user sees their order \"missing\". Use read-your-writes routing.",
         "teaches": [
           "read-your-writes"
@@ -2054,7 +2082,7 @@
         "id": "t29-c3",
         "kind": "diagram",
         "title": "A quorum read",
-        "body": "4 steps from “Client reads key from 2 of 3 replicas” to “Read repair updates B to v5”, via “Replica A has v5, replica B has v4”.",
+        "body": "With N = 3 and R = 2, a read that touches two replicas sees at least one with the latest write, and read repair fixes the stale one.",
         "steps": [
           "Client reads key from 2 of 3 replicas",
           "Replica A has v5, replica B has v4",
@@ -2068,7 +2096,7 @@
       {
         "id": "t29-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: quorum is not linearizable",
         "body": "Treating R + W > N as full linearizability. Sloppy quorums, clock-based conflict resolution and concurrent writes can still return surprising results.",
         "teaches": [
           "quorum-limits"
@@ -2253,7 +2281,7 @@
       {
         "id": "t30-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Choosing a shard key",
         "body": "Pick a shard key with high cardinality and even access. Hash sharding spreads load; range sharding helps range queries but risks hotspots. Cross-shard joins and transactions get hard.",
         "accent": "Core idea",
         "teaches": [
@@ -2263,19 +2291,10 @@
         ]
       },
       {
-        "id": "t30-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Split data across nodes by key — range, hash or directory — to scale writes and storage.",
-        "teaches": [
-          "sharding"
-        ]
-      },
-      {
         "id": "t30-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Choose shard key” to “Rebalance on growth”, via “Hash(key)”.",
+        "title": "Routing a row to its shard",
+        "body": "Hash the shard key, map the hash to a shard (mod N or a ring), send the query there, and rebalance as data grows.",
         "steps": [
           "Choose shard key",
           "Hash(key)",
@@ -2288,9 +2307,26 @@
         ]
       },
       {
+        "id": "t30-c2",
+        "kind": "text",
+        "title": "Worked example: how many shards?",
+        "body": "Assume: 8 TB of data, growing 2 TB per year; Each shard comfortably holds 1 TB with headroom; Peak writes 40,000 per second; one shard handles 5,000.",
+        "teaches": [
+          "sharding"
+        ],
+        "steps": [
+          "Shards for today's storage = 8 ÷ 1 = 8.",
+          "Shards for writes = 40,000 ÷ 5,000 = 8.",
+          "Shards for storage in 2 years = (8 plus 4) ÷ 1 = 12.",
+          "Start with, say, 64 logical shards placed on 12 machines, so later growth moves logical shards instead of re-splitting data."
+        ],
+        "note": "Size shards by the larger of storage and write needs, add growth headroom, and use many logical shards so rebalancing is a move, not a rewrite.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t30-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: a skewed shard key",
         "body": "Choosing a low-cardinality or skewed shard key (country, city, or celebrity user_id).",
         "teaches": [
           "shard-key"
@@ -2519,7 +2555,7 @@
       {
         "id": "t31-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Rings instead of mod N",
         "body": "With hash mod N, changing N remaps nearly every key. On a hash ring each key goes to the next node clockwise; virtual nodes even out load.",
         "accent": "Core idea",
         "teaches": [
@@ -2529,19 +2565,10 @@
         ]
       },
       {
-        "id": "t31-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Map keys and nodes onto a ring so adding a node moves only ~1/N of keys.",
-        "teaches": [
-          "ring"
-        ]
-      },
-      {
         "id": "t31-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Hash nodes onto ring” to “Add node: move one arc”, via “Hash key”.",
+        "title": "Adding a node to a hash ring",
+        "body": "Keys walk clockwise to the first node; a new node takes over one arc, so only the keys in that arc move.",
         "steps": [
           "Hash nodes onto ring",
           "Hash key",
@@ -2554,9 +2581,26 @@
         ]
       },
       {
+        "id": "t31-c2",
+        "kind": "text",
+        "title": "Worked example: keys moved when a cache cluster grows",
+        "body": "Assume: 100 million cached keys; Cluster grows from 10 to 11 nodes.",
+        "teaches": [
+          "ring"
+        ],
+        "steps": [
+          "With hash mod n, a key stays only if hash mod 10 equals hash mod 11, which happens for about 1 in 11 keys.",
+          "So about 10 ÷ 11 of keys move: 100,000,000 × 10 ÷ 11 ≈ 91 million cache misses.",
+          "With consistent hashing, about 1 ÷ 11 of keys move: roughly 9.1 million.",
+          "Consistent hashing moves about one tenth as many keys as mod-n in this case."
+        ],
+        "note": "Adding one node to a mod-n cache empties almost the whole cache and can stampede the database; consistent hashing moves only the new node's fair share.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t31-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: no virtual nodes",
         "body": "Forgetting virtual nodes — a few physical nodes get uneven arcs and become hot.",
         "teaches": [
           "vnodes"
@@ -2737,7 +2781,7 @@
       {
         "id": "t32-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "The choice during a partition",
         "body": "CAP: under a partition (P), a system either rejects some requests to stay consistent (CP) or answers possibly-stale data (AP). Consistency models range from strong (linearizable) to eventual.",
         "accent": "Core idea",
         "teaches": [
@@ -2746,19 +2790,10 @@
         ]
       },
       {
-        "id": "t32-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "During a network partition you choose consistency or availability; otherwise you trade latency vs consistency (PACELC).",
-        "teaches": [
-          "cap"
-        ]
-      },
-      {
         "id": "t32-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Normal operation” to “Heal & reconcile”, via “Network partition”.",
+        "title": "What happens when the network splits",
+        "body": "During a partition each side must either refuse requests to stay consistent (CP) or answer with possibly stale data (AP), then reconcile after healing.",
         "steps": [
           "Normal operation",
           "Network partition",
@@ -2771,9 +2806,26 @@
         ]
       },
       {
+        "id": "t32-c2",
+        "kind": "text",
+        "title": "Worked example: how much a partition costs each choice",
+        "body": "Assume: Partition lasts 2 minutes; Side B serves 30% of 10,000 requests per second.",
+        "teaches": [
+          "cap"
+        ],
+        "steps": [
+          "Requests on side B during the partition = 10,000 × 0.3 = 3,000 per second.",
+          "Over 120 seconds that is 3,000 × 120 = 360,000 requests.",
+          "CP: up to 360,000 requests fail or wait on side B, but no one sees inconsistent data.",
+          "AP: those 360,000 requests succeed, and some may read stale data or create conflicts to resolve later."
+        ],
+        "note": "CAP is a per-operation business choice: count who is affected and what a wrong answer costs.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t32-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: 'pick two of three'",
         "body": "Saying \"pick two of three\" as if you can drop P. Partitions happen; the real choice is C vs A during one.",
         "teaches": [
           "cap"
@@ -3019,7 +3071,7 @@
         "id": "t33-c4",
         "kind": "diagram",
         "title": "One read, two choices",
-        "body": "4 steps from “Client in Mumbai reads a price” to “Pick per feature: catalogue EL, checkout EC”, via “EL: local replica answers in about 2 ms, maybe stale”.",
+        "body": "Even with no partition, each read chooses between a fast local answer that may be stale and a slower answer from the leader.",
         "steps": [
           "Client in Mumbai reads a price",
           "EL: local replica answers in about 2 ms, maybe stale",
@@ -3033,7 +3085,7 @@
       {
         "id": "t33-c5",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: stopping at CAP",
         "body": "Explaining CAP and stopping there. Most of the time there is no partition, and the real question is how much latency you pay for consistency.",
         "teaches": [
           "pacelc"
@@ -3241,7 +3293,7 @@
         "id": "t34-c3",
         "kind": "diagram",
         "title": "Read after a write",
-        "body": "4 steps from “User updates profile on primary” to “Read-your-writes: route this user’s reads to primary briefly”, via “Replica lags 500 ms”.",
+        "body": "A lagging replica can show a user their old profile right after they changed it; read-your-writes routes their reads to the primary for a short time.",
         "steps": [
           "User updates profile on primary",
           "Replica lags 500 ms",
@@ -3255,7 +3307,7 @@
       {
         "id": "t34-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: strong consistency everywhere",
         "body": "Choosing strong consistency everywhere. It costs latency (cross-replica coordination) and availability during partitions. Spend it only where stale data causes real harm.",
         "teaches": [
           "strong-cost"
@@ -3477,7 +3529,7 @@
       {
         "id": "t35-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Exhaust the simple steps before sharding",
         "body": "Most systems never need sharding. First fix slow queries and indexes, add caching and read replicas, then scale vertically, and finally partition by a well-chosen key.",
         "accent": "Core idea",
         "teaches": [
@@ -3485,19 +3537,10 @@
         ]
       },
       {
-        "id": "t35-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Scale in steps: optimise queries → cache → read replicas → vertical → shard.",
-        "teaches": [
-          "scale-steps"
-        ]
-      },
-      {
         "id": "t35-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Optimise queries” to “Shard”, via “Add cache”.",
+        "title": "The scaling ladder for a database",
+        "body": "Fix queries and indexes, add a cache, add read replicas, move to a bigger instance, and shard only when writes or data size demand it.",
         "steps": [
           "Optimise queries",
           "Add cache",
@@ -3510,9 +3553,26 @@
         ]
       },
       {
+        "id": "t35-c2",
+        "kind": "text",
+        "title": "Worked example: when does a single primary run out?",
+        "body": "Assume: Primary handles about 10,000 simple writes per second; Product grows writes 2× per year from 1,500 per second today.",
+        "teaches": [
+          "scale-steps"
+        ],
+        "steps": [
+          "Year 1: 1,500 × 2 = 3,000 per second.",
+          "Year 2: 3,000 × 2 = 6,000 per second.",
+          "Year 3: 6,000 × 2 = 12,000 per second, which exceeds about 10,000.",
+          "So there are roughly two to three years before writes force sharding, plenty of time to plan rather than shard on day one."
+        ],
+        "note": "Project growth against measured capacity to decide when to shard, and say that timeline out loud in an interview.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t35-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: sharding at 100 QPS",
         "body": "Proposing sharding at 100 QPS. Sharding is expensive to undo; justify it with write volume or data size.",
         "teaches": [
           "when-shard"
@@ -3744,7 +3804,7 @@
       {
         "id": "t36-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Decoupling with a queue",
         "body": "Producers enqueue; workers consume at their own pace. Queues buffer bursts, isolate failures and allow retries. Use them when the caller does not need the result immediately.",
         "accent": "Core idea",
         "teaches": [
@@ -3753,19 +3813,10 @@
         ]
       },
       {
-        "id": "t36-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Queues decouple producers from consumers, absorb spikes and enable async work.",
-        "teaches": [
-          "buffer"
-        ]
-      },
-      {
         "id": "t36-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Producer” to “Ack / retry”, via “Enqueue”.",
+        "title": "A job through a queue",
+        "body": "The producer enqueues and returns; workers pull at their own pace and ack on success, so failures are retried instead of lost.",
         "steps": [
           "Producer",
           "Enqueue",
@@ -3778,9 +3829,26 @@
         ]
       },
       {
+        "id": "t36-c2",
+        "kind": "text",
+        "title": "Worked example: sizing workers for a burst",
+        "body": "Assume: Sale spike: 50,000 receipt jobs per minute for 10 minutes; Each job takes 200 ms; one worker does 5 jobs per second; Acceptable backlog: cleared within 20 minutes of the spike starting.",
+        "teaches": [
+          "buffer"
+        ],
+        "steps": [
+          "Arrival rate = 50,000 ÷ 60 ≈ 833 jobs per second.",
+          "Total jobs = 50,000 × 10 = 500,000.",
+          "To finish within 20 minutes (1,200 seconds) needs 500,000 ÷ 1,200 ≈ 417 jobs per second.",
+          "Workers needed = 417 ÷ 5 ≈ 84; to keep pace with the peak instead would need 833 ÷ 5 ≈ 167."
+        ],
+        "note": "The queue lets about 84 workers handle a peak that would otherwise need about 167, at the cost of receipts arriving up to 20 minutes late.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t36-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: queues for synchronous work",
         "body": "Putting synchronous user-facing work behind a queue and then polling for the result.",
         "teaches": [
           "async"
@@ -3970,7 +4038,7 @@
       {
         "id": "t37-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Partitions, ordering and replay",
         "body": "Kafka topics are split into partitions; order is guaranteed per partition. Consumer groups share partitions. Messages are retained so consumers can replay.",
         "accent": "Core idea",
         "teaches": [
@@ -3980,19 +4048,10 @@
         ]
       },
       {
-        "id": "t37-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Pub/sub fans one event to many subscribers; Kafka is a partitioned, replayable log.",
-        "teaches": [
-          "consumer-groups"
-        ]
-      },
-      {
         "id": "t37-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Producer” to “Consumer group B”, via “Topic partition (by key)”.",
+        "title": "An event through a Kafka topic",
+        "body": "The producer keys the event to a partition; the log retains it, and each consumer group reads it independently at its own offset.",
         "steps": [
           "Producer",
           "Topic partition (by key)",
@@ -4005,9 +4064,26 @@
         ]
       },
       {
+        "id": "t37-c2",
+        "kind": "text",
+        "title": "Worked example: choosing a partition count",
+        "body": "Assume: Peak 60,000 events per second; One consumer instance processes 2,500 events per second; Plan for 2× growth.",
+        "teaches": [
+          "consumer-groups"
+        ],
+        "steps": [
+          "Consumers needed today = 60,000 ÷ 2,500 = 24.",
+          "With 2× growth = 24 × 2 = 48 consumers.",
+          "Since one partition is read by at most one consumer in a group, the topic needs at least 48 partitions.",
+          "Choose a round number such as 64 to allow headroom; increasing partitions later changes which partition a key maps to."
+        ],
+        "note": "Partition count caps consumer parallelism, so size it for future peak throughput divided by per-consumer throughput, with headroom.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t37-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: expecting global ordering",
         "body": "Expecting global ordering in Kafka. Ordering is per partition — key by order_id to keep one order’s events in sequence.",
         "teaches": [
           "partition-order"
@@ -4230,7 +4306,7 @@
         "id": "t38-c3",
         "kind": "diagram",
         "title": "Posting with a hybrid feed",
-        "body": "5 steps from “User posts” to “Feed read merges celebrity posts on demand”, via “Event published to topic”.",
+        "body": "Normal posts are pushed into followers' feeds when written; celebrity posts are skipped at write time and merged in when a feed is read.",
         "steps": [
           "User posts",
           "Event published to topic",
@@ -4245,7 +4321,7 @@
       {
         "id": "t38-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: fan-out on write for celebrities",
         "body": "Fan-out on write for everyone. A cricketer with 50 million followers turns one post into 50 million writes. Hybrid feeds treat high-follower accounts differently.",
         "teaches": [
           "celebrity"
@@ -4494,7 +4570,7 @@
         "id": "t39-c3",
         "kind": "diagram",
         "title": "An at-least-once consumer",
-        "body": "5 steps from “Read message” to “Idempotent write makes the replay harmless”, via “Process it (write to the database)”.",
+        "body": "If the consumer crashes after processing but before committing its offset, the message comes back; an idempotent write makes the replay harmless.",
         "steps": [
           "Read message",
           "Process it (write to the database)",
@@ -4518,7 +4594,7 @@
       {
         "id": "t39-c5",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: promising exactly-once",
         "body": "Promising exactly-once delivery over a network. Delivery can only be at-least-once; you get exactly-once effects by making processing idempotent.",
         "teaches": [
           "exactly-once"
@@ -4734,7 +4810,7 @@
         "id": "t40-c3",
         "kind": "diagram",
         "title": "A retried payment",
-        "body": "5 steps from “Client sends POST /pay with key K” to “Server finds K, returns stored success”, via “Server charges, stores K → success”.",
+        "body": "The server stores the idempotency key with the result, so a retry after a lost response gets the stored answer instead of a second charge.",
         "steps": [
           "Client sends POST /pay with key K",
           "Server charges, stores K → success",
@@ -4749,7 +4825,7 @@
       {
         "id": "t40-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: check, then write",
         "body": "Checking for the key and then writing in two separate steps. Two concurrent retries can both pass the check. Make the key insert and the action atomic, for example with a unique constraint.",
         "teaches": [
           "atomic-key"

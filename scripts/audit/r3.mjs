@@ -26,5 +26,49 @@ export function checkR3(topics, root) {
     if (/Trade-offs (&|and) wrap-up|five stages|5 stages|5 steps from “Clarify/i.test(blob)) errors.push('Content still teaches a five-stage interview plan')
   }
 
+  // 2. Card headings are topic-specific: no stock headings, no heading reused across topics, no template bodies
+  {
+    const GENERIC = new Set(['Key idea', 'The core idea', 'How a request flows', 'Watch out for', 'The formulas', 'Why interviewers ask', 'Common trap', 'The brief', 'Quality bar', 'Reference sketch', 'Failure modes', 'Say aloud', 'Overview', 'Summary', 'Introduction'])
+    const seen = new Map()
+    for (const t of topics) {
+      for (const c of t.cards) {
+        if (GENERIC.has(c.title)) errors.push(`Topic ${t.id} ${c.id}: generic card heading "${c.title}"`)
+        if (seen.has(c.title) && seen.get(c.title) !== t.id) errors.push(`Topic ${t.id} ${c.id}: heading "${c.title}" also used by topic ${seen.get(c.title)}`)
+        seen.set(c.title, t.id)
+        if (/^\d+ steps from “/.test(c.body)) errors.push(`Topic ${t.id} ${c.id}: templated "N steps from …" body`)
+        if (/^Boss \d+ (·|non-functionals|reference path|risks|close)/.test(c.body)) errors.push(`Topic ${t.id} ${c.id}: templated boss card body`)
+      }
+    }
+  }
+
+  // 3. No card repeats the intro (objectives) or another card in the same topic
+  {
+    const words = (x) => new Set(x.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 3 || /^\d+$/.test(w)))
+    const jac = (a, b) => {
+      const A = words(a), B = words(b)
+      if (!A.size || !B.size) return 0
+      let i = 0
+      for (const w of A) if (B.has(w)) i++
+      return i / (A.size + B.size - i)
+    }
+    const LIMIT = 0.5
+    let worst = 0
+    for (const t of topics) {
+      const intro = t.objectives.join(' ')
+      t.cards.forEach((c, i) => {
+        const text = [c.body, ...(c.steps ?? [])].join(' ')
+        const ji = jac(c.body, intro)
+        worst = Math.max(worst, ji)
+        if (ji >= LIMIT) errors.push(`Topic ${t.id} ${c.id}: card repeats the lesson intro (similarity ${ji.toFixed(2)})`)
+        t.cards.slice(i + 1).forEach((d) => {
+          const j = jac(text, [d.body, ...(d.steps ?? [])].join(' '))
+          worst = Math.max(worst, j)
+          if (j >= LIMIT) errors.push(`Topic ${t.id}: cards ${c.id} and ${d.id} are near-duplicates (similarity ${j.toFixed(2)})`)
+        })
+      })
+    }
+    info.push(`Card repetition: highest same-topic similarity ${worst.toFixed(2)} (limit ${LIMIT})`)
+  }
+
   return { errors, info }
 }

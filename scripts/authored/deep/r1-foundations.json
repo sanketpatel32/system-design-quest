@@ -139,7 +139,7 @@
       "steps": [
         "Start from users: daily active users (DAU), and how many times each one does the action per day.",
         "Average QPS = DAU × actions per user per day ÷ 86,400 seconds. Round 86,400 to 10^5: it makes mental maths easy and errs slightly low, so note that.",
-        "Peak QPS = average × peak factor. A typical daily curve gives 2–3×; event-driven traffic (a sale opening, a match final, Tatkal) can be 10× or more.",
+        "Peak QPS = average × a peak factor. The factor is an example assumption to state and confirm, not a rule: a smooth daily curve might give about 2–3×, while event-driven traffic (a sale opening, a match final, Tatkal) can be 10× or far more.",
         "Storage per year = new objects per day × average size × 365 (× replication factor, usually 3).",
         "Bandwidth = QPS × bytes per request. Do it separately for ingress (writes) and egress (reads); egress is usually far larger.",
         "Sanity-check the answer against something you know, for example one well-tuned server handling a few thousand simple requests per second."
@@ -148,7 +148,7 @@
     "useWhen": [
       "To decide whether you need sharding, caching or a CDN at all: one machine is often enough below a few thousand QPS.",
       "To size storage tiers: hot data in memory, warm on SSD, cold in object storage.",
-      "To justify a design choice out loud: '50,000 peak QPS is too much for one Postgres primary for writes, so...'"
+      "To justify a design choice out loud: 'At about 70,000 peak writes per second I'd check whether one primary keeps up, given row size, indexes and commit durability, before deciding to partition.'"
     ],
     "avoidWhen": [
       "Do not chase precision: 3.7 TB versus 4 TB never changes the design. Keep one significant figure.",
@@ -181,10 +181,10 @@
           "Negligible"
         ],
         [
-          "Peak ≈ 2–3× average",
-          "Depends on the curve",
-          "Can be 10×+",
-          "Ask; events like a sale or a final dominate"
+          "Peak ≈ 2–3× average (example)",
+          "Depends on the workload",
+          "Event spikes can be 10×+",
+          "State it as an assumption and ask; events often dominate"
         ]
       ]
     },
@@ -195,16 +195,16 @@
         "40 messages sent per user per day",
         "100 bytes per message body, 200 bytes with metadata",
         "Messages kept for 1 year, stored 3× for replication",
-        "Peak factor 3×"
+        "Peak factor 3× (an example assumption for a daily curve; event spikes could be higher)"
       ],
       "steps": [
         "Messages per day = 50M × 40 = 2B (2 billion).",
-        "Average write QPS = 2B ÷ 86,400 ≈ 23,000 per second (with the 10^5 shortcut: 20,000).",
-        "Peak write QPS ≈ 23,000 × 3 ≈ 70,000 per second.",
+        "Average write QPS = 2B ÷ 86,400 ≈ 23,000 per second (with the 10⁵ shortcut: 20,000).",
+        "Peak write QPS ≈ 23,000 × 3 ≈ 70,000 per second, under the assumed 3× peak.",
         "Storage per day = 2 billion messages × 200 bytes = 400 GB. Per year: 400 GB × 365 ≈ 146 TB, and with 3 replicas ≈ 440 TB.",
-        "Ingress at peak = 70,000 messages/s × 200 bytes = 14 MB/s ≈ 112 Mbit/s: small. The heavy part is delivering each message to recipients, plus media, which is stored separately."
+        "Ingress at peak = 70,000 messages/s × 200 bytes = 14 MB/s ≈ 112 Mbit/s."
       ],
-      "result": "About 23K average and 70K peak writes per second, and roughly 150 TB a year of raw messages (about 440 TB with 3× replication). Writes at that rate need a sharded store, but message bandwidth is not the bottleneck."
+      "result": "About 23K average and 70K peak writes per second, and roughly 150 TB a year of raw messages (about 440 TB with replication). Raw message ingress is relatively modest under these assumptions; real network traffic is several times higher once fan-out to each recipient, replication, protocol overhead and media are added. Whether 70K writes/s fits on one database depends on the hardware (CPU, NVMe), the cost of each write (row size, number of indexes), durability settings (fsync per commit or group commit), batching, and the engine (B-tree or LSM). Distribute when measurements show one node lacks headroom at peak, when one machine cannot hold the data (hundreds of TB here does force splitting storage), or when you need to survive a node failure without losing write capacity."
     },
     "india": {
       "title": "Why UPI peaks matter more than averages",
@@ -214,7 +214,7 @@
     "pitfalls": [
       {
         "trap": "Giving the average QPS as the design target.",
-        "say": "'Average is about 23K; with a 3× daily peak I'd design for about 70K, and more if there are event spikes.'"
+        "say": "'Average is about 23K; assuming a 3× daily peak I'd design for about 70K, and I'd ask whether launches or events spike higher.'"
       },
       {
         "trap": "Forgetting replication and indexes when sizing storage.",
@@ -225,10 +225,10 @@
         "say": "Write the chain on the board: 50M × 40 ÷ 10^5 = 20K. The interviewer can follow and correct an assumption instead of your maths."
       }
     ],
-    "diagram": "DAU 50M  x 40 msgs/day  = 2 billion/day\n2 billion / 86,400 s    ~ 23K/s avg\n23K x 3 (peak)          ~ 70K/s\n2 billion x 200 bytes   = 400 GB/day -> ~146 TB/yr (x3 = ~440 TB)",
+    "diagram": "DAU 50M  x 40 msgs/day  = 2 billion/day\n2 billion / 86,400 s    ~ 23K/s avg\n23K x 3 (assumed peak)  ~ 70K/s\n2 billion x 200 bytes   = 400 GB/day -> ~146 TB/yr (x3 = ~440 TB)",
     "takeaways": [
       "Average QPS = DAU × actions ÷ 86,400; treat 86,400 as 10^5 for speed.",
-      "Design for the peak, not the average: 2–3× for daily curves, 10×+ for events.",
+      "Design for the peak, not the average. Peak factors are assumptions you state, for example 2–3× for a daily curve and 10×+ for events.",
       "Storage = objects per day × size × retention × replication.",
       "Keep one significant figure and say your assumptions out loud."
     ],
