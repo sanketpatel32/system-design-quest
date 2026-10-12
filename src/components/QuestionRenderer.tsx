@@ -9,13 +9,23 @@ interface Props {
   initialAnswer?: unknown
   /** MCQ hotkeys 1-4 */
   hotkeys?: boolean
+  number?: number
+  total?: number
+}
+
+const TYPE_LABEL: Record<Question['type'], string> = {
+  multiple_choice: 'Pick one',
+  spot_bottleneck: 'Spot the bottleneck',
+  drag_order: 'Put in order',
+  estimation: 'Estimate',
+  tradeoff: 'Make the call',
 }
 
 function hasStructuredTradeoff(q: TradeoffQuestion) {
   return Boolean(q.rationaleOptions?.length && q.correctRationaleIds?.length)
 }
 
-export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, hotkeys = true }: Props) {
+export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, hotkeys = true, number, total }: Props) {
   const [answer, setAnswer] = useState<unknown>(initialAnswer)
   const [result, setResult] = useState<ReturnType<typeof gradeQuestion> | null>(null)
   const submitted = locked || result !== null
@@ -46,8 +56,14 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
   })
 
   return (
-    <div className="panel-slab p-4 space-y-4">
-      <p className="font-medium text-[#f1f5f9] text-[15px] leading-snug">{question.prompt}</p>
+    <div className={`panel-slab p-5 space-y-4 ${hotkeys && !submitted ? 'question-active' : ''}`}>
+      {number !== undefined && (
+        <p className="text-xs text-dim tabular-nums">
+          Question {number}
+          {total ? ` of ${total}` : ''} · {TYPE_LABEL[question.type]}
+        </p>
+      )}
+      <p className="font-display font-semibold text-chalk text-lg leading-snug">{question.prompt}</p>
       {question.type === 'multiple_choice' && (
         <div className="space-y-2">
           {question.choices.map((c, idx) => {
