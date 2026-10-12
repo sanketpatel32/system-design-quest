@@ -1312,6 +1312,34 @@
         "formula": "TCP 1 RTT + TLS 1.3 1 RTT",
         "workedAnswer": "TCP 1 RTT + TLS 1.3 1 RTT = 2 × 200 ms = 400 ms.",
         "explanation": "TCP 1 RTT + TLS 1.3 1 RTT = 2 × 200 ms = 400 ms."
+      },
+      {
+        "id": "t4-d1",
+        "type": "multiple_choice",
+        "concept": "rtt",
+        "prompt": "RTT from Mumbai to a US server is about 200 ms. With TLS 1.3 and no reused connection, roughly how long before the first response byte (ignoring server time and DNS)?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "About 600 ms"
+          },
+          {
+            "id": "b",
+            "label": "About 200 ms"
+          },
+          {
+            "id": "c",
+            "label": "About 400 ms"
+          },
+          {
+            "id": "d",
+            "label": "About 1,200 ms"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "One round trip each for the TCP handshake, the TLS 1.3 handshake and the HTTP request: 3 × 200 ms ≈ 600 ms."
       }
     ],
     "flashcards": [
@@ -1344,7 +1372,107 @@
         "title": "RFC 1122 — Host Requirements",
         "url": "https://www.rfc-editor.org/rfc/rfc1122"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "layers",
+        "rtt",
+        "handshake",
+        "layer-placement"
+      ],
+      "mechanism": {
+        "title": "What actually happens, layer by layer, when your browser fetches https://example.in/menu",
+        "steps": [
+          "Application layer: the browser builds an HTTP request (method, path, headers). Before it can send anything it needs an IP address, so it asks DNS, which is itself an application-layer protocol, usually over UDP port 53.",
+          "Transport layer: TCP opens a connection to port 443 with a three-way handshake (SYN, SYN-ACK, ACK). That costs one round trip before any application data moves. TCP then numbers bytes, acknowledges them and retransmits losses, so the app sees an ordered, reliable stream.",
+          "Security: TLS runs on top of TCP. TLS 1.3 needs one more round trip to agree keys and verify the server certificate (TLS 1.2 needed two).",
+          "Internet layer: each TCP segment is wrapped in an IP packet with source and destination addresses. Routers forward packets hop by hop using only the IP header; they do not look at TCP or HTTP.",
+          "Link layer: on each hop the packet is framed for the physical medium (Ethernet, Wi-Fi, 4G/5G radio) using MAC or radio addressing, then the frame is discarded and rebuilt at the next hop.",
+          "Back up the stack: the server's network card hands frames to IP, IP to TCP, TCP reassembles the byte stream, TLS decrypts it, and the web server finally parses the HTTP request."
+        ]
+      },
+      "useWhen": [
+        "Placing components: an L4 load balancer works with IPs and ports (fast, protocol-agnostic); an L7 load balancer or API gateway reads HTTP paths, headers and cookies.",
+        "Explaining latency: count round trips per layer (DNS, TCP, TLS, request) to see where the time goes.",
+        "Debugging: 'can I reach the IP?' (L3), 'is the port open?' (L4), 'what status code?' (L7) separates network faults from application faults."
+      ],
+      "avoidWhen": [
+        "Do not recite all seven OSI layers in a design interview; the four-layer TCP/IP model is what systems actually use.",
+        "Do not put application logic at L4: an L4 balancer cannot route by URL path or inspect cookies."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Layer",
+          "Example protocols",
+          "What a device there can see",
+          "Typical component"
+        ],
+        "rows": [
+          [
+            "Application (L7)",
+            "HTTP, gRPC, DNS, WebSocket",
+            "URLs, headers, cookies, bodies",
+            "API gateway, L7 load balancer, WAF"
+          ],
+          [
+            "Transport (L4)",
+            "TCP, UDP, QUIC (over UDP)",
+            "IPs and ports, connection state",
+            "L4 load balancer, firewall rules"
+          ],
+          [
+            "Internet (L3)",
+            "IPv4, IPv6",
+            "Source and destination IP",
+            "Routers"
+          ],
+          [
+            "Link (L2)",
+            "Ethernet, Wi-Fi",
+            "MAC addresses on one network segment",
+            "Switches, access points"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Why a cold HTTPS request from Mumbai to the US feels slow",
+        "assumptions": [
+          "Round trip time (RTT) Mumbai ↔ US East coast ≈ 200 ms (typical public measurements are roughly 180–230 ms)",
+          "DNS answer already cached",
+          "TLS 1.3, no session resumption"
+        ],
+        "steps": [
+          "TCP handshake: 1 RTT = 200 ms.",
+          "TLS 1.3 handshake: 1 RTT = 200 ms.",
+          "HTTP request and first byte of the response: 1 RTT = 200 ms, plus server time.",
+          "Total before the first byte ≈ 3 × 200 = 600 ms, before the server does any work.",
+          "Same request to a Mumbai region with RTT ≈ 5 ms: 3 × 5 = 15 ms."
+        ],
+        "result": "About 600 ms versus about 15 ms for the same request: distance and round trips dominate. That is why we reuse connections (keep-alive, HTTP/2), terminate TLS at a nearby edge, and serve Indian users from Indian regions."
+      },
+      "india": {
+        "title": "Why Indian apps terminate connections in India",
+        "label": "Illustrative estimate",
+        "body": "Most large Indian consumer apps (food delivery, payments, streaming) serve users from cloud regions in Mumbai or Hyderabad and from CDN points of presence inside India. Using the numbers above, a cold HTTPS request to a US origin spends roughly 600 ms just on round trips, while one to a Mumbai edge spends tens of milliseconds even from a city a few hundred kilometres away. On a mobile network, where each round trip is already slower, those extra US round trips are visible as a sluggish first screen. So the TCP and TLS handshakes are terminated as close to the user as possible, and the edge keeps warm, long-lived connections back to the origin."
+      },
+      "pitfalls": [
+        {
+          "trap": "Saying 'the load balancer reads the URL' without saying which layer it works at.",
+          "say": "'For path-based routing I need an L7 balancer; an L4 balancer only sees IPs and ports.'"
+        },
+        {
+          "trap": "Ignoring round trips when explaining latency.",
+          "say": "'A cold HTTPS request is about three round trips before the first byte, so I'd reuse connections and terminate TLS near the user.'"
+        }
+      ],
+      "diagram": "Browser                                Server\n HTTP  (L7)  GET /menu                  HTTP\n TLS         encrypt                    TLS\n TCP   (L4)  port 443, seq/ack          TCP\n IP    (L3)  src/dst IP  --routers-->   IP\n Link  (L2)  Wi-Fi / 4G  frames         Ethernet",
+      "takeaways": [
+        "Use the four-layer TCP/IP model: application, transport, internet, link.",
+        "L4 devices see IPs and ports; L7 devices see HTTP paths, headers and cookies.",
+        "A cold HTTPS request costs about 3 round trips (TCP, TLS 1.3, request) before the first byte.",
+        "Latency is mostly distance × round trips, so serve users from nearby regions and reuse connections."
+      ]
+    }
   },
   {
     "id": 5,
@@ -1586,6 +1714,34 @@
           "r3": "UDP has no ordering; the game must number updates and drop old ones itself."
         },
         "explanation": "Use each transport where its guarantees match the data."
+      },
+      {
+        "id": "t5-d1",
+        "type": "multiple_choice",
+        "concept": "hol",
+        "prompt": "A live stream at 4 Mbit/s over TCP loses one packet and it takes about 200 ms to recover. Roughly how much data waits behind it?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "About 100 KB"
+          },
+          {
+            "id": "b",
+            "label": "About 10 KB"
+          },
+          {
+            "id": "c",
+            "label": "About 1 MB"
+          },
+          {
+            "id": "d",
+            "label": "Nothing; TCP delivers the rest immediately"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "4 Mbit/s × 0.2 s = 0.8 Mbit = 100 KB, all held back because TCP delivers in order."
       }
     ],
     "flashcards": [
@@ -1618,7 +1774,113 @@
         "title": "RFC 793 — TCP",
         "url": "https://www.rfc-editor.org/rfc/rfc793"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "tcp",
+        "udp",
+        "hol",
+        "quic",
+        "choose"
+      ],
+      "mechanism": {
+        "title": "How each protocol moves your data",
+        "steps": [
+          "TCP opens a connection with a three-way handshake (SYN, SYN-ACK, ACK), costing one round trip before data flows.",
+          "TCP numbers every byte. The receiver acknowledges what arrived; anything not acknowledged within the retransmission timeout, or flagged by duplicate ACKs, is sent again.",
+          "TCP delivers bytes strictly in order. If packet 5 is lost, packets 6–20 wait in the receiver's buffer until 5 is retransmitted: this is head-of-line blocking.",
+          "TCP's congestion control (slow start, then additive increase) grows the sending window gradually and halves it on loss, sharing bandwidth fairly but ramping up slowly on new connections.",
+          "UDP just sends datagrams: no handshake, no ordering, no retransmission and no congestion control. Each datagram arrives once, late, out of order or not at all, and the app decides what to do.",
+          "QUIC (the transport under HTTP/3) runs over UDP and rebuilds reliability per stream in user space, so a loss on one stream does not stall the others, and it merges the transport and TLS 1.3 handshakes into one round trip."
+        ]
+      },
+      "useWhen": [
+        "TCP: APIs, payments, file transfer, database connections, chat history: anything that must arrive complete and in order.",
+        "UDP: live voice and video, game state, DNS lookups, telemetry where the newest value beats a retransmitted old one.",
+        "QUIC/HTTP/3: mobile clients on lossy networks that make many parallel requests, and that switch between Wi-Fi and cellular (QUIC connections can survive an IP change)."
+      ],
+      "avoidWhen": [
+        "Do not pick raw UDP for anything that needs every byte; you would end up re-implementing TCP badly.",
+        "Do not pick TCP for real-time media where a 300 ms retransmit makes the data useless; a dropped frame is better than a frozen call."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "",
+          "TCP",
+          "UDP",
+          "QUIC"
+        ],
+        "rows": [
+          [
+            "Setup",
+            "1 RTT handshake (+1 for TLS 1.3)",
+            "None",
+            "1 RTT including TLS; 0-RTT on resumption"
+          ],
+          [
+            "Reliability and order",
+            "Yes, per connection",
+            "No",
+            "Yes, per stream"
+          ],
+          [
+            "Head-of-line blocking",
+            "Yes, across the whole connection",
+            "No",
+            "Only within one stream"
+          ],
+          [
+            "Congestion control",
+            "Yes, in the kernel",
+            "None (app must be careful)",
+            "Yes, in user space"
+          ],
+          [
+            "Typical uses",
+            "HTTP/1.1, HTTP/2, databases",
+            "DNS, VoIP, games, WebRTC media",
+            "HTTP/3"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How much a single lost packet costs a live stream over TCP",
+        "assumptions": [
+          "RTT 100 ms on a mobile network",
+          "Video bitrate 4 Mbit/s",
+          "One packet lost; the sender notices through duplicate ACKs after about one RTT and resends it"
+        ],
+        "steps": [
+          "Time until the lost packet is resent and received ≈ 1 RTT to detect + 1 RTT to deliver ≈ 2 × 100 = 200 ms.",
+          "Data stuck behind it in that time = 4 Mbit/s × 0.2 s = 0.8 Mbit = 100 KB.",
+          "If the loss is only caught by the retransmission timeout instead (at least 200 ms in Linux, often more on mobile), the stall is longer still.",
+          "Over UDP or QUIC streams, the player skips or conceals the missing piece and keeps playing the 100 KB that already arrived."
+        ],
+        "result": "One lost packet can stall about 200 ms of video (roughly 100 KB) behind it on TCP. For live media, dropping data beats waiting for it."
+      },
+      "india": {
+        "title": "Video calls and live cricket on Indian mobile networks",
+        "label": "Illustrative estimate",
+        "body": "On crowded 4G cells in Indian cities, packet loss of a few percent is common at busy hours. A video call app that sends media over TCP would freeze every time a packet is lost, because everything behind it waits for the retransmit. That is why calling apps use WebRTC media over UDP (lost frames are concealed, not waited for), and why large streaming services have adopted HTTP/3 over QUIC for their apps: loss on one stream no longer blocks the others, and a QUIC connection can survive the phone moving from home Wi-Fi to mobile data. The control plane (login, payments, chat history) stays on reliable TCP or QUIC streams."
+      },
+      "pitfalls": [
+        {
+          "trap": "'UDP is faster, so use UDP.'",
+          "say": "'UDP avoids handshakes and retransmit stalls, which helps real-time media. For anything that must arrive complete I'd use TCP or QUIC rather than rebuild reliability.'"
+        },
+        {
+          "trap": "Thinking HTTP/2 solved head-of-line blocking.",
+          "say": "'HTTP/2 removed it at the HTTP layer, but it still runs on one TCP connection, so one lost packet stalls every stream. HTTP/3 on QUIC fixes it at the transport layer.'"
+        }
+      ],
+      "diagram": "TCP:  [1][2][ ][4][5][6]  -> app waits for 3, then gets 3,4,5,6\nQUIC: stream A [1][ ][3]  -> waits for A2\n      stream B [1][2][3]  -> delivered now\nUDP:  [1][2][ ][4][5]     -> app gets 1,2,4,5; decides about 3",
+      "takeaways": [
+        "TCP: ordered, reliable, congestion-controlled, but one loss stalls everything behind it.",
+        "UDP: no guarantees; ideal when late data is useless (voice, video, games, DNS).",
+        "QUIC gives TCP-like reliability per stream over UDP with a 1-RTT handshake that includes TLS.",
+        "Choose by what late or lost data means for the user, not by 'speed'."
+      ]
+    }
   },
   {
     "id": 6,
@@ -1859,6 +2121,34 @@
           "r3": "Cached records keep sending users to the dead region until the TTL expires."
         },
         "explanation": "Minutes-long TTLs balance failover speed against lookup load."
+      },
+      {
+        "id": "t6-d1",
+        "type": "multiple_choice",
+        "concept": "ttl",
+        "prompt": "A region fails and its A record has a 300-second TTL. Roughly how long are typical users stuck before their resolver re-asks?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "About 2.5 minutes on average, up to 5 minutes"
+          },
+          {
+            "id": "b",
+            "label": "Zero; DNS switches instantly"
+          },
+          {
+            "id": "c",
+            "label": "Exactly 300 ms"
+          },
+          {
+            "id": "d",
+            "label": "About 24 hours"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Cached entries have on average half the TTL left: 300 ÷ 2 = 150 s. The worst case is the full 300 s."
       }
     ],
     "flashcards": [
@@ -1886,7 +2176,99 @@
         "title": "RFC 1034 — DNS",
         "url": "https://www.rfc-editor.org/rfc/rfc1034"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "resolution",
+        "ttl",
+        "dns-routing"
+      ],
+      "mechanism": {
+        "title": "Resolving api.example.in from a cold cache",
+        "steps": [
+          "The app asks the operating system's stub resolver, which checks its own cache and then forwards the query to a recursive resolver (your ISP's, or a public one such as 8.8.8.8 or 1.1.1.1).",
+          "The recursive resolver, if it has nothing cached, asks a root server. The root does not know the answer but replies with the name servers for the .in top-level domain.",
+          "The resolver asks a .in TLD server, which replies with the authoritative name servers for example.in.",
+          "The resolver asks the authoritative server, which returns the record (for example an A record with an IPv4 address) and a TTL in seconds.",
+          "The resolver caches the answer for the TTL and returns it. The next user of the same resolver gets it from cache in about a millisecond.",
+          "Managed DNS can return different answers to different resolvers (by location, health or weight), which is how DNS-based global load balancing and failover work."
+        ]
+      },
+      "useWhen": [
+        "Low TTLs (30–60 s) on records you may need to fail over or shift traffic quickly, such as the entry point of a multi-region service.",
+        "High TTLs (hours) on records that rarely change, to cut lookup latency and resolver load.",
+        "Geo or latency-based DNS to send users to the nearest region or CDN point of presence."
+      ],
+      "avoidWhen": [
+        "Do not rely on DNS alone for instant failover: some resolvers and clients cache longer than the TTL, so traffic drains over minutes, not seconds.",
+        "Do not set a very low TTL everywhere: every lookup that misses cache adds a round trip to the authoritative server, and query bills grow."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "TTL",
+          "Failover speed",
+          "Lookup latency and load",
+          "Good for"
+        ],
+        "rows": [
+          [
+            "30–60 s",
+            "Fast (about a minute, plus stragglers)",
+            "More cache misses",
+            "Multi-region entry points"
+          ],
+          [
+            "5–15 min",
+            "Moderate",
+            "Balanced",
+            "Most service hostnames"
+          ],
+          [
+            "1–24 h",
+            "Slow: up to a day for some users",
+            "Fewest lookups",
+            "Static records, verification records"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How long does a TTL keep users on a dead region?",
+        "assumptions": [
+          "A record TTL = 300 s (5 min)",
+          "The region fails at 10:00:00",
+          "Resolver caches filled at random times before the failure"
+        ],
+        "steps": [
+          "A resolver that cached the record just before 10:00 keeps serving it until about 10:05.",
+          "On average a cached entry has half its TTL left: 300 ÷ 2 = 150 s, so the typical user is stuck for about 2.5 minutes.",
+          "Worst case is the full 300 s, plus any client or resolver that ignores the TTL.",
+          "With a 24-hour TTL (86,400 s), the average stuck time would be 43,200 s = 12 hours."
+        ],
+        "result": "A 5-minute TTL means roughly 2.5 minutes of average impact and up to 5 minutes (plus stragglers); a 24-hour TTL means up to a day. Choose the TTL from how fast you must move traffic."
+      },
+      "india": {
+        "title": "Shifting traffic between Mumbai and Hyderabad regions",
+        "label": "Illustrative design",
+        "body": "Many Indian services now run in two Indian cloud regions, commonly Mumbai and Hyderabad, partly for resilience and partly to keep data in India. A common pattern is a global DNS name with a 60-second TTL whose answers point at the healthy region. If health checks on Mumbai fail, the DNS provider stops returning Mumbai's address, and within roughly a minute most new connections go to Hyderabad. Existing long-lived connections (WebSockets, HTTP/2) do not move until they reconnect, so clients need retry and reconnect logic. For very fast failover, anycast IPs or a global load balancer in front of both regions can react in seconds, with DNS as the slower backstop."
+      },
+      "pitfalls": [
+        {
+          "trap": "'We'll fail over with DNS instantly.'",
+          "say": "'DNS failover is bounded by the TTL and by resolvers that over-cache, so I'd use a 60 s TTL plus client retries, or anycast for faster switching.'"
+        },
+        {
+          "trap": "Forgetting that DNS is a dependency that can fail.",
+          "say": "'I'd use a managed DNS provider with anycast name servers and keep a reasonable TTL so cached answers ride out a short outage.'"
+        }
+      ],
+      "diagram": "app -> stub -> recursive resolver\n                 |-> root:        'ask .in servers'\n                 |-> .in TLD:     'ask ns1.example.in'\n                 |-> authoritative: A 203.0.113.10, TTL 60\n                 '-> cache for 60 s",
+      "takeaways": [
+        "Resolution walks root → TLD → authoritative, then caches by TTL.",
+        "TTL trades failover speed against lookup latency and load.",
+        "Average stuck time after a failure is about half the TTL; the worst case is the full TTL plus stragglers.",
+        "DNS can route by geography and health, but it is a slow lever; pair it with retries or anycast."
+      ]
+    }
   },
   {
     "id": 7,
@@ -2083,6 +2465,34 @@
           "a"
         ],
         "explanation": "Authentication of the server is one of TLS’s three guarantees, with confidentiality and integrity."
+      },
+      {
+        "id": "t7-d1",
+        "type": "multiple_choice",
+        "concept": "handshake",
+        "prompt": "Why should a payment request never be sent as TLS 0-RTT early data?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Early data can be replayed by an attacker"
+          },
+          {
+            "id": "b",
+            "label": "0-RTT data is not encrypted"
+          },
+          {
+            "id": "c",
+            "label": "0-RTT only works over UDP"
+          },
+          {
+            "id": "d",
+            "label": "0-RTT skips certificate checks"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "TLS 1.3 0-RTT data is encrypted but has no replay protection by itself, so only idempotent requests should use it."
       }
     ],
     "flashcards": [
@@ -2119,7 +2529,96 @@
         "title": "RFC 8446 — TLS 1.3",
         "url": "https://www.rfc-editor.org/rfc/rfc8446"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "tls-provides",
+        "handshake",
+        "termination",
+        "https-limits",
+        "mtls"
+      ],
+      "mechanism": {
+        "title": "A TLS 1.3 handshake and what each step buys you",
+        "steps": [
+          "Client hello: the client sends the cipher suites it supports and a key share (an ephemeral Diffie–Hellman public key), guessing the group the server will choose.",
+          "Server hello: the server picks a cipher, sends its own key share, and both sides now derive the same session keys without ever sending them. Because the keys are ephemeral, recording traffic and stealing the server's private key later still cannot decrypt it (forward secrecy).",
+          "Certificate and proof: the server sends its certificate chain and signs the handshake with its private key. The client checks the chain up to a trusted certificate authority, the hostname, and the expiry.",
+          "Finished: both sides confirm the handshake was not tampered with. All of this costs one round trip in TLS 1.3 (two in TLS 1.2).",
+          "Data: HTTP requests and responses flow encrypted and integrity-protected. A resumed session can send data with the first flight (0-RTT), but that early data can be replayed, so only safe, idempotent requests should use it.",
+          "mTLS: for service-to-service traffic, the client also presents a certificate, so each side authenticates the other."
+        ]
+      },
+      "useWhen": [
+        "Always, for anything on the public internet: login pages, APIs, static assets (mixed content breaks pages).",
+        "Terminate TLS at the edge (CDN or L7 load balancer) to route on paths and reuse warm connections to the origin.",
+        "mTLS between internal services in zero-trust networks or service meshes."
+      ],
+      "avoidWhen": [
+        "Do not treat HTTPS as 'the API is secure': it protects data in transit, not authorization, input validation or abuse.",
+        "Do not send non-idempotent requests (payments, orders) as TLS 0-RTT early data; it can be replayed."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Where TLS ends",
+          "Pros",
+          "Cons"
+        ],
+        "rows": [
+          [
+            "At the CDN / edge",
+            "Fast handshakes near users; caching; DDoS absorption",
+            "The edge sees plaintext; re-encrypt to origin for sensitive data"
+          ],
+          [
+            "At the L7 load balancer",
+            "Path routing, header inspection, central certificates",
+            "Traffic inside the VPC is plaintext unless re-encrypted"
+          ],
+          [
+            "End to end at each service (mTLS)",
+            "Encrypted everywhere, mutual identity",
+            "Certificate rotation and CPU cost; needs automation such as a mesh"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "What resumption and keep-alive save",
+        "assumptions": [
+          "RTT 50 ms between a Delhi user and a Mumbai edge",
+          "A page needs 20 requests"
+        ],
+        "steps": [
+          "New TCP + TLS 1.3 connection = 2 RTT = 100 ms before the first request.",
+          "If each of 20 requests opened its own connection sequentially: 20 × 100 = 2,000 ms of handshakes.",
+          "With one kept-alive HTTP/2 connection: one handshake of 100 ms, then requests are multiplexed.",
+          "With TLS 1.2 instead of 1.3, each new connection would cost 3 RTT = 150 ms."
+        ],
+        "result": "Reusing one connection saves about 1.9 seconds of handshakes on this page. Connection reuse and TLS 1.3 matter more than raw cipher speed."
+      },
+      "india": {
+        "title": "UPI apps: TLS is necessary but not sufficient",
+        "label": "Public scheme rules, simplified",
+        "body": "Every UPI app talks to its bank or payment service provider over TLS, but nobody treats that as the whole security story. UPI registration binds the app to the phone's SIM by sending an SMS from the device, so a stolen password alone is not enough. Each payment is approved with the user's UPI PIN, which is captured in a secure component and encrypted for the issuing bank, so the app never sees it in plain text. Payment requests are signed, and banks apply limits and fraud checks. TLS keeps the traffic private and untampered on the wire; device binding, the PIN and server-side checks decide whether the payment is allowed."
+      },
+      "pitfalls": [
+        {
+          "trap": "'We use HTTPS, so the API is secure.'",
+          "say": "'HTTPS covers transit. I'd still add authentication, per-resource authorization, input validation and rate limiting.'"
+        },
+        {
+          "trap": "Not saying where TLS terminates.",
+          "say": "'TLS terminates at the L7 load balancer; inside the VPC services use mTLS so traffic stays encrypted and authenticated.'"
+        }
+      ],
+      "diagram": "Client                         Server\n ClientHello + key share  --->\n                          <---  ServerHello + key share\n                          <---  Certificate, signature, Finished\n Finished + GET /         --->            (1 RTT total in TLS 1.3)\n                          <---  200 OK (encrypted)",
+      "takeaways": [
+        "TLS gives confidentiality, integrity and server authentication; mTLS adds client authentication.",
+        "TLS 1.3 needs one round trip; reuse connections to avoid paying it again.",
+        "0-RTT data can be replayed, so only idempotent requests should use it.",
+        "Decide and say where TLS terminates; HTTPS alone does not authorise anything."
+      ]
+    }
   },
   {
     "id": 8,
@@ -2323,6 +2822,34 @@
           "s4"
         ],
         "explanation": "Validate before creating; return the new resource’s location."
+      },
+      {
+        "id": "t8-d1",
+        "type": "multiple_choice",
+        "concept": "pagination",
+        "prompt": "Page size is 20. Roughly how many rows does OFFSET pagination skip to serve page 5,000?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "About 100,000"
+          },
+          {
+            "id": "b",
+            "label": "About 5,000"
+          },
+          {
+            "id": "c",
+            "label": "About 20"
+          },
+          {
+            "id": "d",
+            "label": "About 1,000,000"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Page 5,000 starts after 4,999 full pages: 4,999 × 20 = 99,980 rows, about 100,000, all read and discarded."
       }
     ],
     "flashcards": [
@@ -2350,7 +2877,95 @@
         "title": "RFC 9110 — HTTP Semantics",
         "url": "https://www.rfc-editor.org/rfc/rfc9110"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "verbs",
+        "status",
+        "pagination",
+        "idempotent",
+        "versioning"
+      ],
+      "mechanism": {
+        "title": "Designing one resource well: orders",
+        "steps": [
+          "Name resources as plural nouns and nest only for ownership: /v1/orders, /v1/orders/{id}, /v1/users/{id}/orders.",
+          "Map actions to methods: GET reads (safe, cacheable), POST creates, PUT replaces, PATCH updates part, DELETE removes. GET, PUT and DELETE are idempotent by definition; POST is not.",
+          "Make POST safe to retry with an Idempotency-Key header: the server stores the key with the first result and returns the same result for any retry with that key.",
+          "Return precise status codes: 201 Created with a Location header, 200 OK, 204 No Content, 400 for invalid input, 401 unauthenticated, 403 forbidden, 404 not found, 409 conflict, 422 validation failure, 429 rate limited, 5xx for server faults.",
+          "Paginate lists with a cursor (the last seen sort key, encoded) and a limit, not page numbers, so results stay stable while rows are inserted.",
+          "Version the contract (/v1 in the path or a header) and only make additive changes within a version."
+        ]
+      },
+      "useWhen": [
+        "Public and partner APIs, where predictability, caching (GET) and broad tooling matter.",
+        "CRUD-shaped domains: orders, users, restaurants, tickets.",
+        "Anywhere HTTP caching and CDNs can help: GET responses with Cache-Control and ETags."
+      ],
+      "avoidWhen": [
+        "Very chatty internal service calls with tight latency budgets, where gRPC's binary encoding and streaming fit better.",
+        "Clients that need many differently shaped views of a graph of data in one round trip; GraphQL may fit better."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Pagination",
+          "How it works",
+          "Pros",
+          "Cons"
+        ],
+        "rows": [
+          [
+            "Offset (?page=50&size=20)",
+            "Skip offset rows, return the next page",
+            "Simple; jump to any page",
+            "Deep pages are slow (the DB still reads skipped rows); inserts cause duplicates or gaps"
+          ],
+          [
+            "Cursor (?after=abc&limit=20)",
+            "WHERE sort_key > last_seen ORDER BY sort_key LIMIT 20",
+            "Fast at any depth via an index; stable under inserts",
+            "No 'jump to page 50'; the cursor must be opaque"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Why offset pagination hurts on a large table",
+        "assumptions": [
+          "Orders table with an index on created_at",
+          "Page size 20",
+          "User scrolls to page 5,000"
+        ],
+        "steps": [
+          "Offset query: OFFSET 99,980 LIMIT 20, because 4,999 pages × 20 = 99,980 rows to skip.",
+          "The database walks about 100,000 index entries and discards all but 20.",
+          "Cursor query: WHERE created_at < :last_seen ORDER BY created_at DESC LIMIT 20 seeks straight to the position and reads about 20 entries.",
+          "Work ratio ≈ 100,000 ÷ 20 = 5,000 times more rows touched for the offset version on that page."
+        ],
+        "result": "At deep pages offset pagination does thousands of times more work than a cursor, and it gets worse as users scroll. Use cursors for feeds and long lists."
+      },
+      "india": {
+        "title": "Placing a food order without charging twice",
+        "label": "Illustrative design",
+        "body": "Picture a food delivery app in India on a patchy 4G connection. The user taps Place order, the request reaches the server and the payment is captured, but the response is lost when the phone changes towers. The app retries. If POST /v1/orders is not idempotent, the user gets two orders and two charges. The fix is an Idempotency-Key generated on the phone when the checkout screen opens, sent with every retry. The server stores the key with the created order ID in a table with a unique constraint; a retry finds the key and returns the original 201 response instead of creating a second order. This is the same idea payment providers document for their order and payment APIs."
+      },
+      "pitfalls": [
+        {
+          "trap": "Verbs in URLs (/createOrder) and 200 OK with an error in the body.",
+          "say": "'POST /v1/orders returns 201 with a Location header; validation errors return 422 with a structured error body.'"
+        },
+        {
+          "trap": "Ignoring retries on create endpoints.",
+          "say": "'POST isn't idempotent, so clients send an Idempotency-Key and the server dedupes on it.'"
+        }
+      ],
+      "diagram": "POST /v1/orders  Idempotency-Key: k-81f\n  -> new key?   create order 42, store (k-81f -> 42)  -> 201, Location: /v1/orders/42\n  -> seen key?  look up 42                           -> same 201 response",
+      "takeaways": [
+        "Nouns for resources, HTTP methods for actions, precise status codes.",
+        "GET, PUT and DELETE are idempotent; make POST retry-safe with an idempotency key.",
+        "Prefer cursor pagination for large or changing lists.",
+        "Version the API and keep changes additive within a version."
+      ]
+    }
   },
   {
     "id": 9,
@@ -2562,6 +3177,34 @@
           "a"
         ],
         "explanation": "The contract is defined once and both sides are generated from it."
+      },
+      {
+        "id": "t9-d1",
+        "type": "multiple_choice",
+        "concept": "n-plus-one",
+        "prompt": "A GraphQL query lists 50 orders and naively resolves each order's restaurant separately. How many database round trips is that?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "51"
+          },
+          {
+            "id": "b",
+            "label": "2"
+          },
+          {
+            "id": "c",
+            "label": "50"
+          },
+          {
+            "id": "d",
+            "label": "1"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "One query for the list plus one per order: 1 + 50 = 51. Batching brings it down to 2."
       }
     ],
     "flashcards": [
@@ -2593,7 +3236,112 @@
         "title": "GraphQL Specification",
         "url": "https://spec.graphql.org/"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "graphql-fit",
+        "grpc-fit",
+        "schema-first",
+        "n-plus-one",
+        "streaming"
+      ],
+      "mechanism": {
+        "title": "How each one works on the wire",
+        "steps": [
+          "gRPC: you define services and messages in a .proto file. Code generators create typed client and server stubs in each language, so a call looks like a local function call.",
+          "gRPC sends protobuf, a compact binary encoding, over HTTP/2. One connection carries many concurrent calls (multiplexing), and calls can stream in either direction or both.",
+          "GraphQL: the server publishes a schema of types and fields. The client sends one query naming exactly the fields it wants, usually as a POST to a single /graphql endpoint.",
+          "The GraphQL server runs a resolver per field. A naive resolver for 'each order's restaurant' makes one database call per order: one query for the list plus N for the children, the N+1 problem.",
+          "Fix N+1 with batching (a DataLoader collects all restaurant IDs in one tick and fetches them with a single IN query) and per-request caching.",
+          "Protect GraphQL with query depth and cost limits, persisted queries, and timeouts, because a client controls how much work one request does."
+        ]
+      },
+      "useWhen": [
+        "gRPC: service-to-service calls inside your platform, polyglot microservices, streaming (live location updates, log tailing), latency-sensitive internal paths.",
+        "GraphQL: one backend serving several frontends (Android, iOS, web) that need different shapes of the same data, or a gateway that aggregates many services into one round trip for mobile."
+      ],
+      "avoidWhen": [
+        "gRPC directly from browsers needs gRPC-Web and a proxy; for public APIs, REST/JSON is easier for partners to adopt.",
+        "GraphQL for simple CRUD with one client adds a schema, resolvers, cost limiting and harder HTTP caching for little gain."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "",
+          "REST/JSON",
+          "gRPC",
+          "GraphQL"
+        ],
+        "rows": [
+          [
+            "Payload",
+            "Text JSON",
+            "Binary protobuf",
+            "Text JSON"
+          ],
+          [
+            "Contract",
+            "OpenAPI (optional)",
+            ".proto, required",
+            "Schema, required"
+          ],
+          [
+            "Shape control",
+            "Server decides",
+            "Server decides",
+            "Client picks fields"
+          ],
+          [
+            "HTTP caching",
+            "Easy with GET",
+            "Hard",
+            "Hard (mostly POST)"
+          ],
+          [
+            "Streaming",
+            "Not built in (SSE/WebSockets)",
+            "Built in, bidirectional",
+            "Subscriptions, server-dependent"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "The cost of N+1 on a home screen",
+        "assumptions": [
+          "Home screen shows 50 orders, each with its restaurant",
+          "Each database round trip takes 2 ms inside the data centre",
+          "Resolvers run one after another"
+        ],
+        "steps": [
+          "Naive: 1 query for orders + 50 queries for restaurants = 51 round trips.",
+          "Time ≈ 51 × 2 ms = 102 ms of database waiting per request.",
+          "Batched with a DataLoader: 1 query for orders + 1 IN query for 50 restaurants = 2 round trips ≈ 4 ms.",
+          "At 1,000 requests/s, naive = 51,000 queries/s versus 2,000 queries/s batched."
+        ],
+        "result": "Batching cuts this screen from 51 queries to 2 and the database load by about 25×. Always mention DataLoader-style batching when you propose GraphQL."
+      },
+      "india": {
+        "title": "One food app, three screens, one gateway",
+        "label": "Illustrative design",
+        "body": "A food delivery app in India might show the same restaurant in a search list (name, rating, delivery time), on a restaurant page (menu, offers, photos) and in order history (name and logo only), on low-end Android phones over mobile data. A GraphQL gateway lets each screen fetch exactly those fields in one round trip, instead of three REST calls returning large objects; that matters on slow networks and small data plans. Behind the gateway, the menu, pricing, offers and ETA services talk to each other over gRPC, which is compact and fast, and the ETA service can stream updates. The gateway enforces query cost limits so one deeply nested query cannot fan out into thousands of backend calls."
+      },
+      "pitfalls": [
+        {
+          "trap": "Proposing GraphQL without addressing N+1 or query cost.",
+          "say": "'Resolvers batch through a DataLoader, and the gateway enforces depth and cost limits with persisted queries.'"
+        },
+        {
+          "trap": "Using gRPC for a public partner API without justification.",
+          "say": "'Internally gRPC; externally REST/JSON, because partners can call it with any HTTP client and we can cache GETs.'"
+        }
+      ],
+      "diagram": "Android / iOS / Web\n        | one GraphQL query per screen\n  [GraphQL gateway]  (cost limits, DataLoader batching)\n     |gRPC     |gRPC      |gRPC\n  [menu]    [offers]    [ETA] --stream--> updates",
+      "takeaways": [
+        "gRPC: typed, binary, HTTP/2, streaming; best between services.",
+        "GraphQL: clients choose fields; best when many frontends need different shapes.",
+        "Fix GraphQL's N+1 with batching, and cap query depth and cost.",
+        "A common combination is GraphQL or REST at the edge and gRPC inside."
+      ]
+    }
   },
   {
     "id": 10,
@@ -2827,6 +3575,34 @@
           "n2"
         ],
         "explanation": "Socket state needs a fleet of gateways, with pub/sub routing messages to whichever one holds the user."
+      },
+      {
+        "id": "t10-d1",
+        "type": "multiple_choice",
+        "concept": "polling",
+        "prompt": "1 million users short-poll every 5 seconds. Roughly how many requests per second is that?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "200,000"
+          },
+          {
+            "id": "b",
+            "label": "5 million"
+          },
+          {
+            "id": "c",
+            "label": "20,000"
+          },
+          {
+            "id": "d",
+            "label": "1 million"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "1,000,000 ÷ 5 = 200,000 requests per second, most of them returning nothing new."
       }
     ],
     "flashcards": [
@@ -2858,7 +3634,113 @@
         "title": "HTML Living Standard — Server-sent events",
         "url": "https://html.spec.whatwg.org/multipage/server-sent-events.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "polling",
+        "sse",
+        "websocket",
+        "ws-flow",
+        "connection-state"
+      ],
+      "mechanism": {
+        "title": "Four ways to get updates to a client",
+        "steps": [
+          "Short polling: the client asks 'anything new?' every N seconds. Simple and stateless, but most responses are empty, and updates arrive up to N seconds late.",
+          "Long polling: the client asks, and the server holds the request open until there is news or a timeout (say 30 s), then the client immediately asks again. Fewer empty responses, near-instant delivery, but a reconnect per message.",
+          "Server-Sent Events (SSE): one long-lived HTTP response that the server keeps writing events into. One direction (server to client), automatic reconnect with Last-Event-ID, works through most proxies.",
+          "WebSockets: an HTTP request upgrades to a persistent, full-duplex connection. Both sides can send frames at any time with very little overhead per message.",
+          "At scale, persistent connections live on dedicated gateway servers. A registry (often Redis) maps user ID to gateway, and a pub/sub layer routes each message to the gateway that holds that user's socket.",
+          "Clients must handle reconnects: back off with jitter, resume from the last received event ID, and fall back to fetching missed messages."
+        ]
+      },
+      "useWhen": [
+        "Short polling: updates every minute or slower, small user counts, or as a fallback.",
+        "SSE: one-way live feeds such as scores, order status, notifications and stock tickers.",
+        "WebSockets: two-way, low-latency interaction: chat, collaborative editing, multiplayer games, live location both ways."
+      ],
+      "avoidWhen": [
+        "Do not short-poll every second with a million users; you pay for millions of empty requests.",
+        "Do not open WebSockets for data that changes every few minutes; the connection state costs more than it saves."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "",
+          "Short polling",
+          "Long polling",
+          "SSE",
+          "WebSockets"
+        ],
+        "rows": [
+          [
+            "Direction",
+            "Client pulls",
+            "Client pulls, server holds",
+            "Server → client",
+            "Both ways"
+          ],
+          [
+            "Latency",
+            "Up to the interval",
+            "Near real time",
+            "Real time",
+            "Real time"
+          ],
+          [
+            "Server state",
+            "None",
+            "Held request",
+            "Open stream",
+            "Open socket"
+          ],
+          [
+            "Best for",
+            "Rare updates",
+            "Fallback",
+            "Feeds, status",
+            "Chat, games"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Polling versus pushing for 1 million live users",
+        "assumptions": [
+          "1 million users with the screen open",
+          "Short polling every 5 seconds",
+          "About 1 real update per user per minute",
+          "A tuned WebSocket gateway holds about 100,000 idle connections (often more; measure it)"
+        ],
+        "steps": [
+          "Polling load = 1,000,000 ÷ 5 = 200,000 requests per second.",
+          "Useful updates = 1,000,000 ÷ 60 ≈ 16,700 per second, so about 92% of polls return nothing.",
+          "With WebSockets, gateways needed for connections = 1,000,000 ÷ 100,000 = 10, plus headroom, say 15.",
+          "Messages pushed ≈ 16,700 per second, sent only when something changes."
+        ],
+        "result": "Polling every 5 s costs about 200K requests/s, mostly empty, while pushing costs about 15 gateway servers and about 17K messages/s. At this scale, push wins."
+      },
+      "india": {
+        "title": "Live order tracking in food delivery",
+        "label": "Illustrative estimate",
+        "body": "On a busy evening, hundreds of thousands of people in India may be watching a food order's tracking screen at the same time. The rider app sends location every few seconds; the customer needs to see the rider move and the status change (accepted, picked up, arriving). Short polling every 3–5 seconds from every customer would produce hundreds of thousands of mostly empty requests per second, as the maths above shows. A typical design pushes over WebSockets or SSE: the rider's updates go to a location service, are published per order ID, and the gateway holding that customer's connection forwards them. If the connection drops in a lift or tunnel, the app reconnects and fetches the latest state over plain HTTP."
+      },
+      "pitfalls": [
+        {
+          "trap": "'Just use WebSockets' with no plan for which server holds which socket.",
+          "say": "'Sockets live on gateway servers; a Redis registry maps user to gateway and pub/sub routes messages there.'"
+        },
+        {
+          "trap": "Forgetting reconnection and missed messages.",
+          "say": "'Clients reconnect with backoff and jitter and resume from the last event ID; the server keeps a short replay buffer.'"
+        }
+      ],
+      "diagram": "rider app --location--> [location svc] --publish order:42--> [pub/sub]\n                                                        |\ncustomer <==WebSocket== [gateway 7] <--subscribe order:42-+\n          (registry: user 9 -> gateway 7)",
+      "takeaways": [
+        "Short polling is simple but wasteful; long polling, SSE and WebSockets push updates.",
+        "Use SSE for one-way live feeds and WebSockets for two-way interaction.",
+        "At scale, sockets need dedicated gateways, a user-to-gateway registry and pub/sub routing.",
+        "Always design reconnection and catch-up for missed messages."
+      ]
+    }
   },
   {
     "id": 11,
