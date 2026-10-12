@@ -22,6 +22,7 @@ export function Mascot({ mood = 'idle', size = 120, className = '', title }: { m
     >
       {/* shadow */}
       <ellipse cx="60" cy="113" rx="30" ry="5" fill="#000" opacity="0.08" />
+      <g className={`byte byte-${mood}`}>
       {/* antenna */}
       <path d={sad ? 'M60 24 Q 62 14 72 12' : 'M60 24 V 10'} stroke={shade} strokeWidth="4" strokeLinecap="round" fill="none" />
       <circle cx={sad ? 73 : 60} cy={sad ? 12 : 9} r="6" fill={happy ? '#FFC800' : sad ? '#AFA79A' : '#FF4B4B'} />
@@ -58,7 +59,7 @@ export function Mascot({ mood = 'idle', size = 120, className = '', title }: { m
           <path d="M68 54 Q 73 46 78 54" stroke="#29303D" strokeWidth="4.5" strokeLinecap="round" fill="none" />
         </>
       ) : (
-        <>
+        <g className="byte-eyes">
           <ellipse cx="47" cy={mood === 'think' ? 50 : 53} rx="5" ry="6.5" fill="#29303D" />
           <ellipse cx="73" cy={mood === 'think' ? 50 : 53} rx="5" ry="6.5" fill="#29303D" />
           <circle cx="49" cy={mood === 'think' ? 47 : 50} r="1.8" fill="#fff" />
@@ -69,7 +70,7 @@ export function Mascot({ mood = 'idle', size = 120, className = '', title }: { m
               <path d="M80 46 L 68 42" stroke="#29303D" strokeWidth="3" strokeLinecap="round" />
             </>
           )}
-        </>
+        </g>
       )}
       {/* cheeks */}
       <ellipse cx="38" cy="63" rx="4.5" ry="2.8" fill="#FFB3B3" opacity={sad ? 0.4 : 0.9} />
@@ -88,6 +89,7 @@ export function Mascot({ mood = 'idle', size = 120, className = '', title }: { m
       <rect x="36" y="91" width="48" height="7" rx="3.5" fill={shade} />
       <circle cx="78" cy="83.5" r="2" fill={happy ? '#FFC800' : '#A5ED6E'} />
       <circle cx="78" cy="94.5" r="2" fill="#A5ED6E" />
+      </g>
     </svg>
   )
 }
