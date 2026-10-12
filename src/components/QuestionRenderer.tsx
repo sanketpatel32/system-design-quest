@@ -100,7 +100,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
             <li key={item.id} className="flex gap-2 items-center">
               <select
                 disabled={submitted}
-                className="bg-[#0a0e13] border border-[var(--color-line)] text-sm px-2 py-1.5 text-[var(--color-ink)]"
+                className="field text-sm "
                 value={(answer as string[] | undefined)?.[idx] ?? ''}
                 onChange={(e) => {
                   const arr = [...(Array.isArray(answer) ? (answer as string[]) : question.items.map((i) => i.id))]
@@ -125,7 +125,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
             type="number"
             min={0}
             disabled={submitted}
-            className="w-full max-w-xs bg-[#0a0e13] border border-[var(--color-line)] px-3 py-2 text-[var(--color-ink)]"
+            className="w-full max-w-xs field "
             value={typeof answer === 'string' ? answer : ''}
             onChange={(e) => setAnswer(e.target.value)}
             placeholder={`Answer in ${question.unit}`}
@@ -194,7 +194,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
           ) : (
             <textarea
               disabled={submitted}
-              className="w-full bg-[#0a0e13] border border-[var(--color-line)] p-2 text-sm text-[var(--color-ink)]"
+              className="w-full field"
               rows={3}
               placeholder="Legacy rationale field…"
               value={(answer as { rationale?: string })?.rationale ?? ''}

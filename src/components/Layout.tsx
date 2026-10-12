@@ -45,7 +45,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="hud-block min-w-[130px]">
               <div className="flex justify-between text-[10px] uppercase tracking-widest text-[var(--color-muted)]">
                 <span>Lv</span>
-                <span className="text-[var(--color-ink)] font-bold tabular-nums">{level}</span>
+                <span className="text-chalk font-bold tabular-nums">{level}</span>
               </div>
               <div className="xp-track mt-1">
                 <div className="xp-fill" style={{ width: `${pct}%` }} role="progressbar" aria-valuenow={xp % 500} aria-valuemin={0} aria-valuemax={500} />
