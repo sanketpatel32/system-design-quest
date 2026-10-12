@@ -65,6 +65,16 @@ export function LessonDeck({
         </div>
         {hasRealTitle(card) && <h3 className="font-display text-2xl font-bold text-chalk mb-3">{card.title}</h3>}
         <p className="text-[#d6d0c2] leading-relaxed text-[17px] max-w-[62ch]">{card.body}</p>
+        {card.steps && card.steps.length > 0 && (
+          <ol className="flow mt-5" aria-label="Request flow">
+            {card.steps.map((step, i) => (
+              <li key={step} className="flow-step">
+                <span className="flow-dot tabular-nums" style={{ borderColor: accent }} aria-hidden>{i + 1}</span>
+                <span className="text-chalk text-[15px]">{step}</span>
+              </li>
+            ))}
+          </ol>
+        )}
         {card.diagram && (
           <div className="mt-4 rounded-md border border-[var(--color-rail)] bg-[#0a1624] p-3 overflow-auto" dangerouslySetInnerHTML={{ __html: card.diagram }} />
         )}

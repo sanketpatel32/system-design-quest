@@ -22,6 +22,8 @@ export interface LessonCard {
   body: string
   /** SVG or mermaid-like description rendered as diagram */
   diagram?: string
+  /** Ordered steps of a request flow, rendered as a connected sequence */
+  steps?: string[]
   accent?: string
 }
 
@@ -93,6 +95,8 @@ export interface TradeoffQuestion extends BaseQuestion {
   correctRationaleIds: string[]
   /** Optional distractor rationale ids that fail grading if selected */
   distractorRationaleIds?: string[]
+  /** Why each distractor reason is wrong under the stated constraints */
+  rationaleConflicts?: Record<string, string>
 }
 
 export type Question =

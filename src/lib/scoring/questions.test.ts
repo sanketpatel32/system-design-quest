@@ -46,7 +46,7 @@ describe('gradeTradeoff structured', () => {
   it('fails on distractor rationale', () => {
     const r = gradeTradeoff(q, 'scale', ['r1', 'bad'])
     expect(r.correct).toBe(false)
-    expect(r.feedback).toMatch(/conflicts/)
+    expect(r.feedback).toMatch(/does not hold/)
   })
 })
 
