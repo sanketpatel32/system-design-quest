@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { LessonCard } from '../content/types'
 
+/** Some imported cards carry their kind ('text', 'diagram') as a placeholder title; don't render those. */
+function hasRealTitle(card: LessonCard) {
+  const t = card.title.trim().toLowerCase()
+  return t.length > 0 && t !== card.kind && t !== 'text' && t !== 'diagram' && t !== 'animation'
+}
+
 export function LessonDeck({ cards, accent = '#2dd4bf' }: { cards: LessonCard[]; accent?: string }) {
   const [index, setIndex] = useState(0)
   const card = cards[index]
@@ -25,28 +31,36 @@ export function LessonDeck({ cards, accent = '#2dd4bf' }: { cards: LessonCard[];
     <div className="panel-slab panel-slab-accent" style={{ ['--accent' as string]: accent }}>
       <div className="p-5 sm:p-6">
         <div className="flex justify-between items-baseline gap-4 mb-4">
-          <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--color-muted)]">
-            {index + 1} / {cards.length}
+          <span className="text-xs text-dim tabular-nums" aria-live="polite">
+            Card {index + 1} of {cards.length}
           </span>
-          {card.accent && <span className="hand-accent text-xs">{card.accent}</span>}
+          {card.accent && (
+            <span className="text-xs font-semibold rounded-full px-2 py-0.5" style={{ color: accent, background: `${accent}1f` }}>
+              {card.accent}
+            </span>
+          )}
         </div>
         <div className="flex gap-1 mb-4">
           {cards.map((_, i) => (
-            <div
+            <button
               key={i}
-              className="h-0.5 flex-1 transition-colors duration-200"
-              style={{ background: i <= index ? accent : '#1e242c' }}
+              type="button"
+              aria-label={`Go to card ${i + 1}`}
+              aria-current={i === index ? 'step' : undefined}
+              onClick={() => setIndex(i)}
+              className="h-1.5 flex-1 rounded-full transition-colors duration-200"
+              style={{ background: i <= index ? accent : 'var(--color-rail)' }}
             />
           ))}
         </div>
-        <h3 className="font-display text-xl font-bold text-[#f4f5f6] mb-3">{card.title}</h3>
-        <p className="text-[#c4c9cf] leading-relaxed text-[15px]">{card.body}</p>
+        {hasRealTitle(card) && <h3 className="font-display text-2xl font-bold text-chalk mb-3">{card.title}</h3>}
+        <p className="text-[#d6d0c2] leading-relaxed text-[17px] max-w-[62ch]">{card.body}</p>
         {card.diagram && (
-          <div className="mt-4 border border-[var(--color-line)] bg-[#080b0f] p-3 overflow-auto" dangerouslySetInnerHTML={{ __html: card.diagram }} />
+          <div className="mt-4 rounded-md border border-[var(--color-rail)] bg-[#0a1624] p-3 overflow-auto" dangerouslySetInnerHTML={{ __html: card.diagram }} />
         )}
         {card.kind === 'animation' && (
-          <div className="mt-4 h-1 bg-[#1e242c] overflow-hidden" aria-hidden>
-            <div className="h-full w-1/3 bg-[var(--color-teal)] animate-[slide_1.8s_ease-in-out_infinite]" style={{ animationName: 'slide' }} />
+          <div className="mt-4 h-1 bg-[var(--color-rail)] rounded-full overflow-hidden" aria-hidden>
+            <div className="h-full w-1/3 rounded-full bg-[var(--color-amber)] animate-[slide_1.8s_ease-in-out_infinite]" style={{ animationName: 'slide' }} />
           </div>
         )}
         <div className="flex gap-2 mt-6">
@@ -57,7 +71,7 @@ export function LessonDeck({ cards, accent = '#2dd4bf' }: { cards: LessonCard[];
             Next card
           </button>
         </div>
-        <p className="text-[10px] text-[var(--color-muted)] mt-3 uppercase tracking-wider">← → to flip</p>
+        <p className="text-xs text-dim mt-3">Tip: use the arrow keys to move between cards.</p>
       </div>
     </div>
   )
