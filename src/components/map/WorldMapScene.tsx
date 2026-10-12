@@ -487,14 +487,14 @@ function Curriculum({ statusMap }: { statusMap: Map<number, Status> }) {
           Find a topic
           <input
             type="search"
-            className="field mt-1 block w-64"
+            className="field mt-1 block w-full sm:w-64"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="e.g. caching, Kafka"
           />
         </label>
       </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
+      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
         {learningRegions.map((r) => {
           const all = orderedTopicsInRegion(r.id)
           const topics = needle ? all.filter((t) => t.title.toLowerCase().includes(needle)) : all
@@ -503,7 +503,7 @@ function Curriculum({ statusMap }: { statusMap: Map<number, Status> }) {
           const mins = all.reduce((a, t) => a + topicMinutes(t.id), 0)
           const color = transitLineColor(r.id as RegionId)
           return (
-            <div key={r.id} className="panel p-4 border-l-[6px]" style={{ borderLeftColor: color }}>
+            <div key={r.id} className="panel min-w-0 p-4 border-l-[6px]" style={{ borderLeftColor: color }}>
               <div className="flex items-baseline justify-between gap-2">
                 <h3 className="font-display font-bold" style={{ color }}>{r.subtitle} line</h3>
                 <span className="text-xs text-dim tabular-nums">{done}/{all.length} cleared · ~{Math.round(mins / 6) / 10} h</span>
