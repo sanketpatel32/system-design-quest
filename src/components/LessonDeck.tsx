@@ -54,7 +54,7 @@ export function LessonDeck({
             Card {index + 1} of {cards.length}
           </span>
           {card.accent && (
-            <span className="text-xs font-extrabold uppercase tracking-wide rounded-full px-3 py-1" style={{ color: accent, background: `${accent}1a` }}>
+            <span className="text-xs font-extrabold uppercase tracking-wide rounded-full px-3 py-1" style={{ color: accent, border: `2px solid ${accent}` }}>
               {card.accent}
             </span>
           )}
