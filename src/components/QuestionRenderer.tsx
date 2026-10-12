@@ -384,7 +384,8 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
                 className="field w-full rounded-r-none !min-h-[60px] !text-2xl font-extrabold tabular-nums"
                 value={typeof answer === 'string' ? answer : ''}
                 onChange={(e) => setAnswer(e.target.value)}
-                placeholder="e.g. 1200"
+                placeholder={`Your answer in ${question.unit}`}
+                aria-label={`Your estimate in ${question.unit}`}
               />
               <span className="grid place-items-center rounded-r-2xl border-2 border-l-0 border-[var(--color-rail)] bg-[var(--color-sky)] px-4 font-extrabold text-[#12749f]">
                 {question.unit}
