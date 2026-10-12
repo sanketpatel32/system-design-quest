@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { ArchNode } from './canvas/ArchNode'
+import { ArchNode, TypeGlyph } from './canvas/ArchNode'
+import { Mascot } from './art/Mascot'
 import {
   ReactFlow,
   Background,
@@ -155,7 +156,7 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
                 className={`palette-btn ${suggestedSet.has(p.type) ? 'palette-btn-suggested' : ''}`}
                 onClick={() => addComponent(p.type)}
               >
-                <span aria-hidden className="text-[var(--color-amber)]">+</span>
+                <TypeGlyph type={p.type} />
                 <span className="sr-only">+ </span>
                 {p.label}
               </button>
@@ -183,7 +184,7 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
           </label>
           <button
             type="button"
-            className="w-full btn-cta !py-1.5 text-sm"
+            className="w-full btn-sky btn-sm"
             disabled={nodes.length < 2}
             onClick={() => connectViaForm(srcRef.current?.value ?? '', tgtRef.current?.value ?? '')}
           >
@@ -191,18 +192,19 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
           </button>
         </div>
       </aside>
-      <div className="boss-flow relative h-[460px] rounded-2xl border border-[var(--color-rail)] overflow-hidden bg-[#f7f5f0]">
+      <div className="boss-flow relative h-[480px] rounded-[20px] border-2 border-[var(--color-rail)] overflow-hidden bg-[#f7f5f0]">
         {nodes.length === 0 && (
           <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center p-6 text-center">
             <div className="max-w-xs">
-              <p className="font-display text-lg font-semibold text-chalk">Empty platform</p>
+              <Mascot mood="think" size={84} className="mx-auto" />
+              <p className="font-display text-lg text-chalk mt-1">Empty canvas</p>
               <p className="text-sm text-dim mt-1">Add components from the palette, then drag them into place. Start where the request starts: the client.</p>
             </div>
           </div>
         )}
         {nodes.length >= 2 && edges.length === 0 && (
-          <p className="pointer-events-none absolute left-3 top-3 z-10 rounded-2xl bg-[var(--color-ink)]/90 px-3 py-1.5 text-xs text-chalk">
-            Drag from a right-hand amber dot to another node to wire requests, or use Connect.
+          <p className="pointer-events-none absolute left-3 top-3 z-10 rounded-2xl border-2 border-[var(--color-rail)] bg-white px-3 py-1.5 text-sm font-bold text-chalk">
+            Drag from a node’s right-hand dot to another node to wire requests, or use Connect.
           </p>
         )}
         <ReactFlow
@@ -212,7 +214,7 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
-          colorMode="dark"
+          colorMode="light"
           fitView
           fitViewOptions={{ maxZoom: 1.1, padding: 0.3 }}
           defaultEdgeOptions={{ style: { stroke: '#8AA0B8', strokeWidth: 3 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#8AA0B8' } }}
