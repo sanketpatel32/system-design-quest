@@ -44,3 +44,39 @@ export function checkDepth(topics) {
   }
   return errors
 }
+
+export const MIN_BOSS_BRIEF_WORDS = 300
+
+export function bossDeepWords(b) {
+  if (!b) return 0
+  const r = b.requirements
+  return (
+    wc(b.pitch) + [...r.functional, ...r.nonFunctional, ...r.outOfScope].reduce((n, s) => n + wc(s), 0) +
+    [...b.capacity.assumptions, ...b.capacity.steps, b.capacity.result].reduce((n, s) => n + wc(s), 0) +
+    b.architecture.steps.reduce((n, s) => n + wc(s), 0) +
+    b.deepDives.reduce((n, d) => n + wc(d.title) + wc(d.body), 0) +
+    b.rubric.reduce((n, s) => n + wc(s), 0)
+  )
+}
+
+/** Every boss needs a full study brief, and its brief card must describe the boss it is attached to. */
+export function checkBossDepth(topics) {
+  const errors = []
+  for (const t of topics) {
+    if (t.kind !== 'boss') continue
+    const b = t.bossDeep
+    if (!b) { errors.push(`Boss ${t.id}: missing study brief`); continue }
+    const need = (ok, what) => { if (!ok) errors.push(`Boss ${t.id}: brief ${what}`) }
+    need(b.requirements?.functional?.length >= 2 && b.requirements?.nonFunctional?.length >= 2, 'needs 2+ functional and 2+ non-functional requirements')
+    need(b.capacity?.steps?.length >= 4 && b.capacity?.result, 'capacity maths needs 4+ steps and a result')
+    need(b.architecture?.steps?.length >= 4 && b.architecture?.diagram, 'reference architecture needs 4+ steps and a diagram')
+    need(b.deepDives?.length >= 2, 'needs 2+ deep dives')
+    need(b.rubric?.length >= 3, 'needs a rubric hint with 3+ points')
+    const w = bossDeepWords(b)
+    need(w >= MIN_BOSS_BRIEF_WORDS, `has ${w} words (min ${MIN_BOSS_BRIEF_WORDS})`)
+    const brief = t.cards.find((c) => c.id.endsWith('-c1'))?.body ?? ''
+    const f0 = (t.boss?.functionalRequirements?.[0] ?? '').toLowerCase()
+    need(brief.toLowerCase().includes(f0) && brief.includes(t.title), 'card c1 must name this boss and its first functional requirement')
+  }
+  return errors
+}

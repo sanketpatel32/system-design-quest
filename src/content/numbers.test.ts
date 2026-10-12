@@ -28,6 +28,10 @@ function texts(): { where: string; text: string }[] {
       const d = t.deep
       ;[...d.mechanism.steps, ...d.numbers.assumptions, ...d.numbers.steps, d.numbers.result, d.india.body, ...d.pitfalls.flatMap((p) => [p.trap, p.say]), ...d.takeaways, ...d.tradeoffs.rows.flat()].forEach((x, i) => push(`deep ${i}`, x))
     }
+    if (t.bossDeep) {
+      const b = t.bossDeep
+      ;[b.pitch, ...b.capacity.assumptions, ...b.capacity.steps, b.capacity.result, ...b.architecture.steps, ...b.deepDives.map((d) => d.body), ...b.rubric].forEach((x, i) => push(`boss brief ${i}`, x))
+    }
   }
   return out
 }

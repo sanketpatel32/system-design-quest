@@ -1,0 +1,2469 @@
+{
+ "75": {
+  "pitch": "A short-link service for SMS links sent by Indian banks and shopping apps, where a 160-character SMS cannot fit a long tracking URL.",
+  "requirements": {
+   "functional": [
+    "Create short link from long URL",
+    "Redirect short link to original",
+    "Optional custom alias & expiry"
+   ],
+   "nonFunctional": [
+    "Redirect p99 < 50 ms",
+    "100:1 read/write",
+    "Links never collide"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "50 million daily users, about 2 redirects each per day",
+    "Peak is 5× the daily average",
+    "New links: 1% of redirects, about 1 million per day",
+    "About 500 bytes per stored link"
+   ],
+   "steps": [
+    "Daily redirects = 50,000,000 × 2 = 100,000,000.",
+    "Average = 100,000,000 ÷ 86,400 ≈ 1,160 per second.",
+    "Peak ≈ 1,160 × 5 ≈ 5,800 redirects per second (the quiz target is about 5,800).",
+    "Links per year = 1,000,000 × 365 = 365,000,000.",
+    "Storage per year = 365,000,000 × 500 bytes = 182,500,000,000 bytes, about 183 GB, which a sharded key-value store holds easily.",
+    "7 base62 characters give 62 to the power 7 ≈ 3.5 trillion ids, enough for thousands of years at this rate."
+   ],
+   "result": "About 5,800 redirects per second at peak and under 200 GB of new links per year: the problem is read latency and caching, not storage."
+  },
+  "architecture": {
+   "steps": [
+    "Create: POST /v1/links with the long URL (and Idempotency-Key). The service takes an id from a Snowflake-style generator or a pre-allocated counter range and encodes it in base62.",
+    "Store short_code → long URL, owner, expiry in a key-value store (DynamoDB or Cassandra) partitioned by short_code.",
+    "Redirect: GET /{code} hits a CDN or edge first; on miss, the service reads Redis, then the store, and returns 302 (or 301 if analytics are not needed).",
+    "Click analytics are emitted to a queue and aggregated asynchronously, so redirects never wait on analytics writes.",
+    "Expired or abusive links are blocked by a flag checked at redirect time; a malware-scanning worker checks new long URLs."
+   ],
+   "diagram": "client -> CDN/edge -> redirect svc -> Redis -> KV store (code -> url)\ncreate -> id generator (base62) -> KV store\nredirect -> queue -> analytics workers"
+  },
+  "deepDives": [
+   {
+    "title": "Id generation",
+    "body": "Hashing the long URL and truncating causes collisions that need retries; a counter or Snowflake id encoded in base62 never collides. Counters can be handed out in ranges of, say, 10,000 per server so no request waits on a central database."
+   },
+   {
+    "title": "301 versus 302",
+    "body": "301 is cached by browsers, which cuts load but hides repeat clicks from analytics and makes link edits sticky; 302 keeps every click visible. Banks sending OTP-adjacent links usually prefer 302 plus edge caching with a short TTL."
+   }
+  ],
+  "rubric": [
+   "States read-heavy ratio (100:1) and puts a cache or CDN in front of the store.",
+   "Uses a collision-free id scheme and explains code length from 62 to the power 7.",
+   "Makes analytics asynchronous so redirects stay under 50 ms.",
+   "Covers expiry, abuse scanning and idempotent link creation."
+  ]
+ },
+ "76": {
+  "pitch": "Share code snippets and logs between developers, with expiry, like Pastebin or a GitHub gist.",
+  "requirements": {
+   "functional": [
+    "Create a paste",
+    "Read a paste by ID",
+    "Expire pastes"
+   ],
+   "nonFunctional": [
+    "Reads p99 < 100 ms",
+    "Durable storage",
+    "Read-heavy"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "5 million daily users, about 3 reads each per day",
+    "Peak is 3× the daily average",
+    "New pastes: 500,000 per day, average 10 KB",
+    "Default expiry 30 days"
+   ],
+   "steps": [
+    "Daily reads = 5,000,000 × 3 = 15,000,000.",
+    "Average = 15,000,000 ÷ 86,400 ≈ 174 per second.",
+    "Peak ≈ 174 × 3 ≈ 520 reads per second (the quiz target is about 520).",
+    "New content per day = 500,000 × 10 KB = 5,000,000 KB, about 5 GB.",
+    "With 30-day expiry, steady-state storage is about 5 GB × 30 = 150 GB of paste content, plus small metadata rows.",
+    "Reads at about 520 per second peak are easily served from a cache and CDN for public pastes."
+   ],
+   "result": "About 520 reads per second and roughly 150 GB of live content: a modest system where object storage plus a cache is plenty."
+  },
+  "architecture": {
+   "steps": [
+    "POST /v1/pastes stores the text in object storage under a random key and writes metadata (id, owner, size, visibility, expires_at) in SQL.",
+    "Ids are random base62 strings of 8 or more characters so private pastes cannot be guessed by enumeration.",
+    "GET /p/{id} reads metadata (cached in Redis), checks visibility and expiry, then streams content from object storage or a CDN for public pastes.",
+    "A scheduled job deletes expired pastes in batches using an index on expires_at; object storage lifecycle rules can also expire objects by prefix.",
+    "Large pastes are capped (for example 10 MB) and syntax highlighting is done on the client."
+   ],
+   "diagram": "client -> CDN -> paste svc -> Redis (metadata) -> SQL (metadata)\n                     \\-> object storage (content)\ncron: delete where expires_at < now"
+  },
+  "deepDives": [
+   {
+    "title": "Content in the database or object storage?",
+    "body": "Small pastes could live in SQL, but object storage keeps the database small, makes backups fast and lets a CDN serve public pastes directly; metadata stays in SQL for queries by owner and expiry."
+   },
+   {
+    "title": "Unguessable ids",
+    "body": "Sequential ids let anyone scrape private pastes; random ids from a large space (62 to the power 8 ≈ 218 trillion) make guessing impractical."
+   }
+  ],
+  "rubric": [
+   "Separates metadata (SQL) from content (object storage).",
+   "Uses unguessable ids and checks visibility on read.",
+   "Handles expiry with an indexed cleanup job or lifecycle rules.",
+   "Caches hot pastes and puts public ones behind a CDN."
+  ]
+ },
+ "77": {
+  "pitch": "Protect the OTP and login APIs of a fintech from abuse, shared across every API server.",
+  "requirements": {
+   "functional": [
+    "Limit requests per user/IP/key",
+    "Return 429 with retry hint",
+    "Configurable rules"
+   ],
+   "nonFunctional": [
+    "Adds < 5 ms latency",
+    "Highly available",
+    "Shared across instances"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "20 million daily users, about 20 API calls each per day",
+    "Peak is 5× the daily average",
+    "Each check is one Redis round trip of about 0.5 ms in-zone",
+    "One Redis shard handles about 100,000 simple operations per second (illustrative)"
+   ],
+   "steps": [
+    "Daily API calls = 20,000,000 × 20 = 400,000,000.",
+    "Average = 400,000,000 ÷ 86,400 ≈ 4,630 per second.",
+    "Peak ≈ 4,630 × 5 ≈ 23,000 API calls per second (the quiz target is about 23,000).",
+    "Redis shards needed at peak = 23,000 ÷ 100,000, well under 1, so one primary with a replica works, and 3 shards give headroom and isolation.",
+    "Added latency per request ≈ 0.5 ms network plus script time, inside the 5 ms budget.",
+    "Rule config (limits per endpoint and tier) is small and cached in each gateway instance, refreshed every few seconds."
+   ],
+   "result": "About 23,000 checks per second fit a small Redis cluster; the design challenge is atomicity, fairness of keys and failure behaviour."
+  },
+  "architecture": {
+   "steps": [
+    "The API gateway calls the limiter before routing each request, with keys such as user id, phone number, API key and IP range.",
+    "The limiter runs a Lua script in Redis that refills and takes a token atomically (token bucket), so concurrent servers cannot both take the last token.",
+    "If the bucket is empty, the gateway returns 429 Too Many Requests with a Retry-After header and RateLimit headers.",
+    "Rules are stored in a config service and pushed to gateways; changes take effect without deploys.",
+    "If Redis is unavailable, the gateway falls back to a conservative local in-memory limit per instance (fail open with a cap) for most APIs, and fails closed for OTP sends."
+   ],
+   "diagram": "client -> gateway -> limiter (Lua token bucket in Redis, keyed by user/phone/IP)\n   allowed -> service | denied -> 429 + Retry-After\nconfig svc -> gateways (rules)"
+  },
+  "deepDives": [
+   {
+    "title": "Fail open or fail closed?",
+    "body": "Failing closed during a Redis outage blocks every login; failing open lets attackers through. A per-instance local limit is a middle path: approximate, but bounded."
+   },
+   {
+    "title": "Choosing keys",
+    "body": "Indian mobile carriers put many users behind shared IPs, so per-phone and per-user limits are primary and IP limits are loose, catching only obvious floods."
+   }
+  ],
+  "rubric": [
+   "Uses an atomic token bucket or sliding window in a shared store.",
+   "Returns 429 with Retry-After and explains limit keys.",
+   "Keeps added latency within a few milliseconds.",
+   "States behaviour when the limiter store is down."
+  ]
+ },
+ "78": {
+  "pitch": "Generate unique, roughly time-sortable 64-bit ids for orders, messages and payments across data centres.",
+  "requirements": {
+   "functional": [
+    "Generate unique 64-bit IDs on demand",
+    "IDs roughly sortable by time",
+    "Work across many data centres"
+   ],
+   "nonFunctional": [
+    "Under 1 ms per ID",
+    "No duplicates, ever",
+    "No single point of failure"
+   ],
+   "outOfScope": [
+    "Human-readable vanity IDs",
+    "Cryptographic secrecy of IDs"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "About 1 billion IDs per day",
+    "Peak is 3× the daily average",
+    "Snowflake layout: 41-bit milliseconds, 10-bit worker id, 12-bit sequence"
+   ],
+   "steps": [
+    "Average = 1,000,000,000 ÷ 86,400 ≈ 11,600 per second.",
+    "Peak ≈ 11,600 × 3 ≈ 35,000 IDs per second (the quiz target is about 35,000).",
+    "One worker can issue 4,096 ids per millisecond, about 4,096,000 per second.",
+    "Peak demand of about 35,000 per second needs only one worker in theory; run several per data centre for availability.",
+    "10 worker bits allow 1,024 workers, for example 5 bits of data centre and 5 bits of machine."
+   ],
+   "result": "About 35,000 ids per second at peak is tiny compared with one Snowflake worker's 4 million per second; the real requirements are uniqueness and no single point of failure."
+  },
+  "architecture": {
+   "steps": [
+    "Each generator process gets a unique worker id at start-up, leased from ZooKeeper or etcd, or assigned by deployment config.",
+    "To generate: read the clock in milliseconds; if it equals the last timestamp, increment the sequence, otherwise reset it to 0; if the sequence overflows, wait for the next millisecond.",
+    "Compose the id from the timestamp shifted left 22 bits, the worker id shifted left 12, and the sequence.",
+    "Services usually embed the generator as a library, so there is no network call; a small id service is an alternative for languages without the library.",
+    "If the clock goes backwards, refuse or wait until it passes the last timestamp, and alert."
+   ],
+   "diagram": "service --(library)--> [ timestamp | worker id | sequence ] -> 64-bit id\nworker id lease <- etcd/ZooKeeper (unique per process)"
+  },
+  "deepDives": [
+   {
+    "title": "Clock skew",
+    "body": "NTP corrections can move clocks backwards; issuing ids then could repeat a timestamp with a reused sequence. Waiting or failing fast is safer than risking a duplicate."
+   },
+   {
+    "title": "Alternatives",
+    "body": "UUIDv4 needs no coordination but is 128 bits and random, which hurts B-tree locality; UUIDv7 is time-ordered and standard; database ranges (ticket servers) are simple but depend on a central database."
+   }
+  ],
+  "rubric": [
+   "Explains the bit layout and its capacity.",
+   "Guarantees unique worker ids through a lease or config.",
+   "Handles clock rollback explicitly.",
+   "Avoids a central bottleneck on the hot path."
+  ]
+ },
+ "79": {
+  "pitch": "Design a Dynamo-style distributed key-value store with tunable consistency.",
+  "requirements": {
+   "functional": [
+    "put(key, value)",
+    "get(key)",
+    "Scale horizontally"
+   ],
+   "nonFunctional": [
+    "Highly available",
+    "Tunable consistency",
+    "Low latency"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "10 million daily users, about 50 operations each per day",
+    "Peak is 3× the daily average",
+    "Average value 1 KB, 1 billion keys",
+    "Replication factor 3"
+   ],
+   "steps": [
+    "Daily operations = 10,000,000 × 50 = 500,000,000.",
+    "Average = 500,000,000 ÷ 86,400 ≈ 5,790 per second.",
+    "Peak ≈ 5,790 × 3 ≈ 17,000 operations per second (the quiz target is about 17,000).",
+    "Raw data = 1,000,000,000 × 1 KB = 1,000,000,000 KB, about 1 TB.",
+    "With 3 replicas that is about 3 TB, for example 12 nodes holding about 250 GB each.",
+    "Peak of about 17,000 operations per second spread over 12 nodes is about 1,400 per node, comfortable for an LSM-based node."
+   ],
+   "result": "About 17,000 operations per second and 3 TB of replicated data: a dozen nodes, with the design effort in partitioning, replication and repair."
+  },
+  "architecture": {
+   "steps": [
+    "Partition keys with consistent hashing and virtual nodes; each key lives on the next N = 3 distinct nodes on the ring.",
+    "Any node can coordinate a request: writes go to all 3 replicas and succeed after W acknowledgements; reads ask R replicas (QUORUM: R = 2, W = 2).",
+    "Each node stores data in an LSM tree (commit log, memtable, SSTables) for fast writes.",
+    "Conflicts are detected with version vectors or resolved with last-writer-wins timestamps, chosen per use case.",
+    "Repair with hinted handoff for briefly down nodes, read repair on reads, and Merkle-tree anti-entropy in the background; gossip spreads membership."
+   ],
+   "diagram": "client -> any node (coordinator) -> hash(key) on ring -> replicas A, B, C\n W=2 acks -> ok   |   R=2 replies -> newest wins -> read repair\n gossip membership | hinted handoff | Merkle anti-entropy"
+  },
+  "deepDives": [
+   {
+    "title": "Tuning R and W",
+    "body": "R + W > N gives overlapping quorums; R = 1, W = 1 favours latency; per-request levels let a shopping cart use ONE while an account setting uses QUORUM."
+   },
+   {
+    "title": "Hot keys",
+    "body": "Consistent hashing spreads keys, not load; a hot key needs caching in front, read replicas or splitting the key."
+   }
+  ],
+  "rubric": [
+   "Uses consistent hashing with virtual nodes.",
+   "Explains N, R, W and quorum overlap.",
+   "Names a conflict-resolution strategy.",
+   "Covers repair: hinted handoff, read repair, anti-entropy."
+  ]
+ },
+ "80": {
+  "pitch": "Build a Redis- or Memcached-like distributed cache cluster that application servers share.",
+  "requirements": {
+   "functional": [
+    "get/set with TTL",
+    "Eviction",
+    "Scale nodes"
+   ],
+   "nonFunctional": [
+    "Sub-ms latency",
+    "Survive node loss",
+    "Even load"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "10 million daily users, about 100 cache ops each per day",
+    "Peak is 3× the daily average",
+    "Hot working set 200 GB, about 64 GB of usable RAM per node",
+    "Each node serves about 100,000 operations per second"
+   ],
+   "steps": [
+    "Daily cache ops = 10,000,000 × 100 = 1,000,000,000.",
+    "Average = 1,000,000,000 ÷ 86,400 ≈ 11,600 per second.",
+    "Peak ≈ 11,600 × 3 ≈ 35,000 cache ops per second (the quiz target is about 35,000).",
+    "Nodes for memory = 200 ÷ 64 ≈ 3.1, so 4 primaries, plus one replica each, giving 8 nodes.",
+    "Throughput need at peak ≈ 35,000 ÷ 4 primaries ≈ 8,750 per primary, far below capacity.",
+    "Memory, not throughput, decides the node count here."
+   ],
+   "result": "About 35,000 cache operations per second fits easily; the cluster is sized by memory (about 200 GB), giving 4 primaries plus replicas."
+  },
+  "architecture": {
+   "steps": [
+    "Clients hash each key onto a consistent-hashing ring with virtual nodes (or Redis Cluster's 16,384 hash slots) to find the owning node.",
+    "Each node stores keys in memory with a TTL and evicts with approximate LRU or LFU when memory is full.",
+    "Each primary has a replica; on primary failure, the replica is promoted by the cluster or a sentinel quorum.",
+    "Hot keys are replicated to several nodes or cached briefly in the application process to spread load.",
+    "Adding a node moves only its share of keys; warming is gradual, and TTL jitter prevents mass expiry."
+   ],
+   "diagram": "app (client lib: hash ring) -> node A (primary) -> replica A'\n                           -> node B (primary) -> replica B'\n miss -> DB -> set with TTL+jitter"
+  },
+  "deepDives": [
+   {
+    "title": "Eviction policy",
+    "body": "LRU suits recency-driven access such as sessions; LFU protects steadily popular items from being pushed out by one-off scans."
+   },
+   {
+    "title": "Node loss",
+    "body": "Losing a primary without a replica sends its share of keys to the database at once; replicas, request coalescing and circuit breakers keep the database safe."
+   }
+  ],
+  "rubric": [
+   "Partitions keys with consistent hashing or hash slots.",
+   "Sizes nodes by memory and throughput.",
+   "Explains eviction and TTL jitter.",
+   "Handles node failure and hot keys."
+  ]
+ },
+ "81": {
+  "pitch": "Send push, SMS and email for an e-commerce app, including sale-time spikes.",
+  "requirements": {
+   "functional": [
+    "Send push/SMS/email",
+    "User preferences & opt-out",
+    "Retry failed deliveries"
+   ],
+   "nonFunctional": [
+    "At-least-once delivery",
+    "Handle 10× sale spikes",
+    "Do not spam users"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "100 million daily users, about 3 notifications each per day",
+    "Peak is 10× the daily average",
+    "Message payload about 1 KB",
+    "SMS is the most expensive channel; push is nearly free"
+   ],
+   "steps": [
+    "Daily notifications = 100,000,000 × 3 = 300,000,000.",
+    "Average = 300,000,000 ÷ 86,400 ≈ 3,470 per second.",
+    "Peak ≈ 3,470 × 10 ≈ 35,000 notifications per second (the quiz target is about 35,000).",
+    "Daily notifications = 300,000,000 at about 1 KB each, roughly 300 GB of queue traffic per day.",
+    "A 10× sale spike means about 35,000 per second, beyond what many SMS providers accept per account, so channels need their own rate-limited queues.",
+    "If 5% of notifications are SMS, that is 15,000,000 SMS per day, a real cost line that preference checks and dedup reduce."
+   ],
+   "result": "About 35,000 notifications per second at sale peak: the design must buffer, rate-limit per channel and deduplicate."
+  },
+  "architecture": {
+   "steps": [
+    "Product services publish notification events (user, template, data, idempotency key) to a queue instead of calling providers.",
+    "A notification service checks user preferences, opt-outs, quiet hours and frequency caps, renders the template and picks channels.",
+    "Per-channel queues feed workers for push (APNs, FCM), SMS (DLT-registered templates in India) and email, each rate-limited to the provider's limits.",
+    "Failures retry with exponential backoff; permanent failures and invalid tokens go to a DLQ and update the user's device records.",
+    "Delivery status and clicks are recorded for analytics and to suppress duplicates within a time window."
+   ],
+   "diagram": "services -> event queue -> notification svc (prefs, caps, templates)\n   -> push queue -> FCM/APNs workers\n   -> SMS queue  -> SMS provider workers (rate-limited)\n   -> email queue -> email workers        failures -> retry/DLQ"
+  },
+  "deepDives": [
+   {
+    "title": "Not spamming users",
+    "body": "Frequency caps per user per day, dedup by idempotency key and quiet hours (no promotional pushes at 2 AM) matter as much as throughput."
+   },
+   {
+    "title": "Spikes",
+    "body": "Queues absorb the burst; promotional sends are scheduled and spread over minutes, while transactional ones (order confirmed, OTP) use a separate high-priority queue."
+   }
+  ],
+  "rubric": [
+   "Decouples producers with a queue.",
+   "Separates transactional and promotional priorities.",
+   "Rate-limits per provider and retries with a DLQ.",
+   "Applies preferences, opt-outs and dedup."
+  ]
+ },
+ "82": {
+  "pitch": "An Instagram- or ShareChat-style home feed: post, follow, and read a ranked feed.",
+  "requirements": {
+   "functional": [
+    "Post content",
+    "See ranked feed of followed users",
+    "Like and comment"
+   ],
+   "nonFunctional": [
+    "Feed load < 300 ms",
+    "Eventual consistency ok",
+    "Celebrity fan-out"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "200 million daily users, about 20 feed reads each per day",
+    "Peak is 3× the daily average",
+    "Posts: 20,000,000 per day; average 200 followers per poster",
+    "Feed cache holds the latest 500 post ids per user, 8 bytes each"
+   ],
+   "steps": [
+    "Daily feed reads = 200,000,000 × 20 = 4,000,000,000.",
+    "Average = 4,000,000,000 ÷ 86,400 ≈ 46,300 per second.",
+    "Peak ≈ 46,300 × 3 ≈ 140,000 feed reads per second (the quiz target is about 140,000).",
+    "Fan-out writes per day = 20,000,000 × 200 = 4,000,000,000, about 46,000 per second on average.",
+    "Feed cache per user = 500 × 8 bytes = 4,000 bytes; for 200,000,000 users that is 800,000,000,000 bytes, about 800 GB of Redis across a cluster.",
+    "Reads at about 140,000 per second are served from that cache, not the posts database."
+   ],
+   "result": "About 140,000 feed reads per second with billions of fan-out writes a day: precompute feeds in a cache and treat celebrities separately."
+  },
+  "architecture": {
+   "steps": [
+    "Posting writes the post to the posts store and emits an event.",
+    "Fan-out workers push the post id into each follower's feed list in Redis, for accounts below a follower threshold.",
+    "For celebrity accounts, posts are not pushed; the feed service fetches their recent posts at read time and merges.",
+    "A ranking step scores the merged candidates (recency, affinity, engagement) before returning a page with a cursor.",
+    "Likes and comments are counted asynchronously with sharded counters; the feed shows slightly stale counts."
+   ],
+   "diagram": "post -> posts DB -> event -> fan-out workers -> follower feed lists (Redis)\nread feed -> feed svc -> Redis list + celebrity posts -> rank -> page (cursor)"
+  },
+  "deepDives": [
+   {
+    "title": "Push, pull or hybrid",
+    "body": "Push makes reads cheap but celebrity posts cost millions of writes; pull makes writes cheap but reads slow; hybrid gets both for most users."
+   },
+   {
+    "title": "Inactive users",
+    "body": "Skipping fan-out for users inactive for 30 days saves a large share of writes; their feed is rebuilt on next login."
+   }
+  ],
+  "rubric": [
+   "Chooses hybrid fan-out with a celebrity threshold.",
+   "Sizes the feed cache.",
+   "Uses cursor pagination and a ranking step.",
+   "Keeps counters and ranking asynchronous and eventually consistent."
+  ]
+ },
+ "83": {
+  "pitch": "Twitter or X: post short messages, follow users and read a home timeline.",
+  "requirements": {
+   "functional": [
+    "Post a short tweet",
+    "Follow other users",
+    "Read a home timeline"
+   ],
+   "nonFunctional": [
+    "Timeline loads in under 200 ms",
+    "Highly available reads",
+    "Eventual consistency is fine for timelines"
+   ],
+   "outOfScope": [
+    "Ads ranking",
+    "Direct messages"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "200 million daily users, about 50 timeline reads each per day",
+    "Peak is 3× the daily average",
+    "Tweets: 500,000,000 per day at about 300 bytes with metadata",
+    "Average 200 followers"
+   ],
+   "steps": [
+    "Daily timeline reads = 200,000,000 × 50 = 10,000,000,000.",
+    "Average = 10,000,000,000 ÷ 86,400 ≈ 116,000 per second.",
+    "Peak ≈ 116,000 × 3 ≈ 350,000 timeline reads per second (the quiz target is about 350,000).",
+    "Tweet storage per day = 500,000,000 × 300 bytes = 150,000,000,000 bytes, about 150 GB, or about 55 TB a year.",
+    "Fan-out writes per day = 500,000,000 × 200 = 100,000,000,000, about 1.16 million per second on average: push for everyone is very expensive.",
+    "Timeline reads of about 350,000 per second must come from precomputed caches."
+   ],
+   "result": "About 350,000 timeline reads per second and around a million fan-out writes per second: the hybrid timeline is mandatory."
+  },
+  "architecture": {
+   "steps": [
+    "Tweets are stored in a sharded store keyed by tweet id (Snowflake, time-ordered), with a user_id → tweet ids index.",
+    "Fan-out on write inserts tweet ids into followers' timeline caches for ordinary accounts.",
+    "Celebrity tweets are merged at read time from a small per-celebrity recent list.",
+    "Timeline service reads the cached list, merges celebrity tweets, hydrates tweet bodies from a tweet cache and returns a cursor page.",
+    "Search and trends consume the tweet stream separately through Kafka."
+   ],
+   "diagram": "tweet -> tweet store (Snowflake id) -> Kafka -> fan-out -> timeline caches\nread -> timeline svc -> cache + celebrity merge -> hydrate -> page\nKafka -> search indexer, trends"
+  },
+  "deepDives": [
+   {
+    "title": "Timeline cache size",
+    "body": "Keeping only the latest 800 ids per active user bounds memory; older history is fetched from storage on deep scroll."
+   },
+   {
+    "title": "Consistency",
+    "body": "Timelines are eventually consistent: a tweet may appear seconds later for some followers, which is acceptable; the author sees their own tweet immediately via read-your-writes."
+   }
+  ],
+  "rubric": [
+   "Computes fan-out cost and justifies hybrid.",
+   "Uses time-ordered ids and cursor pagination.",
+   "Separates storage, timeline cache and hydration.",
+   "Covers read-your-writes for the author."
+  ]
+ },
+ "84": {
+  "pitch": "One-to-one and group messaging used across India, with receipts and offline delivery.",
+  "requirements": {
+   "functional": [
+    "Send 1:1 messages",
+    "Group chats",
+    "Delivery/read receipts"
+   ],
+   "nonFunctional": [
+    "Low latency",
+    "Messages never lost",
+    "Offline delivery"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "500 million daily users, about 40 messages each per day",
+    "Peak is 3× the daily average",
+    "Average message 100 bytes",
+    "Messages kept on the server until delivered, then for 30 days for multi-device sync"
+   ],
+   "steps": [
+    "Daily messages = 500,000,000 × 40 = 20,000,000,000.",
+    "Average = 20,000,000,000 ÷ 86,400 ≈ 231,000 per second.",
+    "Peak ≈ 231,000 × 3 ≈ 690,000 messages per second (the quiz target is about 690,000).",
+    "Daily messages = 20,000,000,000; storage per day = 20,000,000,000 × 100 bytes = 2,000,000,000,000 bytes, about 2 TB.",
+    "Peak of about 690,000 messages per second needs many WebSocket gateways: at 100,000 connections each, 500 million users online at once would need 5,000 gateways.",
+    "30 days of messages is about 60 TB, stored in a wide-column store partitioned by conversation and time."
+   ],
+   "result": "About 690,000 messages per second and around 2 TB a day: persistent connections, partitioned storage and per-conversation ordering."
+  },
+  "architecture": {
+   "steps": [
+    "Clients keep a WebSocket (or MQTT) connection to a gateway; a session registry maps user → gateway.",
+    "Send: the sender's gateway passes the message to the chat service, which assigns a per-conversation sequence number and stores it in Cassandra-style storage keyed by (conversation, time bucket).",
+    "The chat service looks up the recipient's gateway and pushes the message; if offline, it stays queued and a push notification is sent.",
+    "Receipts (delivered, read) are small messages flowing back the same way.",
+    "Groups fan out per member; large groups use a group service that writes once and lets members pull."
+   ],
+   "diagram": "A -> gateway 1 -> chat svc (seq, store) -> registry: B on gateway 7 -> gateway 7 -> B\n B offline -> stored + push notification -> delivered on reconnect -> receipt back to A"
+  },
+  "deepDives": [
+   {
+    "title": "Ordering and duplicates",
+    "body": "Per-conversation sequence numbers give order; client-generated message ids let the server and receivers drop retried duplicates."
+   },
+   {
+    "title": "End-to-end encryption",
+    "body": "With end-to-end encryption, as WhatsApp publicly describes using the Signal protocol, the server stores only ciphertext, so search and moderation must happen on devices."
+   }
+  ],
+  "rubric": [
+   "Uses persistent connections and a session registry.",
+   "Stores messages until delivered, with per-conversation order.",
+   "Handles offline users with push notifications.",
+   "Covers receipts, retries and dedup by message id."
+  ]
+ },
+ "85": {
+  "pitch": "Instagram: upload photos, follow users and view a feed of images.",
+  "requirements": {
+   "functional": [
+    "Upload photos",
+    "Follow users",
+    "View feed"
+   ],
+   "nonFunctional": [
+    "Read-heavy",
+    "Durable media",
+    "Feed < 300 ms"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "100 million daily users, about 15 photo views each per day",
+    "Peak is 3× the daily average",
+    "Uploads: 10,000,000 photos per day at 2 MB original, plus 3 resized versions adding about 1 MB",
+    "Average photo view served at about 200 KB"
+   ],
+   "steps": [
+    "Daily photo views = 100,000,000 × 15 = 1,500,000,000.",
+    "Average = 1,500,000,000 ÷ 86,400 ≈ 17,400 per second.",
+    "Peak ≈ 17,400 × 3 ≈ 52,000 photo views per second (the quiz target is about 52,000).",
+    "Storage per day = 10,000,000 × 3 MB = 30,000,000 MB, about 30 TB, roughly 11 PB per year.",
+    "Peak egress = 52,000 views per second × 200 KB = 10,400,000 KB per second, about 10.4 GB per second, around 83 Gbit per second, which must come from a CDN.",
+    "Metadata (who posted, captions, likes) is small and lives in a sharded database."
+   ],
+   "result": "About 52,000 photo views per second and 30 TB of new media a day: object storage plus CDN for bytes, a feed cache for ids."
+  },
+  "architecture": {
+   "steps": [
+    "Upload: the client gets a presigned URL and uploads the original straight to object storage; a metadata row is created as pending.",
+    "Workers create resized versions and thumbnails, strip location metadata if needed and mark the photo ready.",
+    "Feed: follower feeds are precomputed with hybrid fan-out of photo ids.",
+    "Display: the app requests the feed page (ids and metadata) and loads images from CDN URLs at the right size for the screen.",
+    "Likes and comments use sharded counters and a separate comments store."
+   ],
+   "diagram": "app --presigned PUT--> object storage --event--> resize workers -> CDN\napp -> feed svc -> feed cache (ids) -> metadata DB\napp <- images from CDN edge"
+  },
+  "deepDives": [
+   {
+    "title": "CDN and image sizes",
+    "body": "Serving a 200 KB variant instead of the 2 MB original cuts bandwidth ten times; WebP or AVIF formats save more."
+   },
+   {
+    "title": "Hot photos",
+    "body": "A celebrity photo is requested millions of times; the CDN absorbs it, and origin shielding stops thousands of edges from hitting storage at once."
+   }
+  ],
+  "rubric": [
+   "Uploads directly to object storage via presigned URLs.",
+   "Processes images asynchronously into multiple sizes.",
+   "Serves media from a CDN and computes the egress.",
+   "Feeds hold ids; metadata and media are fetched separately."
+  ]
+ },
+ "86": {
+  "pitch": "YouTube-style video: upload, transcode, and an infinite feed of videos to watch.",
+  "requirements": {
+   "functional": [
+    "Upload video",
+    "Infinite scroll feed",
+    "Like & share"
+   ],
+   "nonFunctional": [
+    "Fast start on 4G",
+    "Massive storage",
+    "Personalised"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "100 million daily users, about 50 video views each per day",
+    "Peak is 3× the daily average",
+    "Uploads: 500,000 videos per day, average 100 MB original",
+    "Transcoded ladder of renditions adds about 1.5× the original size"
+   ],
+   "steps": [
+    "Daily video views = 100,000,000 × 50 = 5,000,000,000.",
+    "Average = 5,000,000,000 ÷ 86,400 ≈ 57,900 per second.",
+    "Peak ≈ 57,900 × 3 ≈ 170,000 video views per second (the quiz target is about 170,000).",
+    "Original storage per day = 500,000 × 100 MB = 50,000,000 MB, about 50 TB.",
+    "With renditions, about 50 TB × 2.5 = 125 TB per day, roughly 46 PB per year.",
+    "Video views at about 170,000 per second must be served from CDN edges; the origin should see a tiny fraction."
+   ],
+   "result": "About 170,000 views per second and over 100 TB of new video per day: async transcoding plus CDN delivery is the core."
+  },
+  "architecture": {
+   "steps": [
+    "The client uploads in resumable chunks to object storage via presigned URLs; metadata is created as processing.",
+    "A transcoding pipeline splits the video into segments, encodes each into several resolutions and bitrates in parallel, and packages HLS or DASH manifests.",
+    "Renditions are stored in object storage and distributed via CDN; popular videos are pre-warmed at edges.",
+    "The player picks a bitrate adaptively from measured bandwidth, starting low for a fast start on 4G.",
+    "The feed is generated by a recommendation service; views, likes and watch time stream into analytics."
+   ],
+   "diagram": "upload (chunks) -> object storage -> transcode workers (parallel segments) -> renditions -> CDN\nplayer -> manifest -> segments from CDN (adaptive bitrate)\nfeed -> recommendations -> metadata"
+  },
+  "deepDives": [
+   {
+    "title": "Parallel transcoding",
+    "body": "Splitting a video into segments and encoding them in parallel turns an hour of encoding into minutes, at the cost of orchestration."
+   },
+   {
+    "title": "Fast start on 4G",
+    "body": "Start with a low bitrate, short first segments and a CDN edge close to the user, then step up as bandwidth allows."
+   }
+  ],
+  "rubric": [
+   "Uses resumable chunked uploads to object storage.",
+   "Transcodes asynchronously into an adaptive bitrate ladder.",
+   "Serves segments from a CDN and estimates storage growth.",
+   "Separates recommendation and analytics from playback."
+  ]
+ },
+ "87": {
+  "pitch": "Netflix-style streaming: browse a catalogue, stream at adaptive quality and resume where you left off.",
+  "requirements": {
+   "functional": [
+    "Browse the catalogue",
+    "Stream a title at adaptive quality",
+    "Resume where you left off"
+   ],
+   "nonFunctional": [
+    "Playback starts in under 2 s",
+    "Smooth playback on poor mobile networks",
+    "Survive a region outage"
+   ],
+   "outOfScope": [
+    "Live sports",
+    "User-uploaded video"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "50 million daily users, about 20 video segment requests each per day",
+    "Peak is 4× the daily average",
+    "This quiz scenario is deliberately small; real viewing generates hundreds of segment requests per hour watched",
+    "Average segment 1 MB"
+   ],
+   "steps": [
+    "Daily video segment requests = 50,000,000 × 20 = 1,000,000,000.",
+    "Average = 1,000,000,000 ÷ 86,400 ≈ 11,600 per second.",
+    "Peak ≈ 11,600 × 4 ≈ 46,000 video segment requests per second (the quiz target is about 46,000).",
+    "Segment egress at about 46,000 requests per second × 1 MB is about 46,000 MB per second, about 368 Gbit per second.",
+    "Such bandwidth must come from CDN caches inside or near ISPs; Netflix publicly describes its own Open Connect appliances placed in ISP networks.",
+    "Resume points are tiny writes, for example one every 30 seconds per active viewer, stored in a key-value store."
+   ],
+   "result": "About 46,000 segment requests per second already means hundreds of Gbit per second: delivery is a CDN problem, the control plane is ordinary services."
+  },
+  "architecture": {
+   "steps": [
+    "The catalogue and personalised rows are served by stateless services and caches from the control-plane region.",
+    "Pressing play fetches a manifest listing renditions and segment URLs on the nearest CDN or ISP cache.",
+    "The player downloads segments, measuring throughput and switching bitrate to keep the buffer healthy.",
+    "The player reports progress periodically; a key-value store keeps (user, title) → position for resume on any device.",
+    "Control-plane services run in more than one region with failover; content is pre-positioned at edges overnight."
+   ],
+   "diagram": "app -> catalogue/personalisation (control plane, multi-region)\nplay -> manifest -> segments from ISP/edge cache (adaptive)\nprogress -> KV store (user, title) -> resume"
+  },
+  "deepDives": [
+   {
+    "title": "Pre-positioning",
+    "body": "Popular titles are copied to edge caches during off-peak hours, so evening traffic rarely reaches the origin."
+   },
+   {
+    "title": "Region failure",
+    "body": "If a control-plane region fails, traffic shifts to another region; playback from edge caches continues because it does not depend on the failed region."
+   }
+  ],
+  "rubric": [
+   "Separates control plane from data plane (CDN).",
+   "Explains adaptive bitrate and manifests.",
+   "Stores resume points in a fast key-value store.",
+   "Covers multi-region failover for the control plane."
+  ]
+ },
+ "88": {
+  "pitch": "Uber or Ola: match riders with nearby drivers in Indian cities and track trips live.",
+  "requirements": {
+   "functional": [
+    "Request a ride",
+    "Match nearby driver",
+    "Live location tracking"
+   ],
+   "nonFunctional": [
+    "Match < 5 s",
+    "Location updates every 4 s",
+    "No double assignment"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "20 million daily users, about 4 ride requests each per day",
+    "Peak is 4× the daily average",
+    "500,000 online drivers sending a location every 4 seconds"
+   ],
+   "steps": [
+    "Daily ride requests = 20,000,000 × 4 = 80,000,000.",
+    "Average = 80,000,000 ÷ 86,400 ≈ 926 per second.",
+    "Peak ≈ 926 × 4 ≈ 3,700 ride requests per second (the quiz target is about 3,700).",
+    "Location writes = 500,000 ÷ 4 = 125,000 per second, larger than ride requests.",
+    "Each update is about 100 bytes, so about 12.5 MB per second of location ingest.",
+    "Only the latest position matters for matching, so it lives in memory; history goes to a stream for analytics."
+   ],
+   "result": "Ride requests peak around 3,700 per second, but location updates reach about 125,000 per second: the geo index is the hot path."
+  },
+  "architecture": {
+   "steps": [
+    "Drivers stream locations over a persistent connection to location gateways, which update an in-memory geo index (geohash or H3 cell → drivers) partitioned by city.",
+    "A ride request goes to the dispatch service, which reads nearby cells, filters available drivers and ranks by estimated arrival time.",
+    "Dispatch offers the ride to one driver at a time (or a few in sequence) with a short timeout.",
+    "Acceptance uses a conditional write on the ride (status = requested → assigned) so two drivers cannot both get it.",
+    "During the trip, driver locations are forwarded to the rider's app; trip events go to Kafka for billing and analytics."
+   ],
+   "diagram": "driver app -> location gateway -> geo index (city shard, cells) \nrider -> dispatch -> nearby cells -> rank by ETA -> offer -> accept (conditional write)\ntrip events -> Kafka -> billing, analytics"
+  },
+  "deepDives": [
+   {
+    "title": "No double assignment",
+    "body": "A conditional update on the ride row, or a compare-and-set on the driver's status, guarantees one winner even if two acceptances arrive together."
+   },
+   {
+    "title": "Hot zones",
+    "body": "Airports and stations at peak overload a few cells; finer cells and per-zone dispatch partitions keep queries fast."
+   }
+  ],
+  "rubric": [
+   "Identifies location updates as the dominant write load.",
+   "Uses a geo index of cells partitioned by city.",
+   "Prevents double assignment with a conditional write.",
+   "Ranks by ETA, not straight-line distance."
+  ]
+ },
+ "89": {
+  "pitch": "Zomato or Swiggy: browse restaurants, order and pay, and track the delivery rider live.",
+  "requirements": {
+   "functional": [
+    "Browse & search restaurants",
+    "Place order & pay",
+    "Track rider live"
+   ],
+   "nonFunctional": [
+    "Peak at lunch/dinner",
+    "Order state consistent",
+    "ETA accuracy"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "30 million daily users, about 1 orders each per day",
+    "Peak is 6× the daily average",
+    "Menus are read about 50 times per order",
+    "Order record about 2 KB"
+   ],
+   "steps": [
+    "Daily orders = 30,000,000 × 1 = 30,000,000.",
+    "Average = 30,000,000 ÷ 86,400 ≈ 347 per second.",
+    "Peak ≈ 347 × 6 ≈ 2,100 orders per second (the quiz target is about 2,100).",
+    "Daily orders = 30,000,000, so order storage is about 30,000,000 × 2 KB = 60,000,000 KB, about 60 GB per day.",
+    "Menu reads ≈ 50 × 2,100 ≈ 105,000 per second at peak, which must come from cache.",
+    "Rider location updates add a geo workload similar to ride-hailing."
+   ],
+   "result": "About 2,100 orders per second at dinner peak but around 100,000 menu reads per second: cache the catalogue, keep orders transactional."
+  },
+  "architecture": {
+   "steps": [
+    "Restaurant search and menus are served from Elasticsearch and Redis, refreshed by CDC from the restaurant database.",
+    "Placing an order creates it in SQL with an idempotency key and starts a saga: payment, restaurant accept, rider assignment.",
+    "Each saga step has compensation: if the restaurant rejects, refund; if no rider is found, cancel and refund.",
+    "Rider assignment uses a geo index and batching of nearby orders.",
+    "Order status and rider location are pushed to the customer app over a persistent connection; ETA is predicted by a model."
+   ],
+   "diagram": "app -> search/menu (ES + Redis) \norder -> order svc (SQL, idempotency) -> saga: pay -> restaurant accept -> rider assign\nrider pings -> geo index | status -> push to app"
+  },
+  "deepDives": [
+   {
+    "title": "Order state consistency",
+    "body": "An explicit state machine (placed → paid → accepted → picked → delivered) in SQL, changed only by valid transitions, prevents impossible states."
+   },
+   {
+    "title": "Lunch and dinner peaks",
+    "body": "Peaks are predictable, so autoscaling is scheduled ahead, and non-critical work such as review prompts is queued."
+   }
+  ],
+  "rubric": [
+   "Separates read-heavy catalogue from transactional orders.",
+   "Uses a saga with compensations for payment, restaurant and rider.",
+   "Explains rider assignment with a geo index.",
+   "Pushes live status and ETA to the customer."
+  ]
+ },
+ "90": {
+  "pitch": "Google Docs-style collaborative editing with live cursors and version history.",
+  "requirements": {
+   "functional": [
+    "Edit concurrently",
+    "See others’ cursors",
+    "Version history"
+   ],
+   "nonFunctional": [
+    "Low latency sync",
+    "Convergence",
+    "No data loss"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "10 million daily users, about 200 edit ops each per day",
+    "Peak is 3× the daily average",
+    "An edit operation is about 100 bytes",
+    "Typical document has up to about 10 concurrent editors"
+   ],
+   "steps": [
+    "Daily edit ops = 10,000,000 × 200 = 2,000,000,000.",
+    "Average = 2,000,000,000 ÷ 86,400 ≈ 23,100 per second.",
+    "Peak ≈ 23,100 × 3 ≈ 69,000 edit ops per second (the quiz target is about 69,000).",
+    "Daily edit ops = 2,000,000,000; operation log per day = 2,000,000,000 × 100 bytes = 200,000,000,000 bytes, about 200 GB.",
+    "Peak of about 69,000 ops per second spread over hundreds of thousands of open documents is small per document.",
+    "Snapshots every few hundred operations keep loading fast and let old operations be compacted."
+   ],
+   "result": "About 69,000 edit operations per second overall but few per document: route each document to one session server and keep its log."
+  },
+  "architecture": {
+   "steps": [
+    "Opening a document connects the client by WebSocket to the session server that owns that document (chosen by consistent hashing on document id).",
+    "The client sends operations with the revision it was based on; the server orders them, transforms them against concurrent operations (OT) or merges them (CRDT), and broadcasts the result.",
+    "Operations are appended to a durable log, and snapshots are written periodically for fast loading and version history.",
+    "Cursor and selection updates are ephemeral presence messages, broadcast but not stored.",
+    "If a session server dies, another takes over the document by loading the latest snapshot plus the log tail; clients reconnect and resend unacknowledged operations."
+   ],
+   "diagram": "clients <-> WebSocket <-> doc session server (owner of doc 42)\n    order/transform ops -> append to op log -> broadcast\n    snapshots -> object storage | presence (cursors) not stored"
+  },
+  "deepDives": [
+   {
+    "title": "OT or CRDT",
+    "body": "OT with a central server per document is proven for online editing; CRDTs suit offline-first and peer-to-peer at the cost of metadata."
+   },
+   {
+    "title": "No data loss",
+    "body": "Operations are acknowledged only after they are in the durable log; clients keep unacknowledged operations and resend them after reconnecting."
+   }
+  ],
+  "rubric": [
+   "Routes each document to one owner for ordering.",
+   "Explains OT or CRDT merging with an example.",
+   "Persists an operation log plus snapshots for history.",
+   "Treats presence as ephemeral and handles server failover."
+  ]
+ },
+ "91": {
+  "pitch": "Dropbox or Google Drive: upload, sync across devices and share files with permissions.",
+  "requirements": {
+   "functional": [
+    "Upload/download files",
+    "Sync across devices",
+    "Share with permissions"
+   ],
+   "nonFunctional": [
+    "Durable",
+    "Resumable uploads",
+    "Efficient sync"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "50 million daily users, about 10 file ops each per day",
+    "Peak is 3× the daily average",
+    "Average file 1 MB split into 4 MB chunks (most files are one chunk)",
+    "About 30% of uploaded chunks already exist (dedup)"
+   ],
+   "steps": [
+    "Daily file ops = 50,000,000 × 10 = 500,000,000.",
+    "Average = 500,000,000 ÷ 86,400 ≈ 5,790 per second.",
+    "Peak ≈ 5,790 × 3 ≈ 17,000 file ops per second (the quiz target is about 17,000).",
+    "Daily file operations = 500,000,000; if 20% are uploads, that is 100,000,000 uploads, about 100 TB of new data per day before dedup.",
+    "With 30% dedup, stored data is about 70 TB per day.",
+    "Metadata (file tree, versions, permissions) is small but must be strongly consistent per user."
+   ],
+   "result": "About 17,000 file operations per second and tens of TB per day: chunking, dedup and a consistent metadata service."
+  },
+  "architecture": {
+   "steps": [
+    "The client splits files into chunks and hashes each one (SHA-256).",
+    "It asks the metadata service which chunk hashes are missing, then uploads only those via presigned URLs to object storage (resumable).",
+    "Once chunks are stored, the client commits a new file version: the list of chunk hashes, in a transactional metadata database.",
+    "The metadata service publishes a change event; other devices, connected by long-polling or WebSocket, fetch the changed file list and download only missing chunks.",
+    "Sharing writes permission entries (user or link, role) checked on every access; conflicting edits from two devices create a 'conflicted copy'."
+   ],
+   "diagram": "client: chunk + hash -> metadata svc: which missing? -> upload missing chunks -> object storage\ncommit version (SQL) -> change event -> other devices sync -> download missing chunks"
+  },
+  "deepDives": [
+   {
+    "title": "Efficient sync",
+    "body": "Chunk-level hashing means editing a 1 GB file uploads only changed chunks, and identical files across users are stored once."
+   },
+   {
+    "title": "Conflicts",
+    "body": "If two devices edit the same version offline, the second commit fails the version check and is saved as a conflicted copy instead of overwriting."
+   }
+  ],
+  "rubric": [
+   "Chunks and hashes files for resumable, deduplicated uploads.",
+   "Keeps metadata transactional and separate from blobs.",
+   "Notifies devices of changes and syncs only deltas.",
+   "Handles permissions and edit conflicts explicitly."
+  ]
+ },
+ "92": {
+  "pitch": "A UPI-style payment app (PSP) on top of NPCI: pay to a VPA, collect requests and history.",
+  "requirements": {
+   "functional": [
+    "Send money via VPA",
+    "Collect requests",
+    "Transaction history"
+   ],
+   "nonFunctional": [
+    "Exactly-once debit",
+    "High availability",
+    "Audit trail"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "150 million daily users, about 3 transactions each per day",
+    "Peak is 5× the daily average",
+    "Each transaction writes about 5 ledger and state rows of 500 bytes",
+    "Peak days such as festivals add more; UPI volumes are publicly reported by NPCI monthly"
+   ],
+   "steps": [
+    "Daily transactions = 150,000,000 × 3 = 450,000,000.",
+    "Average = 450,000,000 ÷ 86,400 ≈ 5,210 per second.",
+    "Peak ≈ 5,210 × 5 ≈ 26,000 transactions per second (the quiz target is about 26,000).",
+    "Daily transactions = 450,000,000; storage ≈ 450,000,000 × 2,500 bytes = 1,125,000,000,000 bytes, about 1.1 TB per day.",
+    "Peak of about 26,000 transactions per second needs a sharded transaction store, for example by payer id.",
+    "Every transaction involves calls to NPCI and banks, so most latency is external; the app must handle timeouts and pending states."
+   ],
+   "result": "About 26,000 transactions per second with external dependencies: idempotency, a clear state machine and reconciliation matter more than raw speed."
+  },
+  "architecture": {
+   "steps": [
+    "The app creates a transaction with a unique transaction reference (idempotency key) and status INITIATED in a SQL ledger sharded by user.",
+    "The PSP sends the request to NPCI, which routes the debit to the payer's bank and the credit to the payee's bank.",
+    "Responses move the state machine (INITIATED → PENDING → SUCCESS or FAILED); retries reuse the same reference, so no double debit.",
+    "Timeouts leave the transaction PENDING; a status-check job queries NPCI and a reconciliation job compares daily settlement files.",
+    "History is served from a read model; every state change is written to an append-only audit log."
+   ],
+   "diagram": "app -> PSP txn svc (unique txn ref, SQL ledger) -> NPCI -> payer bank (debit) / payee bank (credit)\nresponses -> state machine | timeouts -> status check | daily recon files"
+  },
+  "deepDives": [
+   {
+    "title": "Exactly-once debit",
+    "body": "The unique transaction reference is enforced at the PSP and checked by the banks, so a retried request can never trigger a second debit."
+   },
+   {
+    "title": "Pending states",
+    "body": "Network timeouts are common; showing 'pending, we will update you' and resolving via status checks is safer than guessing success or failure."
+   }
+  ],
+  "rubric": [
+   "Uses a unique transaction reference end to end.",
+   "Models an explicit state machine including PENDING.",
+   "Reconciles with settlement files.",
+   "Keeps an append-only audit trail."
+  ]
+ },
+ "93": {
+  "pitch": "A digital wallet like Paytm or PhonePe wallet: top-up, transfer and view balance.",
+  "requirements": {
+   "functional": [
+    "Top-up wallet",
+    "Transfer to user",
+    "View balance & history"
+   ],
+   "nonFunctional": [
+    "Strong consistency",
+    "No negative balances",
+    "Audit"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "50 million daily users, about 2 wallet transactions each per day",
+    "Peak is 5× the daily average",
+    "Double-entry ledger: each transfer writes 2 entries of about 300 bytes"
+   ],
+   "steps": [
+    "Daily wallet transactions = 50,000,000 × 2 = 100,000,000.",
+    "Average = 100,000,000 ÷ 86,400 ≈ 1,160 per second.",
+    "Peak ≈ 1,160 × 5 ≈ 5,800 wallet transactions per second (the quiz target is about 5,800).",
+    "Daily wallet transactions = 100,000,000; ledger growth ≈ 100,000,000 × 600 bytes = 60,000,000,000 bytes, about 60 GB per day.",
+    "Peak of about 5,800 transactions per second fits a sharded relational ledger.",
+    "Balances are derived from the ledger and also kept as a running balance row updated in the same transaction."
+   ],
+   "result": "About 5,800 wallet transactions per second: strong consistency per account with a double-entry ledger is the heart of the design."
+  },
+  "architecture": {
+   "steps": [
+    "Each account has a balance row and ledger entries in SQL, sharded by account id.",
+    "A transfer runs in one transaction: lock both balance rows in a fixed order (by account id), check the payer has enough, insert a debit and a credit entry, update both balances, commit.",
+    "Cross-shard transfers use a saga with a holding account, or route both accounts to the same shard when possible.",
+    "Top-ups come from a payment gateway webhook, deduplicated by gateway id, and credit the wallet once.",
+    "A nightly job checks that ledger sums equal balances and that total debits equal total credits."
+   ],
+   "diagram": "transfer -> wallet svc -> BEGIN: lock A, B (ordered) -> check A >= amt -> debit A, credit B (ledger) -> COMMIT\ntop-up webhook (dedup) -> credit | nightly: sum(ledger) == balances"
+  },
+  "deepDives": [
+   {
+    "title": "No negative balances",
+    "body": "The balance check and debit happen in one transaction with row locks (or a conditional update WHERE balance >= amount), so concurrent transfers cannot overdraw."
+   },
+   {
+    "title": "Regulatory audit",
+    "body": "Ledger entries are never updated or deleted; corrections are new reversing entries, which keeps the audit trail complete."
+   }
+  ],
+  "rubric": [
+   "Uses a double-entry ledger with immutable entries.",
+   "Does balance check and update atomically with ordered locks.",
+   "Handles cross-shard transfers explicitly.",
+   "Reconciles ledger totals regularly."
+  ]
+ },
+ "94": {
+  "pitch": "BookMyShow: view shows and seat maps, hold seats for 10 minutes, then pay and confirm.",
+  "requirements": {
+   "functional": [
+    "View shows & seat map",
+    "Hold seats for 10 min",
+    "Pay and confirm"
+   ],
+   "nonFunctional": [
+    "No double booking",
+    "Spikes on blockbuster releases",
+    "Fair queueing"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "10 million daily users, about 5 seat views each per day",
+    "Peak is 10× the daily average",
+    "A blockbuster release puts 200,000 people on one city's seat maps in the first minutes (illustrative)",
+    "A hall has about 300 seats"
+   ],
+   "steps": [
+    "Daily seat views = 10,000,000 × 5 = 50,000,000.",
+    "Average = 50,000,000 ÷ 86,400 ≈ 579 per second.",
+    "Peak ≈ 579 × 10 ≈ 5,800 seat views per second (the quiz target is about 5,800).",
+    "Seat-map reads at peak are about 5,800 per second overall; for one hot show, hundreds of people compete for 300 seats.",
+    "Holds expire after 10 minutes, so each seat can be held and released several times before it sells.",
+    "Seat state per show is tiny (300 seats × a few bytes), so the challenge is contention, not storage."
+   ],
+   "result": "Thousands of seat-map views per second, concentrated on a few hot shows: make holds atomic and seat maps cheap to read."
+  },
+  "architecture": {
+   "steps": [
+    "Seat maps are served from a cache refreshed on every hold or release, with a short TTL for others' changes.",
+    "Holding seats is a conditional update: UPDATE seats SET status = 'HELD', held_by = ?, hold_expires = now + 10 min WHERE show_id = ? AND seat_id IN (...) AND status = 'FREE'; success only if all rows changed.",
+    "Payment happens outside the transaction; on success, a second conditional update sets HELD → BOOKED for that holder.",
+    "Expired holds are released by a sweeper or treated as free when hold_expires has passed.",
+    "For huge launches, a virtual waiting room admits users in batches to protect the booking service."
+   ],
+   "diagram": "users -> waiting room (big launches) -> seat map (cache) \nhold -> conditional update FREE -> HELD (10 min) -> pay -> HELD -> BOOKED\nsweeper: expired HELD -> FREE"
+  },
+  "deepDives": [
+   {
+    "title": "Double booking",
+    "body": "Because the hold only succeeds when the seat is FREE in the same statement, two users clicking the same seat cannot both succeed."
+   },
+   {
+    "title": "Payment after hold expiry",
+    "body": "If a payment succeeds after the hold expired and someone else booked the seat, the system must refund automatically; this is why the hold time exceeds typical payment time."
+   }
+  ],
+  "rubric": [
+   "Uses atomic conditional holds with expiry.",
+   "Separates hold, payment and confirm steps.",
+   "Caches seat maps and handles hot shows.",
+   "Covers refunds when payment and holds race."
+  ]
+ },
+ "95": {
+  "pitch": "IRCTC Tatkal: survive the 10:00 AM rush, sell berths without overselling, issue PNRs.",
+  "requirements": {
+   "functional": [
+    "Search trains & availability",
+    "Book tatkal seats",
+    "Payment & PNR"
+   ],
+   "nonFunctional": [
+    "10× spike at 10:00",
+    "No overselling",
+    "Graceful degradation"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "5 million daily users, about 10 booking attempts each per day",
+    "Peak is 10× the daily average",
+    "Tatkal opens at 10:00 for AC classes and 11:00 for non-AC, as publicly documented by IRCTC",
+    "Most attempts arrive in the first few minutes"
+   ],
+   "steps": [
+    "Daily booking attempts = 5,000,000 × 10 = 50,000,000.",
+    "Average = 50,000,000 ÷ 86,400 ≈ 579 per second.",
+    "Peak ≈ 579 × 10 ≈ 5,800 booking attempts per second (the quiz target is about 5,800).",
+    "The quiz average peak is about 5,800 attempts per second, but if 1,000,000 attempts arrive in the first 60 seconds, that is about 16,700 per second at the opening.",
+    "Seats per popular train-class are a few hundred, so most attempts must fail fast and fairly.",
+    "Search and availability reads are cacheable; only the final allocation must hit the inventory of record."
+   ],
+   "result": "Opening-minute bursts many times the daily average, competing for a few hundred berths: queue, rate limit and allocate atomically."
+  },
+  "architecture": {
+   "steps": [
+    "Pre-scale web, search and booking tiers before 09:55, and serve static content from a CDN.",
+    "A waiting room issues queue tokens and admits users to the booking flow at a rate the inventory service can handle.",
+    "Availability is shown from a cache that may lag by seconds; the booking step re-checks against inventory.",
+    "Allocation decrements the quota with a conditional update per (train, date, class, quota); success creates a PNR, failure tells the user immediately.",
+    "Payment has a timeout; unpaid allocations are released back to the quota, and bot traffic is limited with CAPTCHAs and per-account limits."
+   ],
+   "diagram": "users -> CDN -> waiting room (tokens) -> booking svc -> inventory (conditional decrement per train/class/quota) -> PNR -> payment\ntimeout -> release seat | availability from cache"
+  },
+  "deepDives": [
+   {
+    "title": "Fairness",
+    "body": "A queue with tokens admits users in arrival order and rate, instead of rewarding whoever retries fastest."
+   },
+   {
+    "title": "Graceful degradation",
+    "body": "Under overload, turn off non-essential features (detailed history, recommendations) and keep search and booking alive."
+   }
+  ],
+  "rubric": [
+   "Quantifies the opening-minute burst.",
+   "Uses a waiting room and rate limiting.",
+   "Allocates seats with atomic conditional updates.",
+   "Releases unpaid seats and blocks bots."
+  ]
+ },
+ "96": {
+  "pitch": "Live fantasy-contest leaderboards during IPL matches: update scores, show rank and top N.",
+  "requirements": {
+   "functional": [
+    "Update scores live",
+    "Show rank and top-N",
+    "Millions per contest"
+   ],
+   "nonFunctional": [
+    "Updates within seconds",
+    "Massive spikes at match time",
+    "Accurate final ranks"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "20 million daily users, about 20 score reads each per day",
+    "Peak is 8× the daily average",
+    "A mega contest has 10,000,000 entries (illustrative)",
+    "Each ball can change points for many players"
+   ],
+   "steps": [
+    "Daily score reads = 20,000,000 × 20 = 400,000,000.",
+    "Average = 400,000,000 ÷ 86,400 ≈ 4,630 per second.",
+    "Peak ≈ 4,630 × 8 ≈ 37,000 score reads per second (the quiz target is about 37,000).",
+    "A Redis sorted set entry costs on the order of 100 bytes, so 10,000,000 entries ≈ 1,000,000,000 bytes, about 1 GB per contest, fine for one shard.",
+    "Rank lookups and top-N reads are O(log n) in a sorted set: log2 of 10,000,000 ≈ 23 steps.",
+    "Score reads at about 37,000 per second are mostly 'my rank' and 'top 100', both cacheable for a few seconds."
+   ],
+   "result": "About 37,000 score reads per second and millions of entries per contest: sorted sets per contest plus batched score updates."
+  },
+  "architecture": {
+   "steps": [
+    "Ball-by-ball events from the scoring feed go to Kafka; a points service converts them into point changes per real-world player.",
+    "Workers compute each team's new total (teams contain 11 players) and update Redis sorted sets per contest in batches with ZADD.",
+    "Top-N comes from ZREVRANGE and 'my rank' from ZREVRANK, cached for a few seconds and pushed to clients.",
+    "Very large contests can be split into buckets by score range, or ranks approximated during play and computed exactly at the end.",
+    "Final ranks are recomputed from the authoritative scores in batch after the match before prizes are paid."
+   ],
+   "diagram": "scoring feed -> Kafka -> points svc -> team totals -> Redis ZADD (per contest)\napp -> rank svc -> ZREVRANK / ZREVRANGE (cached seconds)\nmatch end -> batch recompute -> prizes"
+  },
+  "deepDives": [
+   {
+    "title": "Update fan-out",
+    "body": "One wicket changes points for every team containing that bowler, possibly millions of teams; recomputing per team in batches every few seconds is cheaper than per ball per team in real time."
+   },
+   {
+    "title": "Accurate final ranks",
+    "body": "Live ranks can be approximate, but prize distribution uses a deterministic batch computation with tie-break rules, audited before payout."
+   }
+  ],
+  "rubric": [
+   "Uses sorted sets (or equivalent) per contest.",
+   "Batches score updates and caches rank reads.",
+   "Separates live approximate ranks from final exact ranks.",
+   "Handles the match-time spike with pre-scaling."
+  ]
+ },
+ "97": {
+  "pitch": "Typeahead search suggestions for an e-commerce app, including Hinglish and typos.",
+  "requirements": {
+   "functional": [
+    "Suggest top queries for prefix",
+    "Update with trending queries",
+    "Handle Hinglish/typos"
+   ],
+   "nonFunctional": [
+    "p99 < 50 ms",
+    "Very read-heavy",
+    "Fresh within minutes"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "50 million daily users, about 20 keystrokes each per day",
+    "Peak is 3× the daily average",
+    "Top 100,000 prefixes cover most traffic",
+    "Each prefix stores its top 10 completions, about 500 bytes"
+   ],
+   "steps": [
+    "Daily keystrokes = 50,000,000 × 20 = 1,000,000,000.",
+    "Average = 1,000,000,000 ÷ 86,400 ≈ 11,600 per second.",
+    "Peak ≈ 11,600 × 3 ≈ 35,000 keystrokes per second (the quiz target is about 35,000).",
+    "Suggestion cache = 100,000 × 500 bytes = 50,000,000 bytes, about 50 MB, small enough for every server's memory.",
+    "Peak of about 35,000 keystroke requests per second is served from memory with p99 well under 50 ms.",
+    "Debouncing on the client (wait about 100 ms after typing) cuts requests noticeably."
+   ],
+   "result": "About 35,000 keystroke requests per second from a tiny in-memory index: the hard parts are freshness and language handling."
+  },
+  "architecture": {
+   "steps": [
+    "Search logs stream into an aggregation job that counts queries over a sliding window (for example the last 7 days with decay).",
+    "A builder produces a trie or prefix map where each prefix holds its top-k completions, then publishes a snapshot every few minutes.",
+    "Suggestion servers load the snapshot into memory and answer GET /suggest?q=pan in microseconds; a CDN can cache very short popular prefixes.",
+    "Normalisation handles case, spacing, transliteration (pani puri, panipuri, पानी पूरी) and common misspellings before lookup.",
+    "Trending queries are blended from a fast streaming counter so new terms appear within minutes."
+   ],
+   "diagram": "search logs -> stream aggregate (counts, decay) -> builder (prefix -> top-k) -> snapshot\nsuggest servers (in memory) <- snapshot | client (debounce) -> GET /suggest"
+  },
+  "deepDives": [
+   {
+    "title": "Freshness versus cost",
+    "body": "Rebuilding the full index every few minutes is cheap at 50 MB; a separate trending layer handles sudden spikes such as a new phone launch."
+   },
+   {
+    "title": "Filtering",
+    "body": "Offensive or out-of-stock suggestions are filtered at build time, with a block list that applies immediately."
+   }
+  ],
+  "rubric": [
+   "Precomputes top-k completions per prefix.",
+   "Serves from memory with client debouncing.",
+   "Handles Hinglish and typos with normalisation.",
+   "Keeps suggestions fresh within minutes."
+  ]
+ },
+ "98": {
+  "pitch": "A web crawler for Indian news and e-commerce sites feeding a search engine.",
+  "requirements": {
+   "functional": [
+    "Fetch pages from seed URLs",
+    "Extract and enqueue links",
+    "Respect robots.txt and politeness"
+   ],
+   "nonFunctional": [
+    "Billions of pages",
+    "No duplicate fetches",
+    "Fault-tolerant"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "About 1 billion pages fetched per day",
+    "Peak is 1× the daily average",
+    "Average page 100 KB of HTML",
+    "Politeness: at most 1 request per second per host"
+   ],
+   "steps": [
+    "Average = 1,000,000,000 ÷ 86,400 ≈ 11,600 per second.",
+    "Peak ≈ 11,600 × 1 ≈ 12,000 pages fetched per second (the quiz target is about 12,000).",
+    "Pages per day = 1,000,000,000, about 12,000 per second steadily.",
+    "Download bandwidth = 12,000 × 100 KB = 1,200,000 KB per second, about 1.2 GB per second, around 9.6 Gbit per second.",
+    "Raw storage = 1,000,000,000 × 100 KB = 100,000,000,000 KB, about 100 TB per day before compression."
+   ],
+   "result": "About 12,000 pages per second and 100 TB of raw HTML a day: a partitioned frontier, politeness per host and dedup."
+  },
+  "architecture": {
+   "steps": [
+    "Seed URLs enter the URL frontier, a set of queues partitioned by host so each host is fetched at a polite rate.",
+    "Fetcher workers check robots.txt (cached per host), download pages, and store raw HTML in object storage.",
+    "Parsers extract links and text; links are normalised and checked against a seen-URL set (a Bloom filter backed by a store) before enqueueing.",
+    "Content fingerprints (hashes or SimHash) detect duplicate or near-duplicate pages.",
+    "A scheduler sets revisit frequency by how often a page changes: news home pages every few minutes, old articles rarely."
+   ],
+   "diagram": "seeds -> frontier (queues by host) -> fetchers (robots.txt, politeness) -> object storage\n          ^                                           |\n          +---- new links <- dedup (Bloom/seen) <- parser"
+  },
+  "deepDives": [
+   {
+    "title": "Politeness",
+    "body": "Partitioning the frontier by host and assigning each host to one queue enforces per-host rate limits and avoids accidentally overloading small sites."
+   },
+   {
+    "title": "Traps",
+    "body": "Infinite calendars and session-id URLs generate endless links; cap depth and URLs per host, and normalise query parameters."
+   }
+  ],
+  "rubric": [
+   "Partitions the frontier by host for politeness.",
+   "Respects robots.txt.",
+   "Deduplicates URLs and content.",
+   "Estimates bandwidth and storage."
+  ]
+ },
+ "99": {
+  "pitch": "Product search for a large Indian e-commerce catalogue with filters, facets and ranking.",
+  "requirements": {
+   "functional": [
+    "Keyword search",
+    "Filters & facets",
+    "Ranking"
+   ],
+   "nonFunctional": [
+    "Results < 200 ms",
+    "Index updates within a minute",
+    "Scale for sales"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "80 million daily users, about 10 searches each per day",
+    "Peak is 6× the daily average",
+    "Catalogue of 200,000,000 products at 2 KB each in the index",
+    "Sale days raise traffic sharply"
+   ],
+   "steps": [
+    "Daily searches = 80,000,000 × 10 = 800,000,000.",
+    "Average = 800,000,000 ÷ 86,400 ≈ 9,260 per second.",
+    "Peak ≈ 9,260 × 6 ≈ 56,000 searches per second (the quiz target is about 56,000).",
+    "Index size ≈ 200,000,000 × 2 KB = 400,000,000 KB, about 400 GB, split into shards of about 30–50 GB each, roughly 10 shards.",
+    "Peak of about 56,000 searches per second needs several replicas of each shard; if one replica handles about 1,000 searches per second, about 56 replicas in total across shards.",
+    "Price and stock change often; updates flow within a minute through CDC."
+   ],
+   "result": "About 56,000 searches per second over a 400 GB index: shard for size, replicate for throughput, sync from the catalogue by CDC."
+  },
+  "architecture": {
+   "steps": [
+    "The catalogue of record lives in SQL; CDC streams changes through Kafka to indexer workers that update Elasticsearch.",
+    "Queries are analysed (lowercase, synonyms, transliteration, spelling correction) and run against the index with filters such as brand, price and delivery pincode.",
+    "Facet counts come from aggregations on the matching documents.",
+    "Ranking combines text relevance (BM25) with business signals (sales, ratings, availability) and, for top results, a learned ranking model.",
+    "A cache stores results for popular queries for a few seconds, and the search tier is pre-scaled before sales."
+   ],
+   "diagram": "catalogue (SQL) -> CDC -> Kafka -> indexers -> Elasticsearch (shards x replicas)\nquery -> analyse -> search + filters + facets -> rank -> cache -> results"
+  },
+  "deepDives": [
+   {
+    "title": "Freshness",
+    "body": "CDC keeps price and stock in the index within a minute; the product page still reads price from the catalogue at checkout."
+   },
+   {
+    "title": "Sale traffic",
+    "body": "Replicas scale reads; caching the top queries and pre-scaling before announced sales keeps p99 under 200 ms."
+   }
+  ],
+  "rubric": [
+   "Keeps SQL as source of truth and syncs the index by CDC.",
+   "Explains analysis, filters, facets and ranking.",
+   "Sizes shards and replicas.",
+   "Caches hot queries and pre-scales for sales."
+  ]
+ },
+ "100": {
+  "pitch": "A metrics and monitoring system: ingest metrics, power dashboards and alert within a minute.",
+  "requirements": {
+   "functional": [
+    "Ingest metrics",
+    "Query dashboards",
+    "Alert on thresholds"
+   ],
+   "nonFunctional": [
+    "High write volume",
+    "Retention & downsampling",
+    "Alert < 1 min"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "About 5 billion data points per day",
+    "Peak is 2× the daily average",
+    "About 1.5 bytes per compressed sample",
+    "Raw retention 15 days, then rollups"
+   ],
+   "steps": [
+    "Average = 5,000,000,000 ÷ 86,400 ≈ 57,900 per second.",
+    "Peak ≈ 57,900 × 2 ≈ 120,000 data points per second (the quiz target is about 120,000).",
+    "Daily raw storage = 5,000,000,000 × 1.5 bytes = 7,500,000,000 bytes, about 7.5 GB.",
+    "15 days of raw data is about 112 GB; 5-minute rollups for a year add a small fraction of that.",
+    "The binding constraint is series cardinality and ingest rate, about 120,000 points per second at peak, not disk."
+   ],
+   "result": "About 120,000 data points per second and under 10 GB per day compressed: a time-series store with rollups and strict cardinality limits."
+  },
+  "architecture": {
+   "steps": [
+    "Agents on each host collect metrics and push them (or are scraped) into a buffered stream such as Kafka.",
+    "Ingest workers write into a time-series database partitioned by series hash and time.",
+    "A rollup job produces 1-minute and 1-hour aggregates and deletes old raw blocks.",
+    "Dashboards query recent raw data and older rollups; query results are cached.",
+    "An alerting engine evaluates rules every 15–30 seconds on recent data and sends notifications with deduplication and silencing."
+   ],
+   "diagram": "agents -> Kafka -> ingest workers -> TSDB (raw, partitioned)\nrollup job -> 1 min / 1 h aggregates | dashboards -> query (cache)\nalert engine (every 15-30 s) -> notify (dedup, silence)"
+  },
+  "deepDives": [
+   {
+    "title": "Cardinality",
+    "body": "Limits on labels per metric and per team prevent one bad deploy from creating millions of series and taking down ingest."
+   },
+   {
+    "title": "Monitoring the monitor",
+    "body": "Alerting must keep working during incidents, so it runs separately from dashboards, with its own health checks and a dead-man's-switch alert."
+   }
+  ],
+  "rubric": [
+   "Buffers ingest through a stream.",
+   "Uses a time-series store with rollups and retention.",
+   "Evaluates alerts frequently and independently.",
+   "Controls cardinality."
+  ]
+ },
+ "101": {
+  "pitch": "Distributed logging: collect logs from every service, search them within a minute, keep 30 days.",
+  "requirements": {
+   "functional": [
+    "Collect logs from every service",
+    "Search logs by time, service and text",
+    "Keep logs for 30 days"
+   ],
+   "nonFunctional": [
+    "Ingest never blocks the application",
+    "Logs searchable within 1 minute",
+    "Tolerate bursts during incidents"
+   ],
+   "outOfScope": [
+    "Metrics dashboards",
+    "Distributed tracing UI"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "About 5 billion log lines per day",
+    "Peak is 3× the daily average",
+    "Average log line 300 bytes",
+    "Search index adds about 50% overhead"
+   ],
+   "steps": [
+    "Average = 5,000,000,000 ÷ 86,400 ≈ 57,900 per second.",
+    "Peak ≈ 57,900 × 3 ≈ 170,000 log lines per second (the quiz target is about 170,000).",
+    "Daily volume = 5,000,000,000 × 300 bytes = 1,500,000,000,000 bytes, about 1.5 TB.",
+    "With index overhead, about 2.25 TB per day; 30 days is about 67.5 TB, before replicas.",
+    "Peak of about 170,000 lines per second must not slow the applications that produce them."
+   ],
+   "result": "About 170,000 lines per second and roughly 68 TB of searchable logs for 30 days: buffer, index hot data, archive cold data."
+  },
+  "architecture": {
+   "steps": [
+    "Applications write structured logs to local files or stdout; an agent (Fluent Bit, Vector) tails and batches them, buffering on disk.",
+    "Agents ship asynchronously to Kafka, which absorbs bursts during incidents.",
+    "Indexer workers parse, enrich (service, trace id), and write to a search cluster (Elasticsearch, OpenSearch or Loki-style indexing by labels).",
+    "Indices are per day; hot indices on fast disks for 7 days, warm for 30, then archived to object storage.",
+    "Sensitive fields such as tokens and card numbers are masked at the agent before leaving the host."
+   ],
+   "diagram": "app -> local file -> agent (batch, disk buffer) -> Kafka -> indexers -> search cluster (daily indices)\nhot 7 d -> warm 30 d -> object storage archive | masking at agent"
+  },
+  "deepDives": [
+   {
+    "title": "Never block the app",
+    "body": "Agents read files asynchronously; if the pipeline is slow, logs queue on disk or are sampled, rather than making the application wait."
+   },
+   {
+    "title": "Cost",
+    "body": "Full-text indexing every field is expensive; label-based indexing with brute-force search on compressed chunks is far cheaper for logs searched rarely."
+   }
+  ],
+  "rubric": [
+   "Decouples apps from the pipeline with agents and a buffer.",
+   "Estimates daily volume and retention storage.",
+   "Uses hot, warm and archive tiers.",
+   "Masks sensitive data before shipping."
+  ]
+ },
+ "102": {
+  "pitch": "A Kafka-like distributed message log: produce, consume with offsets, retain for days.",
+  "requirements": {
+   "functional": [
+    "Produce messages",
+    "Consume with offsets",
+    "Retention"
+   ],
+   "nonFunctional": [
+    "Durable replicated log",
+    "High throughput",
+    "Ordering per partition"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "About 10 billion messages per day",
+    "Peak is 2× the daily average",
+    "Average message 1 KB",
+    "Replication factor 3, retention 7 days"
+   ],
+   "steps": [
+    "Average = 10,000,000,000 ÷ 86,400 ≈ 116,000 per second.",
+    "Peak ≈ 116,000 × 2 ≈ 230,000 messages per second (the quiz target is about 230,000).",
+    "Daily data = 10,000,000,000 × 1 KB = 10,000,000,000 KB, about 10 TB; with 3 replicas, 30 TB per day.",
+    "7 days of retention needs about 210 TB of disk across brokers.",
+    "Peak of about 230,000 messages per second, about 230 MB per second in, must be spread over many partitions and brokers."
+   ],
+   "result": "About 230,000 messages per second and about 210 TB of retained replicated data: partitioned, replicated append-only logs."
+  },
+  "architecture": {
+   "steps": [
+    "Topics are split into partitions; each partition is an append-only log of segment files on a broker's disk, with an offset index.",
+    "Each partition has a leader and followers; producers write to the leader, followers fetch and stay in the in-sync replica set.",
+    "With acks=all, a write is acknowledged once all in-sync replicas have it; leader election on failure picks an in-sync follower.",
+    "Consumers in a group are assigned partitions and commit offsets; they can rewind to replay.",
+    "Retention deletes whole old segments by time or size; compacted topics keep only the latest value per key."
+   ],
+   "diagram": "producer -> partition leader (append segment) -> followers (ISR)\nconsumer group -> assigned partitions -> read from offset -> commit offset\nretention: delete old segments | metadata: controller (Raft)"
+  },
+  "deepDives": [
+   {
+    "title": "Ordering",
+    "body": "Order is guaranteed per partition only; keys map to partitions so related messages stay ordered."
+   },
+   {
+    "title": "Throughput",
+    "body": "Sequential disk writes, batching, compression and zero-copy transfer to consumers are why a log broker sustains hundreds of MB per second."
+   }
+  ],
+  "rubric": [
+   "Explains partitions, segments and offsets.",
+   "Replicates with leaders, followers and in-sync replicas.",
+   "Covers consumer groups and replay.",
+   "Estimates storage from rate, size, replication and retention."
+  ]
+ },
+ "103": {
+  "pitch": "A distributed job scheduler for cron-like and one-off jobs across many services.",
+  "requirements": {
+   "functional": [
+    "Schedule recurring/one-off jobs",
+    "Execute on workers",
+    "Retries & history"
+   ],
+   "nonFunctional": [
+    "No missed jobs",
+    "At-least-once",
+    "Scale to millions"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "1 million daily users, about 10 job runs each per day",
+    "Peak is 3× the daily average",
+    "10,000,000 job runs per day; each run record about 1 KB"
+   ],
+   "steps": [
+    "Daily job runs = 1,000,000 × 10 = 10,000,000.",
+    "Average = 10,000,000 ÷ 86,400 ≈ 116 per second.",
+    "Peak ≈ 116 × 3 ≈ 350 job runs per second (the quiz target is about 350).",
+    "Run history = 10,000,000 × 1 KB = 10,000,000 KB per day, about 10 GB.",
+    "Peak of about 350 runs per second; many cron jobs cluster at the top of the hour, so add jitter or spread start times.",
+    "Polling for due jobs every second with an index on next_run_time is cheap at this rate."
+   ],
+   "result": "About 350 job runs per second: modest load, so correctness (no missed or double runs) dominates."
+  },
+  "architecture": {
+   "steps": [
+    "Jobs are stored in SQL with schedule, next_run_time, owner and retry policy, indexed by next_run_time.",
+    "Scheduler instances poll for due jobs and claim them with SELECT ... FOR UPDATE SKIP LOCKED or a conditional status update, so each run is claimed once.",
+    "Claimed runs are pushed to a queue; workers execute them and report success or failure.",
+    "Failures retry with backoff up to a limit; runs that exceed a timeout are marked failed and retried; history is kept per run.",
+    "next_run_time is computed after claiming, so a crashed scheduler does not skip the next occurrence."
+   ],
+   "diagram": "jobs (SQL, idx next_run_time) <- schedulers poll + claim (SKIP LOCKED) -> queue -> workers\nworkers -> result -> run history | failure -> retry with backoff"
+  },
+  "deepDives": [
+   {
+    "title": "At-least-once",
+    "body": "Workers may crash after running a job but before reporting; jobs must be idempotent or check a run id."
+   },
+   {
+    "title": "Thundering herd at :00",
+    "body": "Thousands of jobs scheduled at the top of the hour arrive together; adding a small random offset spreads load."
+   }
+  ],
+  "rubric": [
+   "Stores jobs with an index on next run time.",
+   "Claims runs exactly once with locks or conditional updates.",
+   "Executes through a queue with retries and timeouts.",
+   "Makes jobs idempotent and spreads scheduled peaks."
+  ]
+ },
+ "104": {
+  "pitch": "A Yelp-style proximity service: find nearby restaurants or shops, view details, add or update places.",
+  "requirements": {
+   "functional": [
+    "Search places nearby",
+    "View details",
+    "Add/update places"
+   ],
+   "nonFunctional": [
+    "Read-heavy",
+    "Results < 200 ms",
+    "Updates within hours"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "50 million daily users, about 5 nearby searches each per day",
+    "Peak is 4× the daily average",
+    "50,000,000 places, about 1 KB of details each",
+    "Geo index entry about 50 bytes per place"
+   ],
+   "steps": [
+    "Daily nearby searches = 50,000,000 × 5 = 250,000,000.",
+    "Average = 250,000,000 ÷ 86,400 ≈ 2,890 per second.",
+    "Peak ≈ 2,890 × 4 ≈ 12,000 nearby searches per second (the quiz target is about 12,000).",
+    "Place details = 50,000,000 × 1 KB = 50,000,000 KB, about 50 GB, in a database with a cache.",
+    "Geo index = 50,000,000 × 50 bytes = 2,500,000,000 bytes, about 2.5 GB, small enough to keep in memory on every search server.",
+    "Peak of about 12,000 nearby searches per second is served by replicated in-memory indexes."
+   ],
+   "result": "About 12,000 nearby searches per second over a 2.5 GB in-memory geo index: replicate the index, cache details, update in hours."
+  },
+  "architecture": {
+   "steps": [
+    "Places are stored in SQL (or a document store) with latitude, longitude, category and details.",
+    "A builder creates a geohash or quadtree index (cell → place ids) and ships it to search servers; updates are applied in batches every few minutes or hours.",
+    "A search reads the user's cell and neighbours at the right precision for the radius, filters by category and open hours, and ranks by distance, rating and relevance.",
+    "Place details for the result page come from a cache in front of the database.",
+    "Writes (new places, edits) go to the database and moderation; the index catches up on the next build."
+   ],
+   "diagram": "places DB -> index builder (geohash/quadtree) -> search servers (in-memory, replicated)\nquery (lat, lng, r) -> cells + neighbours -> filter -> rank -> ids -> details cache"
+  },
+  "deepDives": [
+   {
+    "title": "Geohash or quadtree",
+    "body": "Geohash is simple and works in any key-value store; a quadtree adapts cell size to density, which helps in crowded city centres."
+   },
+   {
+    "title": "Update freshness",
+    "body": "Places change rarely, so rebuilding or patching the index every few minutes is enough; real-time updates are not required."
+   }
+  ],
+  "rubric": [
+   "Chooses a geo index and handles cell neighbours.",
+   "Sizes the index to fit in memory.",
+   "Separates the search index from place details.",
+   "Accepts eventual updates and justifies it."
+  ]
+ },
+ "105": {
+  "pitch": "A flash sale like Big Billion Days: sell limited stock at a fixed time without overselling.",
+  "requirements": {
+   "functional": [
+    "Show sale item",
+    "Buy within limit",
+    "Pay"
+   ],
+   "nonFunctional": [
+    "Massive spike",
+    "No overselling",
+    "Fairness"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "50 million daily users, about 10 buy attempts each per day",
+    "Peak is 20× the daily average",
+    "10,000 units of a phone, 5,000,000 users waiting at 12:00 (illustrative)"
+   ],
+   "steps": [
+    "Daily buy attempts = 50,000,000 × 10 = 500,000,000.",
+    "Average = 500,000,000 ÷ 86,400 ≈ 5,790 per second.",
+    "Peak ≈ 5,790 × 20 ≈ 120,000 buy attempts per second (the quiz target is about 120,000).",
+    "Attempts per unit = 5,000,000 ÷ 10,000 = 500, so 499 of every 500 attempts must fail quickly and fairly.",
+    "At about 120,000 buy attempts per second, inventory must never be the first thing hit; a waiting room and token admission protect it.",
+    "A single counter row taking 120,000 conditional decrements per second would be a hotspot, so stock is split into, say, 20 buckets of 500 units."
+   ],
+   "result": "About 120,000 buy attempts per second for a few thousand units: absorb the spike at the edge and allocate stock atomically."
+  },
+  "architecture": {
+   "steps": [
+    "Sale pages and assets are static and served by a CDN; the countdown uses client time synced to the server.",
+    "At sale start, a waiting room issues signed tokens and admits users at a controlled rate; rate limits and bot checks apply per account and device.",
+    "Admitted users reserve a unit via an atomic decrement in Redis or a conditional SQL update on one of several stock buckets.",
+    "A reservation creates an order with a short payment window; unpaid reservations expire and return stock.",
+    "Once stock reaches zero, the sale page flips to sold out at the edge, so later requests never reach the backend."
+   ],
+   "diagram": "users -> CDN (static) -> waiting room (tokens, rate limit) -> reserve: atomic decrement (stock buckets) -> order -> pay\nexpired -> stock back | sold out -> edge page"
+  },
+  "deepDives": [
+   {
+    "title": "No overselling",
+    "body": "The decrement and the check that stock is above zero happen in one atomic operation; the order is created only after a successful decrement."
+   },
+   {
+    "title": "Fairness",
+    "body": "A queue with tokens rewards arrival order; per-account limits and bot detection stop scripts from taking most units."
+   }
+  ],
+  "rubric": [
+   "Protects inventory with a waiting room and rate limiting.",
+   "Uses atomic decrements, splitting hot stock if needed.",
+   "Expires unpaid reservations.",
+   "Serves static and sold-out pages from the edge."
+  ]
+ },
+ "106": {
+  "pitch": "Hotel booking like Airbnb or OYO: search, reserve a room for dates, pay and confirm.",
+  "requirements": {
+   "functional": [
+    "Search hotels",
+    "Reserve room",
+    "Pay & confirm"
+   ],
+   "nonFunctional": [
+    "No double booking",
+    "Search < 500 ms",
+    "Supplier integrations"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "10 million daily users, about 8 searches each per day",
+    "Peak is 4× the daily average",
+    "1,000,000 properties with 365 days of availability each"
+   ],
+   "steps": [
+    "Daily searches = 10,000,000 × 8 = 80,000,000.",
+    "Average = 80,000,000 ÷ 86,400 ≈ 926 per second.",
+    "Peak ≈ 926 × 4 ≈ 3,700 searches per second (the quiz target is about 3,700).",
+    "Availability rows = 1,000,000 × 365 = 365,000,000 room-type-date rows, manageable in a sharded SQL store.",
+    "Searches at about 3,700 per second go to a search index plus an availability cache, not the booking database.",
+    "Bookings are far fewer than searches, perhaps one per hundred searches, so the write path is small but must be exact."
+   ],
+   "result": "About 3,700 searches per second over 365 million availability rows: search from an index and cache, book with atomic per-date updates."
+  },
+  "architecture": {
+   "steps": [
+    "Property details and location live in a search index (Elasticsearch) for filters such as city, price and amenities.",
+    "Availability per (property, room type, date) lives in SQL, cached for search; the cache may be slightly stale.",
+    "Booking: in one transaction, conditionally decrement available rooms for every night of the stay (WHERE available > 0); if any night fails, roll back.",
+    "Payment follows with a hold window; supplier hotels connected through channel managers are confirmed through their APIs, with retries.",
+    "Confirmation and cancellation emit events for emails, invoices and supplier sync."
+   ],
+   "diagram": "search -> ES (filters, geo) + availability cache -> results\nbook -> SQL txn: decrement each night WHERE available > 0 -> hold -> pay -> confirm (supplier API)\nevents -> email, invoice, sync"
+  },
+  "deepDives": [
+   {
+    "title": "Multi-night atomicity",
+    "body": "A three-night stay must reserve all three nights or none; one transaction with conditional updates on each date row guarantees that."
+   },
+   {
+    "title": "Supplier integrations",
+    "body": "External hotels may confirm slowly or fail; a saga with timeouts and automatic cancellation and refund keeps users informed."
+   }
+  ],
+  "rubric": [
+   "Separates search from transactional availability.",
+   "Books all nights atomically with conditional updates.",
+   "Handles payment holds and supplier confirmation.",
+   "Accepts stale search results but re-checks at booking."
+  ]
+ },
+ "107": {
+  "pitch": "An ad-click aggregator that counts clicks per ad per minute for billing and reports.",
+  "requirements": {
+   "functional": [
+    "Record clicks",
+    "Aggregate per ad per minute",
+    "Query reports"
+   ],
+   "nonFunctional": [
+    "Exactly-once counts for billing",
+    "Late events",
+    "High throughput"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "100 million daily users, about 10 click events each per day",
+    "Peak is 3× the daily average",
+    "Click event about 200 bytes",
+    "Billing requires exactly-once counts"
+   ],
+   "steps": [
+    "Daily click events = 100,000,000 × 10 = 1,000,000,000.",
+    "Average = 1,000,000,000 ÷ 86,400 ≈ 11,600 per second.",
+    "Peak ≈ 11,600 × 3 ≈ 35,000 click events per second (the quiz target is about 35,000).",
+    "Daily click events = 1,000,000,000; raw data = 1,000,000,000 × 200 bytes = 200,000,000,000 bytes, about 200 GB per day.",
+    "Peak of about 35,000 events per second fits a modest Kafka cluster and Flink job.",
+    "Aggregates per ad per minute are tiny compared with raw events and go to an OLAP store."
+   ],
+   "result": "About 35,000 clicks per second and 200 GB of raw events a day: stream aggregation with exactly-once effects, plus raw storage for reconciliation."
+  },
+  "architecture": {
+   "steps": [
+    "Click servers validate and log each click with a unique click id, then publish to Kafka keyed by ad_id.",
+    "A Flink job deduplicates by click id within a window, aggregates per ad per minute using event time and watermarks, and writes results transactionally.",
+    "Aggregates land in an OLAP store (ClickHouse, Druid or Pinot) for reports and billing queries.",
+    "Raw events are also archived to object storage; a daily batch job recomputes counts to reconcile with the stream results.",
+    "Fraud filters (bots, repeated clicks) run in the stream and mark clicks as invalid before billing."
+   ],
+   "diagram": "click servers (click id) -> Kafka (key ad_id) -> Flink: dedup, window per minute (event time) -> OLAP store\nraw -> object storage -> daily batch recompute -> reconcile"
+  },
+  "deepDives": [
+   {
+    "title": "Exactly-once counts",
+    "body": "Unique click ids, deduplication in the stream and transactional or idempotent sinks give exactly-once effects; the batch recompute is the safety net."
+   },
+   {
+    "title": "Late events",
+    "body": "Mobile clicks can arrive minutes late; watermarks with allowed lateness update the right minute, and anything later is fixed by the daily reconciliation."
+   }
+  ],
+  "rubric": [
+   "Keys the stream by ad and windows by event time.",
+   "Deduplicates by click id for exactly-once billing counts.",
+   "Stores aggregates in an OLAP store.",
+   "Reconciles with a batch recompute from raw data."
+  ]
+ },
+ "108": {
+  "pitch": "A stock-exchange matching engine: accept orders, match by price-time priority, publish trades.",
+  "requirements": {
+   "functional": [
+    "Place limit and market orders",
+    "Match buy and sell orders by price-time priority",
+    "Publish trades and order book updates"
+   ],
+   "nonFunctional": [
+    "Matching latency in microseconds to low milliseconds",
+    "Deterministic, auditable ordering",
+    "No lost or duplicated orders"
+   ],
+   "outOfScope": [
+    "Portfolio analytics",
+    "KYC onboarding"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "About 500 million orders per day",
+    "Peak is 10× the daily average",
+    "About 5,000 listed symbols, with trading concentrated in a few hundred",
+    "Market hours about 6 hours and 15 minutes (as on NSE, publicly documented)"
+   ],
+   "steps": [
+    "Average = 500,000,000 ÷ 86,400 ≈ 5,790 per second.",
+    "Peak ≈ 5,790 × 10 ≈ 58,000 orders per second (the quiz target is about 58,000).",
+    "The quiz scenario's daily average is about 5,800 orders per second over 24 hours; over a 6.25-hour session the real average would be about 22,000 per second, before bursts.",
+    "With a 10× peak factor, about 58,000 orders per second across all symbols; the busiest symbol may take a large share.",
+    "One single-threaded matching engine handles hundreds of thousands of simple operations per second in memory, so one engine per symbol (or per group) fits."
+   ],
+   "result": "About 58,000 orders per second at peak: deterministic in-memory matching per symbol, with a durable sequenced log for recovery and audit."
+  },
+  "architecture": {
+   "steps": [
+    "Orders arrive through gateways that validate them and run risk checks (margin, limits).",
+    "A sequencer assigns a global sequence number and writes each order to a replicated log before matching.",
+    "A single-threaded matching engine per symbol keeps the order book in memory: buy and sell sides sorted by price, then time; incoming orders match against the best opposite prices.",
+    "Trades and book updates are published to market-data feeds and to clearing; every event is in the log.",
+    "Hot standby engines replay the same log; on failure, a standby with the same state takes over deterministically."
+   ],
+   "diagram": "traders -> gateways (validate, risk) -> sequencer (seq no, replicated log) -> matching engine per symbol (in-memory book)\n -> trades -> clearing | book updates -> market data | standby replays log"
+  },
+  "deepDives": [
+   {
+    "title": "Determinism",
+    "body": "A single thread per symbol and a sequenced input log mean replaying the log always reproduces the same trades, which is what makes audit and failover possible."
+   },
+   {
+    "title": "Latency",
+    "body": "Avoiding locks, network hops and garbage-collection pauses in the matching path keeps latency in microseconds; persistence is the replicated log, not a database write per order."
+   }
+  ],
+  "rubric": [
+   "Uses price-time priority in an in-memory order book.",
+   "Sequences and persists orders before matching.",
+   "Keeps matching single-threaded per symbol for determinism.",
+   "Fails over by replaying the log on a standby."
+  ]
+ },
+ "109": {
+  "pitch": "Zoom or Google Meet: group video calls with screen sharing for classes and meetings.",
+  "requirements": {
+   "functional": [
+    "Join a room",
+    "Audio/video",
+    "Screen share"
+   ],
+   "nonFunctional": [
+    "Latency < 200 ms",
+    "Regional media servers",
+    "Adapt to bandwidth"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "10 million daily users, about 2 joins each per day",
+    "Peak is 4× the daily average",
+    "A 10-person call; each participant sends 1.5 megabits per second of video",
+    "SFU forwards streams without decoding"
+   ],
+   "steps": [
+    "Daily joins = 10,000,000 × 2 = 20,000,000.",
+    "Average = 20,000,000 ÷ 86,400 ≈ 231 per second.",
+    "Peak ≈ 231 × 4 ≈ 930 joins per second (the quiz target is about 930).",
+    "Mesh peer-to-peer: each participant uploads to 9 others, so 9 × 1.5 = 13.5 megabits per second of upload, too much for most home connections in India.",
+    "SFU: each participant uploads once (1.5 megabits per second, or several simulcast layers) and downloads 9 streams.",
+    "Joins at about 930 per second are light signalling; media bandwidth through SFUs is the real capacity driver."
+   ],
+   "result": "Joins are only about 930 per second, but media is heavy: SFUs in regions near users forward streams and adapt quality."
+  },
+  "architecture": {
+   "steps": [
+    "Clients join via a signalling service over WebSocket, which authenticates them and assigns a room to a nearby regional SFU.",
+    "Media uses WebRTC over UDP with STUN and TURN for NAT traversal; TURN relays when direct UDP is blocked.",
+    "Each client sends simulcast layers (for example 180p, 360p and 720p); the SFU forwards to each receiver the layer that fits its bandwidth and window size.",
+    "Screen share is another stream, prioritised for clarity over frame rate.",
+    "Large webinars switch to a broadcast model where a few speakers are forwarded to many viewers, possibly via a CDN with HLS for very large audiences."
+   ],
+   "diagram": "client --signalling (WS)--> room svc -> assign regional SFU\nclient --WebRTC (UDP)--> SFU --forward best layer--> other clients\nblocked UDP -> TURN relay"
+  },
+  "deepDives": [
+   {
+    "title": "SFU versus MCU",
+    "body": "An SFU only forwards packets, scaling well; an MCU decodes and mixes, saving client bandwidth but costing a lot of server CPU."
+   },
+   {
+    "title": "Bad networks",
+    "body": "Simulcast plus bandwidth estimation lets a user on a weak mobile network receive 180p while others get 720p, and audio is prioritised over video."
+   }
+  ],
+  "rubric": [
+   "Separates signalling from media.",
+   "Uses SFUs in regions and explains why not mesh.",
+   "Adapts quality with simulcast and bandwidth estimation.",
+   "Handles NAT traversal with STUN and TURN."
+  ]
+ },
+ "110": {
+  "pitch": "Hotstar-style IPL live streaming to tens of millions of concurrent viewers.",
+  "requirements": {
+   "functional": [
+    "Watch live and VOD",
+    "Adaptive bitrate",
+    "Resume playback"
+   ],
+   "nonFunctional": [
+    "Tens of millions concurrent",
+    "Startup < 2 s",
+    "Regional CDN"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "50 million daily users, about 30 segment requests each per day",
+    "Peak is 4× the daily average",
+    "This quiz scenario is deliberately small; live viewers request a new segment every few seconds",
+    "Disney+ Hotstar publicly reported 25.3 million peak concurrent viewers in 2019"
+   ],
+   "steps": [
+    "Daily segment requests = 50,000,000 × 30 = 1,500,000,000.",
+    "Average = 1,500,000,000 ÷ 86,400 ≈ 17,400 per second.",
+    "Peak ≈ 17,400 × 4 ≈ 69,000 segment requests per second (the quiz target is about 69,000).",
+    "At a 4-second segment length, 25,000,000 viewers request about 25,000,000 ÷ 4 = 6,250,000 segments per second at peak.",
+    "At an average 2 megabits per second per viewer, egress is 25,000,000 × 2 = 50,000,000 megabits per second, which is 50 terabits per second.",
+    "Only multiple CDNs with edges deep inside Indian ISPs can deliver that; the origin must see a tiny fraction."
+   ],
+   "result": "Real live peaks reach millions of segment requests and tens of Tbit per second: delivery is entirely a multi-CDN problem, with control-plane services pre-scaled for the toss."
+  },
+  "architecture": {
+   "steps": [
+    "The live feed is encoded into an adaptive bitrate ladder and packaged into short HLS or DASH segments within seconds.",
+    "Segments go to an origin with an origin shield, then to multiple CDNs; manifests point players at the best CDN for their ISP and region.",
+    "Players fetch segments adaptively, dropping quality on weak 4G instead of buffering.",
+    "Login, entitlement and ad services are pre-scaled before the match, because many users join within minutes of the toss.",
+    "Non-essential features (comments, recommendations) degrade first under stress; playback is protected."
+   ],
+   "diagram": "camera feed -> encoders (ABR ladder) -> packager (segments) -> origin + shield -> multi-CDN edges -> players\nlogin/entitlement/ads: pre-scaled | degrade extras first"
+  },
+  "deepDives": [
+   {
+    "title": "Toss-time spike",
+    "body": "Millions join in minutes; pre-scaling and caching entitlement checks stops the login path from becoming the bottleneck before video even starts."
+   },
+   {
+    "title": "Latency versus stability",
+    "body": "Shorter segments cut delay behind the live action but raise request rates and rebuffering risk; a few seconds is a common compromise."
+   }
+  ],
+  "rubric": [
+   "Computes segment request rate and egress at peak.",
+   "Uses multi-CDN with origin shielding.",
+   "Pre-scales login and entitlement for the toss.",
+   "Degrades non-essential features to protect playback."
+  ]
+ },
+ "111": {
+  "pitch": "An online judge like LeetCode or Codeforces: submit code, run tests in a sandbox, show a verdict.",
+  "requirements": {
+   "functional": [
+    "Submit code",
+    "Run tests in sandbox",
+    "Show verdict"
+   ],
+   "nonFunctional": [
+    "Isolation",
+    "Contest spikes",
+    "Fair queueing"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "2 million daily users, about 10 submissions each per day",
+    "Peak is 10× the daily average",
+    "Each submission takes about 2 seconds of sandbox time",
+    "Contest peaks are 10× the average"
+   ],
+   "steps": [
+    "Daily submissions = 2,000,000 × 10 = 20,000,000.",
+    "Average = 20,000,000 ÷ 86,400 ≈ 231 per second.",
+    "Peak ≈ 231 × 10 ≈ 2,300 submissions per second (the quiz target is about 2,300).",
+    "Peak of about 2,300 submissions per second × 2 seconds = 4,600 sandbox-seconds per second, so about 4,600 sandboxes busy at once.",
+    "If one worker machine runs 16 sandboxes, that is about 4,600 ÷ 16 ≈ 288 machines at contest peak.",
+    "Outside contests the fleet can scale down to a small fraction of that."
+   ],
+   "result": "About 2,300 submissions per second at contest peak needs thousands of concurrent sandboxes: queue, isolate and autoscale."
+  },
+  "architecture": {
+   "steps": [
+    "The API stores the submission and puts a job on a queue (separate queues per contest for fairness).",
+    "Workers pull jobs and run code in sandboxes (containers or microVMs such as gVisor or Firecracker) with no network, CPU and memory limits, time limits and a read-only filesystem.",
+    "Tests run against hidden inputs; outputs are compared and a verdict (accepted, wrong answer, time limit) is produced.",
+    "Verdicts are written back and pushed to the user; contest leaderboards update from verdict events.",
+    "Workers autoscale on queue depth before and during contests."
+   ],
+   "diagram": "submit -> API (store) -> queue (per contest) -> workers -> sandbox (no network, limits) -> verdict\nverdict -> DB -> push to user | events -> leaderboard"
+  },
+  "deepDives": [
+   {
+    "title": "Isolation",
+    "body": "User code is hostile by default; sandboxes need syscall filtering, no network, resource limits and fresh environments per run."
+   },
+   {
+    "title": "Fairness",
+    "body": "Per-user and per-contest queues stop one user's flood of submissions from delaying everyone else."
+   }
+  ],
+  "rubric": [
+   "Queues submissions and autoscales workers.",
+   "Runs code in strongly isolated sandboxes with limits.",
+   "Computes concurrent sandbox needs.",
+   "Keeps queueing fair during contests."
+  ]
+ },
+ "112": {
+  "pitch": "An email service: send and receive mail, list the inbox and search it.",
+  "requirements": {
+   "functional": [
+    "Send/receive mail",
+    "Inbox listing",
+    "Full-text search"
+   ],
+   "nonFunctional": [
+    "Durable",
+    "Spam filtering",
+    "Large attachments"
+   ],
+   "outOfScope": [
+    "Building custom hardware",
+    "On-prem mainframe integration"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "100 million daily users, about 20 emails each per day",
+    "Peak is 3× the daily average",
+    "Average email 50 KB including small attachments",
+    "Large attachments stored separately"
+   ],
+   "steps": [
+    "Daily emails = 100,000,000 × 20 = 2,000,000,000.",
+    "Average = 2,000,000,000 ÷ 86,400 ≈ 23,100 per second.",
+    "Peak ≈ 23,100 × 3 ≈ 69,000 emails per second (the quiz target is about 69,000).",
+    "Daily emails = 2,000,000,000; storage = 2,000,000,000 × 50 KB = 100,000,000,000 KB, about 100 TB per day.",
+    "Peak of about 69,000 emails per second through ingestion, spam filtering and indexing.",
+    "Search index adds a fraction of message size and is partitioned per user."
+   ],
+   "result": "About 69,000 emails per second and around 100 TB of mail per day: queue-based ingestion, per-user partitioning and blob storage for bodies."
+  },
+  "architecture": {
+   "steps": [
+    "Inbound SMTP servers accept mail, check SPF, DKIM and DMARC, and put messages on a queue.",
+    "Workers run spam and malware filtering, then store the message body and attachments in object storage and metadata (sender, subject, labels, thread) in a store partitioned by user.",
+    "Each user's mailbox has a per-user search index updated asynchronously.",
+    "Clients list the inbox from metadata with cursor pagination and fetch bodies on open.",
+    "Outbound mail is queued with retries and per-domain rate limits to protect sending reputation."
+   ],
+   "diagram": "SMTP in -> SPF/DKIM/DMARC -> queue -> spam/malware workers -> object storage (bodies) + metadata (per user) -> search index\nclient -> inbox (cursor) -> open -> body | outbound queue -> retries"
+  },
+  "deepDives": [
+   {
+    "title": "Durability",
+    "body": "A message is acknowledged to the sending server only after it is durably queued; otherwise the sender retries, so mail is not lost."
+   },
+   {
+    "title": "Large attachments",
+    "body": "Attachments go to object storage and are referenced by id; identical attachments sent to many recipients can be stored once."
+   }
+  ],
+  "rubric": [
+   "Ingests through a durable queue with authentication checks.",
+   "Stores bodies in object storage and metadata per user.",
+   "Indexes per user for search.",
+   "Queues outbound mail with retries and rate limits."
+  ]
+ },
+ "113": {
+  "pitch": "An S3-like object store: PUT and GET objects by bucket and key, list by prefix, eleven nines durability.",
+  "requirements": {
+   "functional": [
+    "PUT and GET objects by bucket and key",
+    "Store objects from bytes to terabytes",
+    "List objects by prefix"
+   ],
+   "nonFunctional": [
+    "Eleven nines durability",
+    "High availability for reads",
+    "Scale to trillions of objects"
+   ],
+   "outOfScope": [
+    "POSIX file locking",
+    "In-place partial edits"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "About 2 billion object requests per day",
+    "Peak is 3× the daily average",
+    "Average object 500 KB",
+    "Erasure coding 8 data + 4 parity fragments (1.5× overhead)"
+   ],
+   "steps": [
+    "Average = 2,000,000,000 ÷ 86,400 ≈ 23,100 per second.",
+    "Peak ≈ 23,100 × 3 ≈ 69,000 object requests per second (the quiz target is about 69,000).",
+    "Peak of about 69,000 requests per second; if a third are PUTs, about 23,000 × 500 KB = 11,500,000 KB per second, about 11.5 GB per second written.",
+    "Erasure coding stores 1.5× the data, versus 3× for triple replication, halving raw disk for the same object count.",
+    "Any 8 of the 12 fragments rebuild an object, so it survives the loss of any 4 disks or nodes holding its fragments."
+   ],
+   "result": "About 69,000 requests per second and gigabytes per second written: separate metadata from data and use erasure coding for durability at lower cost."
+  },
+  "architecture": {
+   "steps": [
+    "A front-end tier authenticates requests (signed URLs, access keys) and routes them.",
+    "A metadata service maps (bucket, key) → object version, size, checksum and fragment locations, stored in a sharded, strongly consistent database that supports prefix listing.",
+    "PUT: the data is split into fragments with erasure coding and written to storage nodes in different failure domains, then the metadata is committed.",
+    "GET: read the metadata, fetch any 8 fragments in parallel, verify checksums and stream the object.",
+    "Background scrubbers verify checksums and rebuild lost fragments; lifecycle rules move cold objects to cheaper tiers."
+   ],
+   "diagram": "client -> front end (auth) -> metadata svc (bucket/key -> fragments) \nPUT: erasure code 8+4 -> storage nodes (different racks/AZs) -> commit metadata\nGET: fetch 8 of 12 -> verify -> stream | scrubbers repair"
+  },
+  "deepDives": [
+   {
+    "title": "Durability",
+    "body": "Eleven nines come from spreading fragments across failure domains and repairing faster than further failures occur; checksums catch silent corruption."
+   },
+   {
+    "title": "Listing at scale",
+    "body": "Prefix listing needs metadata sorted by key within a bucket, so the metadata store is range-partitioned by (bucket, key), with care for hot prefixes."
+   }
+  ],
+  "rubric": [
+   "Separates metadata from data storage.",
+   "Uses erasure coding or replication across failure domains.",
+   "Verifies with checksums and repairs in the background.",
+   "Supports prefix listing with sorted metadata."
+  ]
+ },
+ "114": {
+  "pitch": "A distributed counter for likes and views that handles very hot counters.",
+  "requirements": {
+   "functional": [
+    "Increment a counter (likes, views)",
+    "Read the current count",
+    "Handle very hot counters"
+   ],
+   "nonFunctional": [
+    "Increments under 10 ms",
+    "Counts may lag by a few seconds",
+    "No lost increments"
+   ],
+   "outOfScope": [
+    "Per-user like history UI",
+    "Fraud detection"
+   ]
+  },
+  "capacity": {
+   "assumptions": [
+    "100 million daily users, about 20 increments each per day",
+    "Peak is 5× the daily average",
+    "A viral post receives 50,000 increments per second (illustrative)",
+    "One Redis key handles roughly 100,000 simple increments per second on one core (illustrative)"
+   ],
+   "steps": [
+    "Daily increments = 100,000,000 × 20 = 2,000,000,000.",
+    "Average = 2,000,000,000 ÷ 86,400 ≈ 23,100 per second.",
+    "Peak ≈ 23,100 × 5 ≈ 120,000 increments per second (the quiz target is about 120,000).",
+    "Peak overall is about 120,000 increments per second across all counters, easily spread over a cluster.",
+    "One viral counter at 50,000 per second sits uncomfortably close to a single key's limit and its shard's CPU.",
+    "Splitting it into 32 sub-counters gives about 50,000 ÷ 32 ≈ 1,560 increments per second each."
+   ],
+   "result": "About 120,000 increments per second overall, with single hot counters near one key's limit: shard hot counters and sum on read."
+  },
+  "architecture": {
+   "steps": [
+    "Increments go to a counter service, which writes to Redis with INCR on the counter key, or on one of N sub-keys chosen at random for hot counters.",
+    "Reads sum the N sub-counters (cached for a second or two), so counts may lag slightly.",
+    "Increments are also written to a log (Kafka) so counts can be rebuilt and persisted to a durable store periodically.",
+    "Counters become hot automatically: when a key's rate passes a threshold, the service starts spreading it over more sub-keys.",
+    "Duplicate increments (such as a double like) are prevented by storing the like itself with a unique (user, post) constraint; the counter counts accepted likes."
+   ],
+   "diagram": "like -> unique (user, post) insert -> counter svc -> INCR counter:post:7#r (r = 0..31)\nread -> sum 32 sub-keys (cache 1 s) | log -> Kafka -> durable store"
+  },
+  "deepDives": [
+   {
+    "title": "No lost increments",
+    "body": "Redis alone can lose recent writes on failover; the Kafka log or periodic durable snapshots allow counts to be rebuilt exactly."
+   },
+   {
+    "title": "Lag versus cost",
+    "body": "Summing 32 keys on every read is cheap with a short cache; allowing counts to lag a few seconds is what makes the design scale."
+   }
+  ],
+  "rubric": [
+   "Shards hot counters into sub-counters.",
+   "Sums on read with a short cache.",
+   "Persists increments durably for rebuilding.",
+   "Deduplicates the underlying action, not the counter."
+  ]
+ }
+}

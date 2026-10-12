@@ -41,6 +41,23 @@ try {
   if (e.code !== 'ENOENT') throw e
 }
 
+// Merge boss study briefs (scripts/authored/boss-deep/*.json: { "<topicId>": BossDeep })
+const bossDeepDir = join(authoredDir, 'boss-deep')
+let bossDeepCount = 0
+try {
+  for (const f of readdirSync(bossDeepDir).filter((x) => x.endsWith('.json')).sort()) {
+    const chunk = JSON.parse(readFileSync(join(bossDeepDir, f), 'utf8'))
+    for (const [id, entry] of Object.entries(chunk)) {
+      const t = topics.find((x) => x.id === Number(id))
+      if (!t || t.kind !== 'boss') throw new Error(`${f}: ${id} is not a boss topic`)
+      t.bossDeep = entry
+      bossDeepCount += 1
+    }
+  }
+} catch (e) {
+  if (e.code !== 'ENOENT') throw e
+}
+
 topics.sort((a, b) => a.id - b.id)
 writeFileSync(out, JSON.stringify(topics, null, 2))
-console.log(`Assembled ${topics.length} topics from ${files.length} files (+${deepCount} deep lessons) -> ${out}`)
+console.log(`Assembled ${topics.length} topics from ${files.length} files (+${deepCount} deep lessons, +${bossDeepCount} boss briefs) -> ${out}`)

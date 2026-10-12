@@ -198,6 +198,17 @@ export interface DeepLesson {
   takeaways: string[]
 }
 
+/** Boss-fight study brief (authored in scripts/authored/boss-deep/*.json). */
+export interface BossDeep {
+  pitch: string
+  requirements: { functional: string[]; nonFunctional: string[]; outOfScope: string[] }
+  capacity: { assumptions: string[]; steps: string[]; result: string }
+  architecture: { steps: string[]; diagram: string }
+  deepDives: { title: string; body: string }[]
+  /** What a strong answer covers */
+  rubric: string[]
+}
+
 export interface Topic {
   id: number
   slug: string
@@ -215,6 +226,7 @@ export interface Topic {
   sources: SourceRef[]
   boss?: BossContent
   deep?: DeepLesson
+  bossDeep?: BossDeep
   bossStages?: BossStage[]
 }
 
