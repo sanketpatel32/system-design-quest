@@ -21,6 +21,113 @@ const TYPE_LABEL: Record<Question['type'], string> = {
   tradeoff: 'Make the call',
 }
 
+/** Lay the request path out left-to-right by edge depth; authored x/y coordinates overlap at real label widths. */
+function BottleneckDiagram({
+  question,
+  picked,
+  disabled,
+  reveal,
+  onPick,
+}: {
+  question: Extract<Question, { type: 'spot_bottleneck' }>
+  picked: string[]
+  disabled: boolean
+  reveal: boolean
+  onPick: (id: string) => void
+}) {
+  const depth = new Map<string, number>()
+  const incoming = new Set(question.diagramEdges.map((e) => e.to))
+  const queue = question.diagramNodes.filter((n) => !incoming.has(n.id)).map((n) => n.id)
+  if (queue.length === 0 && question.diagramNodes[0]) queue.push(question.diagramNodes[0].id)
+  queue.forEach((id) => depth.set(id, 0))
+  for (let i = 0; i < queue.length; i++) {
+    const id = queue[i]!
+    for (const e of question.diagramEdges) {
+      if (e.from === id && !depth.has(e.to)) {
+        depth.set(e.to, (depth.get(id) ?? 0) + 1)
+        queue.push(e.to)
+      }
+    }
+  }
+  const cols = new Map<number, string[]>()
+  for (const n of [...question.diagramNodes].sort((a, b) => a.x - b.x || a.y - b.y)) {
+    const d = depth.get(n.id) ?? 0
+    cols.set(d, [...(cols.get(d) ?? []), n.id])
+  }
+  const NW = 150
+  const NH = 44
+  const GX = 70
+  const GY = 22
+  const pos = new Map<string, { x: number; y: number }>()
+  const maxRows = Math.max(1, ...[...cols.values()].map((c) => c.length))
+  for (const [d, ids] of cols) {
+    const offset = ((maxRows - ids.length) * (NH + GY)) / 2
+    ids.forEach((id, i) => pos.set(id, { x: 10 + d * (NW + GX), y: 10 + offset + i * (NH + GY) }))
+  }
+  const W = 20 + cols.size * NW + (cols.size - 1) * GX
+  const H = 20 + maxRows * NH + (maxRows - 1) * GY
+  return (
+    <div className="rounded-md border border-[var(--color-rail)] bg-[#0a1624] p-3 overflow-x-auto">
+      <p className="text-xs text-dim mb-2">Requests flow left to right. Select the component that saturates first.</p>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-full" style={{ minWidth: Math.min(W, 520), maxHeight: 260 }} role="group" aria-label="Request path diagram">
+        <defs>
+          <marker id={`arrow-${question.id}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0 0L10 5L0 10z" fill="#4E6680" />
+          </marker>
+        </defs>
+        {question.diagramEdges.map((e) => {
+          const a = pos.get(e.from)
+          const b = pos.get(e.to)
+          if (!a || !b) return null
+          return (
+            <line
+              key={`${e.from}-${e.to}`}
+              x1={a.x + NW}
+              y1={a.y + NH / 2}
+              x2={b.x - 2}
+              y2={b.y + NH / 2}
+              stroke="#4E6680"
+              strokeWidth={2}
+              markerEnd={`url(#arrow-${question.id})`}
+            />
+          )
+        })}
+        {question.diagramNodes.map((n) => {
+          const p = pos.get(n.id)!
+          const sel = picked.includes(n.id)
+          const right = reveal && question.correctNodeIds.includes(n.id)
+          const wrong = reveal && sel && !right
+          const stroke = right ? '#6FD38B' : wrong ? '#FF5A4E' : sel ? '#F2B33D' : '#2A4562'
+          return (
+            <g
+              key={n.id}
+              role="button"
+              tabIndex={disabled ? -1 : 0}
+              aria-pressed={sel}
+              aria-label={n.label}
+              aria-disabled={disabled}
+              className={`station ${disabled ? '' : 'cursor-pointer'}`}
+              onClick={() => !disabled && onPick(n.id)}
+              onKeyDown={(e) => {
+                if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault()
+                  onPick(n.id)
+                }
+              }}
+            >
+              <rect className="station-focus" x={p.x - 4} y={p.y - 4} width={NW + 8} height={NH + 8} rx={9} fill="none" stroke="#F2B33D" strokeWidth={2} />
+              <rect x={p.x} y={p.y} width={NW} height={NH} rx={6} fill={sel ? 'rgba(242,179,61,0.12)' : '#14283D'} stroke={stroke} strokeWidth={2} />
+              <text x={p.x + NW / 2} y={p.y + NH / 2 + 4} textAnchor="middle" fontSize={13} fontWeight={600} fill="#EDE6D6" className="font-display">
+                {n.label}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
 function FeedbackMark({ ok }: { ok: boolean }) {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
@@ -107,24 +214,13 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
         </div>
       )}
       {question.type === 'spot_bottleneck' && (
-        <div className="relative h-44 bg-[#080b0f] border border-[var(--color-line)]">
-          {question.diagramNodes.map((n) => (
-            <button
-              key={n.id}
-              type="button"
-              disabled={submitted}
-              onClick={() => setAnswer([n.id])}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 px-2 py-1 text-[11px] font-semibold border ${
-                Array.isArray(answer) && answer.includes(n.id)
-                  ? 'border-[var(--color-teal)] bg-[#0f1f1c] text-[var(--color-teal)]'
-                  : 'border-[var(--color-line)] bg-[#0d1117] text-[#94a3b8]'
-              }`}
-              style={{ left: `${n.x}px`, top: `${n.y}px` }}
-            >
-              {n.label}
-            </button>
-          ))}
-        </div>
+        <BottleneckDiagram
+          question={question}
+          picked={Array.isArray(answer) ? (answer as string[]) : []}
+          disabled={submitted}
+          reveal={result !== null}
+          onPick={(id) => setAnswer([id])}
+        />
       )}
       {question.type === 'drag_order' && (
         <ol className="space-y-2">
