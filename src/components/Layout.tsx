@@ -3,8 +3,8 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useGameStore, useLevel, useStreak } from '../stores/gameStore'
 import { BADGE_LABELS } from '../lib/progression/badges'
 import { IconBadge, IconFlame, IconGem, NavIcon } from './icons/HudIcons'
-import { Mascot } from './art/Mascot'
 import { HelpShortcuts } from './HelpShortcuts'
+import { Logo, LogoMark } from './brand/Logo'
 import { AccountButton } from './AccountButton'
 
 const nav = [
@@ -33,8 +33,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-full flex flex-col lg:pl-[248px]">
       <aside className="sidebar hidden lg:flex">
         <Link to="/" className="flex items-center gap-2 px-3 py-2" aria-label="System Design Quest, back to map">
-          <Mascot size={44} />
-          <span className="font-display text-[26px] text-[var(--color-hero-deep)]">designquest</span>
+          <Logo size={44} />
         </Link>
         <nav className="mt-4 flex flex-col gap-1.5" aria-label="Main">
           {nav.map((item) => (
@@ -53,8 +52,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <header className="shell-header sticky top-0 z-50">
         <div className="max-w-[1180px] mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-3">
           <Link to="/" className="flex items-center gap-2 shrink-0 lg:invisible" aria-label="System Design Quest, back to map" tabIndex={-1}>
-            <Mascot size={40} />
-            <span className="font-display text-2xl text-[var(--color-hero-deep)] hidden sm:inline">designquest</span>
+            <LogoMark size={38} />
+            <span className="font-display text-2xl leading-none hidden sm:inline"><span className="text-chalk">design</span><span className="text-[#58cc02]">quest</span></span>
           </Link>
           <div className="relative flex items-center gap-1">
             <button
