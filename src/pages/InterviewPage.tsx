@@ -155,7 +155,7 @@ export function InterviewPage() {
         <section className="panel p-5 space-y-4" aria-labelledby="brief">
           <div>
             <h2 id="brief" className="font-display text-xl font-bold text-chalk">Brief: {boss.title}</h2>
-            <p className="text-[15px] text-chalk mt-1">
+            <p className="text-[0.9375rem] text-chalk mt-1">
               Your interviewer says: “Design {boss.title}.” Treat the details below as what you would learn by asking.
             </p>
           </div>
@@ -203,11 +203,11 @@ export function InterviewPage() {
               {STAGES.map((s, i) => (
                 <li key={s.label} className="flex-1" style={{ flexGrow: INTERVIEW_STAGE_MINUTES[i] }} aria-current={i === stageIndex ? 'step' : undefined}>
                   <div className="h-3 rounded-full" style={{ background: i < stageIndex ? 'var(--color-hero)' : i === stageIndex ? '#1CB0F6' : '#ECE7DF' }} />
-                  <p className={`mt-1 text-[11px] truncate ${i === stageIndex ? 'text-chalk' : 'text-dim'}`}>{s.label}</p>
+                  <p className={`mt-1 text-[0.6875rem] truncate ${i === stageIndex ? 'text-chalk' : 'text-dim'}`}>{s.label}</p>
                 </li>
               ))}
             </ol>
-            <p className="text-[15px] text-chalk border-t border-[var(--color-rail)] pt-3">{STAGES[stageIndex]!.ask}</p>
+            <p className="text-[0.9375rem] text-chalk border-t border-[var(--color-rail)] pt-3">{STAGES[stageIndex]!.ask}</p>
           </section>
           <div>
             <label htmlFor="mock-notes" className="block text-sm font-semibold text-chalk mb-1">
@@ -215,7 +215,7 @@ export function InterviewPage() {
             </label>
             <textarea
               id="mock-notes"
-              className="field w-full min-h-[130px] text-[15px] leading-relaxed"
+              className="field w-full min-h-[130px] text-[0.9375rem] leading-relaxed"
               value={stageNotes[stageIndex] ?? ''}
               onChange={(e) => {
                 const next = [...stageNotes]
@@ -284,7 +284,7 @@ export function InterviewPage() {
             <div className="mt-3 space-y-2 text-sm text-chalk leading-relaxed">
               <p>{boss.boss?.referenceNotes}</p>
               <p><span className="text-chalk font-semibold">Estimate: </span>{boss.boss?.workedEstimate}</p>
-              <pre className="whitespace-pre-wrap rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 text-[13px] text-chalk">{boss.boss?.exampleApi}</pre>
+              <pre className="whitespace-pre-wrap rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 text-[0.8125rem] text-chalk">{boss.boss?.exampleApi}</pre>
               <p><span className="text-chalk font-semibold">Trade-offs: </span>{boss.boss?.tradeoffAnalysis}</p>
             </div>
           </details>

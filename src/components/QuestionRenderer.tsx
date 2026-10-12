@@ -334,7 +334,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
                   onChange={() => setAnswer([c.id])}
                 />
                 <kbd className="kbd shrink-0">{idx + 1}</kbd>
-                <span className="text-[16px] font-bold text-chalk">{c.label}</span>
+                <span className="text-[1rem] font-bold text-chalk">{c.label}</span>
               </label>
             )
           })}
@@ -427,7 +427,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
               />
               <span>
                 <span className="block font-extrabold text-chalk">{a.label}</span>
-                <span className="block text-[15px] font-semibold text-dim mt-0.5">{a.description}</span>
+                <span className="block text-[0.9375rem] font-semibold text-dim mt-0.5">{a.description}</span>
               </span>
             </label>
           ))}
@@ -522,7 +522,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
                     {shown.correct ? 'Correct' : 'Not this time'}
                   </p>
                   {!/^correct\.?$/i.test(shown.feedback.trim()) && <p className="font-bold">{shown.feedback}</p>}
-                  <p className="mt-1 text-[15px] leading-relaxed text-chalk">
+                  <p className="mt-1 text-[0.9375rem] leading-relaxed text-chalk">
                     <span className="font-extrabold">Why: </span>
                     {question.explanation}
                   </p>

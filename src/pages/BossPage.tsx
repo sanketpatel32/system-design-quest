@@ -183,7 +183,7 @@ export function BossPage() {
                 <span className="text-chalk font-semibold">Estimate: </span>
                 {topic.boss.workedEstimate}
               </p>
-              <pre className="whitespace-pre-wrap rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 text-[13px] text-chalk">{topic.boss.exampleApi}</pre>
+              <pre className="whitespace-pre-wrap rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 text-[0.8125rem] text-chalk">{topic.boss.exampleApi}</pre>
               <p>
                 <span className="text-chalk font-semibold">Trade-offs: </span>
                 {topic.boss.tradeoffAnalysis}

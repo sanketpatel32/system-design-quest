@@ -53,7 +53,7 @@ export function TopicPage() {
     .filter(Boolean)
 
   return (
-    <div className="grid xl:grid-cols-[1fr_260px] gap-6 items-start">
+    <div className="grid xl:grid-cols-[1fr_16.25rem] 2xl:grid-cols-[1fr_19rem] gap-6 items-start">
       <div className="space-y-5 min-w-0">
         <header className="unit-banner flex items-center gap-4 p-5 sm:p-6" style={{ background: pal.deep, ['--banner-shadow' as string]: pal.shadow }}>
           <div className="min-w-0 flex-1">

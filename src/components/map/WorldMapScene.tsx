@@ -71,7 +71,7 @@ export function WorldMapScene() {
   const arenaOpen = unlocked.includes(74) || completed.has(74)
 
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_330px]">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_20.625rem] 2xl:grid-cols-[minmax(0,1fr)_23rem]">
       <section aria-labelledby="map-title" className="min-w-0">
         <Onboarding />
         {nextTopic && (
@@ -219,7 +219,7 @@ function UnitBanner({ regionId, index, done, total, title, subtitle }: { regionI
           <span className="text-sm font-extrabold text-white tabular-nums">{done}/{total}</span>
         </div>
       </div>
-      <RegionArt regionId={regionId} width={150} className="shrink-0 w-[104px] sm:w-[150px] h-auto" />
+      <RegionArt regionId={regionId} width={150} className="shrink-0 w-[6.5rem] sm:w-[9.375rem] h-auto" />
     </div>
   )
 }
@@ -231,7 +231,7 @@ function Unit({ regionId, index, statusMap, completed, nextId }: { regionId: str
   return (
     <section aria-label={`Unit ${index + 1}: ${region.subtitle}`}>
       <UnitBanner regionId={regionId} index={index} done={done} total={topics.length} title={region.name} subtitle={region.subtitle} />
-      <ol className="relative mx-auto mt-8 flex max-w-[420px] flex-col items-center gap-10">
+      <ol className="relative mx-auto mt-8 flex max-w-[26.25rem] flex-col items-center gap-10">
         {topics.map((t, j) => (
           <PathNode key={t.id} topic={t} offset={WIND[(j + index * 3) % WIND.length]!} status={statusMap.get(t.id) ?? 'locked'} current={t.id === nextId} completed={completed} first={j === 0} />
         ))}
@@ -248,7 +248,7 @@ function ArenaUnit({ statusMap, completed, open }: { statusMap: Map<number, Stat
   return (
     <section aria-label="Final unit: Architecture Colosseum">
       <UnitBanner regionId="boss-arena" index={null} done={done} total={arenaTopics.length} title={open ? 'Full design problems, scored stage by stage' : 'Clear Unit 1 to open the gates'} subtitle={arena?.subtitle ?? 'Architecture Colosseum'} />
-      <ol className="relative mx-auto mt-8 flex max-w-[420px] flex-col items-center gap-10">
+      <ol className="relative mx-auto mt-8 flex max-w-[26.25rem] flex-col items-center gap-10">
         {shown.map((t, j) => (
           <PathNode key={t.id} topic={t} offset={WIND[(j * 2) % WIND.length]!} status={statusMap.get(t.id) ?? 'locked'} current={false} completed={completed} boss />
         ))}
@@ -318,7 +318,7 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
       >
         {icon}
       </button>
-      <span className={`pointer-events-none absolute top-1/2 w-[112px] sm:w-[132px] -translate-y-1/2 text-[13px] font-extrabold leading-tight ${labelSide} ${locked ? 'text-dim' : 'text-chalk'}`}>
+      <span className={`pointer-events-none absolute top-1/2 w-[7rem] sm:w-[8.25rem] -translate-y-1/2 text-[0.8125rem] font-extrabold leading-tight ${labelSide} ${locked ? 'text-dim' : 'text-chalk'}`}>
         {topic.title}
       </span>
       {open && (
@@ -382,7 +382,7 @@ function Onboarding() {
       <MascotSays mood="happy" size={88}>
         <h2 id="onboard-title" className="font-display text-xl text-chalk">Hi, I’m Byte! Here’s how DesignQuest works.</h2>
       </MascotSays>
-      <ul className="mt-3 grid gap-3 text-[15px] sm:grid-cols-2">
+      <ul className="mt-3 grid gap-3 text-[0.9375rem] sm:grid-cols-2">
         {[
           ['Lessons', 'Each node is a short lesson, then a quiz. Pass to open the next one.', '#58CC02'],
           ['Hearts', 'You get 3 per quiz. A wrong answer costs one; blank answers never do.', '#FF4B4B'],
