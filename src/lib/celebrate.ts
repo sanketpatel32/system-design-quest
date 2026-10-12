@@ -2,7 +2,12 @@ import confetti from 'canvas-confetti'
 
 export function fireConfetti(reducedMotion: boolean) {
   if (reducedMotion) return
-  confetti({ particleCount: 80, spread: 70, origin: { y: 0.7 } })
+  const colors = ['#58CC02', '#1CB0F6', '#FFC800', '#FF4B4B', '#CE82FF', '#FF9600']
+  confetti({ particleCount: 110, spread: 80, origin: { y: 0.6 }, colors, scalar: 1.1 })
+  setTimeout(() => {
+    confetti({ particleCount: 60, angle: 60, spread: 60, origin: { x: 0, y: 0.7 }, colors })
+    confetti({ particleCount: 60, angle: 120, spread: 60, origin: { x: 1, y: 0.7 }, colors })
+  }, 250)
 }
 
 export function playCelebrationSound(enabled: boolean, hasGesture: boolean) {
