@@ -219,7 +219,7 @@ function UnitBanner({ regionId, index, done, total, title, subtitle }: { regionI
           <span className="text-sm font-extrabold text-white tabular-nums">{done}/{total}</span>
         </div>
       </div>
-      <RegionArt regionId={regionId} width={150} className="shrink-0 hidden min-[420px]:block" />
+      <RegionArt regionId={regionId} width={150} className="shrink-0 w-[104px] sm:w-[150px] h-auto" />
     </div>
   )
 }
