@@ -14,11 +14,12 @@ App server 2 > Redis|sessions
 App server N > Redis|sessions
 DB primary [replicate]~> Read replicas
 
-@6 DNS resolution: the app asks the stub resolver, which asks a recursive resolver; the resolver walks root, then TLD, then authoritative servers, and caches the answer for its TTL.
-App > Stub resolver > Recursive resolver|caches for TTL
-Recursive resolver [1. ask .in?]> Root servers
-Recursive resolver [2. ask domain]> .in TLD servers
-Recursive resolver [3. A record]> Authoritative|A 203.0.113.10, TTL 60
+@6 DNS resolution: the app asks the stub resolver, which asks one recursive resolver; that resolver walks root, then TLD, then authoritative servers, and caches the answer for its TTL.
+App > Stub resolver
+Stub resolver [ask; cached for TTL]> Recursive resolver {svc}
+Recursive resolver {svc} [1. ask .in?]> Root servers
+Recursive resolver {svc} [2. ask domain]> .in TLD servers
+Recursive resolver {svc} [3. A record]> Authoritative|A 203.0.113.10, TTL 60
 
 @10 Live order tracking: the rider app sends location to a location service that publishes to pub/sub; the customer's WebSocket gateway, found via a registry, subscribes and pushes updates.
 Rider app [location]> Location service [publish order:42]> Pub/sub
@@ -46,12 +47,10 @@ Web 3 > Object storage|uploads
 @15 Cache layers from fastest and least shared to slowest and authoritative: app cache, CDN edge, gateway cache, in-process cache, Redis, database buffer pool, disk.
 App cache > CDN edge > Gateway cache > In-process cache > Redis > DB buffer pool > Disk|source of truth
 
-@16 Cache-aside: the app checks the cache; on a hit it returns, on a miss it reads the database and sets the cache with a TTL. Writes go to the database and then delete the cache key.
-App [1. get]> Cache
-App [2. on miss, read]> Database
-App [3. set with TTL]~> Cache
-Writer [update row]> Database
-Writer [then delete key]> Cache
+@16 Cache-aside: on the read path the app gets from the cache; on a miss it reads the database and sets the cache with a TTL. On the write path the writer updates the database, then deletes the cache key.
+App|read path [1. get]> Cache [b. then delete key]< Writer|write path
+App|read path [2. on miss, read]> Database [a. update row]< Writer|write path
+App|read path [3. set with TTL]> Cache
 
 @18 Stampede protection: when a hot key expires, 50K requests per second miss and hit a single-flight guard; one request rebuilds from the database while others are served stale or wait briefly.
 50K req/s on|expired key [miss]> Single-flight guard
@@ -93,12 +92,11 @@ Leader [log, async]~> Follower 2
 Reader [reads, may lag]> Follower 2
 Reader [own recent writes]> Leader
 
-@29 Quorum with N=3, W=2, R=2: a write is acknowledged by r1 and r2; a read asks r2 and r3, returns r2's newer value and repairs r3.
-Writer [W=2]> r1
-Writer [W=2]> r2
-Reader [R=2, newest wins]> r2
-Reader [R=2]> r3
-Reader [read repair]~> r3
+@29 Quorum with N=3, W=2, R=2: the write is sent to all three replicas and succeeds once r1 and r2 acknowledge (r3 is late); a read asks r2 and r3, returns r2's newer value and repairs r3.
+Writer [sent + ack]> r1 {store}
+Writer [sent + ack]> r2 {store} [R=2, newest wins]< Reader
+Writer [sent, late]~> r3 {store} [R=2]< Reader
+r3 {store} [read repair]~< Reader
 
 @30 Sharding: a key is hashed to one of 64 logical shards, and a routing map assigns those shards to 12 physical nodes; user 42 maps to shard 17 on node 5.
 Key|user 42 > hash(key) mod 64 > Logical shard 17 > Routing map > Physical node 5|of 12
@@ -137,10 +135,12 @@ Client > Leader|term 7 [AppendEntries]> Follower F1|acks
 Leader|term 7 [AppendEntries]~> Follower F2|slow
 Follower F1|acks > Majority stored > Commit, apply|and reply
 
-@46 Fencing tokens: A holds the lock with token 33 but pauses; the lease expires and B gets token 34; when A wakes and writes with 33, storage rejects it because 34 was already seen.
-Client A|token 33 [GC pause]> Lease expires > Client B|token 34 [write 34]> Storage|highest token 34
-Client A|token 33 [late write 33]> Storage|highest token 34
-Storage|highest token 34 > Rejects 33
+@46 Fencing tokens: the lock service gives client A token 33; A pauses, its lease expires and B gets token 34 and writes; when A wakes and writes with 33, storage rejects it because 34 was already seen.
+Lock service|lease expires, issues 34 [1. token 33]> Client A|then GC pause
+Lock service|lease expires, issues 34 [2. token 34]> Client B
+Client B [3. write, token 34]> Storage|highest token 34
+Client A|then GC pause [4. late write, token 33]> Storage|highest token 34
+Storage|highest token 34 > Reject 33 {ext}
 
 @51 An API gateway handles TLS, auth, rate limits, routing and tracing, then forwards to a backend-for-frontend that calls profile, offers and orders services in parallel.
 Client > API gateway|TLS, auth, rate limit > BFF > Profile service
@@ -180,9 +180,10 @@ JWT > Alg allow-listed? > Key by kid|from JWKS > Signature OK? > exp, iss, aud O
 Internet > WAF +|rate limit > Gateway|TLS, authn > Service|validate, authz > DB user|least privilege
 
 @61 Direct upload: the app records metadata as pending and returns a presigned URL; the client PUTs bytes straight to object storage, whose event triggers a worker that scans, makes thumbnails and marks the file ready.
-Client [1. request upload]> App|metadata pending
-App|metadata pending [2. presigned URL]> Client
-Client [3. PUT bytes]> Object storage [4. event]~> Worker|scan, thumbnail > Metadata ready
+Client [1. request upload]> App|metadata pending {svc}
+App|metadata pending {svc} [2. presigned URL]> Client
+Client [3. PUT bytes]> Object storage
+Object storage [4. event]~> Worker|scan, thumbnail > Metadata ready {store}
 
 @62 HDFS write pipeline: the NameNode maps file blocks to DataNodes; the client streams a block to DN1 on rack A, which forwards to DN4 and DN5 on rack B.
 Client [where to write?]> NameNode|block map
@@ -277,7 +278,7 @@ Player > Manifest > Segments from CDN|adaptive bitrate
 @87 Netflix: the control plane (catalogue and personalisation) runs multi-region; playback fetches a manifest and then segments from ISP or edge caches; progress is stored by user and title for resume.
 App > Control plane|catalogue, personalisation
 Play > Manifest > Segments from|ISP / edge cache
-Progress > KV store|user, title > Resume
+Progress > KV store|user, title {store} > Resume
 
 @88 Uber/Ola: driver apps send locations through a gateway into a city-sharded geo index; dispatch searches nearby cells, ranks by ETA, makes an offer and records acceptance with a conditional write; trip events go to Kafka for billing and analytics.
 Driver app > Location gateway > Geo index|city shard, cells
@@ -339,11 +340,9 @@ Search + filters|+ facets > Elasticsearch|shards x replicas
 
 @100 Metrics monitoring: agents send to Kafka, ingest workers write raw points to a partitioned TSDB, rollup jobs build 1-minute and 1-hour aggregates, dashboards query through a cache, and an alert engine evaluates rules every 15 to 30 s and notifies with dedup and silencing.
 Agents > Kafka > Ingest workers > TSDB|raw, partitioned
-Rollup job > Aggregates|1 min / 1 h
-TSDB|raw, partitioned > Rollup job
-Dashboards > Query cache > Aggregates|1 min / 1 h
-Alert engine|every 15-30 s > Notify|dedup, silence
-TSDB|raw, partitioned > Alert engine|every 15-30 s
+TSDB|raw, partitioned > Alert engine|every 15-30 s > Notify|dedup, silence
+TSDB|raw, partitioned > Rollup job > Aggregates|1 min / 1 h {store}
+Dashboards > Query cache [reads rollups]> Aggregates|1 min / 1 h {store}
 
 @101 Distributed logging: apps write to a local file; an agent batches with a disk buffer and masks secrets, ships to Kafka, indexers write daily indices to a search cluster, and data ages from hot (7 days) to warm (30 days) to an object storage archive.
 App > Local file > Agent|batch, disk buffer, masking > Kafka > Indexers > Search cluster|daily indices
@@ -393,13 +392,13 @@ Camera feed > Encoders|ABR ladder > Packager|segments > Origin + shield > Multi-
 Players > Login, entitlement,|ads (pre-scaled)
 
 @111 Online judge: submissions are stored by the API and queued per contest; workers run code in a sandbox with no network and strict limits, store the verdict, push it to the user and emit events to the leaderboard.
-Submit > API|store > Queue|per contest > Workers > Sandbox|no network, limits > Verdict > DB
+Submit > API|store > Queue|per contest > Workers > Sandbox|no network, limits {svc} > Verdict > DB
 Verdict [push]> User
 Verdict ~> Leaderboard
 
 @112 Email service: inbound SMTP is checked for SPF, DKIM and DMARC, queued for spam and malware workers, and stored with bodies in object storage and per-user metadata indexed for search; clients read the inbox by cursor; outbound mail is queued with retries.
 SMTP in > SPF / DKIM / DMARC > Queue > Spam + malware|workers > Object storage|bodies
-Spam + malware|workers > Metadata|per user > Search index
+Spam + malware|workers > Metadata|per user {store} > Search index
 Client > Inbox|cursor > Metadata|per user
 Client [send]> Outbound queue|retries
 
@@ -411,6 +410,6 @@ Front end|auth [GET: 8 of 12]> Storage nodes|racks / AZs
 Scrubbers [repair]> Storage nodes|racks / AZs
 
 @114 Distributed counter: a like first inserts a unique (user, post) row, then the counter service increments one of 32 sub-keys; reads sum the 32 sub-keys with a 1-second cache; increments are also logged to Kafka for a durable store.
-Like > Unique insert|(user, post) > Counter service > INCR counter:post:7#r|r = 0..31
+Like > Unique insert|(user, post) {store} > Counter service > INCR counter:post:7#r|r = 0..31
 Read > Sum 32 sub-keys|cache 1 s > INCR counter:post:7#r|r = 0..31
 Counter service ~> Kafka > Durable store
