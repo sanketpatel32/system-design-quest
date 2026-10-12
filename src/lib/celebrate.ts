@@ -1,13 +1,10 @@
 import confetti from 'canvas-confetti'
 
 export function fireConfetti(reducedMotion: boolean) {
-  if (reducedMotion) return
+  if (reducedMotion || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+  // One small, soft burst behind the cheering Byte
   const colors = ['#58CC02', '#1CB0F6', '#FFC800', '#FF4B4B', '#CE82FF', '#FF9600']
-  confetti({ particleCount: 110, spread: 80, origin: { y: 0.6 }, colors, scalar: 1.1 })
-  setTimeout(() => {
-    confetti({ particleCount: 60, angle: 60, spread: 60, origin: { x: 0, y: 0.7 }, colors })
-    confetti({ particleCount: 60, angle: 120, spread: 60, origin: { x: 1, y: 0.7 }, colors })
-  }, 250)
+  confetti({ particleCount: 60, spread: 70, startVelocity: 32, gravity: 1.1, ticks: 160, origin: { y: 0.45 }, colors, scalar: 0.9 })
 }
 
 export function playCelebrationSound(enabled: boolean, hasGesture: boolean) {

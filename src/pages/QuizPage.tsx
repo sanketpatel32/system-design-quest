@@ -132,7 +132,7 @@ export function QuizPage() {
       {showResult ? (
         passed ? (
           <section className="py-4 text-center" aria-labelledby="quiz-result" role="status">
-            <Mascot mood="happy" size={150} className="mx-auto anim-pop" />
+            <Mascot mood="happy" size={150} className={`mx-auto ${claim ? 'byte-cheer' : 'anim-pop'}`} />
             <h1 id="quiz-result" className="font-display mt-3 text-4xl text-[var(--color-hero-deep)]">
               {claim || alreadyCleared ? 'Lesson complete!' : 'You passed!'}
             </h1>
