@@ -44,6 +44,8 @@ export function InterviewPage() {
     setStageStartedAt(ts)
     setStageIndex(0)
     setFinished(false)
+    setNotes('')
+    setCanvas(undefined)
     setPrefs({ hasGestureForSound: true })
   }
 
