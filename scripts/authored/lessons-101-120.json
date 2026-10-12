@@ -1,0 +1,1592 @@
+[
+  {
+    "id": 115,
+    "slug": "clarifying-requirements",
+    "region": "r10-strategy",
+    "order": 1,
+    "title": "Clarifying Requirements",
+    "kind": "lesson",
+    "objectives": [
+      "Explain Clarifying Requirements with measurable requirements and failure modes",
+      "Apply Clarifying Requirements to a high-traffic India-scale scenario in an interview"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t115-c1",
+        "kind": "Why this matters in interviews",
+        "title": "text",
+        "body": "Interview lens on Clarifying Requirements: open with actors, peak traffic shape, and explicit non-goals so the conversation stays bounded like a production RFC review (topic 115).",
+        "accent": "Interview lens"
+      },
+      {
+        "id": "t115-c2",
+        "kind": "Mental model",
+        "title": "text",
+        "body": "Mental model for Clarifying Requirements: map each user action to a synchronous vs asynchronous hop, then mark which hops need strong invariants versus where stale reads are tolerable."
+      },
+      {
+        "id": "t115-c3",
+        "kind": "Request flow sketch",
+        "title": "diagram",
+        "body": "Walk a hot read path for Clarifying Requirements: client → DNS/TLS → edge → service → cache → store. Call out where you would measure p95 and which hop fails first under 10× diurnal peak."
+      },
+      {
+        "id": "t115-c4",
+        "kind": "Trade-off or failure mode",
+        "title": "text",
+        "body": "Failure mode in Clarifying Requirements: retries without idempotency, cache stampedes, or unbounded fan-out often hurt before raw CPU; name the guardrail you add first for this topic."
+      },
+      {
+        "id": "t115-c5",
+        "kind": "How to explain it aloud",
+        "title": "animation",
+        "body": "Say aloud for Clarifying Requirements: (1) user story in one sentence, (2) two numbers (QPS + data size), (3) one trade-off you will revisit in the deep dive.",
+        "accent": "Say this"
+      }
+    ],
+    "questions": [
+      {
+        "id": "t115-q1",
+        "type": "multiple_choice",
+        "prompt": "For Clarifying Requirements, which first step best reduces ambiguity in a system design interview?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Pick databases before requirements"
+          },
+          {
+            "id": "b",
+            "label": "List user actions, scale, and latency/durability targets"
+          },
+          {
+            "id": "c",
+            "label": "Draw microservices for every feature"
+          },
+          {
+            "id": "d",
+            "label": "Discuss office tooling"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Strong interviews anchor on requirements and SLOs before components."
+      },
+      {
+        "id": "t115-q2",
+        "type": "spot_bottleneck",
+        "prompt": "Where is the first saturation point in a naive single-region Clarifying Requirements design under flash traffic?",
+        "diagramNodes": [
+          {
+            "id": "n1",
+            "label": "Clients",
+            "x": 20,
+            "y": 50
+          },
+          {
+            "id": "n2",
+            "label": "API tier",
+            "x": 120,
+            "y": 50
+          },
+          {
+            "id": "n3",
+            "label": "Primary database",
+            "x": 220,
+            "y": 50
+          }
+        ],
+        "diagramEdges": [
+          {
+            "from": "n1",
+            "to": "n2"
+          },
+          {
+            "from": "n2",
+            "to": "n3"
+          }
+        ],
+        "correctNodeIds": [
+          "n3"
+        ],
+        "explanation": "Unsharded OLTP primaries usually exhaust connections/IOPS before stateless tiers."
+      },
+      {
+        "id": "t115-q3",
+        "type": "drag_order",
+        "prompt": "Order a crisp interview flow when presenting Clarifying Requirements.",
+        "items": [
+          {
+            "id": "1",
+            "label": "Clarify functional scope and SLAs"
+          },
+          {
+            "id": "2",
+            "label": "Estimate QPS, storage, and bandwidth"
+          },
+          {
+            "id": "3",
+            "label": "Sketch high-level architecture"
+          },
+          {
+            "id": "4",
+            "label": "Deep dive hot path and failures"
+          }
+        ],
+        "correctOrder": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "explanation": "Numbers before boxes keeps trade-offs honest."
+      },
+      {
+        "id": "t115-q4",
+        "type": "estimation",
+        "prompt": "Clarifying Requirements: 2.4M read requests/day spread uniformly. Estimate average read QPS (nearest integer).",
+        "unit": "QPS",
+        "target": 28.0,
+        "assumptions": [
+          "86400 s/day",
+          "2.4e6 / 86400 ≈ 27.8 QPS average"
+        ],
+        "formula": "QPS ≈ requests_per_day / 86400",
+        "workedAnswer": "2.4M/day ≈ 27.8 QPS average; plan higher for peak factors.",
+        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
+      },
+      {
+        "id": "t115-q5",
+        "type": "tradeoff",
+        "prompt": "Choose an approach to handle 5× lunch-hour spikes for Clarifying Requirements.",
+        "constraints": [
+          "p95 read < 250ms",
+          "Small SRE team",
+          "Must survive regional AZ loss"
+        ],
+        "approaches": [
+          {
+            "id": "scale_up",
+            "label": "Scale up one giant node",
+            "description": "Simple but single choke point"
+          },
+          {
+            "id": "scale_out",
+            "label": "Horizontally scale stateless API + cache",
+            "description": "Adds LB and cache complexity"
+          },
+          {
+            "id": "nothing",
+            "label": "Disable peak features",
+            "description": "Harms revenue"
+          }
+        ],
+        "correctApproachId": "scale_out",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "Stateless tiers absorb burst without one machine ceiling"
+          },
+          {
+            "id": "r2",
+            "label": "Caching shifts read load off the primary"
+          },
+          {
+            "id": "bad",
+            "label": "Vertical scale cannot survive AZ loss by itself"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "bad"
+        ],
+        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
+      },
+      {
+        "id": "t115-q6",
+        "type": "multiple_choice",
+        "prompt": "Which NON-functional requirement is most central to Clarifying Requirements?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "IDE theme"
+          },
+          {
+            "id": "b",
+            "label": "Correctness under retries and partial failures"
+          },
+          {
+            "id": "c",
+            "label": "Logo color palette"
+          },
+          {
+            "id": "d",
+            "label": "Number of standup meetings"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t115-f1",
+        "front": "What is the core interview takeaway for Clarifying Requirements?",
+        "back": "Connect user journeys to SLOs, then justify components and trade-offs for Clarifying Requirements."
+      },
+      {
+        "id": "t115-f2",
+        "front": "Name one pitfall when discussing Clarifying Requirements.",
+        "back": "Skipping scale numbers, ignoring retries/idempotency, or mixing AuthN with AuthZ."
+      },
+      {
+        "id": "t115-f3",
+        "front": "Which metric would you cite first for Clarifying Requirements?",
+        "back": "p95 latency on the hot path plus error rate on writes/reads that affect revenue or safety."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Google SRE Book — Designing Distributed Systems",
+        "url": "https://sre.google/sre-book/designing-distributed-systems/"
+      },
+      {
+        "title": "AWS Well-Architected Framework",
+        "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
+      }
+    ]
+  },
+  {
+    "id": 116,
+    "slug": "deep-dives-trade-off-language",
+    "region": "r10-strategy",
+    "order": 2,
+    "title": "Deep Dives & Trade-off Language",
+    "kind": "lesson",
+    "objectives": [
+      "Explain Deep Dives & Trade-off Language with measurable requirements and failure modes",
+      "Apply Deep Dives & Trade-off Language to a high-traffic India-scale scenario in an interview"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t116-c1",
+        "kind": "Why this matters in interviews",
+        "title": "text",
+        "body": "Interview lens on Deep Dives & Trade-off Language: open with actors, peak traffic shape, and explicit non-goals so the conversation stays bounded like a production RFC review (topic 116).",
+        "accent": "Interview lens"
+      },
+      {
+        "id": "t116-c2",
+        "kind": "Mental model",
+        "title": "text",
+        "body": "Mental model for Deep Dives & Trade-off Language: map each user action to a synchronous vs asynchronous hop, then mark which hops need strong invariants versus where stale reads are tolerable."
+      },
+      {
+        "id": "t116-c3",
+        "kind": "Request flow sketch",
+        "title": "diagram",
+        "body": "Walk a hot read path for Deep Dives & Trade-off Language: client → DNS/TLS → edge → service → cache → store. Call out where you would measure p95 and which hop fails first under 10× diurnal peak."
+      },
+      {
+        "id": "t116-c4",
+        "kind": "Trade-off or failure mode",
+        "title": "text",
+        "body": "Failure mode in Deep Dives & Trade-off Language: retries without idempotency, cache stampedes, or unbounded fan-out often hurt before raw CPU; name the guardrail you add first for this topic."
+      },
+      {
+        "id": "t116-c5",
+        "kind": "How to explain it aloud",
+        "title": "animation",
+        "body": "Say aloud for Deep Dives & Trade-off Language: (1) user story in one sentence, (2) two numbers (QPS + data size), (3) one trade-off you will revisit in the deep dive.",
+        "accent": "Say this"
+      }
+    ],
+    "questions": [
+      {
+        "id": "t116-q1",
+        "type": "multiple_choice",
+        "prompt": "For Deep Dives & Trade-off Language, which first step best reduces ambiguity in a system design interview?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Pick databases before requirements"
+          },
+          {
+            "id": "b",
+            "label": "List user actions, scale, and latency/durability targets"
+          },
+          {
+            "id": "c",
+            "label": "Draw microservices for every feature"
+          },
+          {
+            "id": "d",
+            "label": "Discuss office tooling"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Strong interviews anchor on requirements and SLOs before components."
+      },
+      {
+        "id": "t116-q2",
+        "type": "spot_bottleneck",
+        "prompt": "Where is the first saturation point in a naive single-region Deep Dives & Trade-off Language design under flash traffic?",
+        "diagramNodes": [
+          {
+            "id": "n1",
+            "label": "Clients",
+            "x": 20,
+            "y": 50
+          },
+          {
+            "id": "n2",
+            "label": "API tier",
+            "x": 120,
+            "y": 50
+          },
+          {
+            "id": "n3",
+            "label": "Primary database",
+            "x": 220,
+            "y": 50
+          }
+        ],
+        "diagramEdges": [
+          {
+            "from": "n1",
+            "to": "n2"
+          },
+          {
+            "from": "n2",
+            "to": "n3"
+          }
+        ],
+        "correctNodeIds": [
+          "n3"
+        ],
+        "explanation": "Unsharded OLTP primaries usually exhaust connections/IOPS before stateless tiers."
+      },
+      {
+        "id": "t116-q3",
+        "type": "drag_order",
+        "prompt": "Order a crisp interview flow when presenting Deep Dives & Trade-off Language.",
+        "items": [
+          {
+            "id": "1",
+            "label": "Clarify functional scope and SLAs"
+          },
+          {
+            "id": "2",
+            "label": "Estimate QPS, storage, and bandwidth"
+          },
+          {
+            "id": "3",
+            "label": "Sketch high-level architecture"
+          },
+          {
+            "id": "4",
+            "label": "Deep dive hot path and failures"
+          }
+        ],
+        "correctOrder": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "explanation": "Numbers before boxes keeps trade-offs honest."
+      },
+      {
+        "id": "t116-q4",
+        "type": "estimation",
+        "prompt": "Deep Dives & Trade-off Language: 2.4M read requests/day spread uniformly. Estimate average read QPS (nearest integer).",
+        "unit": "QPS",
+        "target": 28.0,
+        "assumptions": [
+          "86400 s/day",
+          "2.4e6 / 86400 ≈ 27.8 QPS average"
+        ],
+        "formula": "QPS ≈ requests_per_day / 86400",
+        "workedAnswer": "2.4M/day ≈ 27.8 QPS average; plan higher for peak factors.",
+        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
+      },
+      {
+        "id": "t116-q5",
+        "type": "tradeoff",
+        "prompt": "Choose an approach to handle 5× lunch-hour spikes for Deep Dives & Trade-off Language.",
+        "constraints": [
+          "p95 read < 250ms",
+          "Small SRE team",
+          "Must survive regional AZ loss"
+        ],
+        "approaches": [
+          {
+            "id": "scale_up",
+            "label": "Scale up one giant node",
+            "description": "Simple but single choke point"
+          },
+          {
+            "id": "scale_out",
+            "label": "Horizontally scale stateless API + cache",
+            "description": "Adds LB and cache complexity"
+          },
+          {
+            "id": "nothing",
+            "label": "Disable peak features",
+            "description": "Harms revenue"
+          }
+        ],
+        "correctApproachId": "scale_out",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "Stateless tiers absorb burst without one machine ceiling"
+          },
+          {
+            "id": "r2",
+            "label": "Caching shifts read load off the primary"
+          },
+          {
+            "id": "bad",
+            "label": "Vertical scale cannot survive AZ loss by itself"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "bad"
+        ],
+        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
+      },
+      {
+        "id": "t116-q6",
+        "type": "multiple_choice",
+        "prompt": "Which NON-functional requirement is most central to Deep Dives & Trade-off Language?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "IDE theme"
+          },
+          {
+            "id": "b",
+            "label": "Correctness under retries and partial failures"
+          },
+          {
+            "id": "c",
+            "label": "Logo color palette"
+          },
+          {
+            "id": "d",
+            "label": "Number of standup meetings"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t116-f1",
+        "front": "What is the core interview takeaway for Deep Dives & Trade-off Language?",
+        "back": "Connect user journeys to SLOs, then justify components and trade-offs for Deep Dives & Trade-off Language."
+      },
+      {
+        "id": "t116-f2",
+        "front": "Name one pitfall when discussing Deep Dives & Trade-off Language.",
+        "back": "Skipping scale numbers, ignoring retries/idempotency, or mixing AuthN with AuthZ."
+      },
+      {
+        "id": "t116-f3",
+        "front": "Which metric would you cite first for Deep Dives & Trade-off Language?",
+        "back": "p95 latency on the hot path plus error rate on writes/reads that affect revenue or safety."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Google SRE Book — Designing Distributed Systems",
+        "url": "https://sre.google/sre-book/designing-distributed-systems/"
+      },
+      {
+        "title": "AWS Well-Architected Framework",
+        "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
+      }
+    ]
+  },
+  {
+    "id": 117,
+    "slug": "common-mistakes",
+    "region": "r10-strategy",
+    "order": 3,
+    "title": "Common Mistakes",
+    "kind": "lesson",
+    "objectives": [
+      "Explain Common Mistakes with measurable requirements and failure modes",
+      "Apply Common Mistakes to a high-traffic India-scale scenario in an interview"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t117-c1",
+        "kind": "Why this matters in interviews",
+        "title": "text",
+        "body": "Interview lens on Common Mistakes: open with actors, peak traffic shape, and explicit non-goals so the conversation stays bounded like a production RFC review (topic 117).",
+        "accent": "Interview lens"
+      },
+      {
+        "id": "t117-c2",
+        "kind": "Mental model",
+        "title": "text",
+        "body": "Mental model for Common Mistakes: map each user action to a synchronous vs asynchronous hop, then mark which hops need strong invariants versus where stale reads are tolerable."
+      },
+      {
+        "id": "t117-c3",
+        "kind": "Request flow sketch",
+        "title": "diagram",
+        "body": "Walk a hot read path for Common Mistakes: client → DNS/TLS → edge → service → cache → store. Call out where you would measure p95 and which hop fails first under 10× diurnal peak."
+      },
+      {
+        "id": "t117-c4",
+        "kind": "Trade-off or failure mode",
+        "title": "text",
+        "body": "Failure mode in Common Mistakes: retries without idempotency, cache stampedes, or unbounded fan-out often hurt before raw CPU; name the guardrail you add first for this topic."
+      },
+      {
+        "id": "t117-c5",
+        "kind": "How to explain it aloud",
+        "title": "animation",
+        "body": "Say aloud for Common Mistakes: (1) user story in one sentence, (2) two numbers (QPS + data size), (3) one trade-off you will revisit in the deep dive.",
+        "accent": "Say this"
+      }
+    ],
+    "questions": [
+      {
+        "id": "t117-q1",
+        "type": "multiple_choice",
+        "prompt": "For Common Mistakes, which first step best reduces ambiguity in a system design interview?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Pick databases before requirements"
+          },
+          {
+            "id": "b",
+            "label": "List user actions, scale, and latency/durability targets"
+          },
+          {
+            "id": "c",
+            "label": "Draw microservices for every feature"
+          },
+          {
+            "id": "d",
+            "label": "Discuss office tooling"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Strong interviews anchor on requirements and SLOs before components."
+      },
+      {
+        "id": "t117-q2",
+        "type": "spot_bottleneck",
+        "prompt": "Where is the first saturation point in a naive single-region Common Mistakes design under flash traffic?",
+        "diagramNodes": [
+          {
+            "id": "n1",
+            "label": "Clients",
+            "x": 20,
+            "y": 50
+          },
+          {
+            "id": "n2",
+            "label": "API tier",
+            "x": 120,
+            "y": 50
+          },
+          {
+            "id": "n3",
+            "label": "Primary database",
+            "x": 220,
+            "y": 50
+          }
+        ],
+        "diagramEdges": [
+          {
+            "from": "n1",
+            "to": "n2"
+          },
+          {
+            "from": "n2",
+            "to": "n3"
+          }
+        ],
+        "correctNodeIds": [
+          "n3"
+        ],
+        "explanation": "Unsharded OLTP primaries usually exhaust connections/IOPS before stateless tiers."
+      },
+      {
+        "id": "t117-q3",
+        "type": "drag_order",
+        "prompt": "Order a crisp interview flow when presenting Common Mistakes.",
+        "items": [
+          {
+            "id": "1",
+            "label": "Clarify functional scope and SLAs"
+          },
+          {
+            "id": "2",
+            "label": "Estimate QPS, storage, and bandwidth"
+          },
+          {
+            "id": "3",
+            "label": "Sketch high-level architecture"
+          },
+          {
+            "id": "4",
+            "label": "Deep dive hot path and failures"
+          }
+        ],
+        "correctOrder": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "explanation": "Numbers before boxes keeps trade-offs honest."
+      },
+      {
+        "id": "t117-q4",
+        "type": "estimation",
+        "prompt": "Common Mistakes: 2.4M read requests/day spread uniformly. Estimate average read QPS (nearest integer).",
+        "unit": "QPS",
+        "target": 28.0,
+        "assumptions": [
+          "86400 s/day",
+          "2.4e6 / 86400 ≈ 27.8 QPS average"
+        ],
+        "formula": "QPS ≈ requests_per_day / 86400",
+        "workedAnswer": "2.4M/day ≈ 27.8 QPS average; plan higher for peak factors.",
+        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
+      },
+      {
+        "id": "t117-q5",
+        "type": "tradeoff",
+        "prompt": "Choose an approach to handle 5× lunch-hour spikes for Common Mistakes.",
+        "constraints": [
+          "p95 read < 250ms",
+          "Small SRE team",
+          "Must survive regional AZ loss"
+        ],
+        "approaches": [
+          {
+            "id": "scale_up",
+            "label": "Scale up one giant node",
+            "description": "Simple but single choke point"
+          },
+          {
+            "id": "scale_out",
+            "label": "Horizontally scale stateless API + cache",
+            "description": "Adds LB and cache complexity"
+          },
+          {
+            "id": "nothing",
+            "label": "Disable peak features",
+            "description": "Harms revenue"
+          }
+        ],
+        "correctApproachId": "scale_out",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "Stateless tiers absorb burst without one machine ceiling"
+          },
+          {
+            "id": "r2",
+            "label": "Caching shifts read load off the primary"
+          },
+          {
+            "id": "bad",
+            "label": "Vertical scale cannot survive AZ loss by itself"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "bad"
+        ],
+        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
+      },
+      {
+        "id": "t117-q6",
+        "type": "multiple_choice",
+        "prompt": "Which NON-functional requirement is most central to Common Mistakes?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "IDE theme"
+          },
+          {
+            "id": "b",
+            "label": "Correctness under retries and partial failures"
+          },
+          {
+            "id": "c",
+            "label": "Logo color palette"
+          },
+          {
+            "id": "d",
+            "label": "Number of standup meetings"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t117-f1",
+        "front": "What is the core interview takeaway for Common Mistakes?",
+        "back": "Connect user journeys to SLOs, then justify components and trade-offs for Common Mistakes."
+      },
+      {
+        "id": "t117-f2",
+        "front": "Name one pitfall when discussing Common Mistakes.",
+        "back": "Skipping scale numbers, ignoring retries/idempotency, or mixing AuthN with AuthZ."
+      },
+      {
+        "id": "t117-f3",
+        "front": "Which metric would you cite first for Common Mistakes?",
+        "back": "p95 latency on the hot path plus error rate on writes/reads that affect revenue or safety."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Google SRE Book — Designing Distributed Systems",
+        "url": "https://sre.google/sre-book/designing-distributed-systems/"
+      },
+      {
+        "title": "AWS Well-Architected Framework",
+        "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
+      }
+    ]
+  },
+  {
+    "id": 118,
+    "slug": "communication-in-the-interview",
+    "region": "r10-strategy",
+    "order": 4,
+    "title": "Communication in the Interview",
+    "kind": "lesson",
+    "objectives": [
+      "Explain Communication in the Interview with measurable requirements and failure modes",
+      "Apply Communication in the Interview to a high-traffic India-scale scenario in an interview"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t118-c1",
+        "kind": "Why this matters in interviews",
+        "title": "text",
+        "body": "Interview lens on Communication in the Interview: open with actors, peak traffic shape, and explicit non-goals so the conversation stays bounded like a production RFC review (topic 118).",
+        "accent": "Interview lens"
+      },
+      {
+        "id": "t118-c2",
+        "kind": "Mental model",
+        "title": "text",
+        "body": "Mental model for Communication in the Interview: map each user action to a synchronous vs asynchronous hop, then mark which hops need strong invariants versus where stale reads are tolerable."
+      },
+      {
+        "id": "t118-c3",
+        "kind": "Request flow sketch",
+        "title": "diagram",
+        "body": "Walk a hot read path for Communication in the Interview: client → DNS/TLS → edge → service → cache → store. Call out where you would measure p95 and which hop fails first under 10× diurnal peak."
+      },
+      {
+        "id": "t118-c4",
+        "kind": "Trade-off or failure mode",
+        "title": "text",
+        "body": "Failure mode in Communication in the Interview: retries without idempotency, cache stampedes, or unbounded fan-out often hurt before raw CPU; name the guardrail you add first for this topic."
+      },
+      {
+        "id": "t118-c5",
+        "kind": "How to explain it aloud",
+        "title": "animation",
+        "body": "Say aloud for Communication in the Interview: (1) user story in one sentence, (2) two numbers (QPS + data size), (3) one trade-off you will revisit in the deep dive.",
+        "accent": "Say this"
+      }
+    ],
+    "questions": [
+      {
+        "id": "t118-q1",
+        "type": "multiple_choice",
+        "prompt": "For Communication in the Interview, which first step best reduces ambiguity in a system design interview?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Pick databases before requirements"
+          },
+          {
+            "id": "b",
+            "label": "List user actions, scale, and latency/durability targets"
+          },
+          {
+            "id": "c",
+            "label": "Draw microservices for every feature"
+          },
+          {
+            "id": "d",
+            "label": "Discuss office tooling"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Strong interviews anchor on requirements and SLOs before components."
+      },
+      {
+        "id": "t118-q2",
+        "type": "spot_bottleneck",
+        "prompt": "Where is the first saturation point in a naive single-region Communication in the Interview design under flash traffic?",
+        "diagramNodes": [
+          {
+            "id": "n1",
+            "label": "Clients",
+            "x": 20,
+            "y": 50
+          },
+          {
+            "id": "n2",
+            "label": "API tier",
+            "x": 120,
+            "y": 50
+          },
+          {
+            "id": "n3",
+            "label": "Primary database",
+            "x": 220,
+            "y": 50
+          }
+        ],
+        "diagramEdges": [
+          {
+            "from": "n1",
+            "to": "n2"
+          },
+          {
+            "from": "n2",
+            "to": "n3"
+          }
+        ],
+        "correctNodeIds": [
+          "n3"
+        ],
+        "explanation": "Unsharded OLTP primaries usually exhaust connections/IOPS before stateless tiers."
+      },
+      {
+        "id": "t118-q3",
+        "type": "drag_order",
+        "prompt": "Order a crisp interview flow when presenting Communication in the Interview.",
+        "items": [
+          {
+            "id": "1",
+            "label": "Clarify functional scope and SLAs"
+          },
+          {
+            "id": "2",
+            "label": "Estimate QPS, storage, and bandwidth"
+          },
+          {
+            "id": "3",
+            "label": "Sketch high-level architecture"
+          },
+          {
+            "id": "4",
+            "label": "Deep dive hot path and failures"
+          }
+        ],
+        "correctOrder": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "explanation": "Numbers before boxes keeps trade-offs honest."
+      },
+      {
+        "id": "t118-q4",
+        "type": "estimation",
+        "prompt": "Communication in the Interview: 2.4M read requests/day spread uniformly. Estimate average read QPS (nearest integer).",
+        "unit": "QPS",
+        "target": 28.0,
+        "assumptions": [
+          "86400 s/day",
+          "2.4e6 / 86400 ≈ 27.8 QPS average"
+        ],
+        "formula": "QPS ≈ requests_per_day / 86400",
+        "workedAnswer": "2.4M/day ≈ 27.8 QPS average; plan higher for peak factors.",
+        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
+      },
+      {
+        "id": "t118-q5",
+        "type": "tradeoff",
+        "prompt": "Choose an approach to handle 5× lunch-hour spikes for Communication in the Interview.",
+        "constraints": [
+          "p95 read < 250ms",
+          "Small SRE team",
+          "Must survive regional AZ loss"
+        ],
+        "approaches": [
+          {
+            "id": "scale_up",
+            "label": "Scale up one giant node",
+            "description": "Simple but single choke point"
+          },
+          {
+            "id": "scale_out",
+            "label": "Horizontally scale stateless API + cache",
+            "description": "Adds LB and cache complexity"
+          },
+          {
+            "id": "nothing",
+            "label": "Disable peak features",
+            "description": "Harms revenue"
+          }
+        ],
+        "correctApproachId": "scale_out",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "Stateless tiers absorb burst without one machine ceiling"
+          },
+          {
+            "id": "r2",
+            "label": "Caching shifts read load off the primary"
+          },
+          {
+            "id": "bad",
+            "label": "Vertical scale cannot survive AZ loss by itself"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "bad"
+        ],
+        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
+      },
+      {
+        "id": "t118-q6",
+        "type": "multiple_choice",
+        "prompt": "Which NON-functional requirement is most central to Communication in the Interview?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "IDE theme"
+          },
+          {
+            "id": "b",
+            "label": "Correctness under retries and partial failures"
+          },
+          {
+            "id": "c",
+            "label": "Logo color palette"
+          },
+          {
+            "id": "d",
+            "label": "Number of standup meetings"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t118-f1",
+        "front": "What is the core interview takeaway for Communication in the Interview?",
+        "back": "Connect user journeys to SLOs, then justify components and trade-offs for Communication in the Interview."
+      },
+      {
+        "id": "t118-f2",
+        "front": "Name one pitfall when discussing Communication in the Interview.",
+        "back": "Skipping scale numbers, ignoring retries/idempotency, or mixing AuthN with AuthZ."
+      },
+      {
+        "id": "t118-f3",
+        "front": "Which metric would you cite first for Communication in the Interview?",
+        "back": "p95 latency on the hot path plus error rate on writes/reads that affect revenue or safety."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Google SRE Book — Designing Distributed Systems",
+        "url": "https://sre.google/sre-book/designing-distributed-systems/"
+      },
+      {
+        "title": "AWS Well-Architected Framework",
+        "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
+      }
+    ]
+  },
+  {
+    "id": 119,
+    "slug": "numbers-latency-cheat-sheet",
+    "region": "r10-strategy",
+    "order": 5,
+    "title": "Numbers & Latency Cheat Sheet",
+    "kind": "lesson",
+    "objectives": [
+      "Explain Numbers & Latency Cheat Sheet with measurable requirements and failure modes",
+      "Apply Numbers & Latency Cheat Sheet to a high-traffic India-scale scenario in an interview"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t119-c1",
+        "kind": "Why this matters in interviews",
+        "title": "text",
+        "body": "Interview lens on Numbers & Latency Cheat Sheet: open with actors, peak traffic shape, and explicit non-goals so the conversation stays bounded like a production RFC review (topic 119).",
+        "accent": "Interview lens"
+      },
+      {
+        "id": "t119-c2",
+        "kind": "Mental model",
+        "title": "text",
+        "body": "Mental model for Numbers & Latency Cheat Sheet: map each user action to a synchronous vs asynchronous hop, then mark which hops need strong invariants versus where stale reads are tolerable."
+      },
+      {
+        "id": "t119-c3",
+        "kind": "Request flow sketch",
+        "title": "diagram",
+        "body": "Walk a hot read path for Numbers & Latency Cheat Sheet: client → DNS/TLS → edge → service → cache → store. Call out where you would measure p95 and which hop fails first under 10× diurnal peak."
+      },
+      {
+        "id": "t119-c4",
+        "kind": "Trade-off or failure mode",
+        "title": "text",
+        "body": "Failure mode in Numbers & Latency Cheat Sheet: retries without idempotency, cache stampedes, or unbounded fan-out often hurt before raw CPU; name the guardrail you add first for this topic."
+      },
+      {
+        "id": "t119-c5",
+        "kind": "How to explain it aloud",
+        "title": "animation",
+        "body": "Say aloud for Numbers & Latency Cheat Sheet: (1) user story in one sentence, (2) two numbers (QPS + data size), (3) one trade-off you will revisit in the deep dive.",
+        "accent": "Say this"
+      }
+    ],
+    "questions": [
+      {
+        "id": "t119-q1",
+        "type": "multiple_choice",
+        "prompt": "For Numbers & Latency Cheat Sheet, which first step best reduces ambiguity in a system design interview?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Pick databases before requirements"
+          },
+          {
+            "id": "b",
+            "label": "List user actions, scale, and latency/durability targets"
+          },
+          {
+            "id": "c",
+            "label": "Draw microservices for every feature"
+          },
+          {
+            "id": "d",
+            "label": "Discuss office tooling"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Strong interviews anchor on requirements and SLOs before components."
+      },
+      {
+        "id": "t119-q2",
+        "type": "spot_bottleneck",
+        "prompt": "Where is the first saturation point in a naive single-region Numbers & Latency Cheat Sheet design under flash traffic?",
+        "diagramNodes": [
+          {
+            "id": "n1",
+            "label": "Clients",
+            "x": 20,
+            "y": 50
+          },
+          {
+            "id": "n2",
+            "label": "API tier",
+            "x": 120,
+            "y": 50
+          },
+          {
+            "id": "n3",
+            "label": "Primary database",
+            "x": 220,
+            "y": 50
+          }
+        ],
+        "diagramEdges": [
+          {
+            "from": "n1",
+            "to": "n2"
+          },
+          {
+            "from": "n2",
+            "to": "n3"
+          }
+        ],
+        "correctNodeIds": [
+          "n3"
+        ],
+        "explanation": "Unsharded OLTP primaries usually exhaust connections/IOPS before stateless tiers."
+      },
+      {
+        "id": "t119-q3",
+        "type": "drag_order",
+        "prompt": "Order a crisp interview flow when presenting Numbers & Latency Cheat Sheet.",
+        "items": [
+          {
+            "id": "1",
+            "label": "Clarify functional scope and SLAs"
+          },
+          {
+            "id": "2",
+            "label": "Estimate QPS, storage, and bandwidth"
+          },
+          {
+            "id": "3",
+            "label": "Sketch high-level architecture"
+          },
+          {
+            "id": "4",
+            "label": "Deep dive hot path and failures"
+          }
+        ],
+        "correctOrder": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "explanation": "Numbers before boxes keeps trade-offs honest."
+      },
+      {
+        "id": "t119-q4",
+        "type": "estimation",
+        "prompt": "Numbers & Latency Cheat Sheet: 2.4M read requests/day spread uniformly. Estimate average read QPS (nearest integer).",
+        "unit": "QPS",
+        "target": 28.0,
+        "assumptions": [
+          "86400 s/day",
+          "2.4e6 / 86400 ≈ 27.8 QPS average"
+        ],
+        "formula": "QPS ≈ requests_per_day / 86400",
+        "workedAnswer": "2.4M/day ≈ 27.8 QPS average; plan higher for peak factors.",
+        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
+      },
+      {
+        "id": "t119-q5",
+        "type": "tradeoff",
+        "prompt": "Choose an approach to handle 5× lunch-hour spikes for Numbers & Latency Cheat Sheet.",
+        "constraints": [
+          "p95 read < 250ms",
+          "Small SRE team",
+          "Must survive regional AZ loss"
+        ],
+        "approaches": [
+          {
+            "id": "scale_up",
+            "label": "Scale up one giant node",
+            "description": "Simple but single choke point"
+          },
+          {
+            "id": "scale_out",
+            "label": "Horizontally scale stateless API + cache",
+            "description": "Adds LB and cache complexity"
+          },
+          {
+            "id": "nothing",
+            "label": "Disable peak features",
+            "description": "Harms revenue"
+          }
+        ],
+        "correctApproachId": "scale_out",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "Stateless tiers absorb burst without one machine ceiling"
+          },
+          {
+            "id": "r2",
+            "label": "Caching shifts read load off the primary"
+          },
+          {
+            "id": "bad",
+            "label": "Vertical scale cannot survive AZ loss by itself"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "bad"
+        ],
+        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
+      },
+      {
+        "id": "t119-q6",
+        "type": "multiple_choice",
+        "prompt": "Which NON-functional requirement is most central to Numbers & Latency Cheat Sheet?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "IDE theme"
+          },
+          {
+            "id": "b",
+            "label": "Correctness under retries and partial failures"
+          },
+          {
+            "id": "c",
+            "label": "Logo color palette"
+          },
+          {
+            "id": "d",
+            "label": "Number of standup meetings"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t119-f1",
+        "front": "What is the core interview takeaway for Numbers & Latency Cheat Sheet?",
+        "back": "Connect user journeys to SLOs, then justify components and trade-offs for Numbers & Latency Cheat Sheet."
+      },
+      {
+        "id": "t119-f2",
+        "front": "Name one pitfall when discussing Numbers & Latency Cheat Sheet.",
+        "back": "Skipping scale numbers, ignoring retries/idempotency, or mixing AuthN with AuthZ."
+      },
+      {
+        "id": "t119-f3",
+        "front": "Which metric would you cite first for Numbers & Latency Cheat Sheet?",
+        "back": "p95 latency on the hot path plus error rate on writes/reads that affect revenue or safety."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Google SRE Book — Designing Distributed Systems",
+        "url": "https://sre.google/sre-book/designing-distributed-systems/"
+      },
+      {
+        "title": "AWS Well-Architected Framework",
+        "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
+      }
+    ]
+  },
+  {
+    "id": 120,
+    "slug": "pattern-to-use-case-map",
+    "region": "r10-strategy",
+    "order": 6,
+    "title": "Pattern-to-Use-Case Map",
+    "kind": "lesson",
+    "objectives": [
+      "Explain Pattern-to-Use-Case Map with measurable requirements and failure modes",
+      "Apply Pattern-to-Use-Case Map to a high-traffic India-scale scenario in an interview"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t120-c1",
+        "kind": "Why this matters in interviews",
+        "title": "text",
+        "body": "Interview lens on Pattern-to-Use-Case Map: open with actors, peak traffic shape, and explicit non-goals so the conversation stays bounded like a production RFC review (topic 120).",
+        "accent": "Interview lens"
+      },
+      {
+        "id": "t120-c2",
+        "kind": "Mental model",
+        "title": "text",
+        "body": "Mental model for Pattern-to-Use-Case Map: map each user action to a synchronous vs asynchronous hop, then mark which hops need strong invariants versus where stale reads are tolerable."
+      },
+      {
+        "id": "t120-c3",
+        "kind": "Request flow sketch",
+        "title": "diagram",
+        "body": "Walk a hot read path for Pattern-to-Use-Case Map: client → DNS/TLS → edge → service → cache → store. Call out where you would measure p95 and which hop fails first under 10× diurnal peak."
+      },
+      {
+        "id": "t120-c4",
+        "kind": "Trade-off or failure mode",
+        "title": "text",
+        "body": "Failure mode in Pattern-to-Use-Case Map: retries without idempotency, cache stampedes, or unbounded fan-out often hurt before raw CPU; name the guardrail you add first for this topic."
+      },
+      {
+        "id": "t120-c5",
+        "kind": "How to explain it aloud",
+        "title": "animation",
+        "body": "Say aloud for Pattern-to-Use-Case Map: (1) user story in one sentence, (2) two numbers (QPS + data size), (3) one trade-off you will revisit in the deep dive.",
+        "accent": "Say this"
+      }
+    ],
+    "questions": [
+      {
+        "id": "t120-q1",
+        "type": "multiple_choice",
+        "prompt": "For Pattern-to-Use-Case Map, which first step best reduces ambiguity in a system design interview?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Pick databases before requirements"
+          },
+          {
+            "id": "b",
+            "label": "List user actions, scale, and latency/durability targets"
+          },
+          {
+            "id": "c",
+            "label": "Draw microservices for every feature"
+          },
+          {
+            "id": "d",
+            "label": "Discuss office tooling"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Strong interviews anchor on requirements and SLOs before components."
+      },
+      {
+        "id": "t120-q2",
+        "type": "spot_bottleneck",
+        "prompt": "Where is the first saturation point in a naive single-region Pattern-to-Use-Case Map design under flash traffic?",
+        "diagramNodes": [
+          {
+            "id": "n1",
+            "label": "Clients",
+            "x": 20,
+            "y": 50
+          },
+          {
+            "id": "n2",
+            "label": "API tier",
+            "x": 120,
+            "y": 50
+          },
+          {
+            "id": "n3",
+            "label": "Primary database",
+            "x": 220,
+            "y": 50
+          }
+        ],
+        "diagramEdges": [
+          {
+            "from": "n1",
+            "to": "n2"
+          },
+          {
+            "from": "n2",
+            "to": "n3"
+          }
+        ],
+        "correctNodeIds": [
+          "n3"
+        ],
+        "explanation": "Unsharded OLTP primaries usually exhaust connections/IOPS before stateless tiers."
+      },
+      {
+        "id": "t120-q3",
+        "type": "drag_order",
+        "prompt": "Order a crisp interview flow when presenting Pattern-to-Use-Case Map.",
+        "items": [
+          {
+            "id": "1",
+            "label": "Clarify functional scope and SLAs"
+          },
+          {
+            "id": "2",
+            "label": "Estimate QPS, storage, and bandwidth"
+          },
+          {
+            "id": "3",
+            "label": "Sketch high-level architecture"
+          },
+          {
+            "id": "4",
+            "label": "Deep dive hot path and failures"
+          }
+        ],
+        "correctOrder": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "explanation": "Numbers before boxes keeps trade-offs honest."
+      },
+      {
+        "id": "t120-q4",
+        "type": "estimation",
+        "prompt": "Pattern-to-Use-Case Map: 2.4M read requests/day spread uniformly. Estimate average read QPS (nearest integer).",
+        "unit": "QPS",
+        "target": 28.0,
+        "assumptions": [
+          "86400 s/day",
+          "2.4e6 / 86400 ≈ 27.8 QPS average"
+        ],
+        "formula": "QPS ≈ requests_per_day / 86400",
+        "workedAnswer": "2.4M/day ≈ 27.8 QPS average; plan higher for peak factors.",
+        "explanation": "Convert daily volume to per-second capacity before sizing caches and DB pools."
+      },
+      {
+        "id": "t120-q5",
+        "type": "tradeoff",
+        "prompt": "Choose an approach to handle 5× lunch-hour spikes for Pattern-to-Use-Case Map.",
+        "constraints": [
+          "p95 read < 250ms",
+          "Small SRE team",
+          "Must survive regional AZ loss"
+        ],
+        "approaches": [
+          {
+            "id": "scale_up",
+            "label": "Scale up one giant node",
+            "description": "Simple but single choke point"
+          },
+          {
+            "id": "scale_out",
+            "label": "Horizontally scale stateless API + cache",
+            "description": "Adds LB and cache complexity"
+          },
+          {
+            "id": "nothing",
+            "label": "Disable peak features",
+            "description": "Harms revenue"
+          }
+        ],
+        "correctApproachId": "scale_out",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "Stateless tiers absorb burst without one machine ceiling"
+          },
+          {
+            "id": "r2",
+            "label": "Caching shifts read load off the primary"
+          },
+          {
+            "id": "bad",
+            "label": "Vertical scale cannot survive AZ loss by itself"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "bad"
+        ],
+        "explanation": "Horizontal stateless scaling plus caching is the common interview answer for read-heavy bursts."
+      },
+      {
+        "id": "t120-q6",
+        "type": "multiple_choice",
+        "prompt": "Which NON-functional requirement is most central to Pattern-to-Use-Case Map?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "IDE theme"
+          },
+          {
+            "id": "b",
+            "label": "Correctness under retries and partial failures"
+          },
+          {
+            "id": "c",
+            "label": "Logo color palette"
+          },
+          {
+            "id": "d",
+            "label": "Number of standup meetings"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Distributed systems fail partially; interviews probe how you preserve invariants."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t120-f1",
+        "front": "What is the core interview takeaway for Pattern-to-Use-Case Map?",
+        "back": "Connect user journeys to SLOs, then justify components and trade-offs for Pattern-to-Use-Case Map."
+      },
+      {
+        "id": "t120-f2",
+        "front": "Name one pitfall when discussing Pattern-to-Use-Case Map.",
+        "back": "Skipping scale numbers, ignoring retries/idempotency, or mixing AuthN with AuthZ."
+      },
+      {
+        "id": "t120-f3",
+        "front": "Which metric would you cite first for Pattern-to-Use-Case Map?",
+        "back": "p95 latency on the hot path plus error rate on writes/reads that affect revenue or safety."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Google SRE Book — Designing Distributed Systems",
+        "url": "https://sre.google/sre-book/designing-distributed-systems/"
+      },
+      {
+        "title": "AWS Well-Architected Framework",
+        "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
+      }
+    ]
+  }
+]

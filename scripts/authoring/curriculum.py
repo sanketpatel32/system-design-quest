@@ -92,20 +92,27 @@ def build_boss_topic(
     prereq_ids: list[int],
 ) -> dict:
     spec = SPECS["bosses"][str(tid)]
-    base = build_lesson_topic(tid, title, region, order, slug, svg)
-    base["kind"] = "boss"
-    base["durationMinutes"] = 45
-    base["prereqIds"] = prereq_ids
-    base["objectives"] = spec["objectives"]
-    base["cards"] = _cards_from_spec(tid, spec, svg)
-    base["questions"] = spec["questions"]
-    base["flashcards"] = spec["flashcards"]
-    base["sources"] = spec["sources"]
+    topic = {
+        "id": tid,
+        "slug": slug,
+        "region": region,
+        "order": order,
+        "title": title,
+        "kind": "boss",
+        "objectives": spec["objectives"],
+        "difficulty": difficulty_for(tid),
+        "durationMinutes": 45,
+        "prereqIds": prereq_ids,
+        "cards": _cards_from_spec(tid, spec, svg),
+        "questions": spec["questions"],
+        "flashcards": spec["flashcards"],
+        "sources": spec["sources"],
+    }
     boss = dict(spec["boss"])
     boss["prerequisiteTopicIds"] = prereq_ids
-    base["boss"] = boss
-    base["bossStages"] = boss_stages(tid, title, base["questions"])
-    return base
+    topic["boss"] = boss
+    topic["bossStages"] = boss_stages(tid, title, topic["questions"])
+    return topic
 
 
 def boss_stages(tid: int, title: str, questions: list[dict]) -> list[dict]:
