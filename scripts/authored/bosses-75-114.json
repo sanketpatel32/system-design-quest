@@ -344,13 +344,12 @@
         "Friend requests"
       ],
       "estimationScenario": "URL Shortener: assume 50M daily users each doing about 2 redirects a day, with traffic peaking at 5× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for URL Shortener including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "The create-link call (POST /v1/links) times out on a phone and the app retries. How do you avoid making two short links?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in URL Shortener?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A link goes viral and redirects jump 10× with no cache in front of the store. What saturates first?",
+        "Which mechanism guarantees two new links never get the same short code?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for URL Shortener metadata.",
+      "tradeoffPrompt": "Marketing wants every click counted, while ops wants the fewest redirect requests. Which redirect fits marketing?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -496,9 +495,8 @@
       "workedEstimate": "50M × 2 = 100M redirects/day ÷ 86,400 s ≈ 1,200/s on average; × 5 peak ≈ 5,800/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Every redirect for one code hits the same key, so one partition of the store takes the whole spike. Stateless redirect servers scale out; caching the hot code in Redis or at the edge absorbs it.",
+        "Pre-allocated counter ranges per server, encoded in base62. Counter ranges handed out by a coordinator are unique by construction. Truncated hashes and random codes collide and need a check-and-retry; independent counters repeat."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -1159,13 +1157,12 @@
         "Payments"
       ],
       "estimationScenario": "Pastebin: assume 5M daily users each doing about 3 reads a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Pastebin including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "Creating a paste (POST /v1/pastes) times out and the client retries. How do you avoid two copies?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Pastebin?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A popular paste is opened 10× more than usual and bodies are read straight from the object store on every view. What saturates first?",
+        "Why keep paste bodies in object storage rather than in the SQL row?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Pastebin metadata.",
+      "tradeoffPrompt": "Expired pastes must disappear. Which approach balances correctness and cost?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -1303,9 +1300,8 @@
       "workedEstimate": "5M × 3 = 15M reads/day ÷ 86,400 s ≈ 170/s on average; × 3 peak ≈ 520/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Every view fetches the same body. Putting the CDN in front of /raw/{id} serves it from the edge so the store and service barely notice.",
+        "Bodies are large and cold; SQL stays small and fast for metadata. Most pastes are read rarely and can be megabytes. Object storage is cheap, durable and CDN-friendly; SQL keeps only the small, indexed metadata."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -1966,13 +1962,12 @@
         "Chat"
       ],
       "estimationScenario": "Rate Limiter: assume 20M daily users each doing about 20 API calls a day, with traffic peaking at 5× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Rate Limiter including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "A client gets 429 and immediately retries in a tight loop. What should the response tell it?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Rate Limiter?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "Traffic is 10× normal and every gateway checks a single Redis shard for every request. What saturates first?",
+        "Which mechanism lets many gateways enforce one user's limit consistently?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Rate Limiter metadata.",
+      "tradeoffPrompt": "Redis, which holds the rate-limit counters, goes down. For a login endpoint under attack, what is the safer default?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -2109,9 +2104,8 @@
       "workedEstimate": "20M × 20 = 400M API calls/day ÷ 86,400 s ≈ 4,600/s on average; × 5 peak ≈ 23,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Every request costs a Redis round trip on one shard. Shard counters by key, or keep local token buckets that sync periodically.",
+        "An atomic token-bucket update in Redis via a Lua script. A Lua script runs the read-check-decrement atomically in Redis, so concurrent gateways cannot both spend the last token. Local-only counters let a user exceed the limit N times over."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -2775,13 +2769,12 @@
         "Payment refunds"
       ],
       "estimationScenario": "Unique ID Generator: assume about 1B IDs a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Unique ID Generator including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "A service calls nextId() and the call fails halfway. What makes retrying safe?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Unique ID Generator?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "Id demand rises 10× and ids come from one central id service. What saturates first?",
+        "Which mechanism keeps ids unique across 1,024 workers without coordination per id?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Unique ID Generator metadata.",
+      "tradeoffPrompt": "A server's clock jumps backwards by 2 seconds. What should the generator do?",
       "rubric": {
         "acceptableAlternatives": {
           "sql_db": [
@@ -2906,9 +2899,8 @@
       "workedEstimate": "1B IDs/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "A central service is a hot spot and a single point of failure. Embedding the generator as a library with leased worker ids removes the network hop entirely.",
+        "A unique worker id in each 64-bit id, plus timestamp and sequence. Timestamp, worker id and a per-millisecond sequence make each id unique by construction; the worker id is leased once at startup."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -3577,13 +3569,12 @@
         "Search ranking"
       ],
       "estimationScenario": "Distributed KV Store: assume 10M daily users each doing about 50 operations a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Distributed KV Store including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "A put(key, value) times out and the client retries. How does the store avoid a lost or doubled update?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Distributed KV Store?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "One hot cart key gets 10× normal writes. What saturates first?",
+        "A replica is down during a write with W=2. Which mechanism keeps the write and repairs the replica later?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Distributed KV Store metadata.",
+      "tradeoffPrompt": "Carts must never lose an item, even if two devices update at once. Which conflict policy fits?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -3719,9 +3710,8 @@
       "workedEstimate": "10M × 50 = 500M operations/day ÷ 86,400 s ≈ 5,800/s on average; × 3 peak ≈ 17,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Consistent hashing sends every write for a key to the same replica set. Spread hot keys by splitting them or caching reads.",
+        "Hinted handoff to another node, replayed when the replica returns. Another node stores the write with a hint and hands it over on recovery; read repair and Merkle anti-entropy fix anything left."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -4381,13 +4371,12 @@
         "Search ranking"
       ],
       "estimationScenario": "Distributed Cache: assume 10M daily users each doing about 100 cache ops a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Distributed Cache including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "An app server sets a key with TTL, times out, and retries. What happens?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Distributed Cache?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A flash sale sends 10× reads for one product key. What saturates first?",
+        "Many keys expire at the same moment and the database is flooded. Which mechanism prevents it?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Distributed Cache metadata.",
+      "tradeoffPrompt": "Product prices change and must not stay wrong for long. Which write policy fits?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -4523,9 +4512,8 @@
       "workedEstimate": "10M × 100 = 1B cache ops/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "A single hot key lives on one node. Replicate hot keys, add a small in-process cache, or split the key.",
+        "Add random jitter to TTLs and use single-flight on misses. Jitter spreads expiries over time and single-flight lets one request rebuild while others wait or get stale data."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -5184,13 +5172,12 @@
         "Seat booking"
       ],
       "estimationScenario": "Notification System: assume 100M daily users each doing about 3 notifications a day, with traffic peaking at 10× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Notification System including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "The order service sends 'notify user 7, template ORDER_SHIPPED' twice after a retry. How do you avoid a double push?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Notification System?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A sale triggers 10× SMS. The SMS provider allows a fixed rate. What saturates first?",
+        "Which mechanism stops a slow SMS provider from delaying push notifications?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Notification System metadata.",
+      "tradeoffPrompt": "A provider times out. What delivery guarantee is realistic?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -5331,9 +5318,8 @@
       "workedEstimate": "100M × 3 = 300M notifications/day ÷ 86,400 s ≈ 3,500/s on average; × 10 peak ≈ 35,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "External providers enforce their own limits. A dedicated, rate-limited SMS queue absorbs the spike without blocking push or email.",
+        "Separate queues and workers per channel. Per-channel queues isolate failures; a backlog in SMS does not block push or email."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -5999,13 +5985,12 @@
         "Seat lock"
       ],
       "estimationScenario": "News Feed: assume 200M daily users each doing about 20 feed reads a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for News Feed including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "A user taps Post, the request times out and the app retries. How do you avoid a double post?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in News Feed?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A celebrity with 50 million followers posts. With pure fan-out on write, what saturates first?",
+        "Which mechanism keeps feed reads fast for normal accounts?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for News Feed metadata.",
+      "tradeoffPrompt": "Should a like be counted synchronously before the user sees the heart turn red?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -6153,9 +6138,8 @@
       "workedEstimate": "200M × 20 = 4B feed reads/day ÷ 86,400 s ≈ 46,000/s on average; × 3 peak ≈ 140,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "One post becomes 50M writes. Hybrid fan-out pulls celebrity posts at read time instead.",
+        "Precomputed feed lists in Redis written by fan-out workers. Push to followers' lists at write time so a read is one list fetch plus hydration."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -6830,13 +6814,12 @@
         "Seat booking"
       ],
       "estimationScenario": "Twitter/X: assume 200M daily users each doing about 50 timeline reads a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Twitter/X including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "POST /v1/tweets times out and the app retries. How do you avoid a duplicate tweet?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Twitter/X?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A tweet from an account with 100M followers lands. With push-only fan-out, what saturates?",
+        "Which mechanism serves the home timeline in milliseconds?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Twitter/X metadata.",
+      "tradeoffPrompt": "Followers may see a new tweet a few seconds late. Is that acceptable?",
       "rubric": {
         "acceptableAlternatives": {
           "sql_db": [
@@ -6977,9 +6960,8 @@
       "workedEstimate": "200M × 50 = 10B timeline reads/day ÷ 86,400 s ≈ 120,000/s on average; × 3 peak ≈ 350,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Hundreds of millions of cache writes for one tweet. Celebrity tweets are merged at read time instead.",
+        "A cached list of tweet ids per user, hydrated from a tweet cache. Precomputed id lists plus hydration keep reads to a few cache lookups."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -7649,13 +7631,12 @@
         "Search ads"
       ],
       "estimationScenario": "WhatsApp: assume 500M daily users each doing about 40 messages a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for WhatsApp including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "The app resends a message after a dropped connection. How does the server avoid storing it twice?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in WhatsApp?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "New Year's Eve: messages jump 10×. Which component saturates first if gateways cannot grow?",
+        "Which mechanism delivers to a recipient who is offline?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for WhatsApp metadata.",
+      "tradeoffPrompt": "Should the server keep delivered messages?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -7796,9 +7777,8 @@
       "workedEstimate": "500M × 40 = 20B messages/day ÷ 86,400 s ≈ 230,000/s on average; × 3 peak ≈ 690,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Each gateway holds a fixed number of open connections and their traffic. Add gateways and keep them stateless apart from the connection.",
+        "Store the message, send a push, deliver on reconnect. Store-and-forward with a push wake-up is how chat apps reach offline users."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -8463,13 +8443,12 @@
         "Train search"
       ],
       "estimationScenario": "Instagram: assume 100M daily users each doing about 15 photo views a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Instagram including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "The photo upload commit (POST /v1/posts) times out and the app retries. How do you avoid two posts?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Instagram?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A celebrity photo is viewed 10× more and images come from the origin bucket. What saturates first?",
+        "Which mechanism keeps large uploads off the app servers?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Instagram metadata.",
+      "tradeoffPrompt": "Should you store several resized versions of each photo?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -8621,9 +8600,8 @@
       "workedEstimate": "100M × 15 = 1.5B photo views/day ÷ 86,400 s ≈ 17,000/s on average; × 3 peak ≈ 52,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Serving images from the bucket directly is slow and costly; a CDN serves resized variants from the edge.",
+        "Presigned PUT URLs straight to object storage. Presigned URLs let the client upload directly; app servers only handle small metadata calls."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -9298,13 +9276,12 @@
         "Seat map"
       ],
       "estimationScenario": "YouTube: assume 100M daily users each doing about 50 video views a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for YouTube including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "A large upload drops at 80%. How does the client avoid starting again?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in YouTube?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A video goes viral and segments are served from origin. What saturates first?",
+        "Which mechanism lets playback adapt to a weak network?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for YouTube metadata.",
+      "tradeoffPrompt": "Transcode every upload fully, or only on demand?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -9456,9 +9433,8 @@
       "workedEstimate": "100M × 50 = 5B video views/day ÷ 86,400 s ≈ 58,000/s on average; × 3 peak ≈ 170,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Video bytes dominate; the CDN must cache popular segments at the edge.",
+        "Multiple renditions plus a manifest the player switches between. Adaptive bitrate: the player picks a rendition per segment based on measured bandwidth."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -10137,13 +10113,12 @@
         "Stock trading"
       ],
       "estimationScenario": "Netflix: assume 50M daily users each doing about 20 video segment requests a day, with traffic peaking at 4× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Netflix including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "The resume-position update (PUT /v1/progress) is retried. What happens?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Netflix?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A new season drops and starts jump 10×. Which part must not depend on origin?",
+        "Which mechanism makes start-up fast for popular titles?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Netflix metadata.",
+      "tradeoffPrompt": "Progress writes are frequent. Which store fits?",
       "rubric": {
         "acceptableAlternatives": {
           "sql_db": [
@@ -10287,9 +10262,8 @@
       "workedEstimate": "50M × 20 = 1B video segment requests/day ÷ 86,400 s ≈ 12,000/s on average; × 4 peak ≈ 46,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "If every start pulled from origin it would saturate; pre-positioned edge caches carry the load.",
+        "Pushing content into ISP-embedded caches before demand. Pre-positioning popular titles near viewers cuts start-up time and backbone cost."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -10962,13 +10936,12 @@
         "Upload PDFs"
       ],
       "estimationScenario": "Uber/Ola: assume 20M daily users each doing about 4 ride requests a day, with traffic peaking at 4× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Uber/Ola including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "The rider's 'request ride' call times out and the app retries. How do you avoid two rides?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Uber/Ola?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "Location pings jump 10× at rush hour. What saturates first?",
+        "Two drivers tap Accept at the same moment. Which mechanism gives the ride to one?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Uber/Ola metadata.",
+      "tradeoffPrompt": "Should live locations be stored durably?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -11110,9 +11083,8 @@
       "workedEstimate": "20M × 4 = 80M ride requests/day ÷ 86,400 s ≈ 930/s on average; × 4 peak ≈ 3,700/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Pings for one city land on one shard; split busy cities into more cells or shards.",
+        "A conditional write: assign only if the ride is still unassigned. Compare-and-set on the ride row makes exactly one accept succeed."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -11778,13 +11750,12 @@
         "Code review"
       ],
       "estimationScenario": "Zomato/Swiggy: assume 30M daily users each doing about 1 orders a day, with traffic peaking at 6× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Zomato/Swiggy including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "The Place order call times out and the app retries. How do you avoid charging twice?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Zomato/Swiggy?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "Dinner time sends 10× searches. What saturates first if search queries hit SQL directly?",
+        "Payment succeeds but the restaurant rejects the order. Which mechanism handles it?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Zomato/Swiggy metadata.",
+      "tradeoffPrompt": "Search shows an item that just sold out. Is that acceptable?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -11931,9 +11902,8 @@
       "workedEstimate": "30M × 1 = 30M orders/day ÷ 86,400 s ≈ 350/s on average; × 6 peak ≈ 2,100/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Free-text search on SQL is expensive; Elasticsearch plus a menu cache handles it.",
+        "A saga compensation: cancel and refund the payment. Each step has a compensating action; refund undoes the payment."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -12603,13 +12573,12 @@
         "Tatkal"
       ],
       "estimationScenario": "Google Docs: assume 10M daily users each doing about 200 edit ops a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Google Docs including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "An edit op is resent after a reconnect. How do you avoid applying it twice?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Google Docs?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "One shared doc gets 10× editors. What saturates first?",
+        "Which mechanism keeps concurrent edits consistent?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Google Docs metadata.",
+      "tradeoffPrompt": "Should cursor positions be saved in the op log?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -12759,9 +12728,8 @@
       "workedEstimate": "10M × 200 = 2B edit ops/day ÷ 86,400 s ≈ 23,000/s on average; × 3 peak ≈ 69,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "All ops for one doc go through its owner; that is the bottleneck by design.",
+        "Ordering ops on one log and transforming (OT) or merging (CRDT). OT or CRDT let edits from many users converge to the same text."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -13425,13 +13393,12 @@
         "Rides"
       ],
       "estimationScenario": "Dropbox/Drive: assume 50M daily users each doing about 10 file ops a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Dropbox/Drive including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "The commit call after uploading chunks times out and is retried. What makes it safe?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Dropbox/Drive?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A 2 GB file changes slightly. Without chunking, what is wasted?",
+        "Which mechanism uploads only the changed parts?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Dropbox/Drive metadata.",
+      "tradeoffPrompt": "Two devices edit the same file offline. What should sync do?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -13583,9 +13550,8 @@
       "workedEstimate": "50M × 10 = 500M file ops/day ÷ 86,400 s ≈ 5,800/s on average; × 3 peak ≈ 17,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Without chunking every edit re-uploads the full file.",
+        "Content-defined chunking with hashes; upload missing chunks only. Hashes identify which chunks the server already has."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -14267,13 +14233,12 @@
         "Memes"
       ],
       "estimationScenario": "Payment System UPI-style: assume 150M daily users each doing about 3 transactions a day, with traffic peaking at 5× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Payment System UPI-style including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "A payment request times out at the PSP. What should happen next?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Payment System UPI-style?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "Salary day sends 10× payments. Which external step usually limits throughput?",
+        "Which mechanism catches transactions whose final state never arrived?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Payment System UPI-style metadata.",
+      "tradeoffPrompt": "Why model each payment as a state machine?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -14426,9 +14391,8 @@
       "workedEstimate": "150M × 3 = 450M transactions/day ÷ 86,400 s ≈ 5,200/s on average; × 5 peak ≈ 26,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Banks and the switch have their own capacity; the PSP must queue, time out and retry carefully.",
+        "Daily reconciliation against settlement files. Reconciliation compares records with the switch and banks and fixes mismatches."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -15097,13 +15061,12 @@
         "Video ads"
       ],
       "estimationScenario": "Digital Wallet Paytm/PhonePe: assume 50M daily users each doing about 2 wallet transactions a day, with traffic peaking at 5× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Digital Wallet Paytm/PhonePe including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "A transfer request is retried after a timeout. How do you avoid moving money twice?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Digital Wallet Paytm/PhonePe?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "10× transfers between the same few merchants. What saturates first?",
+        "Which mechanism proves balances are right?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Digital Wallet Paytm/PhonePe metadata.",
+      "tradeoffPrompt": "Why lock both wallets in a fixed order?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -15249,9 +15212,8 @@
       "workedEstimate": "50M × 2 = 100M wallet transactions/day ÷ 86,400 s ≈ 1,200/s on average; × 5 peak ≈ 5,800/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Every transfer locks the merchant's row; hot wallets serialise. Batch credits to merchants or use sub-accounts.",
+        "Double-entry ledger; nightly check that sum(ledger) equals balances. Every movement has two entries; totals must reconcile."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -15585,7 +15547,7 @@
     "kind": "boss",
     "objectives": [
       "Scope BookMyShow: view shows & seat map, hold seats for 10 min",
-      "Size it: 50M seat views/day, about 5,800/s at peak",
+      "Size it: 12M seat views in 10 minutes, about 20,000/s",
       "Defend the design: seat holds via conditional update or short redis lock with ttl"
     ],
     "difficulty": 4,
@@ -15713,17 +15675,17 @@
         "tags": [
           "estimation"
         ],
-        "prompt": "BookMyShow: assume 10M daily users each doing about 5 seat views a day, with traffic peaking at 10× the daily average. Estimate peak seat views per second.",
+        "prompt": "BookMyShow: a blockbuster opens bookings, and about 3M users each open about 4 seat maps in the first 10 minutes. Estimate peak seat views per second.",
         "unit": "seat views/s",
-        "target": 5800,
+        "target": 20000,
         "assumptions": [
-          "10M users × 5 per day = 50M/day",
-          "86,400 seconds in a day",
-          "Peak = 10 × average"
+          "3M users × 4 seat maps = 12M seat views",
+          "10 minutes = 600 seconds",
+          "The burst is spread evenly over the window"
         ],
-        "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
-        "workedAnswer": "10M × 5 = 50M seat views/day ÷ 86,400 s ≈ 580/s on average; × 10 peak ≈ 5,800/s.",
-        "explanation": "Average first, then apply the peak factor. 10M × 5 = 50M seat views/day ÷ 86,400 s ≈ 580/s on average; × 10 peak ≈ 5,800/s. Anything within about 50% shows the right order of magnitude.",
+        "formula": "peak/s = views in the window ÷ window length in seconds",
+        "workedAnswer": "3M × 4 = 12M seat views ÷ 600 s = 20,000 seat views/s during the opening burst.",
+        "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 3M × 4 = 12M seat views ÷ 600 s = 20,000 seat views/s during the opening burst. Anything within about 50% shows the right order of magnitude.",
         "concept": "estimation"
       },
       {
@@ -15882,7 +15844,7 @@
       {
         "id": "t94-f2",
         "front": "Peak load estimate for BookMyShow?",
-        "back": "10M × 5 = 50M seat views/day ÷ 86,400 s ≈ 580/s on average; × 10 peak ≈ 5,800/s."
+        "back": "3M × 4 = 12M seat views ÷ 600 s = 20,000 seat views/s during the opening burst."
       },
       {
         "id": "t94-f3",
@@ -15919,14 +15881,13 @@
         "Upload reels",
         "DMs"
       ],
-      "estimationScenario": "BookMyShow: assume 10M daily users each doing about 5 seat views a day, with traffic peaking at 10× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for BookMyShow including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "estimationScenario": "BookMyShow: a blockbuster opens bookings, and about 3M users each open about 4 seat maps in the first 10 minutes.",
+      "apiPrompt": "Fetching the seat map is retried many times. What does it need?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in BookMyShow?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A blockbuster opens and 10× users request holds. What saturates first?",
+        "Which mechanism prevents two people holding the same seat?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for BookMyShow metadata.",
+      "tradeoffPrompt": "How long should holds last?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -16070,12 +16031,11 @@
         }
       ],
       "referenceNotes": "Core flows: View shows & seat map; Hold seats for 10 min; Pay and confirm. Must hold: No double booking; Spikes on blockbuster releases; Fair queueing. Key mechanisms: Seat holds via conditional update or short Redis lock with TTL. Payment saga releases hold on failure/timeout. Virtual waiting room queue for blockbuster drops.",
-      "workedEstimate": "10M × 5 = 50M seat views/day ÷ 86,400 s ≈ 580/s on average; × 10 peak ≈ 5,800/s.",
+      "workedEstimate": "3M × 4 = 12M seat views ÷ 600 s = 20,000 seat views/s during the opening burst.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "All holds for one show hit the same rows; a waiting room limits concurrent holders.",
+        "Conditional update: FREE to HELD only if still FREE. The conditional write makes exactly one hold succeed."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -16087,7 +16047,7 @@
         30
       ],
       "gradingProfile": {
-        "expectedPeakQps": 5787.0370370370365,
+        "expectedPeakQps": 20000,
         "requiredKinds": [
           "client",
           "gateway",
@@ -16122,9 +16082,9 @@
         ]
       },
       "scenario": {
-        "dau": 10000000,
-        "actions": 5,
-        "peak": 10,
+        "daily": 12000000.0,
+        "windowSeconds": 600,
+        "peak": 1,
         "noun": "seat views"
       }
     },
@@ -16207,17 +16167,17 @@
             "tags": [
               "estimation"
             ],
-            "prompt": "BookMyShow: assume 10M daily users each doing about 5 seat views a day, with traffic peaking at 10× the daily average. Estimate peak seat views per second.",
+            "prompt": "BookMyShow: a blockbuster opens bookings, and about 3M users each open about 4 seat maps in the first 10 minutes. Estimate peak seat views per second.",
             "unit": "seat views/s",
-            "target": 5800,
+            "target": 20000,
             "assumptions": [
-              "10M users × 5 per day = 50M/day",
-              "86,400 seconds in a day",
-              "Peak = 10 × average"
+              "3M users × 4 seat maps = 12M seat views",
+              "10 minutes = 600 seconds",
+              "The burst is spread evenly over the window"
             ],
-            "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
-            "workedAnswer": "10M × 5 = 50M seat views/day ÷ 86,400 s ≈ 580/s on average; × 10 peak ≈ 5,800/s.",
-            "explanation": "Average first, then apply the peak factor. 10M × 5 = 50M seat views/day ÷ 86,400 s ≈ 580/s on average; × 10 peak ≈ 5,800/s. Anything within about 50% shows the right order of magnitude.",
+            "formula": "peak/s = views in the window ÷ window length in seconds",
+            "workedAnswer": "3M × 4 = 12M seat views ÷ 600 s = 20,000 seat views/s during the opening burst.",
+            "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 3M × 4 = 12M seat views ÷ 600 s = 20,000 seat views/s during the opening burst. Anything within about 50% shows the right order of magnitude.",
             "concept": "estimation"
           }
         ]
@@ -16410,7 +16370,7 @@
     "kind": "boss",
     "objectives": [
       "Scope IRCTC Tatkal Ticketing: search trains & availability, book tatkal seats",
-      "Size it: 50M booking attempts/day, about 5,800/s at peak",
+      "Size it: 1M booking attempts in the first minute, about 16,700/s",
       "Defend the design: pre-scale before 10:00; waiting-room queue + rate limiter"
     ],
     "difficulty": 4,
@@ -16538,17 +16498,17 @@
         "tags": [
           "estimation"
         ],
-        "prompt": "IRCTC Tatkal Ticketing: assume 5M daily users each doing about 10 booking attempts a day, with traffic peaking at 10× the daily average. Estimate peak booking attempts per second.",
+        "prompt": "IRCTC Tatkal: when the AC Tatkal window opens at 10:00, about 1M booking attempts arrive in the first minute. Estimate peak booking attempts per second.",
         "unit": "booking attempts/s",
-        "target": 5800,
+        "target": 16700,
         "assumptions": [
-          "5M users × 10 per day = 50M/day",
-          "86,400 seconds in a day",
-          "Peak = 10 × average"
+          "1M booking attempts",
+          "First minute = 60 seconds",
+          "Most of the day's Tatkal demand lands in this minute"
         ],
-        "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
-        "workedAnswer": "5M × 10 = 50M booking attempts/day ÷ 86,400 s ≈ 580/s on average; × 10 peak ≈ 5,800/s.",
-        "explanation": "Average first, then apply the peak factor. 5M × 10 = 50M booking attempts/day ÷ 86,400 s ≈ 580/s on average; × 10 peak ≈ 5,800/s. Anything within about 50% shows the right order of magnitude.",
+        "formula": "peak/s = attempts in the window ÷ window length in seconds",
+        "workedAnswer": "1,000,000 attempts ÷ 60 s ≈ 16,700 booking attempts/s at the opening.",
+        "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 1,000,000 attempts ÷ 60 s ≈ 16,700 booking attempts/s at the opening. Anything within about 50% shows the right order of magnitude.",
         "concept": "estimation"
       },
       {
@@ -16707,7 +16667,7 @@
       {
         "id": "t95-f2",
         "front": "Peak load estimate for IRCTC Tatkal Ticketing?",
-        "back": "5M × 10 = 50M booking attempts/day ÷ 86,400 s ≈ 580/s on average; × 10 peak ≈ 5,800/s."
+        "back": "1,000,000 attempts ÷ 60 s ≈ 16,700 booking attempts/s at the opening."
       },
       {
         "id": "t95-f3",
@@ -16729,7 +16689,7 @@
       "functionalRequirements": [
         "Search trains & availability",
         "Book tatkal seats",
-        "Payment & PNR"
+        "Pay, then allocate and issue PNR"
       ],
       "nonFunctionalRequirements": [
         "10× spike at 10:00",
@@ -16744,14 +16704,13 @@
         "Stories",
         "Stickers"
       ],
-      "estimationScenario": "IRCTC Tatkal Ticketing: assume 5M daily users each doing about 10 booking attempts a day, with traffic peaking at 10× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for IRCTC Tatkal Ticketing including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "estimationScenario": "IRCTC Tatkal: when the AC Tatkal window opens at 10:00, about 1M booking attempts arrive in the first minute.",
+      "apiPrompt": "Searching trains is retried often. What does it need?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in IRCTC Tatkal Ticketing?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "At 10:00 the Tatkal window opens. What saturates first without admission control?",
+        "Payment succeeds but no berth is left when allocation runs. What should happen?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for IRCTC Tatkal Ticketing metadata.",
+      "tradeoffPrompt": "Why admit users through a token waiting room at 10:00?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -16902,13 +16861,12 @@
           "to": "blob1"
         }
       ],
-      "referenceNotes": "Core flows: Search trains & availability; Book tatkal seats; Payment & PNR. Must hold: 10× spike at 10:00; No overselling; Graceful degradation. Key mechanisms: Pre-scale before 10:00; waiting-room queue + rate limiter. Inventory decremented atomically per train/class/quota. Cache availability with short TTL; payment saga.",
-      "workedEstimate": "5M × 10 = 50M booking attempts/day ÷ 86,400 s ≈ 580/s on average; × 10 peak ≈ 5,800/s.",
+      "referenceNotes": "Core flows: search trains and availability; book Tatkal berths; pay, then allocate and issue the PNR. Must hold: survive the cliff-shaped burst at 10:00 (AC) and 11:00 (non-AC); never oversell; refund or release the mandate when allocation fails. Key mechanisms: pre-scale before the window; Aadhaar-OTP-authenticated users only and an agent blackout for the first 30 minutes (Railway Board order of 10 Jun 2025); waiting-room tokens plus rate limits; availability from a short-TTL cache; payment first (or an Autopay mandate/lien), then an atomic conditional decrement per train, date, class and quota that generates the PNR; if no berth is left, the payment is refunded or the lien released. No berth is held while the user pays, so availability can change during payment.",
+      "workedEstimate": "1,000,000 attempts ÷ 60 s ≈ 16,700 booking attempts/s at the opening.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Everyone targets the same train, class and quota. A waiting room admits users at a rate the inventory can take.",
+        "Refund automatically or release the Autopay mandate. IRCTC allocates after payment; if allocation fails, the money is refunded or the mandate released."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -16920,7 +16878,7 @@
         41
       ],
       "gradingProfile": {
-        "expectedPeakQps": 5787.0370370370365,
+        "expectedPeakQps": 16700,
         "requiredKinds": [
           "client",
           "gateway",
@@ -16956,9 +16914,9 @@
         ]
       },
       "scenario": {
-        "dau": 5000000,
-        "actions": 10,
-        "peak": 10,
+        "daily": 1000000.0,
+        "windowSeconds": 60,
+        "peak": 1,
         "noun": "booking attempts"
       }
     },
@@ -17041,17 +16999,17 @@
             "tags": [
               "estimation"
             ],
-            "prompt": "IRCTC Tatkal Ticketing: assume 5M daily users each doing about 10 booking attempts a day, with traffic peaking at 10× the daily average. Estimate peak booking attempts per second.",
+            "prompt": "IRCTC Tatkal: when the AC Tatkal window opens at 10:00, about 1M booking attempts arrive in the first minute. Estimate peak booking attempts per second.",
             "unit": "booking attempts/s",
-            "target": 5800,
+            "target": 16700,
             "assumptions": [
-              "5M users × 10 per day = 50M/day",
-              "86,400 seconds in a day",
-              "Peak = 10 × average"
+              "1M booking attempts",
+              "First minute = 60 seconds",
+              "Most of the day's Tatkal demand lands in this minute"
             ],
-            "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
-            "workedAnswer": "5M × 10 = 50M booking attempts/day ÷ 86,400 s ≈ 580/s on average; × 10 peak ≈ 5,800/s.",
-            "explanation": "Average first, then apply the peak factor. 5M × 10 = 50M booking attempts/day ÷ 86,400 s ≈ 580/s on average; × 10 peak ≈ 5,800/s. Anything within about 50% shows the right order of magnitude.",
+            "formula": "peak/s = attempts in the window ÷ window length in seconds",
+            "workedAnswer": "1,000,000 attempts ÷ 60 s ≈ 16,700 booking attempts/s at the opening.",
+            "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 1,000,000 attempts ÷ 60 s ≈ 16,700 booking attempts/s at the opening. Anything within about 50% shows the right order of magnitude.",
             "concept": "estimation"
           }
         ]
@@ -17579,13 +17537,12 @@
         "Paste"
       ],
       "estimationScenario": "Leaderboard: assume 20M daily users each doing about 20 score reads a day, with traffic peaking at 8× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Leaderboard including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "The scoring feed sends the same event twice. How do points stay correct?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Leaderboard?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A big match sends 10× rank requests. What saturates first?",
+        "Which mechanism gives fast rank lookups?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Leaderboard metadata.",
+      "tradeoffPrompt": "Should top-100 be computed live on each request?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -17731,9 +17688,8 @@
       "workedEstimate": "20M × 20 = 400M score reads/day ÷ 86,400 s ≈ 4,600/s on average; × 8 peak ≈ 37,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Every read hits one sorted set; cache top-N for seconds and shard huge contests.",
+        "A Redis sorted set: ZADD to update, ZREVRANK to read. Sorted sets keep scores ordered with O(log n) updates."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -18402,13 +18358,12 @@
         "Video upload"
       ],
       "estimationScenario": "Typeahead: assume 50M daily users each doing about 20 keystrokes a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Typeahead including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "The suggest call fires on every keystroke and may repeat. What makes this safe?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Typeahead?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "Traffic jumps 10× during a big event. What saturates first if suggest servers read SQL?",
+        "Which mechanism answers in a few milliseconds?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Typeahead metadata.",
+      "tradeoffPrompt": "A new trend appears. When does it show up?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -18555,9 +18510,8 @@
       "workedEstimate": "50M × 20 = 1B keystrokes/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Prefix queries on SQL are too slow; serve from in-memory top-k snapshots.",
+        "In-memory prefix-to-top-k map built offline. Precomputation moves the work offline."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -19226,13 +19180,12 @@
         "Payments"
       ],
       "estimationScenario": "Web Crawler: assume about 1B pages fetched a day, with traffic peaking at 1× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Web Crawler including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "A fetcher crashes mid-page and the URL is retried. What keeps that safe?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Web Crawler?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "Crawl rate rises 10× against one large site. What limits you first?",
+        "Which mechanism avoids crawling the same URL repeatedly?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Web Crawler metadata.",
+      "tradeoffPrompt": "Re-crawl popular pages often or rarely?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -19374,9 +19327,8 @@
       "workedEstimate": "1B pages fetched/day ÷ 86,400 s ≈ 12,000/s on average; × 1 peak ≈ 12,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Per-host politeness caps requests; more fetchers do not help one host.",
+        "A Bloom filter or seen-set checked before enqueueing. Checking before enqueue saves bandwidth; Bloom filters may skip a few new pages."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -20041,13 +19993,12 @@
         "Rides"
       ],
       "estimationScenario": "Search Engine: assume 80M daily users each doing about 10 searches a day, with traffic peaking at 6× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Search Engine including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "A search request is retried after a timeout. What does it need?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Search Engine?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A sale sends 10× searches. What saturates first?",
+        "Which mechanism keeps the index in step with the catalogue?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Search Engine metadata.",
+      "tradeoffPrompt": "Search results lag the catalogue by a few seconds. Acceptable?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -20194,9 +20145,8 @@
       "workedEstimate": "80M × 10 = 800M searches/day ÷ 86,400 s ≈ 9,300/s on average; × 6 peak ≈ 56,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Each query fans out to shards; add replicas and cache popular queries.",
+        "CDC from SQL into Kafka, consumed by indexers. CDC streams every change; the index lags by seconds."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -20865,13 +20815,12 @@
         "Seat booking"
       ],
       "estimationScenario": "Metrics & Monitoring: assume about 5B data points a day, with traffic peaking at 2× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Metrics & Monitoring including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "An agent resends a batch of samples. How do totals stay right?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Metrics & Monitoring?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "Someone adds a user_id label. What blows up first?",
+        "Which mechanism makes 30-day dashboards fast?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Metrics & Monitoring metadata.",
+      "tradeoffPrompt": "Alerts every 15 s or every 5 min?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -21012,9 +20961,8 @@
       "workedEstimate": "5B data points/day ÷ 86,400 s ≈ 58,000/s on average; × 2 peak ≈ 120,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Each label value creates a new series; high cardinality overwhelms the TSDB.",
+        "Rollups (1 min, 1 h) queried instead of raw points. Pre-aggregated rollups cut the points read by orders of magnitude."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -21679,13 +21627,12 @@
         "Video transcoding"
       ],
       "estimationScenario": "Distributed Logging: assume about 5B log lines a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Distributed Logging including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "An agent resends a batch after a timeout. What prevents duplicate lines?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Distributed Logging?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "An incident makes pods log 10× more. What saturates first without a buffer?",
+        "Which mechanism keeps 30 days affordable?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Distributed Logging metadata.",
+      "tradeoffPrompt": "Full-text index everything or only labels?",
       "rubric": {
         "acceptableAlternatives": {
           "sql_db": [
@@ -21812,9 +21759,8 @@
       "workedEstimate": "5B log lines/day ÷ 86,400 s ≈ 58,000/s on average; × 3 peak ≈ 170,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Indexing is the expensive step; Kafka absorbs bursts so indexers catch up.",
+        "Hot, warm and archive tiers with daily indices. Tiering puts old data on cheaper storage."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -22479,13 +22425,12 @@
         "Seat maps"
       ],
       "estimationScenario": "Distributed Message Queue: assume about 10B messages a day, with traffic peaking at 2× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Distributed Message Queue including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "A producer retries after a timeout. How do you avoid duplicate records?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Distributed Message Queue?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "One key gets 10× traffic. What saturates first?",
+        "Which mechanism makes writes durable through a broker failure?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Distributed Message Queue metadata.",
+      "tradeoffPrompt": "Strict global ordering or per-key ordering?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -22627,9 +22572,8 @@
       "workedEstimate": "10B messages/day ÷ 86,400 s ≈ 120,000/s on average; × 2 peak ≈ 230,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "A key maps to one partition; ordering per key limits parallelism.",
+        "acks=all with in-sync replicas. The leader acks after ISR followers have the record."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -23291,13 +23235,12 @@
         "Chat"
       ],
       "estimationScenario": "Distributed Job Scheduler: assume 1M daily users each doing about 10 job runs a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Distributed Job Scheduler including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "A job runs twice after a worker crash. What makes that safe?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Distributed Job Scheduler?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "Month-end puts 10× jobs due at midnight. What saturates first?",
+        "Which mechanism lets several schedulers claim jobs without clashes?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Distributed Job Scheduler metadata.",
+      "tradeoffPrompt": "Store jobs in SQL or a time-bucketed queue?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -23447,9 +23390,8 @@
       "workedEstimate": "1M × 10 = 10M job runs/day ÷ 86,400 s ≈ 120/s on average; × 3 peak ≈ 350/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Polling and claiming due rows on one table is the hot spot; partition by time bucket.",
+        "SELECT ... FOR UPDATE SKIP LOCKED on due rows. SKIP LOCKED lets each scheduler take different rows."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -24113,13 +24055,12 @@
         "Chat"
       ],
       "estimationScenario": "Proximity Service Yelp: assume 50M daily users each doing about 5 nearby searches a day, with traffic peaking at 4× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Proximity Service Yelp including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "A nearby search is retried. What does it need?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Proximity Service Yelp?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "Lunchtime sends 10× nearby searches. What saturates first if queries hit the places DB?",
+        "Which mechanism finds places near a point quickly?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Proximity Service Yelp metadata.",
+      "tradeoffPrompt": "New places show up after the next index rebuild. Acceptable?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -24256,9 +24197,8 @@
       "workedEstimate": "50M × 5 = 250M nearby searches/day ÷ 86,400 s ≈ 2,900/s on average; × 4 peak ≈ 12,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Serve from in-memory geo indexes on replicated search servers instead.",
+        "Look up the geohash cell and its neighbours, then filter by distance. Cells narrow the search to a few candidates."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -24582,7 +24522,7 @@
     "kind": "boss",
     "objectives": [
       "Scope Flash Sale Big Billion Day: show sale item, buy within limit",
-      "Size it: 500M buy attempts/day, about 120,000/s at peak",
+      "Size it: 30M buy attempts in 5 minutes, about 100,000/s",
       "Defend the design: static pages on cdn; waiting room + rate limiting"
     ],
     "difficulty": 4,
@@ -24710,17 +24650,17 @@
         "tags": [
           "estimation"
         ],
-        "prompt": "Flash Sale Big Billion Day: assume 50M daily users each doing about 10 buy attempts a day, with traffic peaking at 20× the daily average. Estimate peak buy attempts per second.",
+        "prompt": "Flash Sale Big Billion Day: at 12:00 about 10M users each make about 3 buy attempts in the first 5 minutes. Estimate peak buy attempts per second.",
         "unit": "buy attempts/s",
-        "target": 120000,
+        "target": 100000,
         "assumptions": [
-          "50M users × 10 per day = 500M/day",
-          "86,400 seconds in a day",
-          "Peak = 20 × average"
+          "10M users × 3 attempts = 30M attempts",
+          "5 minutes = 300 seconds",
+          "Attempts are spread evenly over the window"
         ],
-        "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
-        "workedAnswer": "50M × 10 = 500M buy attempts/day ÷ 86,400 s ≈ 5,800/s on average; × 20 peak ≈ 120,000/s.",
-        "explanation": "Average first, then apply the peak factor. 50M × 10 = 500M buy attempts/day ÷ 86,400 s ≈ 5,800/s on average; × 20 peak ≈ 120,000/s. Anything within about 50% shows the right order of magnitude.",
+        "formula": "peak/s = attempts in the window ÷ window length in seconds",
+        "workedAnswer": "10M × 3 = 30M attempts ÷ 300 s = 100,000 buy attempts/s.",
+        "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 10M × 3 = 30M attempts ÷ 300 s = 100,000 buy attempts/s. Anything within about 50% shows the right order of magnitude.",
         "concept": "estimation"
       },
       {
@@ -24879,7 +24819,7 @@
       {
         "id": "t105-f2",
         "front": "Peak load estimate for Flash Sale Big Billion Day?",
-        "back": "50M × 10 = 500M buy attempts/day ÷ 86,400 s ≈ 5,800/s on average; × 20 peak ≈ 120,000/s."
+        "back": "10M × 3 = 30M attempts ÷ 300 s = 100,000 buy attempts/s."
       },
       {
         "id": "t105-f3",
@@ -24916,14 +24856,13 @@
         "Docs",
         "Chat"
       ],
-      "estimationScenario": "Flash Sale Big Billion Day: assume 50M daily users each doing about 10 buy attempts a day, with traffic peaking at 20× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Flash Sale Big Billion Day including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "estimationScenario": "Flash Sale Big Billion Day: at 12:00 about 10M users each make about 3 buy attempts in the first 5 minutes.",
+      "apiPrompt": "Reserve is retried after a timeout. How do you avoid holding two units?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Flash Sale Big Billion Day?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "At 12:00 the sale opens. What saturates first without a waiting room?",
+        "Which mechanism avoids one hot stock row?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Flash Sale Big Billion Day metadata.",
+      "tradeoffPrompt": "A reservation expires unpaid. What happens?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -25067,12 +25006,11 @@
         }
       ],
       "referenceNotes": "Core flows: Show sale item; Buy within limit; Pay. Must hold: Massive spike; No overselling; Fairness. Key mechanisms: Static pages on CDN; waiting room + rate limiting. Stock counter decremented atomically in Redis, persisted to SQL. Order queue processed by workers.",
-      "workedEstimate": "50M × 10 = 500M buy attempts/day ÷ 86,400 s ≈ 5,800/s on average; × 20 peak ≈ 120,000/s.",
+      "workedEstimate": "10M × 3 = 30M attempts ÷ 300 s = 100,000 buy attempts/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Everyone decrements the same stock row.",
+        "Split stock into buckets and decrement atomically. Buckets spread writes."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -25084,7 +25022,7 @@
         41
       ],
       "gradingProfile": {
-        "expectedPeakQps": 115740.74074074074,
+        "expectedPeakQps": 100000,
         "requiredKinds": [
           "client",
           "gateway",
@@ -25120,9 +25058,9 @@
         ]
       },
       "scenario": {
-        "dau": 50000000,
-        "actions": 10,
-        "peak": 20,
+        "daily": 30000000.0,
+        "windowSeconds": 300,
+        "peak": 1,
         "noun": "buy attempts"
       }
     },
@@ -25205,17 +25143,17 @@
             "tags": [
               "estimation"
             ],
-            "prompt": "Flash Sale Big Billion Day: assume 50M daily users each doing about 10 buy attempts a day, with traffic peaking at 20× the daily average. Estimate peak buy attempts per second.",
+            "prompt": "Flash Sale Big Billion Day: at 12:00 about 10M users each make about 3 buy attempts in the first 5 minutes. Estimate peak buy attempts per second.",
             "unit": "buy attempts/s",
-            "target": 120000,
+            "target": 100000,
             "assumptions": [
-              "50M users × 10 per day = 500M/day",
-              "86,400 seconds in a day",
-              "Peak = 20 × average"
+              "10M users × 3 attempts = 30M attempts",
+              "5 minutes = 300 seconds",
+              "Attempts are spread evenly over the window"
             ],
-            "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
-            "workedAnswer": "50M × 10 = 500M buy attempts/day ÷ 86,400 s ≈ 5,800/s on average; × 20 peak ≈ 120,000/s.",
-            "explanation": "Average first, then apply the peak factor. 50M × 10 = 500M buy attempts/day ÷ 86,400 s ≈ 5,800/s on average; × 20 peak ≈ 120,000/s. Anything within about 50% shows the right order of magnitude.",
+            "formula": "peak/s = attempts in the window ÷ window length in seconds",
+            "workedAnswer": "10M × 3 = 30M attempts ÷ 300 s = 100,000 buy attempts/s.",
+            "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 10M × 3 = 30M attempts ÷ 300 s = 100,000 buy attempts/s. Anything within about 50% shows the right order of magnitude.",
             "concept": "estimation"
           }
         ]
@@ -25743,13 +25681,12 @@
         "Ticks"
       ],
       "estimationScenario": "Hotel Booking Airbnb/OYO: assume 10M daily users each doing about 8 searches a day, with traffic peaking at 4× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Hotel Booking Airbnb/OYO including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "Confirm booking is retried. How do you avoid two bookings?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Hotel Booking Airbnb/OYO?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A long weekend sends 10× searches. What saturates first if search hits SQL?",
+        "Which mechanism prevents overbooking a multi-night stay?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Hotel Booking Airbnb/OYO metadata.",
+      "tradeoffPrompt": "Confirm with the supplier synchronously or asynchronously?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -25896,9 +25833,8 @@
       "workedEstimate": "10M × 8 = 80M searches/day ÷ 86,400 s ≈ 930/s on average; × 4 peak ≈ 3,700/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Serve search from Elasticsearch and an availability cache.",
+        "One SQL transaction decrementing every night only if available. All nights succeed or none do."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -26567,13 +26503,12 @@
         "Seats"
       ],
       "estimationScenario": "Ad Click Aggregator: assume 100M daily users each doing about 10 click events a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Ad Click Aggregator including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "A click is logged twice after a retry. How do counts stay right?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Ad Click Aggregator?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A campaign sends 10× clicks for one ad. What saturates first?",
+        "Which mechanism gives numbers billing can trust?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Ad Click Aggregator metadata.",
+      "tradeoffPrompt": "Real-time numbers are slightly off. Acceptable?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -26714,9 +26649,8 @@
       "workedEstimate": "100M × 10 = 1B click events/day ÷ 86,400 s ≈ 12,000/s on average; × 3 peak ≈ 35,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "One key, one partition; salt hot ad ids.",
+        "Daily batch recompute from raw clicks, reconciled with the stream. Batch is the source of truth; stream gives speed."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -27044,7 +26978,7 @@
     "kind": "boss",
     "objectives": [
       "Scope Stock Exchange Matching: place limit and market orders, match buy and sell orders by price-time priority",
-      "Size it: 500M orders/day, about 58,000/s at peak",
+      "Size it: 500M orders in a 6.25-hour session, about 222,000/s at peak",
       "Defend the design: one single-threaded matching engine per symbol for deterministic order"
     ],
     "difficulty": 4,
@@ -27176,17 +27110,17 @@
         "tags": [
           "estimation"
         ],
-        "prompt": "Stock Exchange Matching: assume about 500M orders a day, with traffic peaking at 10× the daily average. Estimate peak orders per second.",
+        "prompt": "Stock Exchange Matching: about 500M orders a day arrive during a 6.25-hour session (9:15 to 15:30), peaking at 10× the session average. Estimate peak orders per second.",
         "unit": "orders/s",
-        "target": 58000,
+        "target": 222000,
         "assumptions": [
-          "500M per day",
-          "86,400 seconds in a day",
-          "Peak = 10 × average"
+          "500M orders per day",
+          "Session = 6.25 h = 22,500 seconds",
+          "Peak = 10 × session average"
         ],
-        "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
-        "workedAnswer": "500M orders/day ÷ 86,400 s ≈ 5,800/s on average; × 10 peak ≈ 58,000/s.",
-        "explanation": "Average first, then apply the peak factor. 500M orders/day ÷ 86,400 s ≈ 5,800/s on average; × 10 peak ≈ 58,000/s. Anything within about 50% shows the right order of magnitude.",
+        "formula": "peak/s = daily orders ÷ session seconds × peak factor",
+        "workedAnswer": "500M orders ÷ 22,500 s ≈ 22,200/s on average; × 10 peak ≈ 222,000/s.",
+        "explanation": "Divide by the trading session, not 86,400 s, then apply the peak factor. 500M orders ÷ 22,500 s ≈ 22,200/s on average; × 10 peak ≈ 222,000/s. Anything within about 50% shows the right order of magnitude.",
         "concept": "estimation"
       },
       {
@@ -27345,7 +27279,7 @@
       {
         "id": "t108-f2",
         "front": "Peak load estimate for Stock Exchange Matching?",
-        "back": "500M orders/day ÷ 86,400 s ≈ 5,800/s on average; × 10 peak ≈ 58,000/s."
+        "back": "500M orders ÷ 22,500 s ≈ 22,200/s on average; × 10 peak ≈ 222,000/s."
       },
       {
         "id": "t108-f3",
@@ -27382,14 +27316,13 @@
         "Photo filters",
         "Restaurant reviews"
       ],
-      "estimationScenario": "Stock Exchange Matching: assume about 500M orders a day, with traffic peaking at 10× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Stock Exchange Matching including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "estimationScenario": "Stock Exchange Matching: about 500M orders a day arrive during a 6.25-hour session (9:15 to 15:30), peaking at 10× the session average.",
+      "apiPrompt": "An order is resent after a timeout. How do you avoid a double order?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Stock Exchange Matching?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "Market open sends 10× orders for one stock. What saturates first?",
+        "Which mechanism lets a standby take over in the same state?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Stock Exchange Matching metadata.",
+      "tradeoffPrompt": "Why a single thread per symbol?",
       "rubric": {
         "acceptableAlternatives": {
           "sql_db": [
@@ -27521,12 +27454,11 @@
         }
       ],
       "referenceNotes": "Core flows: Place limit and market orders; Match buy and sell orders by price-time priority; Publish trades and order book updates. Must hold: Matching latency in microseconds to low milliseconds; Deterministic, auditable ordering; No lost or duplicated orders. Key mechanisms: One single-threaded matching engine per symbol for deterministic order. Every order sequenced and journaled before matching. Hot standby replays the journal on failover.",
-      "workedEstimate": "500M orders/day ÷ 86,400 s ≈ 5,800/s on average; × 10 peak ≈ 58,000/s.",
+      "workedEstimate": "500M orders ÷ 22,500 s ≈ 22,200/s on average; × 10 peak ≈ 222,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "One symbol, one single-threaded engine.",
+        "A sequenced log the standby replays. Determinism plus the same log gives the same book."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -27538,7 +27470,7 @@
         41
       ],
       "gradingProfile": {
-        "expectedPeakQps": 57870.37037037037,
+        "expectedPeakQps": 222000,
         "requiredKinds": [
           "client",
           "gateway",
@@ -27568,7 +27500,8 @@
         ]
       },
       "scenario": {
-        "daily": 500000000,
+        "daily": 500000000.0,
+        "windowSeconds": 22500,
         "peak": 10,
         "noun": "orders"
       }
@@ -27656,17 +27589,17 @@
             "tags": [
               "estimation"
             ],
-            "prompt": "Stock Exchange Matching: assume about 500M orders a day, with traffic peaking at 10× the daily average. Estimate peak orders per second.",
+            "prompt": "Stock Exchange Matching: about 500M orders a day arrive during a 6.25-hour session (9:15 to 15:30), peaking at 10× the session average. Estimate peak orders per second.",
             "unit": "orders/s",
-            "target": 58000,
+            "target": 222000,
             "assumptions": [
-              "500M per day",
-              "86,400 seconds in a day",
-              "Peak = 10 × average"
+              "500M orders per day",
+              "Session = 6.25 h = 22,500 seconds",
+              "Peak = 10 × session average"
             ],
-            "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
-            "workedAnswer": "500M orders/day ÷ 86,400 s ≈ 5,800/s on average; × 10 peak ≈ 58,000/s.",
-            "explanation": "Average first, then apply the peak factor. 500M orders/day ÷ 86,400 s ≈ 5,800/s on average; × 10 peak ≈ 58,000/s. Anything within about 50% shows the right order of magnitude.",
+            "formula": "peak/s = daily orders ÷ session seconds × peak factor",
+            "workedAnswer": "500M orders ÷ 22,500 s ≈ 22,200/s on average; × 10 peak ≈ 222,000/s.",
+            "explanation": "Divide by the trading session, not 86,400 s, then apply the peak factor. 500M orders ÷ 22,500 s ≈ 22,200/s on average; × 10 peak ≈ 222,000/s. Anything within about 50% shows the right order of magnitude.",
             "concept": "estimation"
           }
         ]
@@ -28194,13 +28127,12 @@
         "Coupons"
       ],
       "estimationScenario": "Zoom/Meet: assume 10M daily users each doing about 2 joins a day, with traffic peaking at 4× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Zoom/Meet including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "Join is retried after a timeout. What happens?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Zoom/Meet?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A meeting grows to 100 participants. What saturates first?",
+        "Which mechanism adapts video to a weak connection?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Zoom/Meet metadata.",
+      "tradeoffPrompt": "SFU or MCU?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -28341,9 +28273,8 @@
       "workedEstimate": "10M × 2 = 20M joins/day ÷ 86,400 s ≈ 230/s on average; × 4 peak ≈ 930/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Each client receives many streams; simulcast and layer selection help.",
+        "Simulcast: the SFU forwards a lower layer. The SFU picks a layer per receiver."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -28673,7 +28604,7 @@
     "kind": "boss",
     "objectives": [
       "Scope Hotstar IPL Live Streaming: watch live and vod, adaptive bitrate",
-      "Size it: 1.5B segment requests/day, about 69,000/s at peak",
+      "Size it: 25M concurrent viewers, about 6.25M segment requests/s",
       "Defend the design: transcode into hls/dash ladders via workers; store in object storage"
     ],
     "difficulty": 4,
@@ -28801,17 +28732,17 @@
         "tags": [
           "estimation"
         ],
-        "prompt": "Hotstar IPL Live Streaming: assume 50M daily users each doing about 30 segment requests a day, with traffic peaking at 4× the daily average. Estimate peak segment requests per second.",
+        "prompt": "Hotstar IPL Live Streaming: about 25M viewers watch concurrently, and each player fetches one 4-second video segment every 4 seconds. Estimate peak segment requests per second.",
         "unit": "segment requests/s",
-        "target": 69000,
+        "target": 6250000,
         "assumptions": [
-          "50M users × 30 per day = 1.5B/day",
-          "86,400 seconds in a day",
-          "Peak = 4 × average"
+          "25M concurrent viewers",
+          "One segment per viewer every 4 seconds",
+          "Disney+ Hotstar publicly reported 25.3M peak concurrent viewers in 2019"
         ],
-        "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
-        "workedAnswer": "50M × 30 = 1.5B segment requests/day ÷ 86,400 s ≈ 17,000/s on average; × 4 peak ≈ 69,000/s.",
-        "explanation": "Average first, then apply the peak factor. 50M × 30 = 1.5B segment requests/day ÷ 86,400 s ≈ 17,000/s on average; × 4 peak ≈ 69,000/s. Anything within about 50% shows the right order of magnitude.",
+        "formula": "peak/s = concurrent viewers ÷ segment length in seconds",
+        "workedAnswer": "25,000,000 ÷ 4 s = 6,250,000 segment requests/s.",
+        "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 25,000,000 concurrent viewers ÷ 4 s = 6,250,000 segment requests/s. Anything within about 50% shows the right order of magnitude.",
         "concept": "estimation"
       },
       {
@@ -28970,7 +28901,7 @@
       {
         "id": "t110-f2",
         "front": "Peak load estimate for Hotstar IPL Live Streaming?",
-        "back": "50M × 30 = 1.5B segment requests/day ÷ 86,400 s ≈ 17,000/s on average; × 4 peak ≈ 69,000/s."
+        "back": "25,000,000 concurrent viewers ÷ 4 s = 6,250,000 segment requests/s."
       },
       {
         "id": "t110-f3",
@@ -29007,14 +28938,13 @@
         "Wallet",
         "Seat lock"
       ],
-      "estimationScenario": "Hotstar IPL Live Streaming: assume 50M daily users each doing about 30 segment requests a day, with traffic peaking at 4× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Hotstar IPL Live Streaming including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "estimationScenario": "Hotstar IPL Live Streaming: about 25M viewers watch concurrently, and each player fetches one 4-second video segment every 4 seconds.",
+      "apiPrompt": "The player re-requests the live manifest every few seconds. What does that need?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Hotstar IPL Live Streaming?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "At the toss, 25M viewers join. What saturates first if not pre-scaled?",
+        "Which mechanism carries tens of millions of viewers?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Hotstar IPL Live Streaming metadata.",
+      "tradeoffPrompt": "Longer or shorter segments?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -29162,12 +29092,11 @@
         }
       ],
       "referenceNotes": "Core flows: Watch live and VOD; Adaptive bitrate; Resume playback. Must hold: Tens of millions concurrent; Startup < 2 s; Regional CDN. Key mechanisms: Transcode into HLS/DASH ladders via workers; store in object storage. Multi-CDN delivery; pre-warm edges before matches. Watch progress in NoSQL; graceful degradation of non-video features.",
-      "workedEstimate": "50M × 30 = 1.5B segment requests/day ÷ 86,400 s ≈ 17,000/s on average; × 4 peak ≈ 69,000/s.",
+      "workedEstimate": "25,000,000 concurrent viewers ÷ 4 s = 6,250,000 segment requests/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Video is served by CDNs; login and entitlement are the per-user calls that spike.",
+        "Multi-CDN edges with an origin shield. Edges absorb the load; the shield protects origin."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -29179,7 +29108,7 @@
         65
       ],
       "gradingProfile": {
-        "expectedPeakQps": 69444.44444444444,
+        "expectedPeakQps": 6250000,
         "requiredKinds": [
           "client",
           "cdn",
@@ -29218,9 +29147,9 @@
         ]
       },
       "scenario": {
-        "dau": 50000000,
-        "actions": 30,
-        "peak": 4,
+        "daily": 25000000.0,
+        "windowSeconds": 4,
+        "peak": 1,
         "noun": "segment requests"
       }
     },
@@ -29303,17 +29232,17 @@
             "tags": [
               "estimation"
             ],
-            "prompt": "Hotstar IPL Live Streaming: assume 50M daily users each doing about 30 segment requests a day, with traffic peaking at 4× the daily average. Estimate peak segment requests per second.",
+            "prompt": "Hotstar IPL Live Streaming: about 25M viewers watch concurrently, and each player fetches one 4-second video segment every 4 seconds. Estimate peak segment requests per second.",
             "unit": "segment requests/s",
-            "target": 69000,
+            "target": 6250000,
             "assumptions": [
-              "50M users × 30 per day = 1.5B/day",
-              "86,400 seconds in a day",
-              "Peak = 4 × average"
+              "25M concurrent viewers",
+              "One segment per viewer every 4 seconds",
+              "Disney+ Hotstar publicly reported 25.3M peak concurrent viewers in 2019"
             ],
-            "formula": "peak/s = daily volume ÷ 86,400 × peak factor",
-            "workedAnswer": "50M × 30 = 1.5B segment requests/day ÷ 86,400 s ≈ 17,000/s on average; × 4 peak ≈ 69,000/s.",
-            "explanation": "Average first, then apply the peak factor. 50M × 30 = 1.5B segment requests/day ÷ 86,400 s ≈ 17,000/s on average; × 4 peak ≈ 69,000/s. Anything within about 50% shows the right order of magnitude.",
+            "formula": "peak/s = concurrent viewers ÷ segment length in seconds",
+            "workedAnswer": "25,000,000 ÷ 4 s = 6,250,000 segment requests/s.",
+            "explanation": "Divide the requests by the seconds they actually arrive in, not by a whole day. 25,000,000 concurrent viewers ÷ 4 s = 6,250,000 segment requests/s. Anything within about 50% shows the right order of magnitude.",
             "concept": "estimation"
           }
         ]
@@ -29840,13 +29769,12 @@
         "Video"
       ],
       "estimationScenario": "Online Judge LeetCode: assume 2M daily users each doing about 10 submissions a day, with traffic peaking at 10× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Online Judge LeetCode including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "Submit is retried. How do you avoid judging twice?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Online Judge LeetCode?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A contest starts and submissions jump 10×. What saturates first?",
+        "Which mechanism keeps untrusted code from harming the system?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Online Judge LeetCode metadata.",
+      "tradeoffPrompt": "Warm sandbox pool or start fresh each time?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -29988,9 +29916,8 @@
       "workedEstimate": "2M × 10 = 20M submissions/day ÷ 86,400 s ≈ 230/s on average; × 10 peak ≈ 2,300/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Running code is the costly part; scale workers per contest queue.",
+        "Sandbox: no network, CPU, memory and time limits. Isolation is the core requirement."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -30654,13 +30581,12 @@
         "Rides"
       ],
       "estimationScenario": "Email Service: assume 100M daily users each doing about 20 emails a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Email Service including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "Send is retried. How do you avoid sending twice?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Email Service?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A spam wave sends 10× inbound mail. What saturates first?",
+        "Which mechanism keeps inbox listing fast?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Email Service metadata.",
+      "tradeoffPrompt": "Filter spam before or after delivery?",
       "rubric": {
         "requiredCapabilities": [
           "client",
@@ -30807,9 +30733,8 @@
       "workedEstimate": "100M × 20 = 2B emails/day ÷ 86,400 s ≈ 23,000/s on average; × 3 peak ≈ 69,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Scanning is the expensive step; queue and scale workers.",
+        "Per-user metadata store; bodies in object storage. Small metadata, big bodies elsewhere."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -31481,13 +31406,12 @@
         "Ride matching"
       ],
       "estimationScenario": "S3-like Object Storage: assume about 2B object requests a day, with traffic peaking at 3× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for S3-like Object Storage including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "A PUT is retried after a timeout. What happens?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in S3-like Object Storage?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "Small-object writes jump 10×. What saturates first?",
+        "Which mechanism stores data durably at about 1.5× overhead?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for S3-like Object Storage metadata.",
+      "tradeoffPrompt": "Erasure code or replicate small objects?",
       "rubric": {
         "acceptableAlternatives": {
           "sql_db": [
@@ -31618,9 +31542,8 @@
       "workedEstimate": "2B object requests/day ÷ 86,400 s ≈ 23,000/s on average; × 3 peak ≈ 69,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "Every object needs a metadata commit; partition metadata by bucket and key.",
+        "Erasure coding 8+4 across racks or zones. 8+4 survives 4 lost fragments at 1.5× storage."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
@@ -32297,13 +32220,12 @@
         "Hotel search"
       ],
       "estimationScenario": "Distributed Counter: assume 100M daily users each doing about 20 increments a day, with traffic peaking at 5× the daily average.",
-      "apiPrompt": "Draft REST/JSON APIs for Distributed Counter including auth, idempotency keys, cursor pagination, and error codes for rate limits.",
+      "apiPrompt": "A like is retried. How do you avoid double counting?",
       "deepDivePrompts": [
-        "How do you shard the hottest entities in Distributed Counter?",
-        "Which failure scenarios (AZ loss, broker lag, cache stampede) do you mitigate first?",
-        "How do you observe p95 and error budget burn for this service?"
+        "A viral post gets 10× likes on one key. What saturates first?",
+        "Which mechanism spreads writes on a hot counter?"
       ],
-      "tradeoffPrompt": "Justify SQL vs NoSQL (or cache vs source-of-truth) for Distributed Counter metadata.",
+      "tradeoffPrompt": "Counts can be a second stale. Acceptable?",
       "rubric": {
         "acceptableAlternatives": {
           "sql_db": [
@@ -32444,9 +32366,8 @@
       "workedEstimate": "100M × 20 = 2B increments/day ÷ 86,400 s ≈ 23,000/s on average; × 5 peak ≈ 120,000/s.",
       "exampleApi": "POST /v1/items (Idempotency-Key) • GET /v1/items?cursor= • POST /v1/auth/token",
       "deepDiveAnswers": [
-        "Hash-partition by user_id; isolate celebrity/hot keys to dedicated shards.",
-        "Use cache aside with TTL+jitter; protect DB with circuit breakers and request coalescing.",
-        "AZ loss: multi-AZ replicas, rehearsed failover, queue redrive policies."
+        "One hot key; shard into sub-keys.",
+        "32 sub-counters summed on read. Sub-counters split the load."
       ],
       "tradeoffAnalysis": "Prefer OLTP SQL when invariants matter; add read models/cache for fan-out. Document consistency window for async consumers.",
       "alternativeArchitectures": [
