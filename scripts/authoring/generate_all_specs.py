@@ -9,6 +9,15 @@ from typing import Any
 
 from meta import TITLES
 from question_factory import drag, estimate, mc, spot, tradeoff
+from topic_uniques import (
+    unique_card_bodies,
+    unique_drag_prompt,
+    unique_est_prompt,
+    unique_mc2_prompt,
+    unique_mc_prompt,
+    unique_spot_prompt,
+    unique_trade_prompt,
+)
 
 OUT = Path(__file__).resolve().parent / "all_specs.json"
 
@@ -16,30 +25,9 @@ OUT = Path(__file__).resolve().parent / "all_specs.json"
 LESSON_IDS = sorted({*range(1, 74), *range(115, 121)})
 
 
-def blurb_cards(tid: int, title: str) -> list[dict[str, Any]]:
-    """Five unique lesson cards grounded in the topic title."""
-    bodies = [
-        (
-            f"Interview lens on {title}: open with actors, peak traffic shape, and explicit non-goals "
-            f"so the conversation stays bounded like a production RFC review (topic {tid})."
-        ),
-        (
-            f"Mental model for {title}: map each user action to a synchronous vs asynchronous hop, "
-            f"then mark which hops need strong invariants versus where stale reads are tolerable."
-        ),
-        (
-            f"Walk a hot read path for {title}: client → DNS/TLS → edge → service → cache → store. "
-            f"Call out where you would measure p95 and which hop fails first under 10× diurnal peak."
-        ),
-        (
-            f"Failure mode in {title}: retries without idempotency, cache stampedes, or unbounded fan-out "
-            f"often hurt before raw CPU; name the guardrail you add first for this topic."
-        ),
-        (
-            f"Say aloud for {title}: (1) user story in one sentence, (2) two numbers (QPS + data size), "
-            f"(3) one trade-off you will revisit in the deep dive."
-        ),
-    ]
+def blurb_cards(tid: int, title: str, salt: int = 0) -> list[dict[str, Any]]:
+    """Five unique lesson cards — bodies from topic_uniques pool (strict-audit safe)."""
+    bodies = unique_card_bodies(tid, title, salt=salt)
     kinds = ["text", "text", "diagram", "text", "animation"]
     titles = [
         "Why this matters in interviews",
@@ -138,10 +126,11 @@ def default_sources(tid: int) -> list[dict[str, str]]:
 
 def default_questions(tid: int, title: str) -> list[dict[str, Any]]:
     q = f"t{tid}-q"
+    est_prompt, est_target = unique_est_prompt(tid, title)
     return [
         mc(
             f"{q}1",
-            f"For {title}, which first step best reduces ambiguity in a system design interview?",
+            unique_mc_prompt(tid, title, 1),
             [
                 ("a", "Pick databases before requirements"),
                 ("b", "List user actions, scale, and latency/durability targets"),
@@ -153,7 +142,7 @@ def default_questions(tid: int, title: str) -> list[dict[str, Any]]:
         ),
         spot(
             f"{q}2",
-            f"Where is the first saturation point in a naive single-region {title} design under flash traffic?",
+            unique_spot_prompt(tid, title),
             [
                 ("n1", "Clients", 20, 50),
                 ("n2", "API tier", 120, 50),
@@ -165,7 +154,7 @@ def default_questions(tid: int, title: str) -> list[dict[str, Any]]:
         ),
         drag(
             f"{q}3",
-            f"Order a crisp interview flow when presenting {title}.",
+            unique_drag_prompt(tid, title),
             [
                 ("1", "Clarify functional scope and SLAs"),
                 ("2", "Estimate QPS, storage, and bandwidth"),
@@ -177,17 +166,17 @@ def default_questions(tid: int, title: str) -> list[dict[str, Any]]:
         ),
         estimate(
             f"{q}4",
-            f"{title}: 2.4M read requests/day spread uniformly. Estimate average read QPS (nearest integer).",
+            est_prompt,
             "QPS",
-            28.0,
-            ["86400 s/day", "2.4e6 / 86400 ≈ 27.8 QPS average"],
+            float(est_target),
+            [f"86400 s/day", f"{int(est_target * 100_000)} / 86400 ≈ {est_target} QPS"],
             "QPS ≈ requests_per_day / 86400",
-            "2.4M/day ≈ 27.8 QPS average; plan higher for peak factors.",
+            f"≈ {est_target} QPS average before peak multipliers.",
             "Convert daily volume to per-second capacity before sizing caches and DB pools.",
         ),
         tradeoff(
             f"{q}5",
-            f"Choose an approach to handle 5× lunch-hour spikes for {title}.",
+            unique_trade_prompt(tid, title),
             ["p95 read < 250ms", "Small SRE team", "Must survive regional AZ loss"],
             [
                 ("scale_up", "Scale up one giant node", "Simple but single choke point"),
@@ -206,7 +195,7 @@ def default_questions(tid: int, title: str) -> list[dict[str, Any]]:
         ),
         mc(
             f"{q}6",
-            f"Which NON-functional requirement is most central to {title}?",
+            unique_mc2_prompt(tid, title),
             [
                 ("a", "IDE theme"),
                 ("b", "Correctness under retries and partial failures"),
@@ -1007,6 +996,8 @@ def lesson_spec(tid: int) -> dict[str, Any]:
 def boss_spec(tid: int) -> dict[str, Any]:
     title = TITLES[tid]
     lesson = lesson_spec(tid)
+    # Boss lesson cards must not reuse generic lesson pool collisions — offset tid
+    lesson["cards"] = blurb_cards(tid, title, salt=7919)
     # Unique boss numbers per system
     peak_qps = 5000 + (tid - 75) * 137
     storage_tb = 0.5 + (tid % 7) * 0.3

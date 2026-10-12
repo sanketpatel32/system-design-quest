@@ -36,9 +36,8 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
       if (n >= 1 && n <= 4) {
         const choice = question.choices[n - 1]
         if (!choice) return
-        const cur = new Set(Array.isArray(answer) ? (answer as string[]) : [])
-        cur.add(choice.id)
-        setAnswer([...cur])
+        e.preventDefault()
+        setAnswer([choice.id])
       }
       if (e.key === 'Enter') submit()
     }
@@ -59,16 +58,12 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
                 className={`choice-row flex gap-3 items-start p-3 cursor-pointer ${selected ? 'choice-row-selected' : ''}`}
               >
                 <input
-                  type="checkbox"
+                  type="radio"
+                  name={`mcq-${question.id}`}
                   className="mt-0.5"
                   disabled={submitted}
                   checked={selected}
-                  onChange={(e) => {
-                    const cur = new Set(Array.isArray(answer) ? (answer as string[]) : [])
-                    if (e.target.checked) cur.add(c.id)
-                    else cur.delete(c.id)
-                    setAnswer([...cur])
-                  }}
+                  onChange={() => setAnswer([c.id])}
                 />
                 <span className="text-sm text-[#d1d5db]">
                   <kbd className="font-mono text-[10px] text-[var(--color-muted)] mr-2">{idx + 1}</kbd>

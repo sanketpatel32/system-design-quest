@@ -15,10 +15,44 @@ test('capture key screens', async ({ page }) => {
 
   await page.getByRole('link', { name: /Quiz/i }).click()
   await page.waitForTimeout(500)
-  await page.screenshot({ path: `${out}/03-quiz.png`, fullPage: true })
+  await page.keyboard.press('2')
+  await page.getByRole('button', { name: 'Submit' }).first().click()
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: `${out}/03-quiz-feedback.png`, fullPage: true })
+
+  await page.goto('/')
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'sdq-progress-v3',
+      JSON.stringify({
+        version: 3,
+        xp: 80,
+        badges: ['first_steps'],
+        unlockedTopicIds: [1, 2, 74, 75],
+        topicProgress: {},
+        bossProgress: { completed: false, bestScore: 0, firstClearXpAwarded: false, drafts: {}, submissions: {} },
+        streak: { lastActiveDay: null, history: [] },
+        srs: [],
+        interviews: [],
+        preferences: { soundEnabled: false, reducedMotion: true, hasGestureForSound: false },
+        quizAttempts: {},
+      }),
+    )
+  })
+  await page.reload()
+  await page.goto('/boss/url-shortener')
+  await page.waitForTimeout(600)
+  await page.screenshot({ path: `${out}/04-boss-canvas.png`, fullPage: true })
+  await page.getByRole('button', { name: '+ Client' }).click()
+  await page.getByRole('button', { name: '+ Load Balancer' }).click()
+  await page.getByRole('button', { name: '+ Service' }).click()
+  await page.getByRole('button', { name: '+ SQL DB' }).click()
+  await page.getByRole('button', { name: 'Submit boss attempt' }).click()
+  await page.waitForTimeout(1200)
+  await page.screenshot({ path: `${out}/05-boss-results.png`, fullPage: true })
 
   await page.goto('/interview')
   await page.getByRole('button', { name: 'Start mock' }).click()
   await page.waitForTimeout(700)
-  await page.screenshot({ path: `${out}/04-interview.png`, fullPage: true })
+  await page.screenshot({ path: `${out}/06-interview.png`, fullPage: true })
 })
