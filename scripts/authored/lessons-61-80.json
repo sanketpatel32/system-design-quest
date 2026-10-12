@@ -1242,9 +1242,9 @@
     "title": "Blue-Green/Canary/Feature Flags",
     "kind": "lesson",
     "objectives": [
-      "A repeatable checklist: Requirements, Estimation, Storage, High-level, APIs, Detailed design, Evaluation, Distinctive points.",
-      "Answer: Timebox for requirements?",
-      "Answer: Deep dive goal?"
+      "Compare blue-green and canary releases",
+      "Use feature flags and kill switches safely",
+      "Keep schema changes rollback-safe"
     ],
     "difficulty": 3,
     "durationMinutes": 12,
@@ -1253,139 +1253,219 @@
       {
         "id": "t69-c1",
         "kind": "text",
-        "title": "Why interviewers ask",
-        "body": "A framework keeps you from freezing. Walk the steps, but adapt — interviewers may jump ahead. Timebox each part.",
-        "accent": "Interview lens"
+        "title": "Blue-green",
+        "body": "Run two full environments. Deploy to the idle one (green), test it, then switch the router from blue to green. Rollback is switching back. It needs double capacity during the switch, and database changes must work for both.",
+        "teaches": [
+          "blue-green"
+        ]
       },
       {
         "id": "t69-c2",
         "kind": "text",
-        "title": "The core idea",
-        "body": "A repeatable checklist: Requirements, Estimation, Storage, High-level, APIs, Detailed design, Evaluation, Distinctive points."
+        "title": "Canary",
+        "body": "Send a small share of traffic (1%, then 5%, 25%) to the new version and watch error rates and latency. Roll back automatically if they get worse. It catches problems only real traffic shows.",
+        "teaches": [
+          "canary"
+        ]
       },
       {
         "id": "t69-c3",
-        "kind": "diagram",
-        "title": "How a request flows",
-        "body": "7 steps from “Requirements” to “Evaluate”, via “Estimation”.",
-        "steps": [
-          "Requirements",
-          "Estimation",
-          "Storage schema",
-          "High-level",
-          "APIs",
-          "Deep dive",
-          "Evaluate"
+        "kind": "text",
+        "title": "Feature flags",
+        "body": "Ship code dark and turn features on per user, region or percentage at runtime. Kill switches turn a broken feature off without a deploy. Remove flags once rolled out, or they pile up as untested paths.",
+        "teaches": [
+          "flags"
         ]
       },
       {
         "id": "t69-c4",
+        "kind": "diagram",
+        "title": "A canary rollout",
+        "body": "5 steps from “Deploy v2 next to v1” to “Roll back if metrics worsen”, via “Route 1% of traffic to v2”.",
+        "steps": [
+          "Deploy v2 next to v1",
+          "Route 1% of traffic to v2",
+          "Compare errors and latency",
+          "Increase to 25%, then 100%",
+          "Roll back if metrics worsen"
+        ],
+        "teaches": [
+          "canary"
+        ]
+      },
+      {
+        "id": "t69-c5",
         "kind": "text",
-        "title": "Watch out for",
-        "body": "Reciting the framework mechanically without tailoring it to the problem."
+        "title": "Common trap",
+        "body": "Shipping a schema change the old version cannot read, then rolling back. Make changes backward compatible: add the new column, switch code, remove the old column later.",
+        "teaches": [
+          "schema"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t69-q1",
+        "id": "t69-a1",
+        "concept": "canary",
         "type": "multiple_choice",
-        "prompt": "What should guide how long you spend on each phase?",
-        "choices": [
-          {
-            "id": "b",
-            "label": "A rough timebox and interviewer cues"
-          },
-          {
-            "id": "c",
-            "label": "Always 50% on estimation"
-          },
-          {
-            "id": "a",
-            "label": "Nothing"
-          },
-          {
-            "id": "d",
-            "label": "Skip requirements"
-          }
-        ],
-        "correctChoiceIds": [
-          "b"
-        ],
-        "explanation": "Adapt to the conversation."
-      },
-      {
-        "id": "t69-q2",
-        "type": "drag_order",
-        "prompt": "Order a 45-minute plan.",
-        "items": [
-          {
-            "id": "i0",
-            "label": "Requirements (5 min)"
-          },
-          {
-            "id": "i1",
-            "label": "Estimates (5 min)"
-          },
-          {
-            "id": "i2",
-            "label": "High-level design (10 min)"
-          },
-          {
-            "id": "i3",
-            "label": "Deep dive (15 min)"
-          },
-          {
-            "id": "i4",
-            "label": "Trade-offs & wrap-up (5 min)"
-          }
-        ],
-        "correctOrder": [
-          "i0",
-          "i1",
-          "i2",
-          "i3",
-          "i4"
-        ],
-        "explanation": "Leave buffer for questions."
-      },
-      {
-        "id": "t69-r1",
-        "type": "multiple_choice",
-        "prompt": "Timebox for requirements?",
+        "prompt": "What does a canary release do?",
         "choices": [
           {
             "id": "a",
-            "label": "~5 minutes."
+            "label": "Sends a small share of traffic to v2 and compares its error rate"
           },
           {
             "id": "c",
-            "label": "Putting business logic in it."
+            "label": "Tests only in staging"
           },
           {
             "id": "b",
-            "label": "p95 latency on the hot path plus error rate on writes/reads that affect revenue or safety."
+            "label": "Switches all traffic at once and rolls back if users complain"
           },
           {
             "id": "d",
-            "label": "Saga with compensations, outbox pattern."
+            "label": "Deploys to every server at 2 AM"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "From the lesson: ~5 minutes."
+        "explanation": "Real traffic, limited blast radius."
+      },
+      {
+        "id": "t69-a2",
+        "concept": "blue-green",
+        "type": "multiple_choice",
+        "prompt": "In blue-green, how do you roll back?",
+        "choices": [
+          {
+            "id": "b",
+            "label": "Redeploy the old build to every server"
+          },
+          {
+            "id": "d",
+            "label": "Wait for the next release"
+          },
+          {
+            "id": "c",
+            "label": "Restore the database from backup"
+          },
+          {
+            "id": "a",
+            "label": "Point the router back to the old environment"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The old environment is still running."
+      },
+      {
+        "id": "t69-a3",
+        "concept": "flags",
+        "type": "multiple_choice",
+        "prompt": "A new recommendations widget is crashing the app. Fastest fix?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Turn it off with its kill-switch flag"
+          },
+          {
+            "id": "c",
+            "label": "Hotfix and redeploy"
+          },
+          {
+            "id": "d",
+            "label": "Add servers"
+          },
+          {
+            "id": "b",
+            "label": "Roll back the whole release"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Flags change behaviour without a deploy."
+      },
+      {
+        "id": "t69-a4",
+        "concept": "canary",
+        "type": "drag_order",
+        "prompt": "Order a canary rollout.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "Deploy v2 next to v1"
+          },
+          {
+            "id": "s2",
+            "label": "Route 1% to v2"
+          },
+          {
+            "id": "s3",
+            "label": "Compare errors and latency"
+          },
+          {
+            "id": "s4",
+            "label": "Increase to 25%, then 100%"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Grow only while metrics hold."
+      },
+      {
+        "id": "t69-a5",
+        "concept": "schema",
+        "type": "drag_order",
+        "prompt": "Order a rollback-safe column rename.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "Add the new column"
+          },
+          {
+            "id": "s2",
+            "label": "Write to both columns"
+          },
+          {
+            "id": "s3",
+            "label": "Switch reads to the new column"
+          },
+          {
+            "id": "s4",
+            "label": "Remove the old column"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Every step works with the previous code version."
       }
     ],
     "flashcards": [
       {
-        "id": "70-f0",
-        "front": "Timebox for requirements?",
-        "back": "~5 minutes."
+        "id": "t69-f1",
+        "front": "What does a canary release do?",
+        "back": "Sends a small share of traffic to v2 and compares its error rate. Real traffic, limited blast radius."
       },
       {
-        "id": "70-f1",
-        "front": "Deep dive goal?",
-        "back": "Show depth on the hardest component."
+        "id": "t69-f2",
+        "front": "In blue-green, how do you roll back?",
+        "back": "Point the router back to the old environment. The old environment is still running."
+      },
+      {
+        "id": "t69-f3",
+        "front": "A new recommendations widget is crashing the app. Fastest fix?",
+        "back": "Turn it off with its kill-switch flag. Flags change behaviour without a deploy."
       }
     ],
     "sources": [
@@ -1419,13 +1499,19 @@
         "id": "t70-c1",
         "kind": "text",
         "title": "Containers package the process",
-        "body": "A container image bundles your app and its dependencies, so it runs the same on a laptop and in production. It shares the host kernel, so it starts in seconds rather than minutes like a VM."
+        "body": "A container image bundles your app and its dependencies, so it runs the same on a laptop and in production. It shares the host kernel, so it starts in seconds rather than minutes like a VM.",
+        "teaches": [
+          "containers"
+        ]
       },
       {
         "id": "t70-c2",
         "kind": "text",
         "title": "Kubernetes runs the fleet",
-        "body": "You declare the desired state (5 replicas of checkout, 512 MB each). Kubernetes schedules pods onto nodes, restarts crashed ones and replaces pods when a node dies."
+        "body": "You declare the desired state (5 replicas of checkout, 512 MB each). Kubernetes schedules pods onto nodes, restarts crashed ones and replaces pods when a node dies.",
+        "teaches": [
+          "desired-state"
+        ]
       },
       {
         "id": "t70-c3",
@@ -1438,99 +1524,169 @@
           "Readiness probe passes",
           "Service starts sending traffic",
           "One old pod is removed, repeat"
+        ],
+        "teaches": [
+          "rolling"
         ]
       },
       {
         "id": "t70-c4",
         "kind": "text",
         "title": "Common trap",
-        "body": "Using the liveness probe to check the database. If the DB blips, every pod fails liveness and gets restarted at once. Dependency checks belong in readiness, which only stops traffic."
+        "body": "Using the liveness probe to check the database. If the DB blips, every pod fails liveness and gets restarted at once. Dependency checks belong in readiness, which only stops traffic.",
+        "teaches": [
+          "probes"
+        ]
       }
     ],
     "questions": [
       {
-        "id": "t70-q1",
+        "id": "t70-a1",
+        "concept": "probes",
         "type": "multiple_choice",
-        "prompt": "The database is briefly unavailable and every pod restarts in a loop. Which probe is misconfigured?",
+        "prompt": "The database blips and every pod restarts in a loop. What is misconfigured?",
         "choices": [
-          {
-            "id": "c",
-            "label": "There are too few replicas"
-          },
-          {
-            "id": "b",
-            "label": "Readiness is too lenient"
-          },
           {
             "id": "d",
             "label": "The image is too large"
           },
           {
-            "id": "a",
-            "label": "Liveness checks the database; it should only check the process itself"
-          }
-        ],
-        "correctChoiceIds": [
-          "a"
-        ],
-        "explanation": "Use readiness for dependencies: it stops traffic without killing pods."
-      },
-      {
-        "id": "t70-q2",
-        "type": "multiple_choice",
-        "prompt": "What does Kubernetes do when a node with 3 checkout pods dies?",
-        "choices": [
-          {
-            "id": "a",
-            "label": "Schedules replacement pods on healthy nodes to restore the replica count"
-          },
-          {
             "id": "b",
-            "label": "Nothing until an engineer acts"
+            "label": "The readiness probe checks the database"
           },
           {
             "id": "c",
-            "label": "Deletes the deployment"
+            "label": "The rolling update is too fast"
           },
           {
-            "id": "d",
-            "label": "Moves the node’s disk to another rack"
+            "id": "a",
+            "label": "The liveness probe checks the database"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Controllers reconcile actual state to the declared state."
+        "explanation": "Dependency checks belong in readiness, which only stops traffic."
       },
       {
-        "id": "t70-q3",
+        "id": "t70-a2",
+        "concept": "desired-state",
+        "type": "multiple_choice",
+        "prompt": "A node running three checkout pods dies. What does Kubernetes do?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Schedules replacement pods on healthy nodes"
+          },
+          {
+            "id": "c",
+            "label": "Restarts the node"
+          },
+          {
+            "id": "b",
+            "label": "Waits for the node to come back"
+          },
+          {
+            "id": "d",
+            "label": "Moves traffic to another cluster"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Controllers restore the declared state."
+      },
+      {
+        "id": "t70-a3",
+        "concept": "rolling",
         "type": "drag_order",
-        "prompt": "Order a rolling deploy step.",
+        "prompt": "Order one step of a rolling deploy.",
         "items": [
           {
             "id": "s1",
-            "label": "Start new pod"
+            "label": "New image pushed"
           },
           {
             "id": "s2",
-            "label": "Readiness probe passes"
+            "label": "Deployment creates a new pod"
           },
           {
             "id": "s3",
-            "label": "Traffic sent to new pod"
+            "label": "Readiness probe passes"
           },
           {
             "id": "s4",
-            "label": "Remove an old pod"
+            "label": "Service sends it traffic"
+          },
+          {
+            "id": "s5",
+            "label": "One old pod is removed"
           }
         ],
         "correctOrder": [
           "s1",
           "s2",
           "s3",
-          "s4"
+          "s4",
+          "s5"
         ],
-        "explanation": "Never remove old capacity before new pods are ready."
+        "explanation": "Old pods leave only after new ones are ready."
+      },
+      {
+        "id": "t70-a4",
+        "concept": "containers",
+        "type": "multiple_choice",
+        "prompt": "Why does a container start in seconds while a VM takes minutes?",
+        "choices": [
+          {
+            "id": "c",
+            "label": "Containers skip the network stack"
+          },
+          {
+            "id": "d",
+            "label": "Containers only run on bare metal"
+          },
+          {
+            "id": "a",
+            "label": "It shares the host kernel instead of booting its own OS"
+          },
+          {
+            "id": "b",
+            "label": "Containers have no filesystem"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "No guest OS boot."
+      },
+      {
+        "id": "t70-a5",
+        "concept": "desired-state",
+        "type": "multiple_choice",
+        "prompt": "You declared 5 replicas of checkout and one crashes. What happens?",
+        "choices": [
+          {
+            "id": "d",
+            "label": "The Deployment is deleted"
+          },
+          {
+            "id": "b",
+            "label": "Nothing until you run kubectl again"
+          },
+          {
+            "id": "c",
+            "label": "The other 4 pods restart"
+          },
+          {
+            "id": "a",
+            "label": "Kubernetes sees 4 running instead of 5 and starts a new pod"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Reconciliation loops close the gap."
       }
     ],
     "flashcards": [
