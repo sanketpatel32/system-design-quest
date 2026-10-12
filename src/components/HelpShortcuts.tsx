@@ -26,29 +26,29 @@ export function HelpShortcuts() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#29303d]/45"
       role="dialog"
       aria-modal="true"
       aria-labelledby="help-title"
       onClick={() => setOpen(false)}
     >
       <div
-        className="panel-slab max-w-md w-full p-5 space-y-4 shadow-2xl border border-[var(--color-line)]"
+        className="panel anim-pop max-w-md w-full p-6 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-start gap-3">
-          <h2 id="help-title" className="font-display text-lg font-bold text-chalk">Keyboard shortcuts</h2>
-          <button type="button" className="btn-quiet text-xs" onClick={() => setOpen(false)} aria-label="Close help">
+          <h2 id="help-title" className="font-display text-2xl text-chalk">Keyboard shortcuts</h2>
+          <button type="button" className="btn-quiet btn-sm" onClick={() => setOpen(false)} aria-label="Close help">
             Esc
           </button>
         </div>
-        <ul className="text-sm text-chalk space-y-2">
-          <li><kbd className="font-mono text-[var(--color-teal)]">?</kbd> — toggle this help</li>
-          <li><kbd className="font-mono text-[var(--color-teal)]">1</kbd>–<kbd className="font-mono text-[var(--color-teal)]">4</kbd> — select MCQ option (quiz)</li>
-          <li><kbd className="font-mono text-[var(--color-teal)]">Enter</kbd> — submit current question</li>
-          <li><kbd className="font-mono text-[var(--color-teal)]">←</kbd> / <kbd className="font-mono text-[var(--color-teal)]">→</kbd> — previous / next lesson card</li>
+        <ul className="font-bold text-chalk space-y-3">
+          <li><kbd className="kbd">?</kbd> — toggle this help</li>
+          <li><kbd className="kbd">1</kbd>–<kbd className="kbd">4</kbd> — select MCQ option (quiz)</li>
+          <li><kbd className="kbd">Enter</kbd> — submit current question</li>
+          <li><kbd className="kbd">←</kbd> / <kbd className="kbd">→</kbd> — previous / next lesson card</li>
         </ul>
-        <p className="text-xs text-[var(--color-muted)]">Shortcuts pause while focus is in a text field.</p>
+        <p className="text-sm text-dim">Shortcuts pause while focus is in a text field.</p>
       </div>
     </div>
   )

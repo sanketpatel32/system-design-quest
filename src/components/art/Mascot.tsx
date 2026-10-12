@@ -65,8 +65,8 @@ export function Mascot({ mood = 'idle', size = 120, className = '', title }: { m
           <circle cx="75" cy={mood === 'think' ? 47 : 50} r="1.8" fill="#fff" />
           {sad && (
             <>
-              <path d="M40 44 L 52 47" stroke="#29303D" strokeWidth="3" strokeLinecap="round" />
-              <path d="M80 44 L 68 47" stroke="#29303D" strokeWidth="3" strokeLinecap="round" />
+              <path d="M40 46 L 52 42" stroke="#29303D" strokeWidth="3" strokeLinecap="round" />
+              <path d="M80 46 L 68 42" stroke="#29303D" strokeWidth="3" strokeLinecap="round" />
             </>
           )}
         </>

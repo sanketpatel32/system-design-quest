@@ -300,8 +300,10 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
   return (
     <li ref={ref} className="relative" style={{ transform: `translateX(${offset}px)` }}>
       {current && !open && (
-        <span className="bubble pointer-events-none" style={{ color: p.deep }} aria-hidden>
-          <span className="anim-bob inline-block">Start</span>
+        <span className="pointer-events-none absolute bottom-[calc(100%+14px)] left-1/2 -translate-x-1/2" aria-hidden>
+          <span className="bubble-bob block">
+            <span className="bubble" style={{ color: p.deep }}>Start</span>
+          </span>
         </span>
       )}
       <button
