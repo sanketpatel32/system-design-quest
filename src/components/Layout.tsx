@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { useGameStore, useLevel, useStreak } from '../stores/gameStore'
 import { BADGE_LABELS } from '../lib/progression/badges'
@@ -20,6 +20,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const badges = useGameStore((s) => s.badges)
   const pct = ((xp % 500) / 500) * 100
   const reducedMotion = useGameStore((s) => s.preferences.reducedMotion)
+  const [hudOpen, setHudOpen] = useState(false)
 
   // The in-app setting applies the same rules as the OS-level prefers-reduced-motion
   useEffect(() => {
@@ -53,11 +54,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
               ))}
             </nav>
           </div>
-          <div className="flex items-stretch gap-2 text-xs">
+          <div className="relative flex items-stretch gap-2 text-xs">
+            <button
+              type="button"
+              className="flex items-stretch gap-2 text-left"
+              aria-expanded={hudOpen}
+              aria-controls="hud-explainer"
+              onClick={() => setHudOpen((v) => !v)}
+            >
             <div className="hud-block min-w-[150px]">
               <div className="flex justify-between items-baseline gap-3">
                 <span className="font-display font-semibold text-chalk">Level {level}</span>
-                <span className="tabular-nums text-dim">{xp} xp</span>
+                <span className="tabular-nums text-dim">{xp % 500}/500 xp</span>
               </div>
               <div className="xp-track mt-1.5">
                 <div
@@ -71,14 +79,26 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 />
               </div>
             </div>
-            <div className="hud-block flex items-center gap-1.5" title={`${streak}-day streak`} aria-label={`${streak}-day streak`}>
+            <div className="hud-block flex items-center gap-1.5" aria-label={`${streak}-day streak`}>
               <IconFlame />
               <span className="font-bold tabular-nums">{streak}</span>
+              <span className="text-dim hidden sm:inline">day{streak === 1 ? '' : 's'}</span>
             </div>
             {badges.length > 0 && (
-              <div className="hud-block flex items-center gap-1.5" title={badges.map((b) => BADGE_LABELS[b as keyof typeof BADGE_LABELS] ?? b).join(', ')}>
+              <div className="hud-block flex items-center gap-1.5" aria-label={`${badges.length} badges`}>
                 <IconBadge />
                 <span className="font-bold tabular-nums">{badges.length}</span>
+              </div>
+            )}
+            </button>
+            {hudOpen && (
+              <div id="hud-explainer" className="panel absolute right-0 top-full mt-2 w-72 p-4 text-sm z-50 space-y-2 shadow-xl">
+                <p><span className="font-semibold text-chalk">Level {level}</span> <span className="text-dim">· every 500 XP is a level. {500 - (xp % 500)} XP to the next.</span></p>
+                <p className="text-dim">XP comes from clearing quizzes and boss fights ({xp} total).</p>
+                <p><span className="font-semibold text-chalk">{streak}-day streak</span> <span className="text-dim">· days in a row you studied. Any quiz or review counts.</span></p>
+                {badges.length > 0 && (
+                  <p><span className="font-semibold text-chalk">Badges</span> <span className="text-dim">· {badges.map((b) => BADGE_LABELS[b as keyof typeof BADGE_LABELS] ?? b).join(', ')}</span></p>
+                )}
               </div>
             )}
             <button
