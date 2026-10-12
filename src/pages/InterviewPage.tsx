@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { PageHero } from '../components/ui/PageHero'
 import { Link } from 'react-router-dom'
 import { allTopics } from '../content/catalog'
 import type { CanvasComponentType } from '../content/types'
@@ -129,13 +130,9 @@ export function InterviewPage() {
 
   return (
     <div className="space-y-5">
-      <header className="border-b border-[var(--color-rail)] pb-4">
-        <p className="text-sm font-semibold text-[var(--color-amber)]">Mock interview · 45 minutes</p>
-        <h1 className="font-display text-4xl font-extrabold text-chalk mt-1">Interview mode</h1>
-        <p className="text-[15px] text-dim mt-2 max-w-2xl">
-          One scenario, six timed stages, no hints. The reference answer appears only after you finish.
-        </p>
-      </header>
+      <PageHero eyebrow="Mock interview · 45 minutes" title="Interview mode" icon="interview" tone="orange">
+        One scenario, six timed stages, no hints. The reference answer appears only after you finish.
+      </PageHero>
 
       {!running && (
         <div className="flex flex-wrap gap-3 items-end">
@@ -204,7 +201,7 @@ export function InterviewPage() {
             <ol className="flex gap-1" aria-label="Stages">
               {STAGES.map((s, i) => (
                 <li key={s.label} className="flex-1" style={{ flexGrow: INTERVIEW_STAGE_MINUTES[i] }} aria-current={i === stageIndex ? 'step' : undefined}>
-                  <div className="h-1.5 rounded-full" style={{ background: i < stageIndex ? 'var(--color-clear)' : i === stageIndex ? 'var(--color-amber)' : 'var(--color-rail)' }} />
+                  <div className="h-3 rounded-full" style={{ background: i < stageIndex ? 'var(--color-hero)' : i === stageIndex ? '#1CB0F6' : '#ECE7DF' }} />
                   <p className={`mt-1 text-[11px] truncate ${i === stageIndex ? 'text-chalk' : 'text-dim'}`}>{s.label}</p>
                 </li>
               ))}

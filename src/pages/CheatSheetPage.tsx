@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { PageHero } from '../components/ui/PageHero'
 import { Link } from 'react-router-dom'
 import { topicsById } from '../content/catalog'
 
@@ -35,7 +36,7 @@ function Row({ k, v, approx }: { k: ReactNode; v: ReactNode; approx?: boolean })
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-[var(--color-rail)] py-2 last:border-0 text-sm">
       <dt className="text-dim">{k}</dt>
-      <dd className={`tabular-nums text-right ${approx ? 'text-[var(--color-amber)]' : 'text-chalk font-semibold'}`}>{v}</dd>
+      <dd className={`tabular-nums text-right ${approx ? 'text-[#8350C7] font-extrabold' : 'text-chalk font-semibold'}`}>{v}</dd>
     </div>
   )
 }
@@ -43,13 +44,9 @@ function Row({ k, v, approx }: { k: ReactNode; v: ReactNode; approx?: boolean })
 export function CheatSheetPage() {
   return (
     <div className="space-y-5">
-      <header className="border-b border-[var(--color-rail)] pb-4">
-        <p className="text-sm font-semibold text-[var(--color-amber)]">Reference card</p>
-        <h1 className="font-display text-4xl font-extrabold text-chalk mt-1">Numbers and patterns</h1>
-        <p className="text-[15px] text-dim mt-2 max-w-2xl">
-          Exact values in chalk, interview shortcuts in <span className="text-[var(--color-amber)]">amber</span>. Say which one you are using out loud.
-        </p>
-      </header>
+      <PageHero eyebrow="Reference card" title="Numbers and patterns" icon="cheat" tone="purple">
+        Exact values in plain text, interview shortcuts highlighted. Say which one you are using out loud.
+      </PageHero>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Sheet title="Time and throughput">
@@ -119,7 +116,7 @@ export function CheatSheetPage() {
                     <td className="py-2 pr-4 text-dim">{w}</td>
                     <td className="py-2">
                       {topic && (
-                        <Link className="text-[var(--color-amber)] underline-offset-2 hover:underline" to={`/topic/${topic.slug}`}>
+                        <Link className="font-bold text-[#12749f] underline-offset-2 hover:underline" to={`/topic/${topic.slug}`}>
                           {topic.title}
                         </Link>
                       )}

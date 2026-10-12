@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { PageHero } from '../components/ui/PageHero'
+import { Mascot } from '../components/art/Mascot'
 import { Link } from 'react-router-dom'
 import { allTopics, regions, topicsById } from '../content/catalog'
 import { transitLineColor } from '../lib/design/transitTheme'
@@ -76,50 +78,45 @@ export function RevisionPage() {
   const accent = current ? transitLineColor(current.region) : 'var(--color-amber)'
 
   return (
-    <div className="space-y-5 max-w-3xl">
-      <header className="border-b border-[var(--color-rail)] pb-4">
-        <p className="text-sm font-semibold text-[var(--color-amber)]">Spaced repetition</p>
-        <h1 className="font-display text-4xl font-extrabold text-chalk mt-1">Review</h1>
-        <p className="text-[15px] text-dim mt-2">
-          Recall the answer, reveal it, then rate yourself. The rating decides when the card comes back.
-        </p>
-      </header>
+    <div className="space-y-6 max-w-3xl mx-auto">
+      <PageHero eyebrow="Spaced repetition" title="Review" icon="review" tone="sky"
+        aside={<div className="rounded-2xl bg-white px-4 py-2 text-center"><p className="font-display text-3xl text-[#12749f] tabular-nums">{queue.length}</p><p className="text-xs font-extrabold uppercase tracking-wide text-dim">due now</p></div>}>
+        Recall the answer, reveal it, then rate yourself. The rating decides when the card comes back.
+      </PageHero>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <label className="text-sm text-dim">
-          Line
+        <label className="text-sm font-extrabold text-dim">
+          Unit
           <select className="field mt-1 block min-w-[240px]" value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <option value="all">All lines</option>
+            <option value="all">All units</option>
             {regions.filter((r) => r.id !== 'boss-arena').map((r) => (
-              <option key={r.id} value={r.id}>{r.subtitle} line</option>
+              <option key={r.id} value={r.id}>{r.subtitle}</option>
             ))}
           </select>
         </label>
-        <p className="text-sm text-dim tabular-nums">
-          <span className="font-display text-xl font-bold text-chalk">{queue.length}</span> due now
-          {reviewed > 0 && <span className="block text-xs">{reviewed} reviewed this session</span>}
-        </p>
+        {reviewed > 0 && <p className="text-sm font-extrabold text-[var(--color-hero-deep)] tabular-nums">{reviewed} reviewed this session</p>}
       </div>
       {last && (
-        <p className="text-sm text-dim" role="status">
+        <p className="rounded-2xl bg-[#d7ffb8] px-4 py-2 text-sm font-bold text-[#235c00]" role="status">
           Next due {new Date(last.dueAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} for the card you rated {last.rating}.
         </p>
       )}
       {!current ? (
-        <div className="panel p-6 text-center">
-          <p className="font-display text-xl font-bold text-chalk">Queue empty</p>
-          <p className="text-sm text-dim mt-1">Cards from stations you have opened appear here. Rated cards come back on their scheduled day.</p>
+        <div className="panel p-8 text-center">
+          <Mascot mood="happy" size={120} className="mx-auto" />
+          <p className="font-display text-2xl text-chalk mt-2">Queue empty</p>
+          <p className="font-bold text-dim mt-1">Cards from stations you have opened appear here. Rated cards come back on their scheduled day.</p>
           <Link to="/" className="btn-quiet mt-4">Back to map</Link>
         </div>
       ) : (
-        <div className="panel-slab panel-slab-accent p-6" style={{ ['--accent' as string]: accent }}>
-          <p className="text-sm font-semibold" style={{ color: accent }}>
+        <div className="panel p-6 sm:p-8 text-center" style={{ ['--accent' as string]: accent }}>
+          <p className="text-sm font-extrabold uppercase tracking-wide" style={{ color: accent }}>
             {topicsById.get(current.topicId)?.title}
           </p>
-          <p className="font-display text-2xl font-semibold text-chalk mt-3 leading-snug">{current.flashcard.front}</p>
+          <p className="font-display text-3xl text-chalk mt-4 leading-snug">{current.flashcard.front}</p>
           {flipped ? (
-            <p className="mt-4 border-t border-[var(--color-rail)] pt-4 text-[17px] text-chalk leading-relaxed">{current.flashcard.back}</p>
+            <p className="anim-pop mt-5 rounded-2xl bg-[var(--color-sky)] p-5 text-[18px] font-bold text-chalk leading-relaxed">{current.flashcard.back}</p>
           ) : (
-            <button type="button" className="btn-quiet mt-5" onClick={() => setFlipped(true)}>
+            <button type="button" className="btn-sky mt-6 w-full sm:w-auto sm:min-w-[240px]" onClick={() => setFlipped(true)}>
               Show answer
             </button>
           )}
@@ -127,9 +124,9 @@ export function RevisionPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-6" role="group" aria-label="Rate your recall">
             {RATINGS.map(({ r, label, hint }) => (
               <button key={r} type="button" onClick={() => rate(r)} className={`rate-btn rate-${r}`}>
-                <span className="font-display font-semibold">{label}</span>
-                <span className="block text-xs text-dim">{hint}</span>
-                <span className="block text-xs text-chalk mt-1">Next: {intervalFor(r)}</span>
+                <span className="font-display text-lg">{label}</span>
+                <span className="block text-sm text-dim">{hint}</span>
+                <span className="block text-xs font-extrabold uppercase tracking-wide text-chalk mt-1">Next: {intervalFor(r)}</span>
               </button>
             ))}
           </div>
