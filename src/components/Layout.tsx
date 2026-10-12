@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { useGameStore, useLevel, useStreak } from '../stores/gameStore'
 import { BADGE_LABELS } from '../lib/progression/badges'
@@ -18,6 +19,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const streak = useStreak()
   const badges = useGameStore((s) => s.badges)
   const pct = ((xp % 500) / 500) * 100
+  const reducedMotion = useGameStore((s) => s.preferences.reducedMotion)
+
+  // The in-app setting applies the same rules as the OS-level prefers-reduced-motion
+  useEffect(() => {
+    document.documentElement.classList.toggle('reduce-motion', reducedMotion)
+  }, [reducedMotion])
 
   return (
     <div className="min-h-full flex flex-col">
