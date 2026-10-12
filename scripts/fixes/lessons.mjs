@@ -290,5 +290,17 @@ export const EXTRA_CARDS = {
 
 // Wording fixes inside existing lesson text
 export const TEXT_FIXES = [
+  [
+    'Horizontal scaling needs stateless services, a load balancer and partitioned data, but grows almost linearly.',
+    'Horizontal scaling needs stateless services, a load balancer and partitioned data. It adds capacity, and it only adds availability if the copies fail independently and traffic is routed away from dead ones (health checks, no shared single database). Gains are rarely linear: shared state, coordination and hot keys eat into them.',
+  ],
   ['Always spend the first 5 minutes on requirements.', 'Spend roughly the first five minutes on requirements; the interviewer may steer you sooner.'],
 ]
+
+/** Template card titles replaced with plain-language ones learners can scan */
+export const TITLE_FIXES = {
+  'Trade-off or failure mode': 'Watch out for',
+  'Request flow sketch': 'How a request flows',
+  'Mental model': 'The core idea',
+  'Why this matters in interviews': 'Why interviewers ask',
+}

@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { LESSONS, CARDS_ONLY, EXTRA_CARDS, TEXT_FIXES } from './fixes/lessons.mjs'
+import { LESSONS, CARDS_ONLY, EXTRA_CARDS, TEXT_FIXES, TITLE_FIXES } from './fixes/lessons.mjs'
 import { BLOCK_OWNER, AUTHORED_BLOCKS } from './fixes/bosses.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -94,6 +94,7 @@ for (const t of all.filter((t) => t.kind !== 'boss')) {
 
   t.cards = (t.cards ?? []).map(fixCard)
   for (const c of t.cards) for (const [from, to] of TEXT_FIXES) c.body = c.body.replace(from, to)
+  for (const c of t.cards) if (TITLE_FIXES[c.title]) c.title = TITLE_FIXES[c.title]
   for (const [i, [title, body]] of (EXTRA_CARDS[t.id] ?? []).entries()) {
     const id = `t${t.id}-x${i + 1}`
     if (!t.cards.some((c) => c.id === id)) t.cards.push({ id, kind: 'text', title, body, accent: 'Worked example' })
