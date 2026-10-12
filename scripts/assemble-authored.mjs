@@ -58,6 +58,22 @@ try {
   if (e.code !== 'ENOENT') throw e
 }
 
+// Scenario-specific interview reference data: API sketch, out-of-scope list and the key trade-off per boss
+const interviewFile = join(authoredDir, 'boss-interview', 'interview.json')
+try {
+  const ref = JSON.parse(readFileSync(interviewFile, 'utf8'))
+  for (const [id, r] of Object.entries(ref)) {
+    const t = topics.find((x) => x.id === Number(id))
+    if (!t || t.kind !== 'boss') throw new Error(`boss-interview: ${id} is not a boss topic`)
+    t.boss.exampleApi = r.api.join('\n')
+    t.boss.exclusions = r.outOfScope
+    t.boss.tradeoffAnalysis = r.tradeoff
+    if (t.bossDeep) t.bossDeep.requirements.outOfScope = r.outOfScope
+  }
+} catch (e) {
+  if (e.code !== 'ENOENT') throw e
+}
+
 topics.sort((a, b) => a.id - b.id)
 writeFileSync(out, JSON.stringify(topics, null, 2))
 console.log(`Assembled ${topics.length} topics from ${files.length} files (+${deepCount} deep lessons, +${bossDeepCount} boss briefs) -> ${out}`)

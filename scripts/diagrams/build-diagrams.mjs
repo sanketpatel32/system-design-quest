@@ -265,7 +265,7 @@ function renderExcalidraw(spec, g) {
 }
 
 const specs = parse(fs.readFileSync(path.join(here, 'specs.txt'), 'utf8'))
-fs.rmSync(outDir, { recursive: true, force: true })
+// Overwrite in place (deleting the folder confuses dev-server file watchers); stale files are removed below
 fs.mkdirSync(outDir, { recursive: true })
 const index = {}
 const seen = new Set()
@@ -278,5 +278,7 @@ for (const spec of specs) {
   fs.writeFileSync(path.join(outDir, `${spec.id}.excalidraw`), renderExcalidraw(spec, g))
   index[spec.id] = { alt: spec.alt, width: g.W, height: g.H }
 }
+const keep = new Set(Object.keys(index).flatMap((id) => [`${id}.svg`, `${id}.excalidraw`]))
+for (const f of fs.readdirSync(outDir)) if (!keep.has(f)) fs.rmSync(path.join(outDir, f))
 fs.writeFileSync(indexFile, JSON.stringify(index, null, 2) + '\n')
 console.log(`diagrams: ${specs.length} built`)

@@ -158,6 +158,22 @@ console.log("Boss study briefs enforced for all boss topics")
   for (const t of topics) if (t.bossDeep && !diagrams[String(t.id)]) errors.push(`Boss ${t.id}: no reference-architecture diagram`)
   console.log(`Diagrams: ${Object.keys(diagrams).length} (${topics.filter((t) => t.bossDeep && diagrams[String(t.id)]).length} bosses)`)
 }
+// Interview reference answers must be scenario-specific: no template APIs, exclusions or trade-offs
+{
+  const bossTopics = topics.filter((t) => t.kind === 'boss')
+  const seenApi = new Set(), seenTr = new Set()
+  for (const t of bossTopics) {
+    const b = t.boss
+    if (/\/v1\/items|\/v1\/auth\/token/.test(b.exampleApi)) errors.push(`Boss ${t.id}: template API in exampleApi`)
+    if (b.exclusions.some((x) => /mainframe|custom hardware/i.test(x))) errors.push(`Boss ${t.id}: template out-of-scope text`)
+    if (/Prefer OLTP SQL when invariants matter/.test(b.tradeoffAnalysis)) errors.push(`Boss ${t.id}: template trade-off text`)
+    if (seenApi.has(b.exampleApi)) errors.push(`Boss ${t.id}: exampleApi duplicates another boss`)
+    if (seenTr.has(b.tradeoffAnalysis)) errors.push(`Boss ${t.id}: tradeoffAnalysis duplicates another boss`)
+    seenApi.add(b.exampleApi); seenTr.add(b.tradeoffAnalysis)
+  }
+  const raw = JSON.stringify(bossTopics)
+  if (/mainframe|Building custom hardware/i.test(raw)) errors.push('Boss content still contains template out-of-scope text (mainframe/custom hardware)')
+}
 // While the quiz rewrite lands region by region, failures are reported but only enforced for authored topics
 errors.push(...quiz.errors)
 if (quiz.notes.length) console.log(`AUDIT NOTE: ${quiz.notes.length} quiz notes (two question types, or a long giveaway answer)${process.env.AUDIT_NOTES ? '' : '; set AUDIT_NOTES=1 to list'}`)
