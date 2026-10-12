@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Question, TradeoffQuestion } from '../content/types'
-import { gradeQuestion } from '../lib/scoring/questions'
+import { gradeQuestion, incompleteReason } from '../lib/scoring/questions'
 
 interface Props {
   question: Question
@@ -214,6 +214,12 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
   const [answer, setAnswer] = useState<unknown>(initialAnswer)
   const [result, setResult] = useState<ReturnType<typeof gradeQuestion> | null>(null)
   const submitted = locked || result !== null
+  const pending = incompleteReason(
+    question,
+    question.type === 'drag_order' && !(Array.isArray(answer) && answer.length === question.items.length)
+      ? scrambled(question.items.map((i) => i.id), question.id)
+      : answer,
+  )
 
   const submit = () => {
     if (submitted) return
@@ -222,6 +228,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
       question.type === 'drag_order' && !(Array.isArray(answer) && answer.length === question.items.length)
         ? scrambled(question.items.map((i) => i.id), question.id)
         : answer
+    if (incompleteReason(question, final)) return
     const r = gradeQuestion(question, final)
     setResult(r)
     onSubmit(final, r)
@@ -410,9 +417,12 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
         </div>
       )}
       {!submitted && (
-        <button type="button" onClick={submit} className="btn-cta">
-          Submit
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={submit} className="btn-cta disabled:opacity-40" disabled={pending !== null}>
+            Submit
+          </button>
+          {pending && <span className="text-sm text-dim">{pending}</span>}
+        </div>
       )}
       {result && (
         <div className={`feedback ${result.correct ? 'feedback-ok' : 'feedback-miss'}`} role="status">
