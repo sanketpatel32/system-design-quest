@@ -170,6 +170,7 @@ export function WorldMapScene() {
   const selectedTopic = orderedTopicsInRegion(selectedRegion.id).find((t) => t.id === selectedId)!
   const lineColor = transitLineColor(selectedRegion.id as import('../../content/types').RegionId)
   const st = statusMap.get(selectedId) ?? 'locked'
+  const lineStops = orderedTopicsInRegion(selectedRegion.id).map((t) => t.id)
   const arenaOpen = unlocked.includes(74) || completed.has(74)
 
   const doneCount = learningRegions.reduce(
@@ -304,15 +305,27 @@ export function WorldMapScene() {
           style={{ borderLeftColor: lineColor }}
           data-testid="station-panel"
         >
-          <p className="text-sm" style={{ color: lineColor }}>
-            {selectedRegion.subtitle}, station {selectedTopic.id}
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <p className="font-semibold" style={{ color: lineColor }}>
+              {selectedRegion.subtitle} line
+            </p>
+            <span className={`status-chip status-${st}`}>{STATUS_WORD[st]}</span>
+          </div>
+          <p className="text-xs text-dim mt-0.5 tabular-nums">
+            Topic {selectedTopic.id} · stop {lineStops.indexOf(selectedTopic.id) + 1} of {lineStops.length}
           </p>
           <h2 className="mt-1 font-display text-2xl font-extrabold leading-tight text-chalk" data-testid="topic-title">
             {selectedTopic.title}
           </h2>
           <p className="mt-2 text-dim text-sm">{selectedTopic.objectives?.[0]}</p>
           {st === 'locked' && (
-            <p className="mt-3 text-sm text-fault">{getUnlockHint(selectedTopic.id, completed)}</p>
+            <p className="mt-3 text-sm text-chalk flex gap-2 items-start rounded-md bg-[var(--color-ink)] p-2.5">
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden className="mt-0.5 shrink-0">
+                <rect x="2" y="6" width="10" height="7" rx="1.5" fill="none" stroke="#8FA0B3" strokeWidth="1.5" />
+                <path d="M4.5 6V4.5a2.5 2.5 0 0 1 5 0V6" fill="none" stroke="#8FA0B3" strokeWidth="1.5" />
+              </svg>
+              {getUnlockHint(selectedTopic.id, completed)}
+            </p>
           )}
           <div className="mt-4 flex flex-wrap gap-2">
             {st !== 'locked' && (
