@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { allTopics } from '../content/catalog'
 import { QuestionRenderer } from '../components/QuestionRenderer'
 import { HeartsHud } from '../components/ui/Hud'
-import { themeForRegion } from '../lib/design/regionTheme'
+import { transitLineColor } from '../lib/design/transitTheme'
 import { fireConfetti, playCelebrationSound } from '../lib/celebrate'
 import { INITIAL_HEARTS } from '../lib/scoring/quiz'
 import { useGameStore } from '../stores/gameStore'
@@ -27,7 +27,7 @@ export function QuizPage() {
       : { hearts: INITIAL_HEARTS, answers: {}, results: {}, completed: false },
   )
   const prefs = useGameStore((s) => s.preferences)
-  const accent = topic ? themeForRegion(topic.region).accent : '#2dd4bf'
+  const accent = topic ? transitLineColor(topic.region) : 'var(--color-amber)'
 
   useEffect(() => {
     if (topicId) startQuizAttempt(topicId)
