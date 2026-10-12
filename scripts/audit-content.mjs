@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { checkQuiz } from './audit/quiz-quality.mjs'
 import { checkDepth, checkBossDepth, DEEP_REGIONS } from './audit/depth.mjs'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -144,6 +144,20 @@ errors.push(...checkDepth(topics))
 errors.push(...checkBossDepth(topics))
 console.log(`Depth rules enforced for: ${DEEP_REGIONS.join(', ') || 'none yet'}`)
 console.log("Boss study briefs enforced for all boss topics")
+// Hand-drawn diagrams: every listed diagram has its SVG + .excalidraw, alt text, a real topic, and every boss has one
+{
+  const diagrams = JSON.parse(readFileSync(join(root, 'src/content/generated/diagrams.json'), 'utf8'))
+  const ids = new Set(topics.map((t) => String(t.id)))
+  for (const [id, d] of Object.entries(diagrams)) {
+    if (!ids.has(id)) errors.push(`Diagram ${id}: no such topic`)
+    if (!d.alt || d.alt.length < 40) errors.push(`Diagram ${id}: alt text missing or too short`)
+    for (const ext of ['svg', 'excalidraw']) {
+      if (!existsSync(join(root, `public/diagrams/${id}.${ext}`))) errors.push(`Diagram ${id}: public/diagrams/${id}.${ext} missing`)
+    }
+  }
+  for (const t of topics) if (t.bossDeep && !diagrams[String(t.id)]) errors.push(`Boss ${t.id}: no reference-architecture diagram`)
+  console.log(`Diagrams: ${Object.keys(diagrams).length} (${topics.filter((t) => t.bossDeep && diagrams[String(t.id)]).length} bosses)`)
+}
 // While the quiz rewrite lands region by region, failures are reported but only enforced for authored topics
 errors.push(...quiz.errors)
 if (quiz.notes.length) console.log(`AUDIT NOTE: ${quiz.notes.length} quiz notes (two question types, or a long giveaway answer)${process.env.AUDIT_NOTES ? '' : '; set AUDIT_NOTES=1 to list'}`)

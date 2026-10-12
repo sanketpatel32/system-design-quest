@@ -171,3 +171,14 @@ test('mobile viewport core flow', async ({ page }) => {
   await page.getByTestId('continue-quest').getByRole('link').click()
   await expect(page.getByTestId('topic-title')).toBeVisible()
 })
+
+test('lesson shows hand-drawn diagram with excalidraw download', async ({ page }) => {
+  await page.goto('/topic/the-system-design-interview')
+  const fig = page.getByTestId('sketch-figure')
+  await fig.scrollIntoViewIfNeeded()
+  const img = fig.locator('img')
+  await expect(img).toHaveAttribute('src', '/diagrams/1.svg')
+  await expect(img).toHaveAttribute('alt', /clarify/i)
+  await expect.poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(100)
+  await expect(fig.getByRole('link', { name: 'Download .excalidraw' })).toHaveAttribute('href', '/diagrams/1.excalidraw')
+})

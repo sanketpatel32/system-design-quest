@@ -1,7 +1,8 @@
 import type { BossDeep } from '../content/types'
+import { DiagramFigure } from './DiagramFigure'
 
 /** Boss study brief: requirements, capacity maths, reference architecture, deep dives and a rubric hint. */
-export function BossDeepView({ brief, accent }: { brief: BossDeep; accent: string }) {
+export function BossDeepView({ brief, accent, topicId }: { brief: BossDeep; accent: string; topicId: number }) {
   const r = brief.requirements
   return (
     <section aria-labelledby="boss-brief-title" className="space-y-3" style={{ ['--accent' as string]: accent }}>
@@ -50,7 +51,7 @@ export function BossDeepView({ brief, accent }: { brief: BossDeep; accent: strin
               </li>
             ))}
           </ol>
-          <pre className="deep-diagram" aria-label="Architecture diagram">{brief.architecture.diagram}</pre>
+          <DiagramFigure topicId={topicId} ascii={brief.architecture.diagram} label="Reference architecture" />
         </div>
       </details>
 
