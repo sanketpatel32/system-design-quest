@@ -90,14 +90,7 @@ DesignQuest should feel like a friendly learning game: a warm light page, satura
 - A light dotted grid, thick grey edges, and the same glyphs in the palette.
 
 ## Motion
-- **Springy, and used only where it carries meaning:**
-  - Pop-in for results and popovers.
-  - Bob for the Start bubble and the loading Byte.
-  - Wiggle for sad Byte.
-  - The sheet slides up.
-  - Progress bars fill with a spring.
-  - Buttons press down.
-- **Reduced motion.** `prefers-reduced-motion` and the in-app "Reduce motion" switch both cut animations to ~0ms, and confetti is skipped.
+See **Motion system** at the end of this file for the presets, rules, reduced-motion policy and the full catalogue.
 
 ## Region motifs
 Each region still has a line-drawn landmark (`RegionMotif.tsx`) for compact uses: 24px grid, 1.6 stroke, round caps, stroked in the region colour.
@@ -107,3 +100,36 @@ Each region still has a line-drawn landmark (`RegionMotif.tsx`) for compact uses
 - Each question has a `concept` that a card teaches (`teaches`), either in the topic itself or in its prerequisites.
 - Distractors must be misconceptions a learner might actually hold. Not allowed: joke options, "none of the above", irrelevant tech, or answers that repeat the correct one.
 - `npm run audit` enforces these rules (`scripts/audit/quiz-quality.mjs`).
+
+## Motion system
+
+Motion is there to give feedback and a bit of joy, never to make anyone wait. We use the `motion` package (`motion/react`) for springs, enter/exit and in-view effects, and plain CSS keyframes for small loops (Byte, flame, sparkles).
+
+**Spring presets** (`src/lib/motion/index.ts`, always import from there):
+
+| Preset | Stiffness / damping | Use for |
+| --- | --- | --- |
+| `pop` | 520 / 22, mass 0.8 | Things appearing: map nodes, check marks, popovers, badges, combo burst, level-up |
+| `snappy` | 700 / 30 | Presses and bumps: node squash, HUD chip bumps |
+| `gentle` | 260 / 30 | Page, question and lesson-card transitions |
+| `sheet` | 420 / 30 | Big panels sliding in |
+| `bar` | 160 / 14 | Progress and score fills (slight overshoot) |
+
+**Rules**
+- Animate `transform` and `opacity` only. Bars fill by translating a full-width fill inside an `overflow: hidden` track, not by animating `width`. The one exception is the flowing dashes on diagram and canvas edges (`stroke-dashoffset` on a few thin SVG lines).
+- Never animate a clickable element forever. Idle loops go on a wrapper or decoration (the Start bubble, the pulse ring), so the target stays still for pointers and tests.
+- Transitions run on enter only: no exit animation delays a route or a question change. Decorative overlays (combo burst, gems, level-up) are `pointer-events: none` and `aria-hidden` or a polite live region, and they never take focus.
+- A transformed ancestor breaks `position: fixed`. Route and question wrappers settle to `transform: none`, so the fixed quiz bar and sheet keep working.
+
+**Reduced motion.** `useCalm()` is true when the OS asks for reduced motion or the in-app setting is on. When it's true, `Layout` sets `<MotionConfig reducedMotion="always">`, components skip their `initial` state, and CSS (`@media (prefers-reduced-motion)` and `html.reduce-motion`) switches off loops, the pulse ring, shine, heart crack and confetti. Feedback that carries meaning (colours, icons, text) stays.
+
+**Tests.** `playwright.config.ts` sets `reducedMotion: 'reduce'`, so e2e runs with no animation and no extra waits. The demo recording (`anim-demo.mp4`) uses `no-preference` to show the full motion.
+
+**Catalogue.**
+- Map: nodes pop in with a stagger, the trail draws itself, the current node has a pulse ring and a bobbing Start bubble, completed checks pop, a tapped node squashes, the popover springs open, and the banners idle (flame, train, sparkles).
+- Byte: blinks and floats, jumps when happy, droops when sad, waves in onboarding.
+- Quiz: tiles lift and press, the bar springs with a shine sweep, a lost heart cracks and drops, the wrong tile shakes and the right one glows, the sheet springs up, questions slide in, and a combo burst fires at 3 or more in a row.
+- Celebration: XP counts up, gems fly into the HUD XP chip, the flame flickers, the badge flips with a shine, and there's a level-up moment.
+- Lessons: cards swipe and flip, flow steps stagger in with a travelling packet, and diagram edges flow.
+- Boss: nodes pop in, edges show direction with flowing dashes, and the score bars fill in sequence.
+- Routes fade and slide in; HUD chips bump when their values change.
