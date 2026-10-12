@@ -7,6 +7,11 @@ import { getUnlockHint, topicStatus } from '../../lib/progression/unlocks'
 import { useGameStore } from '../../stores/gameStore'
 
 const learningRegions = regions.filter((r) => r.id !== 'boss-arena')
+/** Minutes: ~1 per lesson card, ~1.5 per question */
+export function topicMinutes(id: number) {
+  const t = topicsById.get(id)
+  return t ? Math.max(5, Math.round(t.cards.length + t.questions.length * 1.5)) : 5
+}
 const arenaTopics = orderedTopicsInRegion('boss-arena')
 const W = 1000
 const TOP = 120
@@ -19,6 +24,8 @@ interface Stop {
   x: number
   y: number
   regionId: string
+  /** Position in the learner's journey, 1-based */
+  n: number
 }
 
 function layoutStops(): Stop[] {
@@ -32,7 +39,7 @@ function layoutStops(): Stop[] {
       const f = n === 1 ? 0 : j / (n - 1)
       const x = ltr ? L + f * (R - L) : R - f * (R - L)
       const y = y0 + (f > 0.5 ? 30 : 0)
-      stops.push({ id, x, y, regionId: r.id })
+      stops.push({ id, x, y, regionId: r.id, n: stops.length + 1 })
     })
   })
   return stops
@@ -85,7 +92,7 @@ function StationDot({
       tabIndex={0}
       data-testid={`station-${stop.id}`}
       data-status={status}
-      aria-label={`Topic ${stop.id}: ${topicsById.get(stop.id)?.title ?? ''}, ${STATUS_WORD[status]}`}
+      aria-label={`Station ${stop.n}: ${topicsById.get(stop.id)?.title ?? ''}, ${STATUS_WORD[status]}`}
       aria-pressed={selected}
       className="station cursor-pointer"
       onClick={onSelect}
@@ -126,8 +133,14 @@ function StationDot({
         fontWeight={600}
         fill={status === 'locked' ? '#5F7790' : '#EDE6D6'}
       >
-        {stop.id}
+        {stop.n}
       </text>
+      <title>{topicsById.get(stop.id)?.title}</title>
+      {(selected || pulse) && (
+        <text x={x} y={y + 30} textAnchor="middle" fontSize={12} fill="#EDE6D6" className="pointer-events-none">
+          {topicsById.get(stop.id)?.title}
+        </text>
+      )}
     </g>
   )
 }
@@ -178,20 +191,44 @@ export function WorldMapScene() {
     0,
   )
   const total = learningRegions.reduce((acc, r) => acc + orderedTopicsInRegion(r.id).length, 0)
+  const bossesDone = arenaTopics.filter((t) => completed.has(t.id)).length
+  const nextTopic = nextId ? topicsById.get(nextId) : undefined
+  const nextStop = STOPS.find((x) => x.id === nextId)
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <section aria-labelledby="map-title" className="min-w-0">
+        <Onboarding />
+        {nextTopic && (
+          <div className="panel panel-slab-accent mb-4 flex flex-wrap items-center gap-4 p-4" data-testid="continue-quest">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-[var(--color-amber)]">Continue your quest</p>
+              <p className="font-display text-xl font-bold text-chalk truncate">{nextTopic.title}</p>
+              <p className="text-sm text-dim">
+                Station {nextStop?.n} · {regions.find((r) => r.id === nextTopic.region)?.subtitle} line · about {topicMinutes(nextTopic.id)} min
+              </p>
+            </div>
+            <Link
+              to={statusMap.get(nextTopic.id) === 'in_progress' ? `/quiz/${nextTopic.slug}` : `/topic/${nextTopic.slug}`}
+              className="btn-cta"
+            >
+              {statusMap.get(nextTopic.id) === 'in_progress' ? 'Resume quiz' : 'Start lesson'}
+            </Link>
+          </div>
+        )}
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
           <div>
             <h1 id="map-title" className="font-display text-3xl font-extrabold md:text-4xl text-chalk">
               The network
             </h1>
-            <p className="text-dim text-[15px] mt-1">Ten lines, one per region. Ride each line in order to open the next.</p>
+            <p className="text-dim text-[15px] mt-1">
+              {total} stations on ten lines, ridden in order, then {arenaTopics.length} boss fights in the Colosseum.
+            </p>
           </div>
-          <p className="text-sm tabular-nums">
-            <span className="font-display text-xl font-bold text-chalk">{doneCount}</span>
-            <span className="text-dim"> / {total} stations cleared</span>
+          <p className="text-sm tabular-nums text-right">
+            <span className="font-display text-xl font-bold text-chalk">{doneCount + bossesDone}</span>
+            <span className="text-dim"> / {total + arenaTopics.length} on your journey</span>
+            <span className="block text-xs text-dim">{doneCount} stations · {bossesDone} bosses</span>
           </p>
         </div>
         <div className="panel overflow-x-auto p-2">
@@ -295,8 +332,11 @@ export function WorldMapScene() {
           </svg>
         </div>
         <p className="mt-2 text-sm text-dim">
-          Filled stations are cleared. A ring means you can enter; the pulsing ring is your next stop.
+          Filled stations are cleared: you passed the quiz (70% or better with a heart left). A ring means you can enter;
+          the pulsing ring is your next stop. Mastery comes from the Review deck, which brings each topic back until you
+          recall it reliably.
         </p>
+        <Curriculum statusMap={statusMap} />
       </section>
 
       <aside className="flex flex-col gap-4" aria-label="Station details">
@@ -312,7 +352,7 @@ export function WorldMapScene() {
             <span className={`status-chip status-${st}`}>{STATUS_WORD[st]}</span>
           </div>
           <p className="text-xs text-dim mt-0.5 tabular-nums">
-            Topic {selectedTopic.id} · stop {lineStops.indexOf(selectedTopic.id) + 1} of {lineStops.length}
+            Station {STOPS.find((x) => x.id === selectedTopic.id)?.n} · stop {lineStops.indexOf(selectedTopic.id) + 1} of {lineStops.length} on this line · about {topicMinutes(selectedTopic.id)} min
           </p>
           <h2 className="mt-1 font-display text-2xl font-extrabold leading-tight text-chalk" data-testid="topic-title">
             {selectedTopic.title}
@@ -350,8 +390,8 @@ export function WorldMapScene() {
           <p className="text-sm text-dim mt-1">
             {arenaOpen ? 'Bosses unlock one after another. Start with the playbook.' : 'Clear the Launchpad line to open the arena.'}
           </p>
-          <ol className="relative mt-3 max-h-[320px] overflow-y-auto pr-1 space-y-0.5">
-            {arenaTopics.map((t) => {
+          <ol className="relative mt-3 space-y-0.5">
+            {arenaTopics.map((t, bi) => {
               const bst = topicStatus(t, unlocked, completed, false)
               const open = bst !== 'locked'
               return (
@@ -363,14 +403,14 @@ export function WorldMapScene() {
                       data-testid={`boss-row-${t.id}`}
                     >
                       <BossDot status={bst} />
-                      <span className="text-dim tabular-nums w-7">{t.id}</span>
+                      <span className="text-dim tabular-nums w-7">{bi + 1}</span>
                       <span className="text-chalk truncate">{t.title}</span>
                     </Link>
                   ) : (
                     <div className="flex items-center gap-2.5 px-2 py-1.5 text-sm" title="Clear the previous boss to unlock">
                       <BossDot status={bst} />
-                      <span className="tabular-nums w-7 text-[#5F7790]">{t.id}</span>
-                      <span className="truncate text-[#7A8DA2]">{t.title}</span>
+                      <span className="tabular-nums w-7 text-[#8FA0B3]">{bi + 1}</span>
+                      <span className="truncate text-[#9AAABB]">{t.title}</span>
                       <span className="sr-only">(locked)</span>
                     </div>
                   )}
@@ -398,5 +438,107 @@ function BossDot({ status }: { status: Status }) {
         strokeWidth="2"
       />
     </svg>
+  )
+}
+
+const ONBOARD_KEY = 'sdq-onboarded'
+
+function Onboarding() {
+  const [open, setOpen] = useState(() => {
+    try {
+      return !localStorage.getItem(ONBOARD_KEY)
+    } catch {
+      return false
+    }
+  })
+  if (!open) return null
+  const close = () => {
+    try {
+      localStorage.setItem(ONBOARD_KEY, '1')
+    } catch {
+      /* private mode */
+    }
+    setOpen(false)
+  }
+  return (
+    <section className="panel mb-4 p-4" aria-labelledby="onboard-title" data-testid="onboarding">
+      <div className="flex items-start justify-between gap-3">
+        <h2 id="onboard-title" className="font-display text-lg font-bold text-chalk">How DesignQuest works</h2>
+        <button type="button" className="btn-quiet" onClick={close}>Got it</button>
+      </div>
+      <ul className="mt-2 grid gap-2 text-sm text-[#d6d0c2] sm:grid-cols-2">
+        <li><span className="font-semibold text-chalk">Lessons</span>: each station is a short lesson, then a quiz. Pass to open the next station.</li>
+        <li><span className="font-semibold text-chalk">Hearts</span>: you get 3 per quiz. A wrong answer costs one; blank answers never do.</li>
+        <li><span className="font-semibold text-chalk">Review</span>: cleared topics come back as flashcards on a schedule, so they stick.</li>
+        <li><span className="font-semibold text-chalk">Bosses</span>: full design problems in the Colosseum, scored stage by stage.</li>
+      </ul>
+    </section>
+  )
+}
+
+function Curriculum({ statusMap }: { statusMap: Map<number, Status> }) {
+  const [q, setQ] = useState('')
+  const needle = q.trim().toLowerCase()
+  return (
+    <section className="mt-6" aria-labelledby="curriculum-title">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h2 id="curriculum-title" className="font-display text-2xl font-bold text-chalk">All stations</h2>
+        <label className="text-sm text-dim">
+          Find a topic
+          <input
+            type="search"
+            className="field mt-1 block w-64"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="e.g. caching, Kafka"
+          />
+        </label>
+      </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        {learningRegions.map((r) => {
+          const all = orderedTopicsInRegion(r.id)
+          const topics = needle ? all.filter((t) => t.title.toLowerCase().includes(needle)) : all
+          if (!topics.length) return null
+          const done = all.filter((t) => statusMap.get(t.id) === 'completed').length
+          const mins = all.reduce((a, t) => a + topicMinutes(t.id), 0)
+          const color = transitLineColor(r.id as RegionId)
+          return (
+            <div key={r.id} className="panel p-4 border-l-[6px]" style={{ borderLeftColor: color }}>
+              <div className="flex items-baseline justify-between gap-2">
+                <h3 className="font-display font-bold" style={{ color }}>{r.subtitle} line</h3>
+                <span className="text-xs text-dim tabular-nums">{done}/{all.length} cleared · ~{Math.round(mins / 6) / 10} h</span>
+              </div>
+              <div className="score-track mt-2" aria-hidden>
+                <div style={{ width: `${(done / all.length) * 100}%`, background: color, height: '100%' }} />
+              </div>
+              <ol className="mt-2 space-y-0.5">
+                {topics.map((t) => {
+                  const st = statusMap.get(t.id) ?? 'locked'
+                  const n = STOPS.find((x) => x.id === t.id)?.n
+                  const body = (
+                    <>
+                      <span className="w-6 tabular-nums text-dim">{n}</span>
+                      <span className={`flex-1 truncate ${st === 'locked' ? 'text-[#9AAABB]' : 'text-chalk'}`}>{t.title}</span>
+                      <span className="text-xs text-dim">{STATUS_WORD[st]}</span>
+                    </>
+                  )
+                  return (
+                    <li key={t.id}>
+                      {st === 'locked' ? (
+                        <div className="flex items-center gap-2 px-2 py-1 text-sm">{body}</div>
+                      ) : (
+                        <Link to={`/topic/${t.slug}`} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-[var(--color-ink)]">
+                          {body}
+                        </Link>
+                      )}
+                    </li>
+                  )
+                })}
+              </ol>
+            </div>
+          )
+        })}
+      </div>
+    </section>
   )
 }
