@@ -54,6 +54,7 @@ function useStatuses() {
 
 export function WorldMapScene() {
   const { statusMap, completed, unlocked } = useStatuses()
+  const quizAttempts = useGameStore((s) => s.quizAttempts)
   const [view, setView] = useState<'path' | 'list'>('path')
   const [q, setQ] = useState('')
 
@@ -62,6 +63,8 @@ export function WorldMapScene() {
     return st === 'available' || st === 'in_progress'
   })
   const nextTopic = nextId ? topicsById.get(nextId) : undefined
+  /** Resume the quiz only when the learner has actually answered something */
+  const resume = Boolean(nextId && Object.keys((quizAttempts[`topic-${nextId}`] as { results?: object } | undefined)?.results ?? {}).length)
   const total = STATION_N.size
   const doneCount = [...STATION_N.keys()].filter((id) => completed.has(id)).length
   const bossesDone = arenaTopics.filter((t) => completed.has(t.id)).length
@@ -86,10 +89,10 @@ export function WorldMapScene() {
               <p className="text-sm text-dim">About {topicMinutes(nextTopic.id)} min · station {STATION_N.get(nextTopic.id)} of {total}</p>
             </div>
             <Link
-              to={statusMap.get(nextTopic.id) === 'in_progress' ? `/quiz/${nextTopic.slug}` : `/topic/${nextTopic.slug}`}
+              to={resume ? `/quiz/${nextTopic.slug}` : `/topic/${nextTopic.slug}`}
               className="btn-cta w-full sm:w-auto"
             >
-              {statusMap.get(nextTopic.id) === 'in_progress' ? 'Resume quiz' : 'Start lesson'}
+              {resume ? 'Resume quiz' : 'Start lesson'}
             </Link>
           </div>
         )}

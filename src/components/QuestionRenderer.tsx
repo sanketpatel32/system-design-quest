@@ -315,7 +315,8 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
                 <input
                   type="radio"
                   name={`mcq-${question.id}`}
-                  className="sr-only"
+                  className="choice-input"
+                  aria-label={c.label}
                   disabled={submitted}
                   checked={selected}
                   onChange={() => setAnswer([c.id])}
