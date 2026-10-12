@@ -15,8 +15,9 @@ export function TopicPage() {
   if (!topic) {
     return (
       <div>
-        <h1 className="font-display text-xl text-rose-400">Topic not found</h1>
-        <Link to="/" className="text-[var(--color-teal)] text-sm">Back to map</Link>
+        <p className="text-sm font-semibold text-[var(--color-fault)]">Signal failure</p>
+        <h1 className="font-display text-3xl font-extrabold text-chalk mt-1">Topic not found</h1>
+        <Link to="/" className="btn-cta mt-4">Back to the map</Link>
       </div>
     )
   }
@@ -24,10 +25,11 @@ export function TopicPage() {
   const status = topicStatus(topic, state.unlockedTopicIds, completed, false)
   if (status === 'locked') {
     return (
-      <div className="max-w-lg space-y-3 panel-slab p-5">
-        <h1 className="font-display text-2xl font-bold">{topic.title}</h1>
-        <p className="text-sm text-[var(--color-muted)]">{getUnlockHint(topic.id, completed)}</p>
-        <Link to="/" className="text-[var(--color-teal)] text-sm font-semibold">Return to map</Link>
+      <div className="max-w-lg space-y-3 panel p-6 mt-4">
+        <p className="text-sm font-semibold text-dim">Locked · topic {topic.id}</p>
+        <h1 className="font-display text-3xl font-extrabold text-chalk">{topic.title}</h1>
+        <p className="text-[15px] text-chalk">{getUnlockHint(topic.id, completed)}</p>
+        <Link to="/" className="btn-cta">Back to the map</Link>
       </div>
     )
   }
