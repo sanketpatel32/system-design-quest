@@ -33,7 +33,13 @@ export function QuizPage() {
     if (topicId) startQuizAttempt(topicId)
   }, [topicId, startQuizAttempt])
 
-  if (!topic) return <p className="text-[var(--color-muted)]">Topic not found</p>
+  if (!topic)
+    return (
+      <div className="py-6">
+        <h1 className="font-display text-3xl font-extrabold text-chalk">Quiz not found</h1>
+        <Link to="/" className="btn-cta mt-4">Back to the map</Link>
+      </div>
+    )
 
   const answered = Object.keys(attempt.results)
   const allDone = topic.questions.every((q) => q.id in attempt.results)

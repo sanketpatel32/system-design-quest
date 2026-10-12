@@ -42,7 +42,12 @@ export function BossPage() {
   const activeId = topic?.bossStages?.flatMap((st) => (st.kind === 'architecture' ? [] : st.questions)).find((q) => !(q.id in stageResults))?.id
 
   if (!topic || !topic.boss || !topic.bossStages) {
-    return <p>Boss not found</p>
+    return (
+      <div className="py-6">
+        <h1 className="font-display text-3xl font-extrabold text-chalk">Boss not found</h1>
+        <Link to="/" className="btn-cta mt-4">Back to the map</Link>
+      </div>
+    )
   }
 
   const onAnswer = (qid: string, correct: boolean) => {
