@@ -231,7 +231,7 @@ for (const b of bosses) {
 
   const stages = {
     requirements: [
-      mc(`${P}-req1`, `Which of these belongs in the first version of ${b.title}?`, fr[0], [...dis.slice(0, 2), ex[0]].filter(Boolean),
+      mc(`${P}-req1`, `Which of these belongs in the first version of ${b.title}?`, fr[0], [...ex, ...dis].filter((d) => d && !/hardware|blockchain|mainframe/i.test(d)).slice(0, 3),
         `In scope: ${fr.join('; ')}. Out of scope for this interview: ${[...ex, ...dis].join('; ')}.`, ['requirements']),
       mc(`${P}-req2`, `Which of these is a non-functional requirement for ${b.title}?`, nfr[0], fr.slice(1, 3).concat(dis[0] ? [dis[0]] : []),
         `Non-functional requirements describe qualities such as latency, durability and availability: ${nfr.join('; ')}. The others are features (functional) or out of scope.`, ['requirements']),
@@ -268,8 +268,8 @@ for (const b of bosses) {
         explanation: 'Stateless app servers scale out behind the load balancer; a single primary store does not. Relieve it with caching or read replicas for reads, and partitioning or queues for writes.',
       },
       mc(`${P}-dd2`, `Which mechanism does ${b.title} need for reliability?`, checks[0] ?? 'Replicate data across zones',
-        ['Keep user sessions in one server’s memory', 'Retry failed writes forever without idempotency', 'Run a single database with no backups'],
-        `${checks.join(' ')} The other options are common reliability mistakes.`, ['deep_dive']),
+        ['Scale the app tier vertically so a single large server never fails', 'Retry failed writes immediately in a tight loop until they succeed', 'Acknowledge the write before it reaches durable storage to keep latency low'],
+        `${checks.join(' ')} The others are tempting but wrong: one big server is still a single point of failure, tight retry loops amplify an outage, and acknowledging before a durable write loses data on a crash.`, ['deep_dive']),
     ],
     tradeoffs: [
       {
@@ -309,6 +309,9 @@ for (const b of bosses) {
   ]
   b.objectives = [`Scope ${b.title}: ${fr.slice(0, 2).join(', ').toLowerCase()}`, `Size it: ${human(s.daily)} ${s.noun}/day, about ${comma(peakR)}/s at peak`, `Defend the design: ${(checks[0] ?? nfr[0]).replace(/\.$/, '').toLowerCase()}`]
   b.cards = b.cards.map(fixCard)
+  const TEACH = { 'The brief': ['requirements'], 'Quality bar': ['requirements', 'estimation'], 'Reference sketch': ['api', 'architecture', 'deep_dive'], 'Failure modes': ['deep_dive', 'tradeoffs'], 'Say aloud': ['tradeoffs', 'estimation'] }
+  b.cards.forEach((c) => { c.teaches = TEACH[c.title] ?? ['architecture'] })
+  for (const st of b.bossStages) for (const q of st.questions ?? []) q.concept = st.kind === 'architecture' ? 'architecture' : st.kind
   // The topic-level list mirrors the stages (used by review and audit), never the old templates
   b.questions = b.bossStages.flatMap((st) => st.questions).map((q) => structuredClone(q))
 }
