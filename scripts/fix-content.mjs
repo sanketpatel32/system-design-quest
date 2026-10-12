@@ -147,8 +147,8 @@ for (const t of all.filter((t) => t.kind !== 'boss')) {
   t.questions = t.questions.map(shuffleChoices)
 
   if (L?.objectives) t.objectives = L.objectives
-  if (t.objectives?.some((o) => /^Answer: /.test(o))) {
-    const keep = t.objectives.filter((o) => !/^Answer: /.test(o))
+  if (t.objectives?.some((o) => /^Answer: |^Explain (why interviewers ask|the core idea)$/.test(o))) {
+    const keep = t.objectives.filter((o) => !/^Answer: |^Explain (why interviewers ask|the core idea)$/.test(o))
     const extra = t.cards.filter((c) => !/interview lens|recap|summary|say it/i.test(c.title)).map((c) => `Explain ${c.title.charAt(0).toLowerCase()}${c.title.slice(1)}`)
     t.objectives = keep.length ? keep : extra.slice(0, 2)
   }
