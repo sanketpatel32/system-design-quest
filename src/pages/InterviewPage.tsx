@@ -102,14 +102,19 @@ export function InterviewPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-3xl font-bold text-lime-200">Interview Mode (45 min)</h1>
-      <p className="text-slate-400">Timers use wall-clock timestamps — refresh won&apos;t reset them. Reference solutions stay hidden.</p>
+      <header className="border-b border-[var(--color-rail)] pb-4">
+        <p className="text-sm font-semibold text-[var(--color-amber)]">Mock interview · 45 minutes</p>
+        <h1 className="font-display text-4xl font-extrabold text-chalk mt-1">Interview mode</h1>
+        <p className="text-[15px] text-dim mt-2 max-w-2xl">
+          One scenario, six timed stages, no hints and no reference answer. The clock runs on wall time, so a refresh will not reset it.
+        </p>
+      </header>
 
       <div className="flex flex-wrap gap-3 items-end">
-        <label className="text-sm">
-          Boss scenario
+        <label className="text-sm text-dim">
+          Scenario
           <select
-            className="ml-2 bg-slate-800 border border-slate-600 rounded px-2 py-1"
+            className="field mt-1 block min-w-[240px]"
             value={bossId}
             onChange={(e) => setBossId(Number(e.target.value))}
             disabled={Boolean(startedAt && !finished)}
@@ -120,16 +125,32 @@ export function InterviewPage() {
           </select>
         </label>
         {!startedAt && (
-          <button type="button" onClick={start} className="px-4 py-2 rounded-lg bg-lime-500/20 border border-lime-400/50">
+          <button type="button" onClick={start} className="btn-cta">
             Start mock
           </button>
         )}
         {startedAt && !finished && (
-          <button type="button" onClick={finishEarly} className="px-4 py-2 rounded-lg border border-slate-600">
+          <button type="button" onClick={finishEarly} className="btn-quiet">
             Finish early
           </button>
         )}
       </div>
+
+      {!startedAt && (
+        <section className="panel p-5" aria-labelledby="mock-plan">
+          <h2 id="mock-plan" className="font-display text-lg font-bold text-chalk">How the 45 minutes split</h2>
+          <ol className="mt-3 grid gap-2 sm:grid-cols-3">
+            {STAGE_LABELS.map((label, i) => (
+              <li key={label} className="flex items-center gap-3 rounded-md border border-[var(--color-rail)] bg-[var(--color-ink)] px-3 py-2">
+                <span className="order-num tabular-nums" aria-hidden>{i + 1}</span>
+                <span className="text-sm text-chalk flex-1">{label}</span>
+                <span className="text-sm text-dim tabular-nums">{INTERVIEW_STAGE_MINUTES[i]} min</span>
+              </li>
+            ))}
+          </ol>
+          <p className="text-sm text-dim mt-3">You get a notes pad and the same architecture canvas as the bosses. Talk through it out loud as you would with an interviewer.</p>
+        </section>
+      )}
 
       {startedAt && !finished && (
         <div className="grid sm:grid-cols-3 gap-3 text-sm">
