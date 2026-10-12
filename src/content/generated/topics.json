@@ -18447,6 +18447,34 @@
           "r3": "The service needs its own data, and function calls become network calls."
         },
         "explanation": "Extract where team and scaling pressure are real."
+      },
+      {
+        "id": "t50-d1",
+        "type": "multiple_choice",
+        "concept": "ms-costs",
+        "prompt": "A request crosses 6 network hops, each with a 1% chance of being slow. About what share of requests hit at least one slow hop?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "About 6%"
+          },
+          {
+            "id": "b",
+            "label": "1%"
+          },
+          {
+            "id": "c",
+            "label": "About 60%"
+          },
+          {
+            "id": "d",
+            "label": "0.01%"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "1 minus 0.99 to the power 6 is about 5.9%, so tail latency grows with call depth."
       }
     ],
     "flashcards": [
@@ -18470,7 +18498,103 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "modular-monolith",
+        "ms-costs",
+        "extract"
+      ],
+      "mechanism": {
+        "title": "Growing from a modular monolith to services",
+        "steps": [
+          "Start with one deployable application split into modules with clear boundaries: orders, payments, catalogue, users. Each module owns its tables, and other modules call it only through its public interface.",
+          "Enforce boundaries with code rules (no reaching into another module's tables or internals), so a later split is mechanical rather than archaeological.",
+          "Watch for real pressure: a module that needs a very different scale (search), a different release cadence, a team that is blocked by everyone else's deploys, or a different technology.",
+          "Extract that one module: give it its own database, replace in-process calls with an API or events, and run both paths behind a flag until the new service is proven (the strangler fig pattern).",
+          "Pay the new costs knowingly: network calls that fail, distributed tracing, versioned APIs, data duplication, sagas instead of transactions, and on-call for one more system.",
+          "Repeat only when another module shows the same pressure; many companies stop at a handful of services."
+        ]
+      },
+      "useWhen": [
+        "Microservices when several teams need to deploy independently, or parts of the system have very different scaling or reliability needs.",
+        "A modular monolith for small teams, new products and domains that are still changing shape."
+      ],
+      "avoidWhen": [
+        "Do not start a five-person startup with twenty microservices; you pay distributed-systems costs before having product-market fit.",
+        "Do not split along technical layers (a 'database service', a 'validation service'); split along business capabilities."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Aspect",
+          "Modular monolith",
+          "Microservices"
+        ],
+        "rows": [
+          [
+            "Deploy",
+            "One unit; simple",
+            "Independent per service"
+          ],
+          [
+            "Calls between parts",
+            "In-process, microseconds",
+            "Network, milliseconds, can fail"
+          ],
+          [
+            "Transactions",
+            "Local ACID",
+            "Sagas and eventual consistency"
+          ],
+          [
+            "Scaling",
+            "Whole app",
+            "Per service"
+          ],
+          [
+            "Operational load",
+            "One pipeline, one runtime",
+            "Many pipelines, tracing, service mesh"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "What a network hop costs a request",
+        "assumptions": [
+          "A page needs 6 sequential calls between components",
+          "In-process call about 0.01 ms; network call about 2 ms at p50 and 20 ms at p99"
+        ],
+        "steps": [
+          "Monolith: 6 calls × 0.01 ms = 0.06 ms of call overhead.",
+          "Microservices at p50: 6 calls × 2 ms = 12 ms.",
+          "At p99, if each call independently has a 1% chance of 20 ms, the chance that at least one of 6 is slow is 1 minus 0.99 to the power 6, about 5.9%.",
+          "So roughly 1 request in 17 hits at least one slow hop, which is why tail latency grows with call depth."
+        ],
+        "result": "Every service boundary on the request path adds milliseconds and multiplies tail-latency risk; keep call chains shallow or parallel."
+      },
+      "india": {
+        "title": "A fintech start-up's first three years",
+        "label": "Illustrative estimate",
+        "body": "A Bengaluru lending start-up launches with a modular monolith: onboarding, KYC, loan ledger, collections and notifications as modules in one codebase and one Postgres database. In year two, KYC calls slow external verification APIs and needs to scale separately, and the notifications module is being changed weekly by a growth team, so both are extracted into services connected by events. The loan ledger stays inside the monolith because it needs multi-table ACID transactions and changes carefully. Three years in, they run five services, not fifty, each extracted for a reason they can state."
+      },
+      "pitfalls": [
+        {
+          "trap": "'Microservices are the modern way, so I'd start with them.'",
+          "say": "'With one team I'd build a modular monolith with strict module boundaries and extract a service only when scaling or team independence demands it.'"
+        },
+        {
+          "trap": "Splitting the database last.",
+          "say": "'A service that shares tables with others is not independent; extraction includes giving it its own data.'"
+        }
+      ],
+      "takeaways": [
+        "Start with a modular monolith and clear boundaries.",
+        "Extract services for scaling, team independence or technology needs.",
+        "Every service boundary costs latency, failure handling and operations.",
+        "Split by business capability, and give each service its own data."
+      ],
+      "diagram": "[ monolith: orders | payments | catalogue | users ]  (one deploy, one DB, clear modules)\n            | extract under pressure\n            v\n[ monolith: orders | payments | users ] --events/API--> [ catalogue service + own DB ]"
+    }
   },
   {
     "id": 51,
@@ -18702,6 +18826,34 @@
           "n2"
         ],
         "explanation": "Move discount logic into a service and keep the gateway thin."
+      },
+      {
+        "id": "t51-d1",
+        "type": "multiple_choice",
+        "concept": "aggregation",
+        "prompt": "A BFF calls three services taking 30, 50 and 80 ms in parallel, with 3 ms gateway overhead. What is the response time?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "About 83 ms"
+          },
+          {
+            "id": "b",
+            "label": "About 163 ms"
+          },
+          {
+            "id": "c",
+            "label": "About 30 ms"
+          },
+          {
+            "id": "d",
+            "label": "About 240 ms"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "In parallel the slowest call (80 ms) dominates, plus 3 ms of overhead."
       }
     ],
     "flashcards": [
@@ -18725,7 +18877,108 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "gateway-flow",
+        "gateway-jobs",
+        "aggregation",
+        "gateway-logic"
+      ],
+      "mechanism": {
+        "title": "What an API gateway does to each request",
+        "steps": [
+          "Terminates TLS for the public domain and normalises the request (headers, request id).",
+          "Authenticates the caller: validates the JWT or session, or the API key, and attaches identity claims for downstream services.",
+          "Applies cross-cutting policy: rate limits per user or key, request size limits, IP allow or deny lists, and CORS.",
+          "Routes by path, host or version to the right internal service, often through service discovery, with timeouts and retries.",
+          "Optionally aggregates: a backend-for-frontend (BFF) endpoint calls several services in parallel and returns one response shaped for the mobile app.",
+          "Records metrics, logs and the trace id, so every downstream call can be correlated."
+        ]
+      },
+      "useWhen": [
+        "One public entry point for many internal services, with consistent authentication, rate limiting and observability.",
+        "A BFF per client type when mobile and web need differently shaped responses."
+      ],
+      "avoidWhen": [
+        "Do not put business logic (pricing rules, order validation) in the gateway; it becomes a shared monolith every team must change, and every release of it risks every API.",
+        "Do not chain many sequential downstream calls in an aggregation endpoint; parallelise or move the composition into a service."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Concern",
+          "Gateway",
+          "Service"
+        ],
+        "rows": [
+          [
+            "TLS, authentication, rate limiting",
+            "Yes",
+            "Trusts gateway, checks authorisation"
+          ],
+          [
+            "Routing and versioning",
+            "Yes",
+            "No"
+          ],
+          [
+            "Response aggregation for a client",
+            "BFF layer",
+            "No"
+          ],
+          [
+            "Business rules",
+            "No",
+            "Yes"
+          ],
+          [
+            "Authorisation on data",
+            "Coarse (scopes)",
+            "Fine-grained (does this user own order 123?)"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Latency of an aggregation endpoint",
+        "assumptions": [
+          "Home screen needs profile (30 ms), offers (50 ms) and orders (80 ms)",
+          "Gateway overhead 3 ms"
+        ],
+        "steps": [
+          "Sequential calls: 30 + 50 + 80 = 160 ms, plus 3 ms overhead, so 163 ms.",
+          "Parallel calls: the slowest dominates, so 80 ms plus 3 ms = 83 ms.",
+          "If offers is optional, a 60 ms timeout with a fallback (empty carousel) caps its effect on the page.",
+          "Then the page waits for the slower of profile (30 ms) and orders (80 ms), still 83 ms; to go faster, orders itself must get quicker or be loaded after first paint."
+        ],
+        "result": "Parallel fan-out in a BFF roughly halves this screen's latency from 163 ms to 83 ms; timeouts keep optional parts from dragging it out."
+      },
+      "india": {
+        "title": "Mobile home screen of a super-app",
+        "label": "Illustrative estimate",
+        "body": "An Indian super-app's home screen shows wallet balance, recharge shortcuts, offers, recent transactions and movie tickets. Making the phone call five services over a patchy 4G connection would cost five round trips at maybe 100 ms each. Instead, a mobile BFF behind the gateway accepts one request, calls the services in parallel inside the data centre where each hop is a few milliseconds, applies timeouts and fallbacks (offers can be skipped), and returns one compact JSON payload. The gateway in front handles authentication and rate limits once for all of them."
+      },
+      "pitfalls": [
+        {
+          "trap": "Putting discount calculation in the gateway.",
+          "say": "'The gateway handles authentication, rate limits and routing; pricing lives in the pricing service so its team owns it.'"
+        },
+        {
+          "trap": "Making the gateway a single point of failure.",
+          "say": "'The gateway runs as several stateless instances behind a load balancer across zones, and its config is versioned and rolled out like code.'"
+        },
+        {
+          "trap": "Treating the gateway as authorisation for everything.",
+          "say": "'The gateway checks the token and scopes; each service still checks that this user may access this resource.'"
+        }
+      ],
+      "takeaways": [
+        "The gateway centralises TLS, auth, rate limiting, routing and tracing.",
+        "Keep business logic in services, not the gateway.",
+        "BFF endpoints aggregate in parallel with timeouts and fallbacks.",
+        "Services still enforce fine-grained authorisation."
+      ],
+      "diagram": "client -> [ API gateway: TLS | auth | rate limit | route | trace ] -> BFF -> (profile || offers || orders) in parallel\n                                                                  -> services"
+    }
   },
   {
     "id": 52,
@@ -18945,6 +19198,34 @@
           "a"
         ],
         "explanation": "The Service tracks ready pods behind one name."
+      },
+      {
+        "id": "t52-d1",
+        "type": "multiple_choice",
+        "concept": "registry",
+        "prompt": "Health checks run every 5 s and need 3 failures. How long before a dead instance is marked unhealthy?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "About 15 seconds"
+          },
+          {
+            "id": "b",
+            "label": "About 1 second"
+          },
+          {
+            "id": "c",
+            "label": "About 3 minutes"
+          },
+          {
+            "id": "d",
+            "label": "Immediately"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "5 seconds × 3 failures = 15 seconds of detection time."
       }
     ],
     "flashcards": [
@@ -18978,7 +19259,104 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "discovery",
+        "registry",
+        "client-server",
+        "k8s-service"
+      ],
+      "mechanism": {
+        "title": "How a call finds a healthy instance",
+        "steps": [
+          "Instances register themselves (or are registered by the platform) in a registry such as Consul, Eureka or the Kubernetes API, with address, port and health.",
+          "Health checks remove instances that fail, and a time-to-live or heartbeat removes ones that vanish without deregistering.",
+          "Client-side discovery: the caller's library asks the registry for instances of 'payments', caches the list and picks one itself (round robin, least requests).",
+          "Server-side discovery: the caller sends to a stable address (a load balancer or proxy), which looks up healthy instances and forwards the request.",
+          "In Kubernetes, a Service gets a stable DNS name such as payments.prod.svc.cluster.local and a virtual IP; kube-proxy or the CNI forwards traffic to the ready pods selected by labels, using the endpoints the control plane maintains.",
+          "A service mesh (Envoy sidecars with Istio or Linkerd) moves discovery, retries and mTLS into a proxy next to each pod."
+        ]
+      },
+      "useWhen": [
+        "Any environment where instances come and go: autoscaling groups, containers, rolling deploys.",
+        "Kubernetes Services for most in-cluster traffic; a registry or mesh for multi-cluster or mixed environments."
+      ],
+      "avoidWhen": [
+        "Do not hard-code IP addresses or instance lists in configuration files.",
+        "Do not rely on DNS alone when record TTLs and client caching delay removal of dead instances; combine it with health checks and retries."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Model",
+          "Who picks the instance",
+          "Pros",
+          "Cons"
+        ],
+        "rows": [
+          [
+            "Client-side (Eureka, Consul plus library)",
+            "Caller",
+            "No extra hop, smart balancing",
+            "Library per language"
+          ],
+          [
+            "Server-side (load balancer)",
+            "LB or proxy",
+            "Simple clients",
+            "Extra hop, LB must scale"
+          ],
+          [
+            "Kubernetes Service",
+            "kube-proxy / CNI",
+            "Built in, DNS name",
+            "Mostly L4 balancing"
+          ],
+          [
+            "Service mesh",
+            "Sidecar proxy",
+            "Retries, mTLS, L7 routing",
+            "Operational complexity"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How quickly a dead instance stops getting traffic",
+        "assumptions": [
+          "Health check every 5 s, 3 failures to mark unhealthy",
+          "Clients refresh their instance list every 10 s"
+        ],
+        "steps": [
+          "Detection time = 5 × 3 = 15 seconds.",
+          "Clients may keep using a cached list for up to 10 more seconds, so worst case about 25 seconds.",
+          "At 400 requests per second to that service with 10 instances, the dead one receives about 40 per second, so about 40 × 25 = 1,000 failed requests without retries.",
+          "Retries to another instance on connection failure turn most of those into slightly slower successes."
+        ],
+        "result": "Detection plus cache refresh sets how long a dead instance gets traffic; retries on another instance hide most of the damage."
+      },
+      "india": {
+        "title": "Payments pods during a rolling deploy",
+        "label": "Illustrative estimate",
+        "body": "During a rolling deploy of a payments service running on Kubernetes in an Indian cloud region, old pods are terminated and new ones start. Callers never see pod IPs: they call payments.prod.svc.cluster.local. A new pod receives traffic only after its readiness probe passes, and a terminating pod is removed from the endpoints first and given a short grace period to finish in-flight requests. Without readiness probes, new pods still loading configuration would receive traffic and fail requests in the middle of the busiest hour."
+      },
+      "pitfalls": [
+        {
+          "trap": "Hard-coding service addresses.",
+          "say": "'Services call a stable name; the registry or Kubernetes Service maps it to healthy instances.'"
+        },
+        {
+          "trap": "Ignoring the time to detect failures.",
+          "say": "'With 5-second checks and 3 failures, detection takes 15 seconds, so callers also retry on another instance.'"
+        }
+      ],
+      "takeaways": [
+        "Discovery maps a stable name to the current healthy instances.",
+        "Client-side saves a hop; server-side keeps clients simple.",
+        "Kubernetes Services plus readiness probes cover most in-cluster cases.",
+        "Detection delay plus cache refresh decides how long dead instances get traffic."
+      ],
+      "diagram": "pod -> registers/ready -> [ registry / k8s endpoints ]\ncaller -> payments.svc (DNS/VIP) -> kube-proxy -> ready pod"
+    }
   },
   {
     "id": 53,
@@ -19201,6 +19579,34 @@
           "r3": "Extra retries add load to a struggling service and slow its recovery."
         },
         "explanation": "Contain optional dependencies so they cannot take checkout down."
+      },
+      {
+        "id": "t53-d1",
+        "type": "multiple_choice",
+        "concept": "retries",
+        "prompt": "Three layers each make up to 3 attempts. If the database is down, how many database attempts can one user request cause?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "27"
+          },
+          {
+            "id": "b",
+            "label": "3"
+          },
+          {
+            "id": "c",
+            "label": "9"
+          },
+          {
+            "id": "d",
+            "label": "6"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Three layers of three attempts each give 27 database attempts; retries multiply across layers."
       }
     ],
     "flashcards": [
@@ -19224,7 +19630,104 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "timeouts",
+        "retries",
+        "breaker",
+        "bulkhead"
+      ],
+      "mechanism": {
+        "title": "How the resilience patterns work together",
+        "steps": [
+          "Timeout: every outbound call gets a deadline based on the dependency's normal p99 (for example 300 ms). Without one, a hung dependency holds threads forever.",
+          "Retry: retry only idempotent or idempotency-keyed operations, only on transient errors, with exponential backoff and jitter, and with a retry budget (for example at most 10% extra traffic).",
+          "Circuit breaker, closed state: calls flow, and the breaker tracks the error rate over a window.",
+          "Open state: when errors pass a threshold (say 50% over 20 or more calls), the breaker fails calls immediately or serves a fallback for a cool-down period, giving the dependency room to recover.",
+          "Half-open state: after the cool-down, a few trial calls are allowed; success closes the breaker, failure opens it again.",
+          "Bulkhead: separate thread pools or connection pools per dependency, so a slow recommendations service cannot exhaust the threads that checkout needs."
+        ]
+      },
+      "useWhen": [
+        "Every network call between services, to databases and to third-party APIs.",
+        "Breakers and fallbacks around non-critical dependencies (recommendations, reviews) so the core flow survives their failure."
+      ],
+      "avoidWhen": [
+        "Do not retry at every layer of a deep call chain; retries multiply.",
+        "Do not retry non-idempotent writes such as payments without an idempotency key."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Pattern",
+          "Protects against",
+          "Risk if misused"
+        ],
+        "rows": [
+          [
+            "Timeout",
+            "Hung calls holding resources",
+            "Too short: false failures; too long: thread exhaustion"
+          ],
+          [
+            "Retry with backoff",
+            "Transient blips",
+            "Retry storms that amplify an outage"
+          ],
+          [
+            "Circuit breaker",
+            "Hammering a failing dependency",
+            "Opening too eagerly on small samples"
+          ],
+          [
+            "Bulkhead",
+            "One dependency starving others",
+            "Pools sized too small waste capacity"
+          ],
+          [
+            "Fallback",
+            "Total feature failure",
+            "Stale or default data shown silently"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How retries multiply in a call chain",
+        "assumptions": [
+          "Three layers: gateway calls A, A calls B, B calls the database",
+          "Each layer makes 1 attempt plus up to 2 retries (3 attempts)"
+        ],
+        "steps": [
+          "If the database is down, B tries it 3 times for each call from A.",
+          "A tries B 3 times, so the database sees 3 × 3 = 9 attempts per call from the gateway.",
+          "The gateway also tries 3 times, so 9 × 3 = 27 database attempts per user request.",
+          "Retrying only at one layer, or using a retry budget, keeps this at about 3."
+        ],
+        "result": "Retries at every layer multiply: three layers of three attempts make 27 calls to a struggling database, so retry at one layer and use budgets."
+      },
+      "india": {
+        "title": "Recommendations down during a sale",
+        "label": "Illustrative estimate",
+        "body": "During a festival sale, an e-commerce site's 'customers also bought' service slows to 5-second responses under load. Without timeouts, product page threads wait on it and the whole page, including Add to Cart, stops responding. With a 200 ms timeout, a circuit breaker that opens once more than half of calls fail, and a bulkhead limiting recommendations to its own small pool, the product page renders without recommendations and sales continue. When the breaker's half-open trial calls succeed a minute later, the carousel quietly returns."
+      },
+      "pitfalls": [
+        {
+          "trap": "'I'll add retries to make it reliable.'",
+          "say": "'Retries can turn an outage into a storm; I'd retry only idempotent calls at one layer with backoff, jitter and a budget, behind a circuit breaker.'"
+        },
+        {
+          "trap": "No timeout on outbound calls.",
+          "say": "'Every call has a timeout based on the dependency's p99, and the caller's deadline is propagated downstream.'"
+        }
+      ],
+      "takeaways": [
+        "Every remote call needs a timeout.",
+        "Retry idempotent calls with backoff, jitter and a budget, at one layer.",
+        "Circuit breakers fail fast and let dependencies recover.",
+        "Bulkheads stop one slow dependency from starving the rest."
+      ],
+      "diagram": "CLOSED --errors > 50%--> OPEN (fail fast / fallback) --cool-down--> HALF-OPEN\n   ^                                                                |\n   +-------------------- trial calls succeed -----------------------+"
+    }
   },
   {
     "id": 54,
@@ -19435,6 +19938,34 @@
           "a"
         ],
         "explanation": "Structure and sample logs."
+      },
+      {
+        "id": "t54-d1",
+        "type": "multiple_choice",
+        "concept": "trace-id",
+        "prompt": "Which signal shows that the payment span took 3.2 s of a slow request?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A distributed trace"
+          },
+          {
+            "id": "b",
+            "label": "A CPU utilisation metric"
+          },
+          {
+            "id": "c",
+            "label": "The deploy history"
+          },
+          {
+            "id": "d",
+            "label": "A Bloom filter"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Traces record spans per service with timings, assembled by a shared trace id."
       }
     ],
     "flashcards": [
@@ -19458,7 +19989,104 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "trace-id",
+        "red",
+        "use",
+        "log-hygiene"
+      ],
+      "mechanism": {
+        "title": "Following one request through logs, metrics and traces",
+        "steps": [
+          "At the edge, the gateway assigns a trace id (W3C traceparent header) and passes it to every downstream call.",
+          "Each service creates spans (start time, duration, status) for its work and outbound calls, tagged with the trace id; a tracing backend (Jaeger, Tempo, Zipkin) assembles them into a waterfall.",
+          "Metrics: each service exports counters and histograms, such as RED for request-driven services (Rate, Errors, Duration) and USE for resources (Utilisation, Saturation, Errors). Dashboards and alerts read these.",
+          "Logs: structured JSON lines with timestamp, level, service, trace id and key fields, never secrets or full card numbers.",
+          "Debugging flow: an alert fires on the p99 duration metric, a trace shows which span is slow, and the logs for that trace id explain why.",
+          "Sampling keeps cost in check: keep all error traces and a small percentage of successful ones.",
+          "Alerts fire on symptoms users feel, such as error rate and p99 latency against the SLO, rather than on every CPU spike, so on-call engineers are woken only for real problems."
+        ]
+      },
+      "useWhen": [
+        "Metrics for alerting and trends: cheap, aggregated, kept long.",
+        "Traces for finding where time goes in a multi-service request; logs for the detailed why."
+      ],
+      "avoidWhen": [
+        "Do not log every request body at high volume; cost explodes and sensitive data leaks.",
+        "Do not use high-cardinality labels such as user_id on metrics; each unique value creates a new time series."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Signal",
+          "Answers",
+          "Cost driver",
+          "Typical retention"
+        ],
+        "rows": [
+          [
+            "Metrics",
+            "Is it healthy? How much?",
+            "Number of time series",
+            "Months"
+          ],
+          [
+            "Logs",
+            "What exactly happened?",
+            "Volume of lines",
+            "Days to weeks"
+          ],
+          [
+            "Traces",
+            "Where did the time go?",
+            "Sampled spans",
+            "Days"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Log volume and the case for sampling",
+        "assumptions": [
+          "5,000 requests per second",
+          "Each request logs 4 lines of 500 bytes"
+        ],
+        "steps": [
+          "Lines per second = 5,000 × 4 = 20,000.",
+          "Bytes per second = 20,000 × 500 = 10,000,000, about 10 MB per second.",
+          "Per day = 10 MB × 86,400 ≈ 864 GB.",
+          "Keeping 14 days needs about 12 TB, before replication.",
+          "Logging one line per request at info level and sampling debug logs at 1% cuts this by about 4×."
+        ],
+        "result": "Verbose logging at 5,000 requests per second produces close to a terabyte a day; decide levels and sampling up front."
+      },
+      "india": {
+        "title": "Finding a slow UPI checkout",
+        "label": "Illustrative estimate",
+        "body": "An Indian e-commerce team gets an alert: checkout p99 latency has jumped from 800 ms to 4 s. The RED dashboard shows the error rate is normal, so requests are slow rather than failing. A sampled trace shows the payment-initiation span taking 3.2 s, and inside it a call to a bank's UPI collect endpoint. The logs for that trace id show repeated retries after timeouts from one bank's API. The team tightens the timeout, routes users of that bank to the intent flow, and updates the status page. Without a shared trace id, the same investigation could have taken hours of grepping across services."
+      },
+      "pitfalls": [
+        {
+          "trap": "'We'll add logging.'",
+          "say": "'I'd emit RED metrics per endpoint for alerts, propagate a trace id across services, and write structured logs keyed by that id.'"
+        },
+        {
+          "trap": "Sampling away the traces you need.",
+          "say": "'I keep every error trace and every trace slower than the SLO threshold, and sample only a small share of fast successful ones.'"
+        },
+        {
+          "trap": "Putting user_id on metrics labels.",
+          "say": "'High-cardinality ids go in logs and traces; metrics labels stay low-cardinality like endpoint and status code.'"
+        }
+      ],
+      "takeaways": [
+        "Metrics alert, traces locate, logs explain.",
+        "Propagate one trace id end to end.",
+        "Use RED for services and USE for resources.",
+        "Control cost with sampling and low-cardinality labels; never log secrets."
+      ],
+      "diagram": "gateway (trace 7f3a) -> orders [span 120 ms] -> payments [span 3.2 s] -> bank API (timeout, retry)\n alert on p99 metric -> open trace 7f3a -> grep logs trace_id=7f3a"
+    }
   },
   {
     "id": 55,
@@ -19654,6 +20282,34 @@
           "s5"
         ],
         "explanation": "Remove single points of failure step by step."
+      },
+      {
+        "id": "t55-d1",
+        "type": "multiple_choice",
+        "concept": "series",
+        "prompt": "Three components each at 99.9% availability are in series. What is the system availability?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "About 99.7%"
+          },
+          {
+            "id": "b",
+            "label": "99.9%"
+          },
+          {
+            "id": "c",
+            "label": "99.99%"
+          },
+          {
+            "id": "d",
+            "label": "About 97%"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "0.999 cubed is about 0.997: series components multiply."
       }
     ],
     "flashcards": [
@@ -19677,7 +20333,104 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "nines",
+        "series",
+        "parallel",
+        "slo-sla",
+        "spof"
+      ],
+      "mechanism": {
+        "title": "Computing availability for a whole system",
+        "steps": [
+          "Convert each target into allowed downtime: 99.9% of a 30-day month is 0.1% of 43,200 minutes, about 43 minutes.",
+          "Components in series (all must work): multiply availabilities. Three dependencies at 99.9% give about 99.7%.",
+          "Components in parallel (any one is enough): the system fails only if all fail. Two independent copies at 99% fail together 1% × 1% of the time, giving 99.99%.",
+          "Find single points of failure: any series component without redundancy, such as one database primary, one DNS provider or one region.",
+          "Set an SLO (internal target, for example 99.95% of checkout requests succeed within 1 s over 30 days) and an error budget (the remaining 0.05%). The SLA is the contractual promise, set looser than the SLO, with credits if broken.",
+          "Spend the error budget on releases and experiments; if it runs out, slow down changes and fix reliability."
+        ]
+      },
+      "useWhen": [
+        "Use the series and parallel maths to decide where redundancy buys the most.",
+        "Use SLOs and error budgets to balance shipping speed against reliability."
+      ],
+      "avoidWhen": [
+        "Do not promise more nines than your dependencies allow; a system cannot beat its series chain without redundancy.",
+        "Do not assume redundant copies fail independently if they share a power feed, zone, deploy or bug."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Availability",
+          "Downtime per year",
+          "Downtime per 30-day month"
+        ],
+        "rows": [
+          [
+            "99%",
+            "About 3.65 days",
+            "About 7.2 hours"
+          ],
+          [
+            "99.9%",
+            "About 8.8 hours",
+            "About 43 minutes"
+          ],
+          [
+            "99.99%",
+            "About 53 minutes",
+            "About 4.3 minutes"
+          ],
+          [
+            "99.999%",
+            "About 5.3 minutes",
+            "About 26 seconds"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Series and parallel worked example",
+        "assumptions": [
+          "Load balancer 99.99%, app tier 99.9%, database 99.9%, all in series",
+          "Then make the database a primary plus a standby with automatic failover, treated as two 99.9% copies"
+        ],
+        "steps": [
+          "Series: 0.9999 × 0.999 ≈ 0.9989, then 0.9989 × 0.999 ≈ 0.9979, so about 99.8%.",
+          "Two database copies in parallel fail together 0.001 × 0.001 = 0.000001 of the time, so about 99.9999%.",
+          "New chain: 0.9999 × 0.999 × 0.999999 ≈ 0.9989, about 99.89%.",
+          "The weakest series link (the app tier at 99.9%) now limits the system; adding redundancy there is the next step."
+        ],
+        "result": "Series chains multiply down; parallel redundancy multiplies failure probabilities, so fix the weakest series link first."
+      },
+      "india": {
+        "title": "UPI apps and bank downtime",
+        "label": "Illustrative estimate",
+        "body": "A UPI payment involves the payer's app, the payer's bank, NPCI's switch and the payee's bank, all in series. Even if each were 99.9% available, four in series would give about 99.6%, which is roughly 2.9 hours of failure a month for some route. That is why payment apps show 'bank server down, try another account': they cannot add redundancy to someone else's bank, but they can let the user switch to a parallel path, another linked account. NPCI also publishes bank-wise technical decline rates, which is publicly reported data that shows this chain in practice."
+      },
+      "pitfalls": [
+        {
+          "trap": "'We'll have five nines.'",
+          "say": "'With a single database in series at 99.9%, the system cannot exceed about 99.9%; I'd add failover and measure an SLO of 99.95% first.'"
+        },
+        {
+          "trap": "Assuming two replicas in the same zone are independent.",
+          "say": "'Copies that share a zone, power feed or deploy fail together, so I place them in different zones and stagger deploys.'"
+        },
+        {
+          "trap": "Mixing up SLO and SLA.",
+          "say": "'The SLO is our internal target with an error budget; the SLA is the looser contractual promise with penalties.'"
+        }
+      ],
+      "takeaways": [
+        "Series availabilities multiply down.",
+        "Parallel redundancy multiplies failure probabilities together.",
+        "Translate nines into minutes of downtime.",
+        "SLO plus error budget guides how fast to ship; SLA is the contract."
+      ],
+      "diagram": "series:   [LB 99.99] -> [app 99.9] -> [DB 99.9]   = ~99.8%\nparallel: [DB 99.9] || [standby 99.9]          = ~99.9999%"
+    }
   },
   {
     "id": 56,
@@ -19921,6 +20674,34 @@
           "r3": "Restoring from backups takes hours and loses up to a day of data."
         },
         "explanation": "Targets drive the strategy."
+      },
+      {
+        "id": "t56-d1",
+        "type": "multiple_choice",
+        "concept": "rpo-rto",
+        "prompt": "With 15-minute snapshots and 2,000 orders per minute, what is the worst-case number of lost orders?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "30,000"
+          },
+          {
+            "id": "b",
+            "label": "2,000"
+          },
+          {
+            "id": "c",
+            "label": "167"
+          },
+          {
+            "id": "d",
+            "label": "0"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Up to 15 minutes of data is lost: 2,000 × 15 = 30,000 orders."
       }
     ],
     "flashcards": [
@@ -19949,7 +20730,104 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "rpo-rto",
+        "strategies",
+        "failover",
+        "cross-region"
+      ],
+      "mechanism": {
+        "title": "Planning disaster recovery from RPO and RTO",
+        "steps": [
+          "Define RPO (recovery point objective): how much data, measured in time, you can afford to lose. Define RTO (recovery time objective): how long you can be down.",
+          "Backup and restore: periodic backups to another region. Cheapest; RPO equals the backup interval, RTO is hours to rebuild and restore.",
+          "Pilot light: data continuously replicated to a second region with minimal infrastructure running; scale it up on failover. RPO of seconds to minutes, RTO of tens of minutes.",
+          "Warm standby: a scaled-down but running copy of the full stack in the second region. RTO of minutes.",
+          "Active-active: both regions serve traffic; failover is shifting traffic. RTO near zero, but writes need conflict handling or per-user home regions.",
+          "Failover itself: detect, decide (often a human for regional failover), promote the database, shift DNS or global load balancing, then verify. Rehearse it with game days, because untested failover usually fails."
+        ]
+      },
+      "useWhen": [
+        "Tier systems by business impact: payments and orders get warm standby or active-active; internal reporting gets backup and restore.",
+        "Regulated data must also satisfy data-residency rules, such as keeping payment data in India under RBI rules (publicly reported), which shapes where the DR region can be."
+      ],
+      "avoidWhen": [
+        "Do not pay for active-active everywhere; it doubles cost and adds write-conflict complexity for systems that tolerate an hour of downtime.",
+        "Do not count on a DR plan that has never been rehearsed."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Strategy",
+          "Typical RPO",
+          "Typical RTO",
+          "Relative cost"
+        ],
+        "rows": [
+          [
+            "Backup and restore",
+            "Hours",
+            "Hours",
+            "Low"
+          ],
+          [
+            "Pilot light",
+            "Seconds to minutes",
+            "Tens of minutes",
+            "Low to medium"
+          ],
+          [
+            "Warm standby",
+            "Seconds",
+            "Minutes",
+            "Medium to high"
+          ],
+          [
+            "Active-active",
+            "Near zero",
+            "Near zero",
+            "Highest"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "What an RPO means in lost orders",
+        "assumptions": [
+          "2,000 orders per minute at peak",
+          "Option A: 15-minute snapshots; option B: asynchronous replication with about 5 seconds of lag"
+        ],
+        "steps": [
+          "Option A worst case loses up to 15 minutes: 2,000 × 15 = 30,000 orders.",
+          "Option B loses about 5 seconds: 2,000 × 5 ÷ 60 ≈ 167 orders.",
+          "Synchronous cross-region replication would lose none but adds the inter-region round trip to every commit.",
+          "Lost orders still have payment records at the gateway, so reconciliation is needed either way."
+        ],
+        "result": "RPO translates directly into lost business events; continuous replication shrinks 30,000 lost orders to a couple of hundred."
+      },
+      "india": {
+        "title": "Regional outage for a brokerage app",
+        "label": "Illustrative estimate",
+        "body": "A stock-broking app in India cannot be down during market hours, 9:15 to 15:30 IST, when a few minutes of outage can trigger customer losses and regulatory scrutiny. It might run warm standby across two Indian cloud regions, such as Mumbai and Hyderabad, replicating order and ledger data continuously, and rehearse failover monthly on a weekend. Because the exchanges are the source of truth for executed trades, reconciliation after failover compares the app's records with exchange trade files to fill any gap left by replication lag. Back-office reporting, by contrast, uses nightly backups."
+      },
+      "pitfalls": [
+        {
+          "trap": "'We'll be multi-region.'",
+          "say": "'Our RPO is under a minute and RTO under 15 minutes for orders, so I'd use warm standby with async replication; reporting uses backups.'"
+        },
+        {
+          "trap": "Forgetting to test failover.",
+          "say": "'We'd rehearse regional failover quarterly with game days and measure the actual RTO.'"
+        }
+      ],
+      "takeaways": [
+        "RPO is tolerable data loss; RTO is tolerable downtime.",
+        "Strategies trade cost for lower RPO and RTO.",
+        "Tier systems by impact instead of one plan for all.",
+        "Rehearse failover; untested DR is a guess."
+      ],
+      "diagram": "region A (primary) --async replication (lag ~5 s)--> region B (warm standby)\n failure: detect -> decide -> promote DB in B -> shift DNS/GSLB -> verify -> reconcile"
+    }
   },
   {
     "id": 57,
@@ -23055,6 +23933,34 @@
           "s4"
         ],
         "explanation": "Every step works with the previous code version."
+      },
+      {
+        "id": "t69-d1",
+        "type": "multiple_choice",
+        "concept": "schema",
+        "prompt": "Why use expand-and-contract for a column rename during a canary?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Old and new code versions run at the same time and both must work with the schema"
+          },
+          {
+            "id": "b",
+            "label": "Because SQL cannot rename columns"
+          },
+          {
+            "id": "c",
+            "label": "To make the canary faster"
+          },
+          {
+            "id": "d",
+            "label": "So feature flags are not needed"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "During a gradual rollout both versions are live, so schema changes must stay compatible with both."
       }
     ],
     "flashcards": [
@@ -23083,7 +23989,105 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "blue-green",
+        "canary",
+        "flags",
+        "schema"
+      ],
+      "mechanism": {
+        "title": "How a canary release with flags rolls out",
+        "steps": [
+          "Blue-green: run the new version (green) alongside the old (blue) on full capacity, test it, then switch all traffic at the load balancer. Rollback is switching back.",
+          "Canary: send a small share of real traffic (say 1%) to the new version, compare its error rate and latency with the old, and step up through 5%, 25%, 50% and 100% if healthy.",
+          "Automated analysis checks the canary against guardrail metrics and rolls back on a breach without waiting for a human.",
+          "Feature flags separate deploy from release: code ships dark, and the feature is turned on per user, per city or per percentage, and off instantly if it misbehaves.",
+          "Database changes use expand and contract: add the new column or table first (compatible with old code), deploy code that writes both, backfill, switch reads, and only later drop the old column.",
+          "Clean up flags after rollout; stale flags become hidden complexity."
+        ]
+      },
+      "useWhen": [
+        "Canary for risky changes to high-traffic services where real traffic reveals problems tests miss.",
+        "Feature flags for gradual product launches, A/B tests and kill switches for risky features."
+      ],
+      "avoidWhen": [
+        "Blue-green for stateful systems where both versions cannot safely share the database schema.",
+        "Long-lived flags for permanent configuration; they are for rollouts, not settings."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Strategy",
+          "Blast radius",
+          "Rollback speed",
+          "Cost"
+        ],
+        "rows": [
+          [
+            "Big-bang deploy",
+            "Everyone",
+            "Slow (redeploy)",
+            "Low"
+          ],
+          [
+            "Blue-green",
+            "Everyone at switch time",
+            "Instant switch back",
+            "Double capacity during release"
+          ],
+          [
+            "Canary",
+            "Small share first",
+            "Fast, shift traffic away",
+            "Needs metrics comparison"
+          ],
+          [
+            "Feature flag",
+            "Chosen users",
+            "Instant toggle",
+            "Flag management and cleanup"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How many users a canary exposes",
+        "assumptions": [
+          "1,000,000 requests per hour",
+          "Canary at 1% for 30 minutes",
+          "A bug fails 20% of requests on the new version"
+        ],
+        "steps": [
+          "Canary traffic = 1,000,000 × 0.01 = 10,000 requests per hour, so about 5,000 in 30 minutes.",
+          "Failed requests = 5,000 × 0.2 = 1,000.",
+          "A big-bang deploy with the same bug for the same 30 minutes would fail 500,000 × 0.2 = 100,000 requests.",
+          "With automated rollback after 5 minutes instead of 30, failures drop to about 167."
+        ],
+        "result": "A 1% canary with fast automated rollback limits a bad release to hundreds of failures instead of a hundred thousand."
+      },
+      "india": {
+        "title": "Launching a new checkout in one city",
+        "label": "Illustrative estimate",
+        "body": "A food-delivery app redesigns its checkout. The code ships to all servers behind a flag that is off. The team turns it on for employees, then for 1% of users in Jaipur, watching payment success rate and order completion against the old flow. Payment success drops slightly for one bank's netbanking users, so they turn the flag off for that segment within minutes, fix it, and resume. Over two weeks the flag goes to 100% across cities, and the old code and the flag are deleted. No deploy was ever rolled back; only flags moved."
+      },
+      "pitfalls": [
+        {
+          "trap": "'We'll deploy on Friday night when traffic is low and fix bugs Monday.'",
+          "say": "'I'd canary at 1% with automated rollback on error and latency guardrails, during working hours when the team can respond.'"
+        },
+        {
+          "trap": "Dropping a column in the same release that stops using it.",
+          "say": "'I'd expand and contract: add the new column, dual-write, backfill, switch reads, and drop the old column in a later release.'"
+        }
+      ],
+      "takeaways": [
+        "Separate deploy from release with feature flags.",
+        "Canaries limit blast radius; automate rollback on guardrails.",
+        "Blue-green gives instant switch-back but needs double capacity.",
+        "Use expand and contract for schema changes."
+      ],
+      "diagram": "deploy v2 dark --> flag on: staff --> 1% --> 5% --> 25% --> 100% --> delete flag\n          metrics guardrails breached at any step --> flag off / shift traffic back"
+    }
   },
   {
     "id": 70,
@@ -23293,6 +24297,34 @@
           "a"
         ],
         "explanation": "Reconciliation loops close the gap."
+      },
+      {
+        "id": "t70-d1",
+        "type": "multiple_choice",
+        "concept": "probes",
+        "prompt": "A pod is still loading its cache and should not get traffic yet. Which probe handles this?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Readiness probe"
+          },
+          {
+            "id": "b",
+            "label": "Liveness probe"
+          },
+          {
+            "id": "c",
+            "label": "No probe; Kubernetes knows automatically"
+          },
+          {
+            "id": "d",
+            "label": "Horizontal Pod Autoscaler"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Readiness decides whether the pod receives traffic; liveness decides whether to restart it."
       }
     ],
     "flashcards": [
@@ -23321,7 +24353,103 @@
         "title": "AWS Well-Architected Framework",
         "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html"
       }
-    ]
+    ],
+    "deep": {
+      "teaches": [
+        "containers",
+        "desired-state",
+        "probes",
+        "rolling"
+      ],
+      "mechanism": {
+        "title": "How Kubernetes keeps an app running",
+        "steps": [
+          "A container image packages the app and its dependencies; it runs as an isolated process using Linux namespaces and cgroups, sharing the host kernel.",
+          "You declare desired state in a Deployment: image version, 6 replicas, CPU and memory requests and limits, probes.",
+          "The scheduler places pods on nodes with enough free requested resources; controllers continuously compare actual state with desired state and fix differences, for example restarting a crashed pod or replacing pods from a failed node.",
+          "Probes: the liveness probe restarts a stuck container; the readiness probe controls whether the pod receives traffic; the startup probe gives slow starters time before liveness kicks in.",
+          "Rolling update: change the image tag; Kubernetes creates new pods and removes old ones gradually, bounded by maxSurge and maxUnavailable, sending traffic only to ready pods.",
+          "The Horizontal Pod Autoscaler adjusts the replica count from metrics such as CPU utilisation against the requested CPU."
+        ]
+      },
+      "useWhen": [
+        "Many services needing consistent deploys, autoscaling, self-healing and service discovery.",
+        "Teams with the skills (or a managed offering such as EKS, GKE or AKS) to operate it."
+      ],
+      "avoidWhen": [
+        "A single small app where a managed platform (a PaaS or serverless) is simpler and cheaper.",
+        "Do not use the liveness probe to check downstream dependencies; a database blip would restart every pod at once."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Option",
+          "You manage",
+          "Good for"
+        ],
+        "rows": [
+          [
+            "VMs with scripts",
+            "Everything",
+            "Few long-lived apps"
+          ],
+          [
+            "Managed Kubernetes",
+            "Workloads and cluster add-ons",
+            "Many services, platform team"
+          ],
+          [
+            "PaaS / serverless containers",
+            "Just the app",
+            "Small teams, simple scaling"
+          ],
+          [
+            "Functions (FaaS)",
+            "Code only",
+            "Event-driven, spiky, short tasks"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Sizing replicas and a rolling update",
+        "assumptions": [
+          "Peak 3,000 requests per second; one pod handles 250 at target CPU",
+          "Rolling update with maxSurge 25% and maxUnavailable 0"
+        ],
+        "steps": [
+          "Pods needed at peak = 3,000 ÷ 250 = 12.",
+          "Add N+2 headroom for a node failure and deploys: 14 replicas.",
+          "maxSurge 25% of 14 is 3.5, rounded up to 4 extra pods during the rollout; maxUnavailable 0 keeps all 14 serving.",
+          "So the cluster needs room for 14 plus 4 = 18 pods' worth of requested resources during deploys."
+        ],
+        "result": "Size replicas from peak load per pod plus headroom, and reserve surge capacity so rolling updates never reduce serving pods."
+      },
+      "india": {
+        "title": "Exam-results day for an ed-tech app",
+        "label": "Illustrative estimate",
+        "body": "When board exam results are published, an ed-tech app's result-lookup service can see traffic jump many times over within minutes. On Kubernetes, the team pre-scales the Deployment the night before, sets a Horizontal Pod Autoscaler with a higher ceiling, and makes sure the cluster autoscaler can add nodes. Readiness probes keep new pods out of rotation until they have loaded the cache of school codes. When one node fails under load, the controller reschedules its pods elsewhere within a minute, and students only see slightly slower responses."
+      },
+      "pitfalls": [
+        {
+          "trap": "Liveness probes that check the database.",
+          "say": "'Liveness checks only that the process can respond; dependency health goes in readiness or metrics, so a database blip does not restart every pod.'"
+        },
+        {
+          "trap": "Setting CPU limits far below what a JVM or Node process needs at peak.",
+          "say": "'I set requests from measured usage and leave headroom on limits, because CPU throttling shows up as latency spikes that are hard to diagnose.'"
+        },
+        {
+          "trap": "No resource requests.",
+          "say": "'Pods get CPU and memory requests so the scheduler can place them and the autoscaler has a baseline.'"
+        }
+      ],
+      "takeaways": [
+        "Containers package apps; Kubernetes reconciles desired state.",
+        "Readiness gates traffic, liveness restarts, startup protects slow boots.",
+        "Rolling updates are bounded by maxSurge and maxUnavailable.",
+        "Size replicas from per-pod throughput plus headroom."
+      ],
+      "diagram": "Deployment (replicas: 14, image: v2) -> ReplicaSet -> pods\ncontroller loop: desired 14 vs actual 13 -> create 1\nrolling: +4 new (ready?) -> remove old -> repeat"
+    }
   },
   {
     "id": 71,
