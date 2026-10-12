@@ -11,15 +11,8 @@ ROOT = Path(__file__).resolve().parents[2]
 AUTHORED = ROOT / "scripts" / "authored"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from curriculum import (  # noqa: E402
-    BOSS_PREREQS,
-    TITLES,
-    boss_stages,
-    build_boss_topic,
-    build_lesson_topic,
-    build_tutorial_topic,
-    region_order_for,
-)
+from curriculum import build_boss_topic, build_lesson_topic, build_tutorial_topic  # noqa: E402
+from meta import BOSS_PREREQS, TITLES, region_order_for  # noqa: E402
 
 SVG_FLOW = (
     "<svg viewBox='0 0 320 120' xmlns='http://www.w3.org/2000/svg'>"
@@ -73,34 +66,6 @@ def validate_unique(topics: list[dict]) -> None:
 
 def main() -> None:
     AUTHORED.mkdir(parents=True, exist_ok=True)
-    all_topics: list[dict] = []
-
-    def add_lesson(tid: int) -> dict:
-        title = TITLES[tid]
-        region, order = region_order_for(tid)
-        topic = build_lesson_topic(tid, title, region, order, slugify(title), SVG_FLOW)
-        all_topics.append(topic)
-        return topic
-
-    def add_boss(tid: int) -> dict:
-        title = TITLES[tid]
-        region, order = region_order_for(tid)
-        topic = build_boss_topic(
-            tid, title, region, order, slugify(title), SVG_FLOW, BOSS_PREREQS.get(tid, [])
-        )
-        all_topics.append(topic)
-        return topic
-
-    lessons_01_20 = [add_lesson(i) for i in range(1, 21)]
-    lessons_21_40 = [add_lesson(i) for i in range(21, 41)]
-    lessons_41_60 = [add_lesson(i) for i in range(41, 61)]
-    lessons_61_80 = [add_lesson(i) for i in range(61, 74)] + [add_lesson(i) for i in (69, 70) if i < 74]
-    # 69-70 already in range 61-73 path — include 69,70 explicitly
-    ids_61_80 = sorted({*range(61, 74), 69, 70})
-    lessons_61_80 = [add_lesson(i) for i in ids_61_80]
-
-    # Reset all_topics for clean per-file writes
-    all_topics = []
 
     def pack_lessons(ids: list[int]) -> list[dict]:
         out = []
