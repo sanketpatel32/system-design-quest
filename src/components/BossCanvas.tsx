@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { ArchNode } from './canvas/ArchNode'
 import {
   ReactFlow,
@@ -68,6 +68,8 @@ export function BossCanvas({ initial, onChange }: Props) {
     [initial],
   )
 
+  const srcRef = useRef<HTMLSelectElement>(null)
+  const tgtRef = useRef<HTMLSelectElement>(null)
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
 
@@ -116,7 +118,7 @@ export function BossCanvas({ initial, onChange }: Props) {
   }
 
   const connectViaForm = (sourceId: string, targetId: string) => {
-    if (!sourceId || !targetId) return
+    if (!sourceId || !targetId || sourceId === targetId) return
     const edge: Edge = { id: `e${edges.length + 1}`, source: sourceId, target: targetId }
     const next = [...edges, edge]
     setEdges(next)
@@ -124,39 +126,48 @@ export function BossCanvas({ initial, onChange }: Props) {
   }
 
   return (
-    <div className="grid lg:grid-cols-[168px_1fr] gap-3">
-      <aside className="panel-slab p-2 space-y-1">
-        <p className="text-[10px] uppercase tracking-widest text-[var(--color-muted)] px-1">Components</p>
-        {PALETTE.map((p) => (
-          <button
-            key={p.type}
-            type="button"
-            className="w-full text-left text-[11px] px-2 py-1.5 btn-quiet"
-            onClick={() => addComponent(p.type)}
-          >
-            + {p.label}
-          </button>
-        ))}
-        <div className="pt-2 mt-2 border-t border-[var(--color-line)]">
-          <p className="text-[10px] uppercase tracking-widest text-[var(--color-muted)] mb-1 px-1">Wire</p>
-          <select id="src" className="w-full mb-1 field text-xs">
-            {nodes.map((n) => (
-              <option key={n.id} value={n.id}>{String((n.data as { label?: string }).label)} ({n.id})</option>
+    <div className="grid lg:grid-cols-[200px_1fr] gap-3">
+      <aside className="panel-slab p-3 space-y-3" aria-label="Canvas tools">
+        <div>
+          <p className="text-sm font-semibold text-chalk mb-2">Add a component</p>
+          <div className="grid grid-cols-2 lg:grid-cols-1 gap-1">
+            {PALETTE.map((p) => (
+              <button
+                key={p.type}
+                type="button"
+                className="palette-btn"
+                onClick={() => addComponent(p.type)}
+              >
+                <span aria-hidden className="text-[var(--color-amber)]">+</span>
+                <span className="sr-only">+ </span>
+                {p.label}
+              </button>
             ))}
-          </select>
-          <select id="tgt" className="w-full mb-1 field text-xs">
-            {nodes.map((n) => (
-              <option key={n.id} value={n.id}>{String((n.data as { label?: string }).label)} ({n.id})</option>
-            ))}
-          </select>
+          </div>
+        </div>
+        <div className="pt-3 border-t border-[var(--color-rail)] space-y-1.5">
+          <p className="text-sm font-semibold text-chalk">Connect without dragging</p>
+          <label className="block text-xs text-dim">
+            From
+            <select ref={srcRef} className="mt-0.5 w-full field text-xs" disabled={nodes.length < 2}>
+              {nodes.map((n) => (
+                <option key={n.id} value={n.id}>{String((n.data as { label?: string }).label)} ({n.id})</option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-xs text-dim">
+            To
+            <select ref={tgtRef} className="mt-0.5 w-full field text-xs" disabled={nodes.length < 2}>
+              {nodes.map((n) => (
+                <option key={n.id} value={n.id}>{String((n.data as { label?: string }).label)} ({n.id})</option>
+              ))}
+            </select>
+          </label>
           <button
             type="button"
-            className="w-full text-xs py-1.5 btn-cta"
-            onClick={() => {
-              const src = (document.getElementById('src') as HTMLSelectElement)?.value
-              const tgt = (document.getElementById('tgt') as HTMLSelectElement)?.value
-              connectViaForm(src, tgt)
-            }}
+            className="w-full btn-cta !py-1.5 text-sm"
+            disabled={nodes.length < 2}
+            onClick={() => connectViaForm(srcRef.current?.value ?? '', tgtRef.current?.value ?? '')}
           >
             Connect
           </button>
