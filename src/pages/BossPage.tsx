@@ -3,11 +3,20 @@ import { Link, useParams } from 'react-router-dom'
 import { allTopics } from '../content/catalog'
 import { BossCanvas, type CanvasSnapshot } from '../components/BossCanvas'
 import { QuestionRenderer } from '../components/QuestionRenderer'
-import { gradeBossSubmission } from '../lib/scoring/boss'
+import { gradeBossSubmission, type BossBreakdown } from '../lib/scoring/boss'
 import type { UserGraph } from '../lib/scoring/graph'
 import { INITIAL_HEARTS } from '../lib/scoring/quiz'
 import { HeartsHud } from '../components/ui/Hud'
 import { useGameStore } from '../stores/gameStore'
+
+const RUBRIC: { key: keyof BossBreakdown; label: string; max: number }[] = [
+  { key: 'requirements', label: 'Requirements', max: 15 },
+  { key: 'estimation', label: 'Estimation', max: 15 },
+  { key: 'api', label: 'API design', max: 10 },
+  { key: 'architecture', label: 'Architecture', max: 30 },
+  { key: 'deepDive', label: 'Deep dive', max: 20 },
+  { key: 'tradeoffs', label: 'Trade-offs', max: 10 },
+]
 
 export function BossPage() {
   const { slug } = useParams()
@@ -106,27 +115,77 @@ export function BossPage() {
       )}
 
       {grade && (
-        <section className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
-          <h3 className="text-xl font-semibold">Score: {grade.total}/100 {grade.passed ? '✅' : '— keep iterating'}</h3>
-          <ul className="text-sm text-slate-300 grid sm:grid-cols-2 gap-1">
-            {Object.entries(grade.breakdown).map(([k, v]) => (
-              <li key={k}>{k}: {v}</li>
-            ))}
-          </ul>
-          <ul className="text-sm text-slate-400 list-disc pl-5">
-            {grade.feedback.map((f) => <li key={f}>{f}</li>)}
-          </ul>
-          <details className="text-sm">
-            <summary className="cursor-pointer text-cyan-300">Reference architecture & notes</summary>
-            <p className="mt-2">{topic.boss.referenceNotes}</p>
-            <p>{topic.boss.workedEstimate}</p>
-            <pre className="whitespace-pre-wrap bg-slate-900/60 p-2 rounded">{topic.boss.exampleApi}</pre>
-            <p>{topic.boss.tradeoffAnalysis}</p>
+        <section className="panel p-5 space-y-5" aria-labelledby="boss-score" role="status">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className={`text-sm font-semibold ${grade.passed ? 'text-[var(--color-clear)]' : 'text-[var(--color-amber)]'}`}>
+                {grade.passed ? 'Boss cleared · 70 needed to pass' : 'Not cleared yet · 70 needed to pass'}
+              </p>
+              <h2 id="boss-score" className="font-display text-3xl font-extrabold text-chalk mt-1">
+                Score: <span className="tabular-nums">{grade.total}</span>
+                <span className="text-dim text-xl font-semibold">/100</span>
+              </h2>
+            </div>
+          </div>
+          <div className="score-track" aria-hidden>
+            <div className="score-fill" style={{ width: `${grade.total}%`, background: grade.passed ? 'var(--color-clear)' : 'var(--color-amber)' }} />
+            <div className="score-pass" />
+          </div>
+          <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-3">
+            {RUBRIC.map(({ key, label, max }) => {
+              const v = grade.breakdown[key]
+              return (
+                <div key={key}>
+                  <div className="flex justify-between text-sm">
+                    <dt className="text-chalk">{label}</dt>
+                    <dd className="tabular-nums text-dim">
+                      <span className="text-chalk font-semibold">{v}</span> / {max}
+                    </dd>
+                  </div>
+                  <div className="score-track score-track-thin mt-1" aria-hidden>
+                    <div className="score-fill" style={{ width: `${(v / max) * 100}%`, background: v === max ? 'var(--color-clear)' : 'var(--color-dim)' }} />
+                  </div>
+                </div>
+              )
+            })}
+          </dl>
+          {grade.feedback.length > 0 && (
+            <div>
+              <h3 className="font-display font-semibold text-chalk mb-2">What to fix</h3>
+              <ul className="text-sm text-[#d6d0c2] space-y-1.5">
+                {grade.feedback.map((f) => (
+                  <li key={f} className="flex gap-2">
+                    <span aria-hidden className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-amber)]" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <details className="reference rounded-md border border-[var(--color-rail)] bg-[var(--color-ink)]">
+            <summary className="cursor-pointer px-4 py-3 font-display font-semibold text-chalk">Reference architecture and notes</summary>
+            <div className="px-4 pb-4 space-y-3 text-sm text-[#d6d0c2] leading-relaxed">
+              <p>{topic.boss.referenceNotes}</p>
+              <p>
+                <span className="text-chalk font-semibold">Estimate: </span>
+                {topic.boss.workedEstimate}
+              </p>
+              <pre className="whitespace-pre-wrap rounded-md border border-[var(--color-rail)] bg-[#0a1624] p-3 text-[13px] text-chalk">{topic.boss.exampleApi}</pre>
+              <p>
+                <span className="text-chalk font-semibold">Trade-offs: </span>
+                {topic.boss.tradeoffAnalysis}
+              </p>
+            </div>
           </details>
+          {!grade.passed && (
+            <button type="button" className="btn-quiet" onClick={() => { setSubmitted(false); setGrade(null) }}>
+              Revise the design and resubmit
+            </button>
+          )}
         </section>
       )}
 
-      <Link to="/" className="text-cyan-300">← Map</Link>
+      <Link to="/" className="btn-quiet">Back to map</Link>
     </div>
   )
 }
