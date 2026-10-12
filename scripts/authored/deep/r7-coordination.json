@@ -1,0 +1,628 @@
+{
+ "45": {
+  "teaches": [
+   "majority",
+   "raft-election",
+   "raft-commit"
+  ],
+  "mechanism": {
+   "title": "How Raft elects a leader and commits an entry",
+   "steps": [
+    "Every node is a follower, a candidate or the leader, and time is divided into numbered terms.",
+    "Followers expect regular heartbeats from the leader. If none arrives within a randomised election timeout (for example 150–300 ms), a follower becomes a candidate, increments the term, votes for itself and asks others for votes.",
+    "A node grants at most one vote per term, and only to a candidate whose log is at least as up to date as its own. A candidate with votes from a majority becomes leader; randomised timeouts make split votes rare.",
+    "Clients send commands to the leader, which appends each command to its log and sends AppendEntries to followers.",
+    "Once a majority of nodes (including the leader) have stored the entry, the leader marks it committed, applies it to its state machine and replies to the client. Followers apply it when they learn the commit index.",
+    "A leader from an old term that comes back sees a higher term in any reply and steps down, so there is at most one leader per term whose entries can commit."
+   ]
+  },
+  "useWhen": [
+   "Small, critical, strongly consistent state: cluster membership, configuration, leader election, locks, metadata (etcd, ZooKeeper's similar Zab protocol, Consul, Kafka KRaft).",
+   "Replicated databases that need linearizable writes, such as CockroachDB and TiKV, which run Raft per range."
+  ],
+  "avoidWhen": [
+   "Bulk high-throughput data paths where every write paying a majority round trip is too expensive and eventual consistency is acceptable.",
+   "Clusters of two or four nodes: the even node adds cost without adding fault tolerance."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Cluster size",
+    "Majority",
+    "Failures tolerated",
+    "Notes"
+   ],
+   "rows": [
+    [
+     "3",
+     "2",
+     "1",
+     "Common default"
+    ],
+    [
+     "4",
+     "3",
+     "1",
+     "No gain over 3, more traffic"
+    ],
+    [
+     "5",
+     "3",
+     "2",
+     "Common for important control planes"
+    ],
+    [
+     "7",
+     "4",
+     "3",
+     "Slower writes; rarely needed"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Commit latency of a three-region Raft group",
+   "assumptions": [
+    "Leader in Mumbai; followers in Hyderabad (about 20 ms round trip) and Singapore (about 60 ms), illustrative",
+    "Local disk fsync 1 ms"
+   ],
+   "steps": [
+    "The leader needs one follower's acknowledgement for a majority of 2 out of 3.",
+    "The fastest follower is Hyderabad at about 20 ms, plus about 1 ms fsync on each side.",
+    "Commit latency is therefore roughly 22 ms, set by the second-fastest node (counting the leader), not the slowest.",
+    "If Hyderabad fails, commits wait for Singapore and latency rises to roughly 62 ms."
+   ],
+   "result": "Raft commit latency is the round trip to the nearest majority; placing replicas decides both latency and which failures you survive."
+  },
+  "india": {
+   "title": "Configuration store for a payments platform",
+   "label": "Illustrative estimate",
+   "body": "A payments company might keep feature flags, routing rules for bank partners and service leadership in an etcd or ZooKeeper cluster of five nodes spread across three availability zones. If one zone goes down, the remaining nodes still form a majority of three, so a new leader is elected within about a second and configuration stays writable. Because every write goes through the Raft log, two services can never see conflicting answers to 'which node is the settlement leader'. The trade-off is that this store is slow for bulk data, so transaction records live elsewhere; only small, critical metadata goes through consensus."
+  },
+  "pitfalls": [
+   {
+    "trap": "Deploying a four-node consensus cluster 'for more safety'.",
+    "say": "'Four nodes need three for a majority and still tolerate only one failure; I'd use three or five.'"
+   },
+   {
+    "trap": "Using consensus for every piece of data.",
+    "say": "'Consensus pays a majority round trip per write; I'd use it for metadata and leader election and keep bulk data elsewhere.'"
+   }
+  ],
+  "takeaways": [
+   "A majority of 2f + 1 nodes tolerates f failures.",
+   "Randomised election timeouts make split votes rare.",
+   "An entry commits once a majority stores it.",
+   "Terms ensure an old leader steps down when it returns."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t45-d1",
+    "type": "multiple_choice",
+    "concept": "majority",
+    "prompt": "How many node failures can a five-node Raft cluster tolerate while still committing writes?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "2"
+     },
+     {
+      "id": "b",
+      "label": "1"
+     },
+     {
+      "id": "c",
+      "label": "4"
+     },
+     {
+      "id": "d",
+      "label": "0"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "A majority of 5 is 3, so 2 nodes can fail and 3 still form a majority."
+   }
+  ],
+  "diagram": "client -> LEADER (term 7) --AppendEntries--> F1 ack\n                         \\--AppendEntries--> F2 (slow)\n majority (leader + F1) stored -> commit -> apply -> reply"
+ },
+ "46": {
+  "teaches": [
+   "election",
+   "lock-flow",
+   "lock-ttl",
+   "fencing"
+  ],
+  "mechanism": {
+   "title": "Taking a distributed lock safely",
+   "steps": [
+    "A client asks the lock service (etcd, ZooKeeper, or Redis with care) for lock 'invoice-job' with a lease time to live, such as 10 seconds.",
+    "If granted, the service also returns a fencing token: a number that increases with every grant (in etcd the revision, in ZooKeeper the zxid or a sequence node).",
+    "The holder renews the lease periodically, for example every 3 seconds, while it works.",
+    "If the holder pauses (a long garbage-collection pause or a network blip) past the lease, the lease expires and another client gets the lock with a higher token.",
+    "Every write to the protected resource carries the token, and the resource rejects any token lower than the highest it has seen. The paused old holder, waking up with token 33 after token 34 was issued, is rejected.",
+    "Leader election is the same idea: the lock holder is the leader, and it must stop acting as leader once its lease expires."
+   ]
+  },
+  "useWhen": [
+   "One active scheduler or cron runner across replicas, single-writer jobs, and leader election for a partition owner.",
+   "Coarse-grained coordination where a few seconds of failover are acceptable."
+  ],
+  "avoidWhen": [
+   "Do not use a lock where a database constraint or conditional write would do; locks add a dependency and failure modes.",
+   "Do not rely on a lease alone for correctness when the protected resource cannot check fencing tokens; a paused holder can still write."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Approach",
+    "Safety",
+    "Notes"
+   ],
+   "rows": [
+    [
+     "etcd / ZooKeeper lease",
+     "Strong (consensus-backed)",
+     "Fencing via revision or zxid"
+    ],
+    [
+     "Single Redis SET NX PX",
+     "Efficiency only",
+     "Lost on failover; no fencing by default"
+    ],
+    [
+     "Redlock across Redis nodes",
+     "Debated",
+     "Depends on timing assumptions"
+    ],
+    [
+     "Database row lock / conditional update",
+     "Strong within one database",
+     "Simple if the resource is that database"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Lease and renewal timing",
+   "assumptions": [
+    "Lease TTL 10 s, renewal every 3 s",
+    "Worst observed GC pause 2 s, network delay 1 s"
+   ],
+   "steps": [
+    "Between renewals there are 3 s of normal work, plus up to 2 s of pause and 1 s of network delay before the renewal lands.",
+    "Worst-case gap is 3 plus 2 plus 1, so 6 s, which is under the 10 s TTL, leaving 4 s of slack.",
+    "Failover takes up to the TTL: if the holder dies, others wait about 10 s before taking over.",
+    "A longer pause, say 12 s, would exceed the TTL, so fencing tokens are still required for safety."
+   ],
+   "result": "Choose the TTL so normal renewals have slack, and accept that failover takes about one TTL; fencing covers the pauses timing cannot."
+  },
+  "india": {
+   "title": "One settlement job at a time",
+   "label": "Illustrative estimate",
+   "body": "Consider a lending app that runs a nightly job to compute EMIs due and trigger NACH auto-debit instructions to banks. Running it twice would debit customers twice, which is unacceptable. The job runs on three pods for availability, but each must take a lease in etcd before starting, and every debit instruction carries the fencing token and a per-loan idempotency key. If the leader pod stalls during a long pause and a second pod takes over, the stalled pod's later writes carry the lower token and are rejected by the instruction table. The lock decides who should work, while the token and idempotency keys guarantee that no one does harm."
+  },
+  "pitfalls": [
+   {
+    "trap": "'I'll use Redis SETNX as a lock for payments.'",
+    "say": "'A single Redis lock can be lost on failover; for correctness I'd use etcd leases plus fencing tokens checked by the resource.'"
+   },
+   {
+    "trap": "Assuming the lock holder knows when its lease expired.",
+    "say": "'A paused process cannot tell its lease expired, so every write carries a fencing token that the storage checks.'"
+   }
+  ],
+  "takeaways": [
+   "Locks need leases so a dead holder does not block forever.",
+   "Leases alone are unsafe under pauses; use fencing tokens.",
+   "Use a consensus-backed store for correctness-critical locks.",
+   "Prefer constraints and conditional writes when they suffice."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t46-d1",
+    "type": "multiple_choice",
+    "concept": "fencing",
+    "prompt": "A paused lock holder wakes up after its lease expired and tries to write. What stops it from corrupting data?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The storage rejects its lower fencing token"
+     },
+     {
+      "id": "b",
+      "label": "Its lease automatically renews"
+     },
+     {
+      "id": "c",
+      "label": "The network drops all its packets"
+     },
+     {
+      "id": "d",
+      "label": "Nothing; this cannot happen"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Each new grant gets a higher token, and the resource rejects writes with a token lower than the highest seen."
+   }
+  ],
+  "diagram": "A gets lock (token 33) ... long GC pause ...   lease expires\nB gets lock (token 34) -> write(34) accepted\nA wakes -> write(33) -> storage: 33 < 34 -> REJECTED"
+ },
+ "47": {
+  "teaches": [
+   "skew",
+   "lamport",
+   "vector"
+  ],
+  "mechanism": {
+   "title": "How logical clocks order events without trusting wall clocks",
+   "steps": [
+    "Physical clocks drift and are corrected by NTP, so two servers may disagree by milliseconds or more; 'later timestamp' does not reliably mean 'happened later'.",
+    "Lamport clock: each process keeps a counter. Increment it before each event; attach it to messages; on receive, set the counter to the maximum of local and received, plus 1.",
+    "This guarantees that if A happened before B, then L(A) < L(B). The reverse is not true: L(A) < L(B) does not prove A caused B.",
+    "Vector clock: each process keeps a vector with one counter per process. It increments its own entry on each event and, on receive, takes the element-wise maximum and then increments its own entry.",
+    "Compare vectors: if every entry of V(A) is less than or equal to V(B) and at least one is smaller, A happened before B. If neither dominates, the events are concurrent: a true conflict.",
+    "Stores like the original Dynamo used version vectors to detect concurrent updates and keep both versions as siblings for the application to merge."
+   ]
+  },
+  "useWhen": [
+   "Lamport clocks when you need a total order consistent with causality, for example ordering operations in a log, with ties broken by process id.",
+   "Vector clocks when you must detect concurrent writes to the same data, such as multi-leader or offline-first sync."
+  ],
+  "avoidWhen": [
+   "Do not use wall-clock timestamps alone for last-writer-wins on important data; clock skew silently drops writes.",
+   "Do not use vector clocks with thousands of writers per key without pruning; the vector grows with each writer."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Clock",
+    "Detects causality",
+    "Detects concurrency",
+    "Size"
+   ],
+   "rows": [
+    [
+     "Wall clock",
+     "No (skew)",
+     "No",
+     "One timestamp"
+    ],
+    [
+     "Lamport",
+     "One direction only",
+     "No",
+     "One integer"
+    ],
+    [
+     "Vector",
+     "Yes",
+     "Yes",
+     "One entry per writer"
+    ],
+    [
+     "Hybrid logical clock",
+     "Yes, close to wall time",
+     "No",
+     "Timestamp plus counter"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Working a Lamport example",
+   "assumptions": [
+    "Process P starts at 0, Q starts at 0"
+   ],
+   "steps": [
+    "P does a local event: P = 1. P sends message m with timestamp 2 (incremented to 2 on send).",
+    "Q does two local events: Q = 1, then Q = 2.",
+    "Q receives m (timestamp 2): Q = max(2, 2) plus 1 = 3.",
+    "So the receive event (3) is ordered after the send (2), as causality requires, even though Q's clock started independently."
+   ],
+   "result": "Lamport clocks always order a receive after its send by taking the maximum and adding one."
+  },
+  "india": {
+   "title": "Offline edits to a shared shopping list",
+   "label": "Illustrative estimate",
+   "body": "A family in Chennai shares a grocery list in an app. Amma edits 'milk ×2' to 'milk ×3' on her phone in a basement with no signal, while Appa, online, changes it to 'milk ×1'. When Amma's phone reconnects, wall-clock timestamps would let whichever phone's clock happens to be ahead silently win. With version vectors, the server sees that neither edit includes the other, so the edits are concurrent, and the app shows both values or applies a merge rule (keep the larger quantity). Detecting that a conflict exists is the clock's job; resolving it is a product decision."
+  },
+  "pitfalls": [
+   {
+    "trap": "'We'll order events by server timestamp.'",
+    "say": "'Server clocks skew; for causality I'd use Lamport or hybrid logical clocks, and version vectors to detect concurrent writes.'"
+   },
+   {
+    "trap": "Claiming Lamport clocks detect concurrency.",
+    "say": "'Lamport ordering is consistent with causality but cannot tell concurrent events apart; vector clocks can.'"
+   }
+  ],
+  "takeaways": [
+   "Wall clocks drift, so timestamps do not prove order.",
+   "Lamport: if A happened before B then L(A) < L(B), not the reverse.",
+   "Vector clocks detect concurrent updates.",
+   "Detecting a conflict is separate from resolving it."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t47-d1",
+    "type": "multiple_choice",
+    "concept": "vector",
+    "prompt": "Version vectors {P:2, Q:1} and {P:1, Q:2} belong to two updates of the same key. What are they?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Concurrent: neither happened before the other"
+     },
+     {
+      "id": "b",
+      "label": "The first happened before the second"
+     },
+     {
+      "id": "c",
+      "label": "The second happened before the first"
+     },
+     {
+      "id": "d",
+      "label": "Identical updates"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Neither vector is less than or equal to the other in every entry, so the updates are concurrent."
+   }
+  ],
+  "diagram": "P: [1] --send m(2)--> \nQ: [1] [2] --recv m--> max(2,2)+1 = [3]\nvectors: {P:1,Q:0} vs {P:0,Q:1} -> neither dominates -> concurrent"
+ },
+ "48": {
+  "teaches": [
+   "gossip",
+   "phi",
+   "indirect"
+  ],
+  "mechanism": {
+   "title": "How gossip spreads state and detects failures",
+   "steps": [
+    "Every second (one gossip round), each node picks a few random peers and exchanges what it knows: membership, heartbeat counters, versions of metadata.",
+    "Each node merges what it hears, keeping the newer version of each entry. Information spreads like an epidemic: the number of informed nodes roughly multiplies each round.",
+    "Failure detection: each node increments its own heartbeat counter; if a node's counter stops increasing in what others hear, it becomes suspect.",
+    "A phi-accrual detector (used by Cassandra and Akka) outputs a suspicion level from the observed distribution of heartbeat arrival times, instead of a fixed timeout, adapting to slow networks.",
+    "SWIM-style indirect probing: if node A's direct ping to B fails, A asks a few other nodes to ping B. Only if they also fail is B marked suspect, which avoids false alarms from one bad link.",
+    "Suspect nodes get a grace period to refute (by gossiping a higher incarnation number) before being declared dead."
+   ]
+  },
+  "useWhen": [
+   "Large clusters (hundreds to thousands of nodes) that need membership and failure information without a central coordinator: Cassandra, Consul's Serf, many service meshes.",
+   "Spreading eventually consistent metadata such as schema versions and load figures."
+  ],
+  "avoidWhen": [
+   "Strongly consistent decisions such as electing exactly one leader; use consensus for those.",
+   "Tiny clusters where a simple central health check is easier to reason about."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Approach",
+    "Detection time",
+    "Network load",
+    "False positives"
+   ],
+   "rows": [
+    [
+     "Central heartbeat server",
+     "Fast",
+     "Concentrated on the server",
+     "Server is a single point of failure"
+    ],
+    [
+     "All-to-all heartbeats",
+     "Fast",
+     "n squared messages",
+     "Low"
+    ],
+    [
+     "Gossip",
+     "About log n rounds to spread",
+     "A few messages per node per round",
+     "Tunable"
+    ],
+    [
+     "SWIM with indirect probes",
+     "Bounded",
+     "Constant per node",
+     "Lower, thanks to indirect checks"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "How fast gossip reaches everyone",
+   "assumptions": [
+    "1,000 nodes",
+    "Each informed node tells 2 random peers per 1-second round (fan-out 2)"
+   ],
+   "steps": [
+    "Informed nodes roughly triple each round at first: 1, then 3, then 9, then 27.",
+    "3 to the power 6 is 729 and 3 to the power 7 is 2,187, so about 7 rounds cover 1,000 nodes in the ideal case.",
+    "Random duplicates slow the tail, so in practice allow roughly 10 rounds, about 10 seconds.",
+    "Each node sends only 2 messages per round regardless of cluster size, about 2,000 messages per second cluster-wide."
+   ],
+   "result": "Gossip spreads to 1,000 nodes in roughly log-base-3 of 1,000, about 7 rounds ideal and about 10 in practice, at a constant cost per node."
+  },
+  "india": {
+   "title": "A storage cluster across zones",
+   "label": "Illustrative estimate",
+   "body": "Imagine a Cassandra cluster of 300 nodes for a messaging app, spread across three zones in an Indian cloud region. A brief network hiccup in one zone delays some heartbeats. A fixed 2-second timeout would mark healthy nodes dead and trigger needless data movement, while the phi-accrual detector notices that heartbeat delays were already variable and raises suspicion gradually. Membership changes spread to all 300 nodes through gossip within a few seconds, without any central server that could itself fail."
+  },
+  "pitfalls": [
+   {
+    "trap": "'A central server will ping every node.'",
+    "say": "'At hundreds of nodes I'd use gossip with SWIM-style indirect probes so there is no central failure point and fewer false positives.'"
+   },
+   {
+    "trap": "Using gossip for leader election.",
+    "say": "'Gossip is eventually consistent; leader election needs consensus such as Raft.'"
+   }
+  ],
+  "takeaways": [
+   "Gossip spreads information in about log n rounds.",
+   "Load per node stays constant as the cluster grows.",
+   "Phi-accrual adapts suspicion to observed network behaviour.",
+   "Indirect probes reduce false failure detections."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t48-d1",
+    "type": "multiple_choice",
+    "concept": "indirect",
+    "prompt": "Why does SWIM ask other nodes to ping a node that missed a direct ping?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "To avoid declaring it dead because of one bad network path"
+     },
+     {
+      "id": "b",
+      "label": "To elect it as leader"
+     },
+     {
+      "id": "c",
+      "label": "To copy its data"
+     },
+     {
+      "id": "d",
+      "label": "To increase the replication factor"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Indirect probes distinguish a dead node from a single failed link, reducing false positives."
+   }
+  ],
+  "diagram": "round 1: A -> B, C\nround 2: A, B, C -> 6 more\nround 3: ... ~3x per round -> all 1,000 nodes in ~7-10 rounds"
+ },
+ "49": {
+  "teaches": [
+   "bloom",
+   "bloom-risk",
+   "hll",
+   "cms"
+  ],
+  "mechanism": {
+   "title": "How the three probabilistic structures work",
+   "steps": [
+    "Bloom filter: a bit array of m bits and k hash functions. To add an item, set the k bits its hashes point to. To query, check those k bits: if any is 0, the item is definitely absent; if all are 1, it is probably present.",
+    "False positives happen when other items happened to set all k bits. False negatives never happen, unless items are deleted, which a plain Bloom filter does not support.",
+    "HyperLogLog: hash each item, use the first few bits to pick one of many registers, and record the longest run of leading zeros seen in the rest. Rare long runs imply many distinct items; averaging across registers gives a count estimate.",
+    "Redis HyperLogLog uses about 12 KB per counter and has a standard error of about 0.81%, whether it counts thousands or billions of distinct items.",
+    "Count-Min Sketch: a small table of d rows by w counters. Each item increments one counter per row; its estimated count is the minimum of its d counters. Estimates may be too high (collisions), never too low.",
+    "All three trade a small, bounded error for huge memory savings, and all merge easily across servers."
+   ]
+  },
+  "useWhen": [
+   "Bloom: skip disk lookups for keys that are not there (LSM SSTables), avoid cache penetration, check 'username probably taken' before hitting the database.",
+   "HyperLogLog for unique visitors; Count-Min for heavy hitters such as top search terms or abusive IPs."
+  ],
+  "avoidWhen": [
+   "Any case where a false positive causes harm without a fallback check, such as blocking a payment.",
+   "Exact billing counts; use exact counters or logs for anything charged money."
+  ],
+  "tradeoffs": {
+   "columns": [
+    "Structure",
+    "Answers",
+    "Error",
+    "Memory"
+   ],
+   "rows": [
+    [
+     "Bloom filter",
+     "Is x in the set?",
+     "False positives only",
+     "About 9.6 bits per item at 1%"
+    ],
+    [
+     "HyperLogLog",
+     "How many distinct?",
+     "About 0.81% (Redis)",
+     "About 12 KB per counter"
+    ],
+    [
+     "Count-Min Sketch",
+     "How often did x occur?",
+     "Overestimates only",
+     "w × d counters"
+    ],
+    [
+     "Exact set / map",
+     "Exact",
+     "None",
+     "Grows with distinct items"
+    ]
+   ]
+  },
+  "numbers": {
+   "title": "Sizing a Bloom filter",
+   "assumptions": [
+    "100 million keys",
+    "Target false-positive rate 1%"
+   ],
+   "steps": [
+    "Optimal bits per item is about 1.44 × log2(1 ÷ 0.01), and log2(100) ≈ 6.64, so about 9.6 bits per item.",
+    "Total bits = 100,000,000 × 9.6 = 960,000,000 bits.",
+    "In bytes: 960,000,000 ÷ 8 = 120,000,000 bytes, about 120 MB.",
+    "Optimal number of hash functions is about 9.6 × 0.693 ≈ 6.6, so use 7."
+   ],
+   "result": "A 1% Bloom filter over 100 million keys fits in about 120 MB with 7 hash functions, far smaller than storing the keys."
+  },
+  "india": {
+   "title": "Daily unique viewers of a streaming show",
+   "label": "Illustrative estimate",
+   "body": "An OTT app wants 'unique viewers today' for each of thousands of shows across India. Exact sets of user ids would need gigabytes per popular show. A HyperLogLog per show per day takes about 12 KB in Redis, and the app can merge per-region counters to get national totals with under 1% error, which is fine for a dashboard. For billing advertisers by impressions, though, the company would use exact event logs processed in a warehouse, because an error of even 0.8% on a large invoice is real money."
+  },
+  "pitfalls": [
+   {
+    "trap": "Saying a Bloom filter can return false negatives.",
+    "say": "'A Bloom filter can say probably present when absent, but never absent when present.'"
+   },
+   {
+    "trap": "Using approximate counts for billing.",
+    "say": "'HyperLogLog is fine for dashboards; billing uses exact logs.'"
+   }
+  ],
+  "takeaways": [
+   "Bloom filters: no false negatives, tunable false positives.",
+   "About 9.6 bits per item gives a 1% false-positive rate.",
+   "HyperLogLog counts distinct items in about 12 KB with under 1% error.",
+   "Count-Min overestimates frequencies; never use sketches for billing."
+  ],
+  "extraQuestions": [
+   {
+    "id": "t49-d1",
+    "type": "multiple_choice",
+    "concept": "bloom",
+    "prompt": "A Bloom filter says a key is NOT in the set. What can you conclude?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The key is definitely absent"
+     },
+     {
+      "id": "b",
+      "label": "The key is probably absent, with a 1% error"
+     },
+     {
+      "id": "c",
+      "label": "The key is probably present"
+     },
+     {
+      "id": "d",
+      "label": "Nothing at all"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "If any of the key's bits is 0, it was never added, so a negative answer is certain."
+   }
+  ],
+  "diagram": "Bloom (m bits, k=3): add 'ravi' -> set bits 3, 9, 14\nquery 'anu' -> bits 3, 7, 14 -> bit 7 is 0 -> definitely absent\nquery 'om'  -> bits 3, 9, 14 all 1 -> probably present (check DB)"
+ }
+}
