@@ -31,9 +31,9 @@ export function PageHero({
         <NavIcon name={icon} size={44} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-extrabold uppercase tracking-wider text-white/90">{eyebrow}</p>
+        <p className="text-sm font-extrabold uppercase tracking-wider text-white">{eyebrow}</p>
         <h1 className="font-display text-3xl sm:text-4xl leading-tight text-white">{title}</h1>
-        {children && <div className="mt-1 font-bold text-white/95">{children}</div>}
+        {children && <div className="mt-1 font-bold text-white">{children}</div>}
       </div>
       {aside}
     </header>

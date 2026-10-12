@@ -209,9 +209,9 @@ function UnitBanner({ regionId, index, done, total, title, subtitle }: { regionI
   return (
     <div className={`unit-banner flex items-center gap-3 p-5 pr-2 min-h-[120px] ${gold ? 'banner-gold' : ''}`} style={{ background: gold ? p.bright : p.deep, ['--banner-shadow' as string]: p.shadow }}>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-extrabold uppercase tracking-wider text-white/90">{index === null ? 'Final unit' : `Unit ${index + 1}`}</p>
+        <p className="text-sm font-extrabold uppercase tracking-wider text-white">{index === null ? 'Final unit' : `Unit ${index + 1}`}</p>
         <h2 className="font-display text-2xl leading-tight text-white">{subtitle}</h2>
-        <p className="font-bold text-white/90">{title}</p>
+        <p className="font-bold text-white">{title}</p>
         <div className="mt-2 flex items-center gap-2">
           <div className="h-3 w-28 overflow-hidden rounded-full bg-white/30" aria-hidden>
             <div className="h-full rounded-full bg-white" style={{ width: `${(done / Math.max(1, total)) * 100}%` }} />
@@ -328,7 +328,7 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
         >
           <span aria-hidden className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45" style={{ background: locked ? '#5B6472' : boss ? '#8A5A00' : p.deep }} />
           <p className="font-display text-lg leading-snug">{topic.title}</p>
-          <p className="text-sm font-bold text-white/90">
+          <p className="text-sm font-bold text-white">
             {boss ? 'Boss fight' : `Station ${n}`} · {STATUS_WORD[status]} · about {topicMinutes(topic.id)} min
           </p>
           {locked ? (
@@ -414,7 +414,7 @@ function Curriculum({ statusMap, needle }: { statusMap: Map<number, Status>; nee
             <div key={r.id} className="panel min-w-0 overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-3 text-white" style={{ background: p.deep }}>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-extrabold uppercase tracking-wider text-white/90">{r.id === 'boss-arena' ? 'Final unit' : `Unit ${i + 1}`}</p>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-white">{r.id === 'boss-arena' ? 'Final unit' : `Unit ${i + 1}`}</p>
                   <h3 className="font-display text-lg leading-tight">{r.subtitle}</h3>
                 </div>
                 <span className="text-sm font-extrabold tabular-nums">{done}/{all.length}</span>

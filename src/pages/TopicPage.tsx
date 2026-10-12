@@ -57,10 +57,10 @@ export function TopicPage() {
       <div className="space-y-5 min-w-0">
         <header className="unit-banner flex items-center gap-4 p-5 sm:p-6" style={{ background: pal.deep, ['--banner-shadow' as string]: pal.shadow }}>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-extrabold uppercase tracking-wider text-white/90">{regionName} · topic {topic.id}</p>
+            <p className="text-sm font-extrabold uppercase tracking-wider text-white">{regionName} · topic {topic.id}</p>
             <h1 className="font-display text-3xl sm:text-4xl text-white mt-1 leading-tight" data-testid="topic-title">{topic.title}</h1>
             {topic.objectives.length > 0 && (
-              <ul className="mt-3 space-y-1 font-bold text-white/95 max-w-xl">
+              <ul className="mt-3 space-y-1 font-bold text-white max-w-xl">
                 {topic.objectives.map((o) => (
                   <li key={o} className="flex gap-2">
                     <span aria-hidden className="mt-[0.55em] h-2 w-2 shrink-0 rounded-full bg-white" />
