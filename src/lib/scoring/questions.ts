@@ -80,23 +80,44 @@ export function gradeEstimationQuestion(
   }
 }
 
+type TradeoffLegacy = TradeoffQuestion & {
+  rationaleKeywords?: string[]
+}
+
 export function gradeTradeoff(
   q: TradeoffQuestion,
   approachId: string,
-  rationale: string,
+  selectedRationaleIds: string[],
+  legacyRationaleText?: string,
 ): GradeResult {
   const approachOk = approachId === q.correctApproachId
-  const lower = rationale.toLowerCase()
-  const keywordHits = q.rationaleKeywords.filter((k) => lower.includes(k.toLowerCase()))
-  const rationaleOk = keywordHits.length >= Math.min(2, q.rationaleKeywords.length)
+  const legacy = q as TradeoffLegacy
+  let rationaleOk = false
+  let hasDistractor = false
+  if (q.rationaleOptions?.length && q.correctRationaleIds?.length) {
+    const selected = new Set(selectedRationaleIds)
+    const required = new Set(q.correctRationaleIds)
+    const distractors = new Set(q.distractorRationaleIds ?? [])
+    hasDistractor = [...selected].some((id) => distractors.has(id))
+    rationaleOk =
+      !hasDistractor &&
+      [...required].every((id) => selected.has(id)) &&
+      selected.size === required.size
+  } else if (legacy.rationaleKeywords?.length) {
+    const lower = (legacyRationaleText ?? '').toLowerCase()
+    const hits = legacy.rationaleKeywords.filter((k) => lower.includes(k.toLowerCase()))
+    rationaleOk = hits.length >= Math.min(2, legacy.rationaleKeywords.length)
+  }
   const correct = approachOk && rationaleOk
   return {
     correct,
     feedback: correct
-      ? 'Strong trade-off call with constraints addressed.'
-      : approachOk
-        ? 'Approach fits, but tie your rationale to latency, consistency, or cost constraints.'
-        : 'Pick the approach that best matches the stated constraints.',
+      ? 'Approach and structured rationale match the constraints.'
+      : hasDistractor
+        ? 'One selected reason conflicts with the constraints — review the explanation.'
+        : approachOk
+          ? 'Pick the rationale options that directly support this approach under the constraints.'
+          : 'Choose the approach that best fits the non-functional requirements.',
   }
 }
 
@@ -114,8 +135,13 @@ export function gradeQuestion(
     case 'estimation':
       return gradeEstimationQuestion(q, typeof answer === 'string' ? answer : '')
     case 'tradeoff': {
-      const a = answer as { approachId?: string; rationale?: string }
-      return gradeTradeoff(q, a.approachId ?? '', a.rationale ?? '')
+      const a = answer as { approachId?: string; rationaleIds?: string[]; rationale?: string }
+      return gradeTradeoff(
+        q,
+        a.approachId ?? '',
+        Array.isArray(a.rationaleIds) ? a.rationaleIds : [],
+        typeof a.rationale === 'string' ? a.rationale : undefined,
+      )
     }
     default:
       return { correct: false, feedback: 'Unknown question type.' }

@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react'
+import { ArchNode } from './canvas/ArchNode'
 import {
   ReactFlow,
   Background,
@@ -42,6 +43,8 @@ interface Props {
 
 let nodeCounter = 1
 
+const nodeTypes = { arch: ArchNode }
+
 export function BossCanvas({ initial, onChange }: Props) {
   const initialNodes: Node[] = useMemo(
     () =>
@@ -49,7 +52,7 @@ export function BossCanvas({ initial, onChange }: Props) {
         id: n.id,
         position: n.position,
         data: { label: n.label, componentType: n.type },
-        type: 'default',
+        type: 'arch',
       })),
     [initial],
   )
@@ -103,6 +106,7 @@ export function BossCanvas({ initial, onChange }: Props) {
     const node: Node = {
       id,
       position: { x: 80 + (nodes.length % 4) * 140, y: 60 + Math.floor(nodes.length / 4) * 90 },
+      type: 'arch',
       data: { label: type.replace(/_/g, ' '), componentType: type },
     }
     const next = [...nodes, node]
@@ -119,34 +123,34 @@ export function BossCanvas({ initial, onChange }: Props) {
   }
 
   return (
-    <div className="grid lg:grid-cols-[200px_1fr] gap-3">
-      <aside className="space-y-2">
-        <p className="text-xs text-slate-400">Palette</p>
+    <div className="grid lg:grid-cols-[168px_1fr] gap-3">
+      <aside className="panel-slab p-2 space-y-1">
+        <p className="text-[10px] uppercase tracking-widest text-[var(--color-muted)] px-1">Components</p>
         {PALETTE.map((p) => (
           <button
             key={p.type}
             type="button"
-            className="w-full text-left text-xs px-2 py-1 rounded border border-slate-600 hover:border-cyan-400/50"
+            className="w-full text-left text-[11px] px-2 py-1.5 btn-quiet"
             onClick={() => addComponent(p.type)}
           >
             + {p.label}
           </button>
         ))}
-        <div className="pt-3 border-t border-slate-700">
-          <p className="text-xs text-slate-400 mb-1">Keyboard/mobile connect</p>
-          <select id="src" className="w-full mb-1 bg-slate-800 text-xs rounded border border-slate-600">
+        <div className="pt-2 mt-2 border-t border-[var(--color-line)]">
+          <p className="text-[10px] uppercase tracking-widest text-[var(--color-muted)] mb-1 px-1">Wire</p>
+          <select id="src" className="w-full mb-1 bg-[#0a0e13] text-xs border border-[var(--color-line)] text-[var(--color-ink)]">
             {nodes.map((n) => (
               <option key={n.id} value={n.id}>{String((n.data as { label?: string }).label)} ({n.id})</option>
             ))}
           </select>
-          <select id="tgt" className="w-full mb-1 bg-slate-800 text-xs rounded border border-slate-600">
+          <select id="tgt" className="w-full mb-1 bg-[#0a0e13] text-xs border border-[var(--color-line)] text-[var(--color-ink)]">
             {nodes.map((n) => (
               <option key={n.id} value={n.id}>{String((n.data as { label?: string }).label)} ({n.id})</option>
             ))}
           </select>
           <button
             type="button"
-            className="w-full text-xs py-1 rounded bg-slate-800 border border-slate-600"
+            className="w-full text-xs py-1.5 btn-cta"
             onClick={() => {
               const src = (document.getElementById('src') as HTMLSelectElement)?.value
               const tgt = (document.getElementById('tgt') as HTMLSelectElement)?.value
@@ -157,8 +161,9 @@ export function BossCanvas({ initial, onChange }: Props) {
           </button>
         </div>
       </aside>
-      <div className="h-[420px] rounded-lg border border-slate-700 overflow-hidden bg-slate-950">
+      <div className="h-[420px] border border-[var(--color-line)] overflow-hidden bg-[#06090c] panel-slab">
         <ReactFlow
+          nodeTypes={nodeTypes}
           nodes={nodes}
           edges={edges}
           onNodesChange={(c) => {
