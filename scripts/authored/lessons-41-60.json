@@ -16,7 +16,7 @@
       {
         "id": "t41-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Token bucket and sliding windows",
         "body": "Token bucket: tokens refill at rate r up to capacity b; each request spends one — allows bursts. Sliding window counters smooth boundary spikes. Store counters in Redis for a shared limit.",
         "accent": "Core idea",
         "teaches": [
@@ -26,19 +26,10 @@
         ]
       },
       {
-        "id": "t41-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Protect services by capping requests per key using token bucket, leaky bucket or sliding windows.",
-        "teaches": [
-          "token-bucket"
-        ]
-      },
-      {
         "id": "t41-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Request arrives” to “No: 429 Too Many Requests”, via “Lookup key bucket”.",
+        "title": "Checking a request against its bucket",
+        "body": "Look up the caller's bucket; if a token is available spend it and allow the request, otherwise answer 429 with Retry-After.",
         "steps": [
           "Request arrives",
           "Lookup key bucket",
@@ -51,9 +42,26 @@
         ]
       },
       {
+        "id": "t41-c2",
+        "kind": "text",
+        "title": "Worked example: token bucket for an OTP endpoint",
+        "body": "Assume: Allow on average 1 OTP per 30 seconds per phone; Allow a burst of 3.",
+        "teaches": [
+          "token-bucket"
+        ],
+        "steps": [
+          "Refill rate R = 1 ÷ 30 ≈ 0.033 tokens per second.",
+          "Bucket size B = 3, so a user can request 3 OTPs back to back.",
+          "After the burst, the next token arrives after 30 seconds; in 10 minutes at most 3 plus 600 ÷ 30 = 23 OTPs can be sent.",
+          "A fixed window of 3 per minute would instead allow 6 in two seconds across a minute boundary."
+        ],
+        "note": "A token bucket of size 3 refilling every 30 seconds caps a phone at 23 OTPs in 10 minutes while still allowing an honest quick retry.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t41-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: fixed-window bursts",
         "body": "Fixed windows let 2× traffic through at window boundaries. Mention sliding windows or token buckets.",
         "teaches": [
           "fixed-window"
@@ -248,7 +256,7 @@
       {
         "id": "t42-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "UUIDs vs Snowflake IDs",
         "body": "UUIDv4 is random and needs no coordination but indexes poorly. Snowflake 64-bit IDs (timestamp + worker + sequence) are sortable. UUIDv7 adds time ordering.",
         "accent": "Core idea",
         "teaches": [
@@ -257,19 +265,10 @@
         ]
       },
       {
-        "id": "t42-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Generate unique IDs at scale: UUIDs, DB sequences, Snowflake, or ticket servers.",
-        "teaches": [
-          "snowflake"
-        ]
-      },
-      {
         "id": "t42-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Timestamp bits” to “Sortable 64-bit ID”, via “Worker ID bits”.",
+        "title": "Building a Snowflake ID",
+        "body": "Concatenate milliseconds since an epoch, a worker ID and a per-millisecond sequence into 64 bits that sort by time.",
         "steps": [
           "Timestamp bits",
           "Worker ID bits",
@@ -282,9 +281,26 @@
         ]
       },
       {
+        "id": "t42-c2",
+        "kind": "text",
+        "title": "Worked example: capacity of the Snowflake layout",
+        "body": "Assume: 41 timestamp bits in milliseconds; 10 machine bits, 12 sequence bits.",
+        "teaches": [
+          "snowflake"
+        ],
+        "steps": [
+          "Timestamp range = 2 to the power 41 ms, about 2,199,023,255,552 ms.",
+          "Divided by about 31,557,600,000 ms per year, that is roughly 69.7 years from the chosen epoch.",
+          "Machines = 2 to the power 10, which is 1,024.",
+          "IDs per machine per millisecond = 2 to the power 12, which is 4,096, so about 4,096,000 per second per machine."
+        ],
+        "note": "The classic layout lasts about 69 years, supports 1,024 generators and about 4 million IDs per second each.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t42-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: public auto-increment IDs",
         "body": "Using auto-increment IDs exposed publicly — leaks volume and enables enumeration.",
         "teaches": [
           "auto-increment"
@@ -505,7 +521,7 @@
         "id": "t43-c3",
         "kind": "diagram",
         "title": "A trip booking saga",
-        "body": "5 steps from “Reserve flight” to “Compensate: cancel flight”, via “Reserve hotel”.",
+        "body": "When the payment step fails, the saga runs compensating actions in reverse order to undo the hotel and flight reservations.",
         "steps": [
           "Reserve flight",
           "Reserve hotel",
@@ -529,7 +545,7 @@
       {
         "id": "t43-c5",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: 2PC by default",
         "body": "Defaulting to 2PC across microservices. It ties every service’s availability together and holds locks across network calls. Prefer sagas unless you truly need atomic commit.",
         "teaches": [
           "2pc-blocking"
@@ -767,7 +783,7 @@
         "id": "t44-c3",
         "kind": "diagram",
         "title": "Outbox to broker",
-        "body": "5 steps from “BEGIN” to “Relay publishes to Kafka and marks them sent”, via “Insert the order and an outbox event”.",
+        "body": "Follow one order through: the relay may run a few seconds behind the commit, so consumers hear about the order slightly later, but never about an order that was rolled back.",
         "steps": [
           "BEGIN",
           "Insert the order and an outbox event",
@@ -791,7 +807,7 @@
       {
         "id": "t44-c5",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: relays deliver twice",
         "body": "Forgetting the relay delivers at least once. It can crash after publishing but before marking the row sent, so consumers must handle duplicates idempotently.",
         "teaches": [
           "outbox-dupes"
@@ -1020,7 +1036,7 @@
         "id": "t45-c3",
         "kind": "diagram",
         "title": "A Raft write",
-        "body": "5 steps from “Client sends the write to the leader” to “Leader commits and applies it”, via “Leader appends it to its log”.",
+        "body": "A Raft write is committed once a majority of nodes has it in their log; only then does the leader apply it and answer the client.",
         "steps": [
           "Client sends the write to the leader",
           "Leader appends it to its log",
@@ -1044,7 +1060,7 @@
       {
         "id": "t45-c5",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: two-node consensus",
         "body": "Running consensus on 2 nodes, or putting a high-latency link in every write. Two nodes cannot lose one and keep a majority, and every commit waits for the slowest member of the majority.",
         "teaches": [
           "majority"
@@ -1234,7 +1250,7 @@
       {
         "id": "t46-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Locks with leases",
         "body": "Redis SET NX PX gives a simple lock with TTL; ZooKeeper/etcd give safer locks. Always bound locks with TTLs and design for lock loss.",
         "accent": "Core idea",
         "teaches": [
@@ -1242,19 +1258,10 @@
         ]
       },
       {
-        "id": "t46-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Coordinate exclusive access across services with leases, fencing, and caution.",
-        "teaches": [
-          "fencing"
-        ]
-      },
-      {
         "id": "t46-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Request lock” to “TTL auto-expires on crash”, via “SET key NX PX”.",
+        "title": "Taking and losing a lock safely",
+        "body": "SET NX PX takes the lock with a lease; the holder works and releases it, and if it crashes the lease expires so others can proceed.",
         "steps": [
           "Request lock",
           "SET key NX PX",
@@ -1267,9 +1274,26 @@
         ]
       },
       {
+        "id": "t46-c2",
+        "kind": "text",
+        "title": "Worked example: lease and renewal timing",
+        "body": "Assume: Lease TTL 10 s, renewal every 3 s; Worst observed GC pause 2 s, network delay 1 s.",
+        "teaches": [
+          "fencing"
+        ],
+        "steps": [
+          "Between renewals there are 3 s of normal work, plus up to 2 s of pause and 1 s of network delay before the renewal lands.",
+          "Worst-case gap is 3 plus 2 plus 1, so 6 s, which is under the 10 s TTL, leaving 4 s of slack.",
+          "Failover takes up to the TTL: if the holder dies, others wait about 10 s before taking over.",
+          "A longer pause, say 12 s, would exceed the TTL, so fencing tokens are still required for safety."
+        ],
+        "note": "Choose the TTL so normal renewals have slack, and accept that failover takes about one TTL; fencing covers the pauses timing cannot.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t46-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: locks without a TTL",
         "body": "Holding a lock without a TTL — a crashed holder blocks everyone forever.",
         "teaches": [
           "lock-ttl"
@@ -1492,7 +1516,7 @@
       {
         "id": "t47-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Ordering without trusted clocks",
         "body": "NTP-synced clocks can skew by milliseconds. Lamport clocks give a causal total order; vector clocks detect concurrency. Snowflake-style IDs combine time + machine + sequence.",
         "accent": "Core idea",
         "teaches": [
@@ -1502,20 +1526,10 @@
         ]
       },
       {
-        "id": "t47-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Wall clocks drift; use logical clocks (Lamport, vector) or hybrid clocks for ordering.",
-        "teaches": [
-          "lamport",
-          "vector"
-        ]
-      },
-      {
         "id": "t47-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Event on A” to “Causal order preserved”, via “Increment counter”.",
+        "title": "Lamport timestamps across two nodes",
+        "body": "Each node increments its counter per event and sends it; a receiver takes max(own, received) + 1, so causes always sort before effects.",
         "steps": [
           "Event on A",
           "Increment counter",
@@ -1528,9 +1542,27 @@
         ]
       },
       {
+        "id": "t47-c2",
+        "kind": "text",
+        "title": "Worked example: Lamport timestamps step by step",
+        "body": "Assume: Process P starts at 0, Q starts at 0.",
+        "teaches": [
+          "lamport",
+          "vector"
+        ],
+        "steps": [
+          "P does a local event: P = 1. P sends message m with timestamp 2 (incremented to 2 on send).",
+          "Q does two local events: Q = 1, then Q = 2.",
+          "Q receives m (timestamp 2): Q = max(2, 2) plus 1 = 3.",
+          "So the receive event (3) is ordered after the send (2), as causality requires, even though Q's clock started independently."
+        ],
+        "note": "Lamport clocks always order a receive after its send by taking the maximum and adding one.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t47-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: last-write-wins on skewed clocks",
         "body": "Using server timestamps to decide \"last write wins\" across regions without accounting for skew.",
         "teaches": [
           "skew"
@@ -1749,7 +1781,7 @@
         "id": "t48-c3",
         "kind": "diagram",
         "title": "One gossip round",
-        "body": "5 steps from “Node picks random peers” to “Cluster converges”, via “They exchange state with version numbers”.",
+        "body": "Each round, nodes swap state with a few random peers and keep the newer entries, so news reaches the whole cluster in a few rounds.",
         "steps": [
           "Node picks random peers",
           "They exchange state with version numbers",
@@ -1773,7 +1805,7 @@
       {
         "id": "t48-c5",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: dead after one missed beat",
         "body": "Declaring a node dead on one missed heartbeat. A GC pause triggers a rebalance, the node comes back, and data moves twice.",
         "teaches": [
           "heartbeat"
@@ -1977,7 +2009,7 @@
         "id": "t49-c3",
         "kind": "diagram",
         "title": "Crawler deduplication",
-        "body": "4 steps from “New URL found” to “Definitely new: fetch and add to filter”, via “Check Bloom filter”.",
+        "body": "The crawler asks the Bloom filter first: 'definitely new' URLs are fetched, 'probably seen' ones are skipped (rarely, a new URL is skipped by mistake).",
         "steps": [
           "New URL found",
           "Check Bloom filter",
@@ -1991,7 +2023,7 @@
       {
         "id": "t49-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: false positives that hurt",
         "body": "Using a Bloom filter where a false positive is harmful, such as deciding a username is taken. A false positive there blocks a real user; confirm against the database.",
         "teaches": [
           "bloom-risk"
@@ -2188,7 +2220,7 @@
       {
         "id": "t50-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "What microservices cost",
         "body": "Microservices give independent deploys and scaling but add network calls, distributed data and ops cost. A modular monolith keeps boundaries without the overhead.",
         "accent": "Core idea",
         "teaches": [
@@ -2197,20 +2229,10 @@
         ]
       },
       {
-        "id": "t50-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Start with a modular monolith; split services along team and domain boundaries when needed.",
-        "teaches": [
-          "modular-monolith",
-          "extract"
-        ]
-      },
-      {
         "id": "t50-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Monolith” to “Own its data”, via “Modular boundaries”.",
+        "title": "When to extract a service",
+        "body": "Start with a modular monolith; extract a module into a service only when team or scaling pressure justifies it, and give it its own data.",
         "steps": [
           "Monolith",
           "Modular boundaries",
@@ -2223,9 +2245,27 @@
         ]
       },
       {
+        "id": "t50-c2",
+        "kind": "text",
+        "title": "Worked example: what a network hop costs a request",
+        "body": "Assume: A page needs 6 sequential calls between components; In-process call about 0.01 ms; network call about 2 ms at p50 and 20 ms at p99.",
+        "teaches": [
+          "modular-monolith",
+          "extract"
+        ],
+        "steps": [
+          "Monolith: 6 calls × 0.01 ms = 0.06 ms of call overhead.",
+          "Microservices at p50: 6 calls × 2 ms = 12 ms.",
+          "At p99, if each call independently has a 1% chance of 20 ms, the chance that at least one of 6 is slow is 1 minus 0.99 to the power 6, about 5.9%.",
+          "So roughly 1 request in 17 hits at least one slow hop, which is why tail latency grows with call depth."
+        ],
+        "note": "Every service boundary on the request path adds milliseconds and multiplies tail-latency risk; keep call chains shallow or parallel.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t50-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: 15 services for 3 people",
         "body": "Splitting a 3-person team’s app into 15 services.",
         "teaches": [
           "ms-costs"
@@ -2448,7 +2488,7 @@
       {
         "id": "t51-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "What belongs in a gateway",
         "body": "The gateway terminates client traffic, verifies tokens, applies quotas, routes to services and can aggregate responses. It keeps cross-cutting concerns out of each service.",
         "accent": "Core idea",
         "teaches": [
@@ -2457,19 +2497,10 @@
         ]
       },
       {
-        "id": "t51-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "A single entry point that handles auth, rate limiting, routing, and request aggregation.",
-        "teaches": [
-          "gateway-jobs"
-        ]
-      },
-      {
         "id": "t51-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Mobile client” to “Microservice”, via “API gateway”.",
+        "title": "A mobile call through the gateway",
+        "body": "The gateway authenticates the token, applies rate limits and routes the call to the right service, keeping these concerns out of each service.",
         "steps": [
           "Mobile client",
           "API gateway",
@@ -2482,9 +2513,26 @@
         ]
       },
       {
+        "id": "t51-c2",
+        "kind": "text",
+        "title": "Worked example: latency of an aggregation endpoint",
+        "body": "Assume: Home screen needs profile (30 ms), offers (50 ms) and orders (80 ms); Gateway overhead 3 ms.",
+        "teaches": [
+          "gateway-jobs"
+        ],
+        "steps": [
+          "Sequential calls: 30 + 50 + 80 = 160 ms, plus 3 ms overhead, so 163 ms.",
+          "Parallel calls: the slowest dominates, so 80 ms plus 3 ms = 83 ms.",
+          "If offers is optional, a 60 ms timeout with a fallback (empty carousel) caps its effect on the page.",
+          "Then the page waits for the slower of profile (30 ms) and orders (80 ms), still 83 ms; to go faster, orders itself must get quicker or be loaded after first paint."
+        ],
+        "note": "Parallel fan-out in a BFF roughly halves this screen's latency from 163 ms to 83 ms; timeouts keep optional parts from dragging it out.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t51-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: business logic in the gateway",
         "body": "Putting business logic in the gateway. It becomes a bottleneck and a deployment choke point.",
         "teaches": [
           "gateway-logic"
@@ -2734,7 +2782,7 @@
         "id": "t52-c4",
         "kind": "diagram",
         "title": "A call with discovery",
-        "body": "5 steps from “Instance starts and registers” to “Caller calls one; dead instances expire from the list”, via “It sends heartbeats”.",
+        "body": "Instances register and heartbeat; callers ask the registry for healthy instances, and entries that stop heartbeating expire.",
         "steps": [
           "Instance starts and registers",
           "It sends heartbeats",
@@ -2749,7 +2797,7 @@
       {
         "id": "t52-c5",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: hard-coded IPs",
         "body": "Hard-coding IPs in config, or caching lookups with no refresh. Deploys then send traffic to instances that no longer exist.",
         "teaches": [
           "discovery"
@@ -2986,7 +3034,7 @@
         "id": "t53-c4",
         "kind": "diagram",
         "title": "A breaker through an outage",
-        "body": "5 steps from “Closed: calls flow” to “Trials succeed: closed again”, via “Failures pass the threshold”.",
+        "body": "The breaker opens after repeated failures so callers fail fast, then lets a few trial calls through before closing again.",
         "steps": [
           "Closed: calls flow",
           "Failures pass the threshold",
@@ -3202,7 +3250,7 @@
       {
         "id": "t54-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "RED, USE and trace IDs",
         "body": "Track RED (rate, errors, duration) for services and USE (utilisation, saturation, errors) for resources. Correlate with a trace ID propagated through every hop.",
         "accent": "Core idea",
         "teaches": [
@@ -3212,19 +3260,10 @@
         ]
       },
       {
-        "id": "t54-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Metrics show what, logs show details, traces show where across services.",
-        "teaches": [
-          "pillars"
-        ]
-      },
-      {
         "id": "t54-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Request gets trace ID” to “Dashboards & alerts”, via “Each service logs it”.",
+        "title": "Following one request through telemetry",
+        "body": "The edge assigns a trace ID, every service logs it and records spans, and aggregated metrics drive dashboards and alerts.",
         "steps": [
           "Request gets trace ID",
           "Each service logs it",
@@ -3237,9 +3276,27 @@
         ]
       },
       {
+        "id": "t54-c2",
+        "kind": "text",
+        "title": "Worked example: log volume and the case for sampling",
+        "body": "Assume: 5,000 requests per second; Each request logs 4 lines of 500 bytes.",
+        "teaches": [
+          "pillars"
+        ],
+        "steps": [
+          "Lines per second = 5,000 × 4 = 20,000.",
+          "Bytes per second = 20,000 × 500 = 10,000,000, about 10 MB per second.",
+          "Per day = 10 MB × 86,400 ≈ 864 GB.",
+          "Keeping 14 days needs about 12 TB, before replication.",
+          "Logging one line per request at info level and sampling debug logs at 1% cuts this by about 4×."
+        ],
+        "note": "Verbose logging at 5,000 requests per second produces close to a terabyte a day; decide levels and sampling up front.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t54-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: unstructured DEBUG logging",
         "body": "Logging everything at DEBUG in production with no structure or sampling.",
         "teaches": [
           "log-hygiene"
@@ -3436,7 +3493,7 @@
       {
         "id": "t55-c1",
         "kind": "text",
-        "title": "The formulas",
+        "title": "The availability formulas",
         "body": "99.9% ≈ 8.8 h/year down, 99.99% ≈ 53 min/year. Components in series multiply availability (lower); redundant components in parallel raise it. SLO = internal target; SLA = contractual promise.",
         "accent": "Core maths",
         "teaches": [
@@ -3447,19 +3504,10 @@
         ]
       },
       {
-        "id": "t55-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Availability is uptime percentage; each extra nine cuts allowed downtime by 10×.",
-        "teaches": [
-          "nines"
-        ]
-      },
-      {
         "id": "t55-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Single node” to “Health checks + failover”, via “Find SPOFs”.",
+        "title": "Removing single points of failure",
+        "body": "Find the components whose failure takes everything down, add replicas, spread them across zones and fail over on health checks.",
         "steps": [
           "Single node",
           "Find SPOFs",
@@ -3472,9 +3520,26 @@
         ]
       },
       {
+        "id": "t55-c2",
+        "kind": "text",
+        "title": "Worked example: availability in series and in parallel",
+        "body": "Assume: Load balancer 99.99%, app tier 99.9%, database 99.9%, all in series; Then make the database a primary plus a standby with automatic failover, treated as two 99.9% copies.",
+        "teaches": [
+          "nines"
+        ],
+        "steps": [
+          "Series: 0.9999 × 0.999 ≈ 0.9989, then 0.9989 × 0.999 ≈ 0.9979, so about 99.8%.",
+          "Two database copies in parallel fail together 0.001 × 0.001 = 0.000001 of the time, so about 99.9999%. That is an upper bound: it assumes independent failures and instant failover, and in practice failover time and correlated failures dominate.",
+          "New chain: 0.9999 × 0.999 × 0.999999 ≈ 0.9989, about 99.89%.",
+          "The weakest series link (the app tier at 99.9%) now limits the system; adding redundancy there is the next step."
+        ],
+        "note": "Series chains multiply down; parallel redundancy multiplies failure probabilities, so fix the weakest series link first.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t55-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: five nines on one zone",
         "body": "Claiming five nines without redundancy across zones. Availability comes from removing single points of failure.",
         "teaches": [
           "spof"
@@ -3676,7 +3741,7 @@
         "id": "t56-c3",
         "kind": "diagram",
         "title": "Regional failover",
-        "body": "5 steps from “Mumbai region fails health checks” to “Fail back after the incident”, via “DNS or a global load balancer shifts traffic”.",
+        "body": "When the primary region fails health checks, traffic shifts, the standby region promotes its replica and scales up, and you fail back later.",
         "steps": [
           "Mumbai region fails health checks",
           "DNS or a global load balancer shifts traffic",
@@ -3700,7 +3765,7 @@
       {
         "id": "t56-c5",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: untested failover",
         "body": "Never testing failover. Backups that were never restored and runbooks that were never run tend to fail on the day. Rehearse with game days.",
         "teaches": [
           "failover"
@@ -3927,7 +3992,7 @@
       {
         "id": "t57-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Sessions vs tokens",
         "body": "Sessions store state server-side (easy revoke). JWTs are signed, stateless, short-lived with refresh tokens. OAuth 2.0 delegates access; OIDC adds identity.",
         "accent": "Core idea",
         "teaches": [
@@ -3936,19 +4001,10 @@
         ]
       },
       {
-        "id": "t57-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Prove who the user is: server sessions, signed tokens, or delegated OAuth/OIDC.",
-        "teaches": [
-          "sessions"
-        ]
-      },
-      {
         "id": "t57-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Login with OTP” to “Refresh when expired”, via “Verify”.",
+        "title": "OTP login to authenticated API calls",
+        "body": "Verify the OTP, issue a short-lived access token and a refresh token, call APIs with the access token and refresh it when it expires.",
         "steps": [
           "Login with OTP",
           "Verify",
@@ -3961,9 +4017,26 @@
         ]
       },
       {
+        "id": "t57-c2",
+        "kind": "text",
+        "title": "Worked example: revocation window of a stolen token",
+        "body": "Assume: Access token lifetime 15 minutes; Attacker steals a token at a random moment.",
+        "teaches": [
+          "sessions"
+        ],
+        "steps": [
+          "Remaining lifetime is uniformly between 0 and 15 minutes, so on average 15 ÷ 2 = 7.5 minutes of misuse.",
+          "With a 60-minute lifetime the average window is 60 ÷ 2 = 30 minutes.",
+          "With server-side sessions, deleting the session ends misuse on the next request.",
+          "Adding a deny-list check for high-risk actions (transfers) closes the window for those actions at the cost of one lookup."
+        ],
+        "note": "Token lifetime is the revocation window; keep it short and add server-side checks for sensitive actions.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t57-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: long-lived JWTs",
         "body": "Long-lived JWTs with no revocation path.",
         "teaches": [
           "jwt-revoke"
@@ -4191,7 +4264,7 @@
         "id": "t58-c3",
         "kind": "diagram",
         "title": "Sign in with Google",
-        "body": "4 steps from “App redirects to Google with code_challenge” to “App exchanges code + verifier for ID and access tokens”, via “User logs in and consents”.",
+        "body": "The app sends the user to Google with a PKCE challenge, gets a one-time code back, and exchanges code plus verifier for tokens.",
         "steps": [
           "App redirects to Google with code_challenge",
           "User logs in and consents",
@@ -4205,7 +4278,7 @@
       {
         "id": "t58-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: access token as identity",
         "body": "Using an OAuth access token as proof of identity. It says what the app may do, not who the user is. Use the OIDC ID token for login.",
         "teaches": [
           "id-token"
@@ -4451,7 +4524,7 @@
         "id": "t59-c3",
         "kind": "diagram",
         "title": "Verifying a request",
-        "body": "4 steps from “Client sends Authorization: Bearer token” to “Passes user claims to service”, via “Gateway checks signature with public key”.",
+        "body": "The gateway verifies the token's signature with the issuer's public key and checks expiry, audience and issuer before trusting its claims.",
         "steps": [
           "Client sends Authorization: Bearer token",
           "Gateway checks signature with public key",
@@ -4466,7 +4539,7 @@
       {
         "id": "t59-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: week-long access tokens",
         "body": "Week-long access tokens. A stateless token cannot be easily revoked, so keep access tokens short (minutes) and use refresh tokens, which can be revoked server-side.",
         "teaches": [
           "jwt-lifetime"
@@ -4697,7 +4770,7 @@
         "id": "t60-c4",
         "kind": "diagram",
         "title": "A request through the layers",
-        "body": "5 steps from “TLS at the edge” to “Validate input and run a parameterised query”, via “Rate limit and web firewall”.",
+        "body": "Each layer stops a different attack, so a request is checked at the edge, at the gateway and again in the service.",
         "steps": [
           "TLS at the edge",
           "Rate limit and web firewall",

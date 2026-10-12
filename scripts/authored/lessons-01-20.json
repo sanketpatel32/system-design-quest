@@ -16,18 +16,12 @@
       {
         "id": "t1-c1",
         "kind": "text",
-        "title": "Why interviewers ask",
+        "title": "What interviewers grade",
         "body": "Interviewers grade how you think, not a single right diagram. They watch for: clarifying scope, sensible numbers, a clear API, a clean high-level design, a deep dive into one hard part, and honest trade-offs.",
         "accent": "Interview lens",
         "teaches": [
           "grading"
         ]
-      },
-      {
-        "id": "t1-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "A 45-minute collaborative conversation where you clarify, estimate, sketch, and defend trade-offs."
       },
       {
         "id": "t1-c3",
@@ -47,9 +41,15 @@
         ]
       },
       {
+        "id": "t1-c2",
+        "kind": "text",
+        "title": "Misconception: there is one right answer",
+        "body": "Many candidates try to reach the 'correct' architecture. There isn't one. Two strong candidates can draw different designs for the same prompt and both pass, because the interviewer grades whether each choice follows from the stated requirements and numbers, and whether you can say what it costs."
+      },
+      {
         "id": "t1-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: designing before scoping",
         "body": "Jumping straight into Kafka and microservices before asking what the product does. Spend roughly the first five minutes on requirements; the interviewer may steer you sooner.",
         "teaches": [
           "clarify-first"
@@ -293,8 +293,8 @@
       {
         "id": "t2-c1",
         "kind": "text",
-        "title": "The formulas",
-        "body": "QPS = DAU × actions per user ÷ 86,400. Peak ≈ 2–10× average. Storage = writes/day × object size × retention. Round aggressively; the order of magnitude matters.",
+        "title": "The estimation formulas",
+        "body": "QPS = DAU × actions per user ÷ 86,400. Peak = average × a peak factor you assume and say out loud (for example 2–3× for a daily curve, 10×+ for event spikes). Storage = writes/day × object size × retention. Round aggressively; the order of magnitude matters.",
         "accent": "Core maths",
         "teaches": [
           "qps",
@@ -303,20 +303,10 @@
         ]
       },
       {
-        "id": "t2-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Turn users into QPS, storage and bandwidth with rounded math: 1 day ≈ 10^5 seconds.",
-        "teaches": [
-          "qps",
-          "rounding"
-        ]
-      },
-      {
         "id": "t2-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “DAU” to “× peak factor”, via “× actions/user”.",
+        "title": "From users to peak QPS",
+        "body": "Multiply users by actions, divide by the seconds in a day, then multiply by the peak factor you assume for this product.",
         "steps": [
           "DAU",
           "× actions/user",
@@ -330,10 +320,29 @@
         ]
       },
       {
+        "id": "t2-c2",
+        "kind": "text",
+        "title": "Worked example: QPS, storage and bandwidth for a chat app",
+        "body": "Assume: 50 million DAU; 40 messages sent per user per day; 100 bytes per message body, 200 bytes with metadata; Messages kept for 1 year, stored 3× for replication; Peak factor 3× (an example assumption for a daily curve; event spikes could be higher).",
+        "teaches": [
+          "qps",
+          "rounding"
+        ],
+        "steps": [
+          "Messages per day = 50M × 40 = 2B (2 billion).",
+          "Average write QPS = 2B ÷ 86,400 ≈ 23,000 per second (with the 10⁵ shortcut: 20,000).",
+          "Peak write QPS ≈ 23,000 × 3 ≈ 70,000 per second, under the assumed 3× peak.",
+          "Storage per day = 2 billion messages × 200 bytes = 400 GB. Per year: 400 GB × 365 ≈ 146 TB, and with 3 replicas ≈ 440 TB.",
+          "Ingress at peak = 70,000 messages/s × 200 bytes = 14 MB/s ≈ 112 Mbit/s."
+        ],
+        "note": "About 23K average and 70K peak writes per second, and roughly 150 TB a year of raw messages (about 440 TB with replication). Raw message ingress is relatively modest under these assumptions; real network traffic is several times higher once fan-out to each recipient, replication, protocol overhead and media are added. Whether 70K writes/s fits on one database depends on the hardware (CPU, NVMe), the cost of each write (row size, number of indexes), durability settings (fsync per commit or group commit), batching, and the engine (B-tree or LSM). Distribute when measurements show one node lacks headroom at peak, when one machine cannot hold the data (hundreds of TB here does force splitting storage), or when you need to survive a node failure without losing write capacity.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t2-c4",
         "kind": "text",
-        "title": "Watch out for",
-        "body": "Forgetting the peak factor. India traffic is spiky: cricket finals, Big Billion Days, Tatkal at 10 AM.",
+        "title": "Trap: forgetting the peak",
+        "body": "Designing for the average. Traffic in India is spiky around cricket finals, Big Billion Days and Tatkal at 10 AM, so state a peak factor for the workload and ask whether events push it higher.",
         "teaches": [
           "peak"
         ]
@@ -423,7 +432,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Averages hide spikes. Peak factors are workload assumptions you state, often 2–10× and higher for flash sales."
+        "explanation": "Averages hide spikes. A peak factor is a workload assumption you state and confirm: about 2–3× for a smooth daily curve, 10× or more when sales open."
       },
       {
         "id": "t2-a5",
@@ -470,8 +479,8 @@
       },
       {
         "id": "3-f1",
-        "front": "Peak factor?",
-        "back": "Peak traffic ≈ 2–10× average; spikier for events."
+        "front": "How do you pick a peak factor?",
+        "back": "It is an assumption you state, not a constant: for example 2–3× for a daily curve, 10× or more for events. Ask the interviewer."
       }
     ],
     "sources": [
@@ -506,7 +515,7 @@
       {
         "id": "t3-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Scale up or scale out",
         "body": "Vertical scaling is simple but hits a ceiling and is a single point of failure. Horizontal scaling needs stateless services, a load balancer and partitioned data. It adds capacity, and it only adds availability if the copies fail independently and traffic is routed away from dead ones (health checks, no shared single database). Gains are rarely linear: shared state, coordination and hot keys eat into them.",
         "accent": "Core idea",
         "teaches": [
@@ -516,20 +525,10 @@
         ]
       },
       {
-        "id": "t3-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Scale up with a bigger box or scale out with more boxes behind a load balancer.",
-        "teaches": [
-          "vertical",
-          "lb"
-        ]
-      },
-      {
         "id": "t3-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “One server” to “N servers (horizontal)”, via “Bigger server (vertical)”.",
+        "title": "Growing from one server to many",
+        "body": "Scale up first because it is simple; before scaling out, move state off the servers so any instance can serve any request.",
         "steps": [
           "One server",
           "Bigger server (vertical)",
@@ -543,9 +542,27 @@
         ]
       },
       {
+        "id": "t3-c2",
+        "kind": "text",
+        "title": "Worked example: how many app servers for a peak?",
+        "body": "Assume: Peak 60,000 requests per second; One app server handles about 2,000 requests per second at a safe 60–70% CPU (measure this in a load test); Each server is 99.9% available on its own.",
+        "teaches": [
+          "vertical",
+          "lb"
+        ],
+        "steps": [
+          "Servers needed for load = 60,000 ÷ 2,000 = 30.",
+          "Add headroom to survive losing one availability zone of three: 30 ÷ (2/3) = 45 servers.",
+          "Availability of one server = 99.9%: about 8.8 hours of downtime a year (0.001 × 8,760 h).",
+          "With two independent servers behind a load balancer, both are down at once with probability 0.001² = 10^-6, so the app tier is about 99.9999% available, ignoring the load balancer and correlated failures."
+        ],
+        "note": "About 30 servers for raw load and about 45 to stay up through a zone failure. Redundancy, not size, is what moves availability from 'three nines' towards 'six nines'; correlated failures and shared dependencies stop you getting the full benefit.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t3-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: in-memory sessions",
         "body": "Saying \"just add servers\" while keeping session state in server memory. Stateless first, then scale out.",
         "teaches": [
           "stateless"
@@ -790,7 +807,7 @@
         "id": "t4-c3",
         "kind": "diagram",
         "title": "A new HTTPS connection",
-        "body": "5 steps from “DNS lookup” to “Response”, via “TCP handshake (1 RTT)”.",
+        "body": "Before the first byte, a cold HTTPS request pays for a DNS lookup, a TCP handshake and a TLS handshake, each costing round trips.",
         "steps": [
           "DNS lookup",
           "TCP handshake (1 RTT)",
@@ -805,7 +822,7 @@
       {
         "id": "t4-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: ignoring round trips",
         "body": "Ignoring round trips. From Mumbai to a us-east server one RTT is roughly 200 ms, so a cold HTTPS connection spends about 400 ms before the first byte. Keep-alive, connection pooling and edge termination exist to avoid paying that on every request.",
         "teaches": [
           "rtt"
@@ -1011,7 +1028,7 @@
         "id": "t5-c3",
         "kind": "diagram",
         "title": "Opening a TCP connection",
-        "body": "5 steps from “Client sends SYN” to “Lost segment is retransmitted”, via “Server replies SYN-ACK”.",
+        "body": "TCP's three-way handshake opens the connection; sequence numbers then let the receiver spot gaps and the sender retransmit lost segments.",
         "steps": [
           "Client sends SYN",
           "Server replies SYN-ACK",
@@ -1035,7 +1052,7 @@
       {
         "id": "t5-c5",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: 'UDP is faster'",
         "body": "Saying UDP is “faster” and stopping there. It skips handshakes and waiting on retransmits, but if you need reliability you must rebuild it in the app, which is exactly what QUIC does.",
         "teaches": [
           "udp"
@@ -1262,7 +1279,7 @@
       {
         "id": "t6-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "How a name becomes an IP",
         "body": "Browsers ask a recursive resolver, which walks root → .in/.com TLD → authoritative server and caches by TTL. Low TTLs allow fast failover; high TTLs reduce lookups.",
         "accent": "Core idea",
         "teaches": [
@@ -1271,19 +1288,10 @@
         ]
       },
       {
-        "id": "t6-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "DNS maps names to IPs through a cached hierarchy: resolver → root → TLD → authoritative.",
-        "teaches": [
-          "resolution"
-        ]
-      },
-      {
         "id": "t6-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "6 steps from “Browser cache” to “IP”, via “Recursive resolver”.",
+        "title": "One DNS lookup, hop by hop",
+        "body": "A cache miss walks from the recursive resolver to the root, the TLD and the authoritative server; every answer is cached for its TTL.",
         "steps": [
           "Browser cache",
           "Recursive resolver",
@@ -1297,9 +1305,26 @@
         ]
       },
       {
+        "id": "t6-c2",
+        "kind": "text",
+        "title": "Worked example: how long does a TTL keep users on a dead region?",
+        "body": "Assume: A record TTL = 300 s (5 min); The region fails at 10:00:00; Resolver caches filled at random times before the failure.",
+        "teaches": [
+          "resolution"
+        ],
+        "steps": [
+          "A resolver that cached the record just before 10:00 keeps serving it until about 10:05.",
+          "On average a cached entry has half its TTL left: 300 ÷ 2 = 150 s, so the typical user is stuck for about 2.5 minutes.",
+          "Worst case is the full 300 s, plus any client or resolver that ignores the TTL.",
+          "With a 24-hour TTL (86,400 s), the average stuck time would be 43,200 s = 12 hours."
+        ],
+        "note": "A 5-minute TTL means roughly 2.5 minutes of average impact and up to 5 minutes (plus stragglers); a 24-hour TTL means up to a day. Choose the TTL from how fast you must move traffic.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t6-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: long TTLs slow failover",
         "body": "Forgetting that DNS caching delays failover. A 24 h TTL means some users hit the dead region for a day.",
         "teaches": [
           "ttl"
@@ -1542,7 +1567,7 @@
         "id": "t7-c2",
         "kind": "diagram",
         "title": "The handshake",
-        "body": "5 steps from “Client hello (supported ciphers, key share)” to “Encrypted HTTP flows”, via “Server hello + certificate”.",
+        "body": "In TLS 1.3 the client and server exchange key shares in one round trip, the client checks the certificate chain, and both sides derive the session keys.",
         "steps": [
           "Client hello (supported ciphers, key share)",
           "Server hello + certificate",
@@ -1566,7 +1591,7 @@
       {
         "id": "t7-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: 'HTTPS makes it secure'",
         "body": "Saying HTTPS makes an API secure. It protects data in transit only. You still need authentication, authorization, input validation and rate limiting.",
         "teaches": [
           "https-limits"
@@ -1763,7 +1788,7 @@
       {
         "id": "t8-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Resources, verbs and status codes",
         "body": "GET /orders/42, POST /orders, PATCH /orders/42. Use 2xx/4xx/5xx correctly, cursor pagination for large lists, and versioning (/v1). PUT and DELETE are idempotent; POST is not by default.",
         "accent": "Core idea",
         "teaches": [
@@ -1774,19 +1799,10 @@
         ]
       },
       {
-        "id": "t8-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Resources as nouns, HTTP verbs as actions, proper status codes, pagination and idempotency.",
-        "teaches": [
-          "verbs"
-        ]
-      },
-      {
         "id": "t8-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Client” to “201 Created + Location”, via “POST /v1/orders”.",
+        "title": "Creating an order over REST",
+        "body": "A POST is validated, creates the resource, and answers 201 with a Location header pointing at the new order.",
         "steps": [
           "Client",
           "POST /v1/orders",
@@ -1799,9 +1815,26 @@
         ]
       },
       {
+        "id": "t8-c2",
+        "kind": "text",
+        "title": "Worked example: why offset pagination hurts on a large table",
+        "body": "Assume: Orders table with an index on created_at; Page size 20; User scrolls to page 5,000.",
+        "teaches": [
+          "verbs"
+        ],
+        "steps": [
+          "Offset query: OFFSET 99,980 LIMIT 20, because 4,999 pages × 20 = 99,980 rows to skip.",
+          "The database walks about 100,000 index entries and discards all but 20.",
+          "Cursor query: WHERE created_at < :last_seen ORDER BY created_at DESC LIMIT 20 seeks straight to the position and reads about 20 entries.",
+          "Work ratio ≈ 100,000 ÷ 20 = 5,000 times more rows touched for the offset version on that page."
+        ],
+        "note": "At deep pages offset pagination does thousands of times more work than a cursor, and it gets worse as users scroll. Use cursors for feeds and long lists.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t8-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: verbs in URLs, 200 for errors",
         "body": "Using verbs in URLs (/getOrder) and returning 200 with an error body. Status codes are part of the contract.",
         "teaches": [
           "verbs",
@@ -1994,7 +2027,7 @@
       {
         "id": "t9-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "GraphQL for clients, gRPC between services",
         "body": "GraphQL fits varied frontends that need different shapes from one endpoint. gRPC fits service-to-service calls: binary, schema-first, streaming, low latency.",
         "accent": "Core idea",
         "teaches": [
@@ -2004,20 +2037,10 @@
         ]
       },
       {
-        "id": "t9-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "GraphQL lets clients pick fields; gRPC gives fast typed RPC over HTTP/2 with protobuf.",
-        "teaches": [
-          "graphql-fit",
-          "grpc-fit"
-        ]
-      },
-      {
         "id": "t9-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Client query” to “Shaped response”, via “GraphQL gateway”.",
+        "title": "One GraphQL query fanning out to gRPC",
+        "body": "The gateway parses the query, resolvers call services over gRPC, and the response is shaped to exactly the fields asked for.",
         "steps": [
           "Client query",
           "GraphQL gateway",
@@ -2030,9 +2053,27 @@
         ]
       },
       {
+        "id": "t9-c2",
+        "kind": "text",
+        "title": "Worked example: the cost of N+1 on a home screen",
+        "body": "Assume: Home screen shows 50 orders, each with its restaurant; Each database round trip takes 2 ms inside the data centre; Resolvers run one after another.",
+        "teaches": [
+          "graphql-fit",
+          "grpc-fit"
+        ],
+        "steps": [
+          "Naive: 1 query for orders + 50 queries for restaurants = 51 round trips.",
+          "Time ≈ 51 × 2 ms = 102 ms of database waiting per request.",
+          "Batched with a DataLoader: 1 query for orders + 1 IN query for 50 restaurants = 2 round trips ≈ 4 ms.",
+          "At 1,000 requests/s, naive = 51,000 queries/s versus 2,000 queries/s batched."
+        ],
+        "note": "Batching cuts this screen from 51 queries to 2 and the database load by about 25×. Always mention DataLoader-style batching when you propose GraphQL.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t9-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: unbounded nested queries",
         "body": "Using GraphQL without query cost limits — one nested query can fan out into thousands of DB calls (N+1).",
         "teaches": [
           "n-plus-one"
@@ -2237,7 +2278,7 @@
       {
         "id": "t10-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Polling, SSE or WebSockets",
         "body": "Short polling wastes requests. Long polling holds a request open. SSE streams server→client over HTTP. WebSockets keep a full-duplex connection — needed for chat and live location.",
         "accent": "Core idea",
         "teaches": [
@@ -2247,20 +2288,10 @@
         ]
       },
       {
-        "id": "t10-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Real-time options: polling, long polling, server-sent events (one-way), WebSockets (two-way).",
-        "teaches": [
-          "sse",
-          "websocket"
-        ]
-      },
-      {
         "id": "t10-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Client opens WS” to “Push to client”, via “Gateway holds socket”.",
+        "title": "Pushing an event to a connected user",
+        "body": "The gateway holding the user's socket subscribes to their channel, so a published event is routed to that gateway and pushed down the socket.",
         "steps": [
           "Client opens WS",
           "Gateway holds socket",
@@ -2273,9 +2304,27 @@
         ]
       },
       {
+        "id": "t10-c2",
+        "kind": "text",
+        "title": "Worked example: polling versus pushing for 1 million live users",
+        "body": "Assume: 1 million users with the screen open; Short polling every 5 seconds; About 1 real update per user per minute; A tuned WebSocket gateway holds about 100,000 idle connections (often more; measure it).",
+        "teaches": [
+          "sse",
+          "websocket"
+        ],
+        "steps": [
+          "Polling load = 1,000,000 ÷ 5 = 200,000 requests per second.",
+          "Useful updates = 1,000,000 ÷ 60 ≈ 16,700 per second, so about 92% of polls return nothing.",
+          "With WebSockets, gateways needed for connections = 1,000,000 ÷ 100,000 = 10, plus headroom, say 15.",
+          "Messages pushed ≈ 16,700 per second, sent only when something changes."
+        ],
+        "note": "Polling every 5 s costs about 200K requests/s, mostly empty, while pushing costs about 15 gateway servers and about 17K messages/s. At this scale, push wins.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t10-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: ignoring connection state",
         "body": "Ignoring connection state at scale: millions of sockets need dedicated gateway servers and a pub/sub to route messages to the right one.",
         "teaches": [
           "connection-state"
@@ -2502,7 +2551,7 @@
       {
         "id": "t11-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Matching the algorithm to the traffic",
         "body": "Round robin is simple for uniform requests. Least connections suits uneven request lengths. Weighted handles mixed hardware. Hashing (IP or key) gives affinity for caches.",
         "accent": "Core idea",
         "teaches": [
@@ -2513,20 +2562,10 @@
         ]
       },
       {
-        "id": "t11-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Round robin, least connections, weighted, and consistent hashing — pick by workload shape.",
-        "teaches": [
-          "round-robin",
-          "hashing"
-        ]
-      },
-      {
         "id": "t11-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Request” to “Update counters”, via “Algorithm”.",
+        "title": "Picking a server for each request",
+        "body": "The balancer applies its algorithm to the healthy pool, forwards the request and updates its counters (connections, weights) for the next pick.",
         "steps": [
           "Request",
           "Algorithm",
@@ -2539,9 +2578,27 @@
         ]
       },
       {
+        "id": "t11-c2",
+        "kind": "text",
+        "title": "Worked example: how many keys move when you add a server?",
+        "body": "Assume: 10 cache servers, growing to 11; Keys spread uniformly.",
+        "teaches": [
+          "round-robin",
+          "hashing"
+        ],
+        "steps": [
+          "Modulo hashing: a key stays put only if hash mod 10 equals hash mod 11, which is true for about 1 key in 11.",
+          "So about 10 ÷ 11 ≈ 91% of keys move to a different server, and the cache hit rate collapses.",
+          "Consistent hashing: the new server takes over only its share of the ring, about 1 ÷ 11 ≈ 9% of keys.",
+          "With 1 billion cached keys, that is about 910 million keys moving versus about 91 million."
+        ],
+        "note": "Adding one server to ten moves about 91% of keys with modulo hashing but only about 9% with consistent hashing. That is why caches and partitions use consistent hashing.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t11-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: round robin on uneven requests",
         "body": "Using round robin when request durations vary wildly; slow servers accumulate a backlog.",
         "teaches": [
           "least-conn"
@@ -2760,7 +2817,7 @@
       {
         "id": "t12-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "What L4 and L7 can see",
         "body": "L4 forwards TCP/UDP connections without reading payloads. L7 terminates HTTP, so it can route /api vs /static, do header-based canary routing and TLS termination.",
         "accent": "Core idea",
         "teaches": [
@@ -2769,20 +2826,10 @@
         ]
       },
       {
-        "id": "t12-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "L4 routes by IP/port (fast, protocol-agnostic); L7 routes by HTTP content (paths, headers, cookies).",
-        "teaches": [
-          "l4",
-          "l7"
-        ]
-      },
-      {
         "id": "t12-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Packet arrives” to “Forward to pool”, via “L4: inspect IP/port”.",
+        "title": "Routing a request at L4 and L7",
+        "body": "L4 decides from IP and port alone; L7 terminates TLS, parses HTTP and matches a path or header rule before forwarding to a pool.",
         "steps": [
           "Packet arrives",
           "L4: inspect IP/port",
@@ -2795,9 +2842,27 @@
         ]
       },
       {
+        "id": "t12-c2",
+        "kind": "text",
+        "title": "Worked example: how many requests fail before a dead server is removed?",
+        "body": "Assume: 10 backends sharing 1,000 requests per second evenly; Health check every 5 s; 3 consecutive failures mark a backend unhealthy; No retries at the balancer.",
+        "teaches": [
+          "l4",
+          "l7"
+        ],
+        "steps": [
+          "Each backend gets 1,000 ÷ 10 = 100 requests per second.",
+          "Detection takes up to 3 checks × 5 s = 15 s.",
+          "Failed requests ≈ 100 × 15 = 1,500 in that window.",
+          "With a 2 s interval and 2 failures to trip: 2 × 2 = 4 s, so about 100 × 4 = 400 failures; with passive health checks (eject after a few real errors) it can be under a second."
+        ],
+        "note": "Aggressive health checks plus passive outlier detection and safe retries cut the damage from about 1,500 failed requests to a few hundred or fewer.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t12-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: the wrong layer for the job",
         "body": "Choosing L4 when you need path-based routing, or L7 for non-HTTP protocols.",
         "teaches": [
           "l4",
@@ -3019,7 +3084,7 @@
       {
         "id": "t13-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Client-side vs server-side proxies",
         "body": "Nginx/Envoy as a reverse proxy hides backends, terminates TLS, compresses and caches. A forward proxy (corporate) sits in front of clients to filter or anonymise outbound traffic.",
         "accent": "Core idea",
         "teaches": [
@@ -3028,20 +3093,10 @@
         ]
       },
       {
-        "id": "t13-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "A reverse proxy fronts servers (TLS, caching, compression); a forward proxy fronts clients.",
-        "teaches": [
-          "reverse",
-          "forward"
-        ]
-      },
-      {
         "id": "t13-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Client” to “Response”, via “Reverse proxy”.",
+        "title": "A request through a reverse proxy",
+        "body": "The proxy terminates TLS, serves cached or compressed responses itself and forwards only the rest to the upstream app.",
         "steps": [
           "Client",
           "Reverse proxy",
@@ -3054,9 +3109,27 @@
         ]
       },
       {
+        "id": "t13-c2",
+        "kind": "text",
+        "title": "Worked example: what a caching reverse proxy saves the origin",
+        "body": "Assume: 20,000 requests per second for product pages at peak; 80% of them are cacheable for 60 s at the proxy; Each origin render costs about 20 ms of CPU.",
+        "teaches": [
+          "reverse",
+          "forward"
+        ],
+        "steps": [
+          "Requests served from the proxy cache = 20,000 × 0.8 = 16,000 per second.",
+          "Requests reaching the origin = 20,000 − 16,000 = 4,000 per second.",
+          "Origin CPU needed = 4,000 × 0.02 s = 80 CPU-seconds per second, about 80 cores, versus 20,000 × 0.02 = 400 cores without the cache.",
+          "That is a 5× reduction in origin capacity."
+        ],
+        "note": "An 80% cache hit rate at the reverse proxy cuts origin load by 5× (from about 400 cores to about 80).",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t13-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: mixing up forward and reverse",
         "body": "Mixing up the two. Reverse = server side; forward = client side.",
         "teaches": [
           "reverse",
@@ -3306,7 +3379,7 @@
         "id": "t14-c4",
         "kind": "diagram",
         "title": "A request with external sessions",
-        "body": "5 steps from “Client sends a cookie with the session id” to “Changes are written back to Redis”, via “Balancer picks any healthy instance”.",
+        "body": "Because the session lives in Redis, the balancer can send each request to any healthy instance and the cart is still there.",
         "steps": [
           "Client sends a cookie with the session id",
           "Balancer picks any healthy instance",
@@ -3322,7 +3395,7 @@
       {
         "id": "t14-c5",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: carts in server memory",
         "body": "Keeping a shopping cart in server memory and then scaling out. Users bounce between instances and their carts vanish. Move the cart to a shared store first.",
         "teaches": [
           "stateless"
@@ -3549,7 +3622,7 @@
       {
         "id": "t15-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Why caching works: skewed reads",
         "body": "Reads often follow a power law: a small set of keys gets most traffic. Serving them from memory (Redis, local LRU) drops latency from ms to µs and shields the DB.",
         "accent": "Core idea",
         "teaches": [
@@ -3558,36 +3631,42 @@
         ]
       },
       {
-        "id": "t15-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Caches keep hot data in fast storage to cut latency and offload databases.",
-        "teaches": [
-          "hit-rate"
-        ]
-      },
-      {
         "id": "t15-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "7 steps from “Request” to “Populate cache”, via “Check cache”.",
+        "title": "A cache-aside read",
+        "body": "Check the cache; on a hit return it, on a miss read the database and populate the cache so the next read hits.",
         "steps": [
-          "Request",
-          "Check cache",
-          "Hit",
-          "return",
-          "Miss",
-          "DB",
-          "Populate cache"
+          "Request arrives",
+          "Check the cache",
+          "Hit: return the value",
+          "Miss: read the database",
+          "Populate the cache with a TTL"
         ],
         "teaches": [
           "cache-flow"
         ]
       },
       {
+        "id": "t15-c2",
+        "kind": "text",
+        "title": "Worked example: why the last few percent of hit rate matter",
+        "body": "Assume: Cache hit costs 1 ms, database read costs 10 ms; 100,000 reads per second.",
+        "teaches": [
+          "hit-rate"
+        ],
+        "steps": [
+          "Average latency = hit rate × 1 ms + miss rate × 10 ms.",
+          "At 90% hits: 0.9 of reads cost 1 ms and 0.1 cost 10 ms, so 0.9 + 1.0 ≈ 1.9 ms on average; database reads = 100,000 × 0.1 = 10,000 per second.",
+          "At 99% hits: 0.99 + 0.1 ≈ 1.09 ms on average; database reads = 100,000 × 0.01 = 1,000 per second.",
+          "Going from 90% to 99% cuts database load 10×, even though the hit rate only rose 9 points."
+        ],
+        "note": "Database load is driven by the miss rate: 10% misses means 10,000 DB reads/s, 1% means 1,000. Quote miss rate, not just hit rate, when sizing the database.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t15-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: caching everything",
         "body": "Caching everything blindly. Cache data that is read-heavy and tolerant of brief staleness.",
         "teaches": [
           "what-to-cache"
@@ -3777,7 +3856,7 @@
       {
         "id": "t16-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Cache-aside, write-through, write-behind",
         "body": "Cache-aside: app reads cache, on miss reads DB and sets cache. Write-through: write cache and DB synchronously (fresh, slower writes). Write-behind: write cache, flush DB later (fast, risk of loss).",
         "accent": "Core idea",
         "teaches": [
@@ -3787,21 +3866,10 @@
         ]
       },
       {
-        "id": "t16-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Cache-aside loads on miss; write-through writes both; write-behind writes cache then DB asynchronously.",
-        "teaches": [
-          "cache-aside",
-          "write-through",
-          "write-behind"
-        ]
-      },
-      {
         "id": "t16-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Read cache” to “Return”, via “Miss”.",
+        "title": "The cache-aside read path",
+        "body": "On a miss the app reads the database, writes the value to the cache with a TTL and returns it; writes go to the database and invalidate the key.",
         "steps": [
           "Read cache",
           "Miss",
@@ -3814,9 +3882,28 @@
         ]
       },
       {
+        "id": "t16-c2",
+        "kind": "text",
+        "title": "Worked example: what write-behind buys and risks for a like counter",
+        "body": "Assume: 20,000 likes per second at peak; Flush to the database every 5 seconds, batched per post; On average a hot post receives many likes per window, so each batch row covers many likes.",
+        "teaches": [
+          "cache-aside",
+          "write-through",
+          "write-behind"
+        ],
+        "steps": [
+          "Direct writes: 20,000 database updates per second.",
+          "With write-behind, each flush writes one row per post touched; if 2,000 distinct posts are liked per 5-second window, that is 2,000 updates per flush ÷ 5 s = 400 updates per second.",
+          "Write reduction ≈ 20,000 ÷ 400 = 50×.",
+          "Risk: if the cache node dies just before a flush, up to 5 s × 20,000 = 100,000 likes are lost."
+        ],
+        "note": "Write-behind turns about 20,000 writes/s into about 400, at the risk of losing up to about 100,000 likes in a crash. Fine for likes, never for payments.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t16-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: write-behind for money",
         "body": "Using write-behind for payments. Losing buffered writes on a crash is unacceptable for money.",
         "teaches": [
           "write-behind"
@@ -4038,7 +4125,7 @@
       {
         "id": "t17-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "LRU, LFU and TTL",
         "body": "LRU evicts least recently used — good default. LFU keeps frequently used items — good for stable hot sets. TTL expires data by age regardless of use.",
         "accent": "Core idea",
         "teaches": [
@@ -4048,22 +4135,10 @@
         ]
       },
       {
-        "id": "t17-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "When memory is full: LRU, LFU, FIFO or TTL decide what to drop.",
-        "teaches": [
-          "lru",
-          "lfu",
-          "fifo",
-          "ttl"
-        ]
-      },
-      {
         "id": "t17-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Cache full” to “Insert new key”, via “New key arrives”.",
+        "title": "What happens when the cache is full",
+        "body": "A new key arrives, the policy picks a victim (least recent, least frequent or expired), the victim is evicted and the new key inserted.",
         "steps": [
           "Cache full",
           "New key arrives",
@@ -4076,9 +4151,29 @@
         ]
       },
       {
+        "id": "t17-c2",
+        "kind": "text",
+        "title": "Worked example: how big must the cache be for a 90% hit rate?",
+        "body": "Assume: 10 million products, about 2 KB of cached data each; Popularity is heavily skewed: about 20% of products receive about 90% of views (an illustrative skew; measure yours).",
+        "teaches": [
+          "lru",
+          "lfu",
+          "fifo",
+          "ttl"
+        ],
+        "steps": [
+          "Hot set = 10,000,000 × 0.2 = 2,000,000 products.",
+          "Memory for the hot set = 2,000,000 × 2 KB ≈ 4 GB.",
+          "Caching everything would need 10,000,000 × 2 KB ≈ 20 GB.",
+          "With LRU or LFU and about 4–5 GB, the cache holds the hot set and reaches roughly 90% hits; the last 10% of hits would cost the other 16 GB."
+        ],
+        "note": "About 4 GB buys roughly 90% hits under this skew; going further costs memory much faster than it adds hits. Size the cache for the hot set, then let the eviction policy keep it hot.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t17-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: no TTLs at all",
         "body": "Never setting TTLs, so stale entries live forever after the source changes.",
         "teaches": [
           "ttl"
@@ -4275,7 +4370,7 @@
       {
         "id": "t18-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Stampede, penetration, avalanche",
         "body": "Stampede: a popular key expires and thousands of requests hit the DB. Fix with request coalescing (single flight), locks, early refresh, and TTL jitter. Hot keys: replicate or add local caches.",
         "accent": "Core idea",
         "teaches": [
@@ -4284,19 +4379,10 @@
         ]
       },
       {
-        "id": "t18-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Protect against many simultaneous misses and single overloaded keys.",
-        "teaches": [
-          "stampede"
-        ]
-      },
-      {
         "id": "t18-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Hot key expires” to “All waiters served”, via “Many misses”.",
+        "title": "Surviving a hot key expiring",
+        "body": "Single-flight lets one request rebuild the value while the others wait for it, so the database sees one read instead of thousands.",
         "steps": [
           "Hot key expires",
           "Many misses",
@@ -4309,9 +4395,26 @@
         ]
       },
       {
+        "id": "t18-c2",
+        "kind": "text",
+        "title": "Worked example: a stampede on one hot key",
+        "body": "Assume: A trending-deals key is read 50,000 times per second; Rebuilding it takes 200 ms of database queries; The key expires with no protection.",
+        "teaches": [
+          "stampede"
+        ],
+        "steps": [
+          "Requests arriving during the 200 ms rebuild window = 50,000 × 0.2 = 10,000.",
+          "Without coalescing, up to 10,000 identical rebuild queries hit the database at once.",
+          "With single-flight, 1 request rebuilds and the other 9,999 wait or get the stale value.",
+          "Database queries per expiry fall from about 10,000 to 1."
+        ],
+        "note": "One unprotected hot key can send about 10,000 identical queries to the database in 200 ms; coalescing makes it one.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t18-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: identical TTLs",
         "body": "Setting identical TTLs on a million keys, so they all expire together.",
         "teaches": [
           "avalanche"
@@ -4540,7 +4643,7 @@
       {
         "id": "t19-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Edge caching and invalidation",
         "body": "Edge PoPs cache assets with TTLs; misses go to origin. Use cache keys, versioned URLs for invalidation, and signed URLs for private media.",
         "accent": "Core idea",
         "teaches": [
@@ -4550,35 +4653,42 @@
         ]
       },
       {
-        "id": "t19-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "CDNs cache static and media content close to users, cutting latency and origin load.",
-        "teaches": [
-          "edge"
-        ]
-      },
-      {
         "id": "t19-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "6 steps from “User in Pune” to “Store at edge”, via “Nearest PoP”.",
+        "title": "A user in Pune fetching an asset",
+        "body": "The nearest PoP serves a cached copy; on a miss it fetches from the origin, stores the object at the edge and serves it.",
         "steps": [
           "User in Pune",
           "Nearest PoP",
-          "Cache hit? serve",
-          "Miss",
-          "origin",
-          "Store at edge"
+          "Hit: serve from the edge",
+          "Miss: fetch from the origin",
+          "Store at the edge for its TTL"
         ],
         "teaches": [
           "edge"
         ]
       },
       {
+        "id": "t19-c2",
+        "kind": "text",
+        "title": "Worked example: egress for a live stream with and without a CDN",
+        "body": "Assume: 10 million concurrent viewers; Average bitrate 2 Mbit/s (a mix of mobile qualities); Video split into 6-second segments; each edge fetches each segment from the shield once; 500 edge locations.",
+        "teaches": [
+          "edge"
+        ],
+        "steps": [
+          "Total delivery bandwidth = 10,000,000 × 2 Mbit/s = 20,000,000 Mbit/s = 20 Tbit/s, all served by CDN edges.",
+          "Without a CDN, the origin itself would have to push about 20 Tbit/s.",
+          "With a CDN, each edge fetches each segment about once per rendition, so the origin or shield serves roughly 500 edges × a handful of renditions per segment.",
+          "Origin egress ≈ 500 × 2 Mbit/s × 5 renditions = 5,000 Mbit/s = 5 Gbit/s, about 4,000× less than 20 Tbit/s."
+        ],
+        "note": "The CDN carries about 20 Tbit/s at the edges while the origin sends a few Gbit/s. Live streaming at this scale is only possible because each edge fetches each segment once.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t19-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: purging everything on deploy",
         "body": "Purging the whole CDN on every deploy. Use content-hashed filenames so new versions get new URLs.",
         "teaches": [
           "versioned-urls"
@@ -4763,7 +4873,7 @@
       {
         "id": "t20-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Redis data structures and scaling",
         "body": "Redis offers data structures (sorted sets, hashes), persistence, replication and cluster sharding. Memcached is simple, multithreaded key-value. Clients shard keys with consistent hashing.",
         "accent": "Core idea",
         "teaches": [
@@ -4773,19 +4883,10 @@
         ]
       },
       {
-        "id": "t20-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Shared in-memory caches scale out across nodes using sharding and replication.",
-        "teaches": [
-          "redis-cluster"
-        ]
-      },
-      {
         "id": "t20-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “App” to “Async replica”, via “Hash key”.",
+        "title": "A write in Redis Cluster",
+        "body": "The client hashes the key to a slot, sends the write to that slot's primary, and the primary replicates to its replica asynchronously.",
         "steps": [
           "App",
           "Hash key",
@@ -4798,9 +4899,26 @@
         ]
       },
       {
+        "id": "t20-c2",
+        "kind": "text",
+        "title": "Worked example: a live leaderboard for a quiz show",
+        "body": "Assume: 5 million players in one sorted set; About 100 bytes per entry including member ID and skiplist plus hash overhead (an estimate; check with MEMORY USAGE); 200,000 score updates per second at peak.",
+        "teaches": [
+          "redis-cluster"
+        ],
+        "steps": [
+          "Memory = 5,000,000 × 100 bytes = 500,000,000 bytes ≈ 500 MB, which fits easily on one node.",
+          "ZADD and ZRANK are O(log N); log2 of 5 million is about 22, so each operation is a few dozen steps.",
+          "200,000 updates per second is above what one node handles comfortably, so split players into shards (for example 4 sorted sets by player ID), giving 50,000 updates per second per shard.",
+          "Global top 10 = take the top 10 from each of the 4 shards (40 entries) and merge them."
+        ],
+        "note": "About 500 MB of memory and O(log N) updates: sorted sets make a 5-million-player leaderboard cheap. Shard by player and merge the per-shard top 10s for the global top 10.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t20-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: one node, no replica",
         "body": "Using a single Redis node for critical data with no replica — one restart wipes the hot set and floods the DB.",
         "teaches": [
           "redis-replica"

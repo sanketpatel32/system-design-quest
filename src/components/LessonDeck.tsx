@@ -93,6 +93,12 @@ export function LessonDeck({
             ))}
           </ol>
         )}
+        {card.note && (
+          <p className="mt-4 rounded-2xl bg-[#f3f9ec] p-4 leading-relaxed text-chalk font-semibold" data-testid="card-note">
+            <span className="font-extrabold">Result. </span>
+            {card.note}
+          </p>
+        )}
         {card.diagram && (
           <div className="mt-4 rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 overflow-x-auto" dangerouslySetInnerHTML={{ __html: lightDiagram(card.diagram) }} />
         )}

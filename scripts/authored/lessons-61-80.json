@@ -16,7 +16,7 @@
       {
         "id": "t61-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Blobs in a bucket, metadata in a DB",
         "body": "Object stores are durable (11 nines), cheap and scale infinitely. Clients upload directly with pre-signed URLs; metadata goes to a DB; processing runs async.",
         "accent": "Core idea",
         "teaches": [
@@ -25,19 +25,10 @@
         ]
       },
       {
-        "id": "t61-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Store blobs in S3-like object stores; upload via pre-signed URLs; serve via CDN.",
-        "teaches": [
-          "presigned"
-        ]
-      },
-      {
         "id": "t61-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “Client asks for upload URL” to “CDN serves”, via “Pre-signed URL”.",
+        "title": "A presigned upload",
+        "body": "The app hands the client a presigned URL, the client uploads straight to the bucket, an event triggers processing, and the CDN serves the result.",
         "steps": [
           "Client asks for upload URL",
           "Pre-signed URL",
@@ -50,9 +41,26 @@
         ]
       },
       {
+        "id": "t61-c2",
+        "kind": "text",
+        "title": "Worked example: bandwidth saved by presigned uploads",
+        "body": "Assume: 100,000 photo uploads per hour at 3 MB each.",
+        "teaches": [
+          "presigned"
+        ],
+        "steps": [
+          "Data per hour = 100,000 × 3 MB = 300,000 MB, which is 300 GB.",
+          "Per second = 300,000 MB ÷ 3,600 ≈ 83 MB per second, about 667 Mbit per second.",
+          "Proxying through app servers would add that much inbound and outbound traffic and tie up connections for each slow mobile upload.",
+          "With presigned URLs the app servers handle only small JSON requests."
+        ],
+        "note": "Presigned direct uploads keep about 667 Mbit per second of photo traffic off the app servers.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t61-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: images as database BLOBs",
         "body": "Storing images as BLOBs in the relational DB.",
         "teaches": [
           "blob-trap"
@@ -258,7 +266,7 @@
         "id": "t62-c3",
         "kind": "diagram",
         "title": "Reading a file",
-        "body": "4 steps from “Client asks NameNode for block locations” to “NameNode never touches the data”, via “NameNode returns DataNodes per block”.",
+        "body": "The client gets block locations from the NameNode, then streams the data straight from DataNodes; the NameNode never handles file bytes.",
         "steps": [
           "Client asks NameNode for block locations",
           "NameNode returns DataNodes per block",
@@ -272,7 +280,7 @@
       {
         "id": "t62-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: tiny files in HDFS",
         "body": "Using HDFS for millions of tiny files or low-latency lookups. Each file costs NameNode memory, and HDFS is built for large sequential scans, not serving user requests.",
         "teaches": [
           "hdfs-fit"
@@ -453,7 +461,7 @@
       {
         "id": "t63-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Inverted indexes and analysers",
         "body": "An inverted index maps terms → documents. Analysers tokenise, lowercase and stem. Keep the DB as source of truth and sync to the search cluster via CDC or events.",
         "accent": "Core idea",
         "teaches": [
@@ -463,35 +471,42 @@
         ]
       },
       {
-        "id": "t63-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "Full-text search uses inverted indexes (Elasticsearch/OpenSearch) built from the primary DB.",
-        "teaches": [
-          "inverted"
-        ]
-      },
-      {
         "id": "t63-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "6 steps from “Write to DB” to “ranked results”, via “CDC event”.",
+        "title": "Keeping search in sync with the database",
+        "body": "Writes land in the database, a change event feeds the indexer, and queries hit the search cluster for ranked results.",
         "steps": [
-          "Write to DB",
-          "CDC event",
-          "Indexer",
+          "Write to the database",
+          "Change event (CDC)",
+          "Indexer updates the index",
           "Search cluster",
-          "Query",
-          "ranked results"
+          "Query returns ranked results"
         ],
         "teaches": [
           "index-sync"
         ]
       },
       {
+        "id": "t63-c2",
+        "kind": "text",
+        "title": "Worked example: why a LIKE scan is slow",
+        "body": "Assume: 10,000,000 product rows, 200 bytes of searchable text each; Disk or memory scan at 1 GB per second.",
+        "teaches": [
+          "inverted"
+        ],
+        "steps": [
+          "Text to scan = 10,000,000 × 200 bytes = 2,000,000,000 bytes, about 2 GB.",
+          "At 1 GB per second that is about 2 seconds per query, with all CPU cores busy.",
+          "An inverted index looks up the postings for 'paneer' directly, typically in milliseconds.",
+          "At 100 searches per second, LIKE would need about 200 seconds of scanning every second, which is impossible."
+        ],
+        "note": "Substring scans grow with table size; an inverted index grows with the number of matching documents.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t63-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: LIKE '%term%' at scale",
         "body": "Using SQL LIKE \"%term%\" on millions of rows for search.",
         "teaches": [
           "like-scan"
@@ -700,7 +715,7 @@
         "id": "t64-c2",
         "kind": "diagram",
         "title": "Counting words",
-        "body": "5 steps from “Split input into chunks” to “Write the results”, via “Map: emit (word, 1)”.",
+        "body": "Map emits (word, 1) pairs, the shuffle groups pairs by word across machines, and reduce sums each group.",
         "steps": [
           "Split input into chunks",
           "Map: emit (word, 1)",
@@ -989,7 +1004,7 @@
         "id": "t65-c3",
         "kind": "diagram",
         "title": "Counting clicks per minute",
-        "body": "4 steps from “Clicks land in Kafka” to “Results written to a store for dashboards”, via “Processor groups by ad and 1-minute event-time window”.",
+        "body": "Clicks are grouped by ad into one-minute event-time windows, and the watermark decides when a window is complete enough to emit.",
         "steps": [
           "Clicks land in Kafka",
           "Processor groups by ad and 1-minute event-time window",
@@ -1003,7 +1018,7 @@
       {
         "id": "t65-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: in-order, exactly-once events",
         "body": "Assuming events arrive in order and exactly once. Mobile clients send late events and brokers redeliver, so use watermarks for lateness and idempotent or transactional sinks for duplicates.",
         "teaches": [
           "stream-dupes"
@@ -1200,7 +1215,7 @@
       {
         "id": "t66-c1",
         "kind": "text",
-        "title": "Key idea",
+        "title": "Row stores vs column stores",
         "body": "Row stores suit point reads/writes. Column stores (ClickHouse, BigQuery) compress columns and scan aggregates fast. Time-series DBs handle append-heavy metrics with downsampling.",
         "accent": "Core idea",
         "teaches": [
@@ -1209,19 +1224,10 @@
         ]
       },
       {
-        "id": "t66-c2",
-        "kind": "text",
-        "title": "The core idea",
-        "body": "OLTP serves transactions; OLAP column stores serve aggregates over huge datasets.",
-        "teaches": [
-          "oltp-olap"
-        ]
-      },
-      {
         "id": "t66-c3",
         "kind": "diagram",
-        "title": "How a request flows",
-        "body": "5 steps from “App writes OLTP” to “Dashboards”, via “CDC / ETL”.",
+        "title": "From OLTP writes to dashboards",
+        "body": "CDC or ETL copies changes from the transactional database into a columnar warehouse, where aggregations feed dashboards.",
         "steps": [
           "App writes OLTP",
           "CDC / ETL",
@@ -1234,9 +1240,26 @@
         ]
       },
       {
+        "id": "t66-c2",
+        "kind": "text",
+        "title": "Worked example: why columnar scans are cheaper",
+        "body": "Assume: 1,000,000,000 order rows, 40 columns of 8 bytes each; Query sums one column grouped by one other column.",
+        "teaches": [
+          "oltp-olap"
+        ],
+        "steps": [
+          "Row store reads every column: 1,000,000,000 × 320 bytes = 320,000,000,000 bytes, about 320 GB.",
+          "Column store reads 2 columns: 1,000,000,000 × 16 bytes = 16,000,000,000 bytes, about 16 GB.",
+          "With typical 5× compression on columnar data, that is about 3.2 GB.",
+          "So the same query reads roughly 100 times less data."
+        ],
+        "note": "Reading only the needed columns, compressed, is why warehouses scan billions of rows in seconds.",
+        "source": "deep-numbers"
+      },
+      {
         "id": "t66-c4",
         "kind": "text",
-        "title": "Watch out for",
+        "title": "Trap: analytics on the OLTP primary",
         "body": "Running heavy analytical queries on the production OLTP database.",
         "teaches": [
           "olap-on-oltp"
@@ -1455,7 +1478,7 @@
         "id": "t67-c3",
         "kind": "diagram",
         "title": "Finding restaurants within 2 km",
-        "body": "4 steps from “Get user’s geohash cell” to “Compute exact distance and sort”, via “Add the 8 neighbouring cells”.",
+        "body": "Look up the user's cell and its eight neighbours, fetch candidates from those cells, then compute exact distances and sort.",
         "steps": [
           "Get user’s geohash cell",
           "Add the 8 neighbouring cells",
@@ -1469,7 +1492,7 @@
       {
         "id": "t67-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: searching one cell",
         "body": "Searching only the user’s own cell. A restaurant 50 m away can sit across a cell boundary, so always include neighbouring cells.",
         "teaches": [
           "neighbours"
@@ -1712,7 +1735,7 @@
         "id": "t68-c3",
         "kind": "diagram",
         "title": "A metric’s life",
-        "body": "5 steps from “Agent emits cpu{host=web-12}” to “Raw data expires after retention”, via “Ingest appends to the current time block”.",
+        "body": "A sample is appended to the current block, compacted later, rolled up into coarser averages and finally deleted when retention ends.",
         "steps": [
           "Agent emits cpu{host=web-12}",
           "Ingest appends to the current time block",
@@ -1727,7 +1750,7 @@
       {
         "id": "t68-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: high-cardinality labels",
         "body": "Putting user IDs or request IDs in labels. Every unique label combination is a new series, so cardinality explodes and memory with it.",
         "teaches": [
           "cardinality"
@@ -1943,7 +1966,7 @@
         "id": "t69-c4",
         "kind": "diagram",
         "title": "A canary rollout",
-        "body": "5 steps from “Deploy v2 next to v1” to “Roll back if metrics worsen”, via “Route 1% of traffic to v2”.",
+        "body": "A canary sends a small share of traffic to the new version, compares its errors and latency with the old one, and widens or rolls back.",
         "steps": [
           "Deploy v2 next to v1",
           "Route 1% of traffic to v2",
@@ -1958,7 +1981,7 @@
       {
         "id": "t69-c5",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: irreversible schema changes",
         "body": "Shipping a schema change the old version cannot read, then rolling back. Make changes backward compatible: add the new column, switch code, remove the old column later.",
         "teaches": [
           "schema"
@@ -2179,7 +2202,7 @@
         "id": "t70-c3",
         "kind": "diagram",
         "title": "A rolling deploy",
-        "body": "5 steps from “New image pushed” to “One old pod is removed, repeat”, via “Deployment creates a new pod”.",
+        "body": "Kubernetes starts a new pod, waits for its readiness probe, sends it traffic and only then removes an old pod.",
         "steps": [
           "New image pushed",
           "Deployment creates a new pod",
@@ -2194,7 +2217,7 @@
       {
         "id": "t70-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: database checks in liveness",
         "body": "Using the liveness probe to check the database. If the DB blips, every pod fails liveness and gets restarted at once. Dependency checks belong in readiness, which only stops traffic.",
         "teaches": [
           "probes"
@@ -2417,7 +2440,7 @@
         "id": "t71-c3",
         "kind": "diagram",
         "title": "Paging a feed with cursors",
-        "body": "5 steps from “Client asks for the first 20” to “Repeat until there is no cursor”, via “Server returns items and next_cursor”.",
+        "body": "Each page returns a cursor that encodes the last item seen, and the next query seeks past it using the index instead of counting rows.",
         "steps": [
           "Client asks for the first 20",
           "Server returns items and next_cursor",
@@ -2441,7 +2464,7 @@
       {
         "id": "t71-c5",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: OFFSET for infinite feeds",
         "body": "Using OFFSET for an infinite feed. Deep pages get slower and new posts push items onto the next page, so users see duplicates.",
         "teaches": [
           "offset"
@@ -2686,7 +2709,7 @@
         "id": "t72-c3",
         "kind": "diagram",
         "title": "Optimistic update",
-        "body": "4 steps from “Read row with version 7” to “0 rows updated: someone else won, re-read and retry”, via “Compute new value”.",
+        "body": "The update only succeeds if the version is unchanged; zero rows updated means another writer won, so re-read and retry.",
         "steps": [
           "Read row with version 7",
           "Compute new value",
@@ -2700,7 +2723,7 @@
       {
         "id": "t72-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: locks around external calls",
         "body": "Holding a pessimistic lock while calling an external payment API. The lock lives for seconds and everything else queues behind it. Keep lock scopes short.",
         "teaches": [
           "lock-scope"
@@ -2941,7 +2964,7 @@
         "id": "t73-c3",
         "kind": "diagram",
         "title": "Two users insert at once",
-        "body": "4 steps from “A inserts “X” at position 5” to “Both copies converge”, via “B deletes position 2”.",
+        "body": "The server shifts A's insert position to account for B's delete, so both users end up with the same document.",
         "steps": [
           "A inserts “X” at position 5",
           "B deletes position 2",
@@ -2955,7 +2978,7 @@
       {
         "id": "t73-c4",
         "kind": "text",
-        "title": "Common trap",
+        "title": "Trap: last-write-wins on documents",
         "body": "Using last-write-wins on whole documents. One user’s entire edit disappears. Merge at the operation or character level.",
         "teaches": [
           "lww-docs"
