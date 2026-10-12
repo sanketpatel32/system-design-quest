@@ -153,20 +153,53 @@ export function InterviewPage() {
       )}
 
       {startedAt && !finished && (
-        <div className="grid sm:grid-cols-3 gap-3 text-sm">
-          <div className="rounded-lg border border-cyan-500/30 p-3" data-testid="interview-overall-timer">Overall: {fmt(overallLeft)}</div>
-          <div className="rounded-lg border border-violet-500/30 p-3">Stage {stageIndex + 1}: {STAGE_LABELS[stageIndex]} ({INTERVIEW_STAGE_MINUTES[stageIndex]}m) — {fmt(stageLeft)}</div>
-          <div className="rounded-lg border border-slate-600 p-3">Prompt: {boss?.boss?.apiPrompt ?? 'Clarify users, scale, and constraints.'}</div>
-        </div>
+        <section className="panel p-5 space-y-4" aria-label="Interview clock">
+          <div className="flex flex-wrap items-end gap-x-10 gap-y-3">
+            <div>
+              <p className="text-xs text-dim">Time left overall</p>
+              <p className="font-display text-5xl font-extrabold tabular-nums text-chalk leading-none mt-1" data-testid="interview-overall-timer">
+                {fmt(overallLeft)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-dim">
+                Stage {stageIndex + 1} of {STAGE_LABELS.length} · {STAGE_LABELS[stageIndex]}
+              </p>
+              <p
+                className={`font-display text-3xl font-bold tabular-nums leading-none mt-1 ${stageLeft < 60_000 ? 'text-[var(--color-fault)]' : 'text-[var(--color-amber)]'}`}
+                aria-live={stageLeft < 60_000 ? 'polite' : 'off'}
+              >
+                {fmt(stageLeft)}
+              </p>
+            </div>
+          </div>
+          <ol className="flex gap-1" aria-label="Stages">
+            {STAGE_LABELS.map((label, i) => (
+              <li key={label} className="flex-1" style={{ flexGrow: INTERVIEW_STAGE_MINUTES[i] }} aria-current={i === stageIndex ? 'step' : undefined}>
+                <div
+                  className="h-1.5 rounded-full"
+                  style={{ background: i < stageIndex ? 'var(--color-clear)' : i === stageIndex ? 'var(--color-amber)' : 'var(--color-rail)' }}
+                />
+                <p className={`mt-1 text-[11px] truncate ${i === stageIndex ? 'text-chalk' : 'text-dim'}`}>{label}</p>
+              </li>
+            ))}
+          </ol>
+          <p className="text-sm text-[#d6d0c2] border-t border-[var(--color-rail)] pt-3">
+            <span className="text-chalk font-semibold">Prompt: </span>
+            {boss?.boss?.apiPrompt ?? 'Clarify users, scale, and constraints.'}
+          </p>
+        </section>
       )}
 
       {startedAt && !finished && (
         <>
+          <label htmlFor="mock-notes" className="block text-sm font-semibold text-chalk -mb-2">Your notes</label>
           <textarea
-            className="w-full min-h-[120px] bg-slate-900 border border-slate-700 rounded p-3"
+            id="mock-notes"
+            className="field w-full min-h-[140px] text-[15px] leading-relaxed"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Interview notes…"
+            placeholder="Requirements, numbers, API sketch… saved as you type."
           />
           <BossCanvas initial={canvas} onChange={setCanvas} />
         </>
