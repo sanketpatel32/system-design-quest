@@ -5,7 +5,6 @@ import { LessonDeck } from '../components/LessonDeck'
 import { DeepLessonView } from '../components/DeepLessonView'
 import { BossDeepView } from '../components/BossDeepView'
 import { regionPalette, transitLineColor } from '../lib/design/transitTheme'
-import { RegionArt } from '../components/art/RegionArt'
 import { Mascot } from '../components/art/Mascot'
 import { IconLock } from '../components/icons/HudIcons'
 import { getUnlockHint, topicStatus } from '../lib/progression/unlocks'
@@ -15,6 +14,7 @@ export function TopicPage() {
   const { slug } = useParams()
   const topic = allTopics.find((t) => t.slug === slug)
   const state = useGameStore()
+  const recordLessonCard = useGameStore((s) => s.recordLessonCard)
   const completed = completedTopicIds(state)
   const accent = topic ? transitLineColor(topic.region) : 'var(--color-amber)'
 
@@ -43,7 +43,7 @@ export function TopicPage() {
   }
 
   const pal = regionPalette(topic.region)
-  const regionName = regions.find((r) => r.id === topic.region)?.subtitle ?? ''
+  const regionName = topic.region === 'boss-arena' ? 'Boss fights' : regions.find((r) => r.id === topic.region)?.name ?? ''
   const finalAction =
     topic.kind === 'boss' ? (
       <Link to={`/boss/${topic.slug}`} className="btn-cta flex-1 sm:flex-none">Enter the boss fight</Link>
@@ -58,7 +58,7 @@ export function TopicPage() {
   return (
     <div className="grid xl:grid-cols-[1fr_16.25rem] 2xl:grid-cols-[1fr_19rem] gap-6 items-start">
       <div className="space-y-5 min-w-0">
-        <header className="unit-banner flex items-center gap-4 p-5 sm:p-6" style={{ background: pal.deep, ['--banner-shadow' as string]: pal.shadow }}>
+        <header className="unit-banner flex items-center gap-4 p-4 sm:p-5" style={{ background: pal.deep, ['--banner-shadow' as string]: pal.shadow }}>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-extrabold uppercase tracking-wider text-white">{regionName} · {topicLabel(topic.id)}</p>
             <h1 className="font-display text-3xl sm:text-4xl text-white mt-1 leading-tight" data-testid="topic-title">{topic.title}</h1>
@@ -73,9 +73,15 @@ export function TopicPage() {
               </ul>
             )}
           </div>
-          <RegionArt regionId={topic.region} width={170} className="hidden shrink-0 sm:block" />
         </header>
-        <LessonDeck cards={topic.cards} accent={accent} finalAction={finalAction} />
+        <LessonDeck
+          key={topic.id}
+          cards={topic.cards}
+          accent={accent}
+          finalAction={finalAction}
+          initialIndex={completed.has(topic.id) ? 0 : (state.lessonProgress[topic.id]?.card ?? 0)}
+          onIndexChange={(i) => recordLessonCard(topic.id, i, topic.cards.length)}
+        />
         {topic.deep && <DeepLessonView deep={topic.deep} accent={accent} topicId={topic.id} />}
         {topic.bossDeep && <BossDeepView brief={topic.bossDeep} accent={accent} topicId={topic.id} />}
         <div className="flex flex-wrap gap-2">

@@ -62,6 +62,15 @@ export interface AppPreferences {
   hasGestureForSound: boolean
 }
 
+/** How far the learner got through a lesson's cards */
+export interface LessonProgress {
+  /** Index of the last card shown */
+  card: number
+  /** True once the learner has reached the final card (the lesson counts as read) */
+  viewed: boolean
+  updatedAt: string
+}
+
 export interface PersistedState {
   version: number
   xp: number
@@ -76,6 +85,7 @@ export interface PersistedState {
   srs: SrsCardState[]
   interviews: InterviewSession[]
   preferences: AppPreferences
+  lessonProgress: Record<number, LessonProgress>
   quizAttempts: Record<
     string,
     {
@@ -109,4 +119,5 @@ export const defaultPersistedState = (): PersistedState => ({
     hasGestureForSound: false,
   },
   quizAttempts: {},
+  lessonProgress: {},
 })

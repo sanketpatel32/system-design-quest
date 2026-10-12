@@ -5,7 +5,7 @@ import type { Topic } from '../../content/types'
 import { regionPalette } from '../../lib/design/transitTheme'
 import { getUnlockHint, isTopicUnlocked, topicStatus } from '../../lib/progression/unlocks'
 import { useGameStore } from '../../stores/gameStore'
-import { RegionArt } from '../art/RegionArt'
+import { RegionMotif } from './RegionMotif'
 import { Mascot, MascotSays } from '../art/Mascot'
 import { IconBook, IconCastle, IconCheck, IconLock, IconStar } from '../icons/HudIcons'
 
@@ -32,6 +32,7 @@ function useStatuses() {
   const unlocked = useGameStore((s) => s.unlockedTopicIds)
   const topicProgress = useGameStore((s) => s.topicProgress)
   const quizAttempts = useGameStore((s) => s.quizAttempts)
+  const lessonProgress = useGameStore((s) => s.lessonProgress)
   const completed = useMemo(
     () => new Set(Object.entries(topicProgress).filter(([, v]) => v.completed).map(([id]) => Number(id))),
     [topicProgress],
@@ -40,17 +41,20 @@ function useStatuses() {
     const m = new Map<number, Status>()
     for (const r of regions)
       for (const t of orderedTopicsInRegion(r.id)) {
-        const inProgress = Boolean(quizAttempts[`topic-${t.id}`] && !topicProgress[t.id]?.completed)
+        const answered = Object.keys(quizAttempts[`topic-${t.id}`]?.results ?? {}).length > 0
+        const started = (lessonProgress[t.id]?.card ?? 0) > 0 || Boolean(lessonProgress[t.id]?.viewed)
+        const inProgress = (answered || started) && !topicProgress[t.id]?.completed
         m.set(t.id, topicStatus(t, unlocked, completed, inProgress))
       }
     return m
-  }, [unlocked, completed, quizAttempts, topicProgress])
+  }, [unlocked, completed, quizAttempts, topicProgress, lessonProgress])
   return { statusMap, completed, unlocked }
 }
 
 export function WorldMapScene() {
   const { statusMap, completed, unlocked } = useStatuses()
   const quizAttempts = useGameStore((s) => s.quizAttempts)
+  const lessonProgress = useGameStore((s) => s.lessonProgress)
   const [view, setView] = useState<'path' | 'list'>('path')
   const [q, setQ] = useState('')
   const [allBosses, setAllBosses] = useState(false)
@@ -69,6 +73,10 @@ export function WorldMapScene() {
   const nextTopic = nextId ? topicsById.get(nextId) : undefined
   /** Resume the quiz only when the learner has actually answered something */
   const resume = Boolean(nextId && Object.keys((quizAttempts[`topic-${nextId}`] as { results?: object } | undefined)?.results ?? {}).length)
+  const lp = nextId ? lessonProgress[nextId] : undefined
+  /** Resume the lesson on the card the learner left (or the quiz, once they've answered something) */
+  const lessonStarted = Boolean(lp && (lp.card > 0 || lp.viewed))
+  const nextQuestion = nextTopic ? nextTopic.questions.findIndex((x) => !(x.id in (quizAttempts[`topic-${nextTopic.id}`]?.results ?? {}))) : -1
   const total = STATION_N.size
   const doneCount = [...STATION_N.keys()].filter((id) => completed.has(id)).length
   const bossesDone = arenaTopics.filter((t) => completed.has(t.id)).length
@@ -88,16 +96,25 @@ export function WorldMapScene() {
             <Mascot mood="idle" size={64} className="shrink-0 hidden sm:block" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-extrabold uppercase tracking-wide" style={{ color: regionPalette(nextTopic.region).deep }}>
-                Continue · Unit {learningRegions.findIndex((r) => r.id === nextTopic.region) + 1}
+                {resume || lessonStarted ? 'Continue' : 'Up next'} · Unit {learningRegions.findIndex((r) => r.id === nextTopic.region) + 1}
               </p>
               <p className="font-display text-xl text-chalk truncate">{nextTopic.title}</p>
-              <p className="text-sm text-dim">About {topicMinutes(nextTopic.id)} min · lesson {STATION_N.get(nextTopic.id)} of {total}</p>
+              <p className="text-sm text-dim" data-testid="continue-detail">
+                {resume
+                  ? `Quiz in progress · question ${nextQuestion + 1} of ${nextTopic.questions.length} is next`
+                  : lessonStarted && lp
+                    ? lp.viewed && lp.card >= nextTopic.cards.length - 1
+                      ? 'Lesson read · the quiz is next'
+                      : `Lesson in progress · card ${lp.card + 1} of ${nextTopic.cards.length}`
+                    : `About ${topicMinutes(nextTopic.id)} min · lesson ${STATION_N.get(nextTopic.id)} of ${total}`}
+              </p>
             </div>
             <Link
-              to={resume ? `/quiz/${nextTopic.slug}` : `/topic/${nextTopic.slug}`}
+              to={resume || lp?.viewed ? `/quiz/${nextTopic.slug}` : `/topic/${nextTopic.slug}`}
+              data-testid="continue-link"
               className="btn-cta w-full sm:w-auto"
             >
-              {resume ? 'Resume quiz' : 'Start lesson'}
+              {resume ? 'Continue quiz' : lp?.viewed ? 'Continue to the quiz' : lessonStarted ? 'Continue lesson' : 'Start lesson'}
             </Link>
           </div>
         )}
@@ -105,7 +122,7 @@ export function WorldMapScene() {
           <div>
             <h1 id="map-title" className="font-display text-3xl md:text-4xl text-chalk">The network</h1>
             <p className="text-dim mt-1">
-              {doneCount + playbookDone + bossesDone} of {total + 1 + arenaTopics.length} cleared · {total} lessons in {learningRegions.length} units, the Interview Playbook, then {arenaTopics.length} boss fights
+              {doneCount} of {total} lessons cleared in {learningRegions.length} units · practice track: {playbookDone + bossesDone} of {1 + arenaTopics.length} (Interview Playbook and {arenaTopics.length} bosses, open after Unit 1, alongside the units)
             </p>
           </div>
           <div className="flex items-center gap-1 rounded-2xl border-2 border-[var(--color-rail)] bg-white p-1" role="group" aria-label="Map view">
@@ -122,6 +139,16 @@ export function WorldMapScene() {
             ))}
           </div>
         </div>
+        {view === 'path' && nextTopic && (
+          <button
+            type="button"
+            className="btn-quiet mb-4 w-full sm:w-auto"
+            data-testid="jump-current"
+            onClick={() => document.getElementById(`station-anchor-${nextTopic.id}`)?.scrollIntoView({ block: 'center' })}
+          >
+            Jump to current lesson
+          </button>
+        )}
         <label className="mb-6 block">
           <span className="sr-only">Find a topic</span>
           <input
@@ -136,9 +163,18 @@ export function WorldMapScene() {
           />
         </label>
         {view === 'path' ? (
-          <div className="space-y-10 overflow-x-clip pb-4">
+          <div className="space-y-6 overflow-x-clip pb-4">
             {learningRegions.map((r, i) => (
-              <Unit key={r.id} index={i} regionId={r.id} statusMap={statusMap} completed={completed} nextId={nextId} />
+              <div key={r.id} className="space-y-6">
+                <Unit index={i} regionId={r.id} statusMap={statusMap} completed={completed} nextId={nextId} />
+                {i === 0 && (
+                  <a href="#arena" onClick={(e) => { e.preventDefault(); showBossList() }} className="flex items-center gap-3 rounded-2xl border-2 border-dashed border-[#E0A800] bg-[#FFFBEA] px-4 py-3 text-sm font-bold text-[#6b4700]" data-testid="practice-track-signpost">
+                    <IconCastle size={28} />
+                    <span className="flex-1">{arenaOpen ? 'Practice track open: the Interview Playbook and boss fights run alongside Units 2–10.' : 'After Unit 1, a boss-fight practice track opens alongside the remaining units.'}</span>
+                    <span className="font-extrabold uppercase tracking-wide">Go</span>
+                  </a>
+                )}
+              </div>
             ))}
             <ArenaUnit statusMap={statusMap} completed={completed} open={arenaOpen} all={allBosses} onShowAll={() => setAllBosses(true)} />
           </div>
@@ -160,18 +196,18 @@ export function WorldMapScene() {
             <div className="progress-fill" style={{ width: `${Math.max(4, (doneCount / total) * 100)}%` }} />
           </div>
         </section>
-        <section className="panel p-5" aria-labelledby="arena-title">
+        <section className={`panel ${arenaOpen ? 'p-5' : 'p-4'}`} aria-labelledby="arena-title" data-testid="boss-sidebar">
           <div className="flex items-center gap-3">
-            <IconCastle size={44} />
+            <IconCastle size={arenaOpen ? 44 : 32} />
             <div className="min-w-0 flex-1">
-              <h2 id="arena-title" className="font-display text-lg text-chalk">Architecture Colosseum</h2>
+              <h2 id="arena-title" className="font-display text-lg text-chalk">Boss fights</h2>
               <p className="text-sm text-dim">{bossesDone} of {arenaTopics.length} bosses beaten</p>
             </div>
           </div>
           <p className="text-sm text-dim mt-2">
-            {arenaOpen ? 'Start with the Interview Playbook; bosses then unlock one after another.' : 'Clear Unit 1 to open the arena.'}
+            {arenaOpen ? 'Practice track, alongside the units. Start with the Interview Playbook; bosses then unlock one after another.' : 'Practice track. Opens after Unit 1 and runs alongside the other units.'}
           </p>
-          <ol className="mt-3 space-y-1">
+          {arenaOpen && <ol className="mt-3 space-y-1" data-testid="boss-sidebar-list">
             {arenaTopics.slice(0, 7).map((t, bi) => {
               const bst = statusMap.get(t.id) ?? 'locked'
               return (
@@ -193,9 +229,9 @@ export function WorldMapScene() {
                 </li>
               )
             })}
-          </ol>
+          </ol>}
           <button type="button" className="mt-2 text-sm font-extrabold uppercase tracking-wide text-[#12749f]" onClick={showBossList} data-testid="see-all-bosses">
-            See all {arenaTopics.length} bosses
+            {arenaOpen ? `See all ${arenaTopics.length} bosses` : `Preview the ${arenaTopics.length} bosses`}
           </button>
         </section>
       </aside>
@@ -208,23 +244,30 @@ function BossPip({ status }: { status: Status }) {
   return <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-full border-[3px]" style={{ background: bg, borderColor: status === 'locked' ? '#E6E0D6' : '#E0A800' }} />
 }
 
-function UnitBanner({ regionId, index, done, total, title, subtitle }: { regionId: string; index: number | null; done: number; total: number; title: string; subtitle: string }) {
+function UnitBanner({ regionId, index, done, total, title, collapsed, onToggle, note }: { regionId: string; index: number | null; done: number; total: number; title: string; collapsed?: boolean; onToggle?: () => void; note?: string }) {
   const p = regionPalette(regionId)
   const gold = regionId === 'boss-arena'
   return (
-    <div className={`unit-banner flex items-center gap-3 p-5 pr-2 min-h-[120px] ${gold ? 'banner-gold' : ''}`} style={{ background: gold ? p.bright : p.deep, ['--banner-shadow' as string]: p.shadow }}>
+    <div className={`unit-banner flex items-center gap-3 px-4 py-3 sm:px-5 ${gold ? 'banner-gold' : ''}`} style={{ background: gold ? p.bright : p.deep, ['--banner-shadow' as string]: p.shadow }}>
+      <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/20">
+        <RegionMotif regionId={regionId} color={gold ? '#3d2a00' : '#fff'} size={26} />
+      </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-extrabold uppercase tracking-wider text-white">{index === null ? 'Final unit' : `Unit ${index + 1}`}</p>
-        <h2 className="font-display text-2xl leading-tight text-white">{subtitle}</h2>
-        <p className="font-bold text-white">{title}</p>
-        <div className="mt-2 flex items-center gap-2">
-          <div className="h-3 w-28 overflow-hidden rounded-full bg-white/30" aria-hidden>
-            <div className="h-full rounded-full bg-white" style={{ width: `${(done / Math.max(1, total)) * 100}%` }} />
-          </div>
-          <span className="text-sm font-extrabold text-white tabular-nums">{done}/{total}</span>
-        </div>
+        <p className="text-xs font-extrabold uppercase tracking-wider text-white">{index === null ? 'Practice track · opens after Unit 1' : `Unit ${index + 1}`}</p>
+        <h2 className="font-display text-xl leading-tight text-white">{title}</h2>
+        {note && <p className="text-sm font-bold text-white">{note}</p>}
       </div>
-      <RegionArt regionId={regionId} width={150} className="shrink-0 w-[6.5rem] sm:w-[9.375rem] h-auto" />
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <span className="text-sm font-extrabold text-white tabular-nums">{done}/{total}</span>
+        <div className="h-2.5 w-16 overflow-hidden rounded-full bg-white/30" aria-hidden>
+          <div className="h-full rounded-full bg-white" style={{ width: `${(done / Math.max(1, total)) * 100}%` }} />
+        </div>
+        {onToggle && (
+          <button type="button" onClick={onToggle} aria-expanded={!collapsed} className="mt-1 rounded-lg bg-white/20 px-2.5 py-1 text-xs font-extrabold uppercase tracking-wide text-white hover:bg-white/30" data-testid={`unit-toggle-${regionId}`}>
+            {collapsed ? 'Show' : 'Hide'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -233,38 +276,61 @@ function Unit({ regionId, index, statusMap, completed, nextId }: { regionId: str
   const region = learningRegions.find((r) => r.id === regionId)!
   const topics = orderedTopicsInRegion(regionId as Topic['region'])
   const done = topics.filter((t) => completed.has(t.id)).length
+  const hasCurrent = topics.some((t) => t.id === nextId)
+  const allLocked = topics.every((t) => (statusMap.get(t.id) ?? 'locked') === 'locked')
+  // Shorter path: finished units and units you can't open yet start folded; the current unit is always open
+  const foldByDefault = !hasCurrent && (done === topics.length || allLocked)
+  const [collapsed, setCollapsed] = useState(foldByDefault)
+  useEffect(() => setCollapsed(foldByDefault), [foldByDefault])
+  const note = collapsed ? (done === topics.length ? `All ${topics.length} lessons cleared` : allLocked ? `${topics.length} lessons · locked` : `${topics.length} lessons`) : undefined
   return (
-    <section aria-label={`Unit ${index + 1}: ${region.subtitle}`}>
-      <UnitBanner regionId={regionId} index={index} done={done} total={topics.length} title={region.name} subtitle={region.subtitle} />
-      <ol className="relative mx-auto mt-8 flex max-w-[26.25rem] flex-col items-center gap-10">
-        {topics.map((t, j) => (
-          <PathNode key={t.id} topic={t} offset={WIND[(j + index * 3) % WIND.length]!} status={statusMap.get(t.id) ?? 'locked'} current={t.id === nextId} completed={completed} first={j === 0} />
-        ))}
-      </ol>
+    <section aria-label={`Unit ${index + 1}: ${region.name}`} id={`unit-${regionId}`} className="scroll-mt-24" data-testid={`unit-${index + 1}`} data-collapsed={collapsed}>
+      <UnitBanner regionId={regionId} index={index} done={done} total={topics.length} title={region.name} collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} note={note} />
+      {!collapsed && (
+        <ol className="relative mx-auto mt-6 flex max-w-[26.25rem] flex-col items-center gap-6">
+          {topics.map((t, j) => (
+            <PathNode key={t.id} topic={t} offset={WIND[(j + index * 3) % WIND.length]!} status={statusMap.get(t.id) ?? 'locked'} current={t.id === nextId} completed={completed} first={j === 0} />
+          ))}
+        </ol>
+      )}
     </section>
   )
 }
 
 function ArenaUnit({ statusMap, completed, open, all, onShowAll }: { statusMap: Map<number, Status>; completed: Set<number>; open: boolean; all: boolean; onShowAll: () => void }) {
-  const arena = regions.find((r) => r.id === 'boss-arena')
   const done = arenaTopics.filter((t) => completed.has(t.id)).length
-  const setAll = (_: boolean) => onShowAll()
+  const [collapsed, setCollapsed] = useState(!open)
+  useEffect(() => setCollapsed(!open), [open])
   const shown = all ? arenaTopics : arenaTopics.slice(0, 6)
+  const isCollapsed = collapsed && !all
   return (
-    <section id="arena" aria-label="Final unit: Architecture Colosseum" className="scroll-mt-24">
-      <UnitBanner regionId="boss-arena" index={null} done={done} total={arenaTopics.length} title={open ? 'Full design problems, scored stage by stage' : 'Clear Unit 1 to open the gates'} subtitle={arena?.subtitle ?? 'Architecture Colosseum'} />
-      <ol className="relative mx-auto mt-8 flex max-w-[26.25rem] flex-col items-center gap-10">
-        {playbook && (
-          <PathNode topic={playbook} offset={0} status={statusMap.get(playbook.id) ?? 'locked'} current={false} completed={completed} />
-        )}
-        {shown.map((t, j) => (
-          <PathNode key={t.id} topic={t} offset={WIND[(j * 2) % WIND.length]!} status={statusMap.get(t.id) ?? 'locked'} current={false} completed={completed} boss />
-        ))}
-      </ol>
-      {!all && (
-        <div className="mt-6 text-center">
-          <button type="button" className="btn-quiet" onClick={() => setAll(true)}>Show all {arenaTopics.length} bosses</button>
-        </div>
+    <section id="arena" aria-label="Practice track: Architecture Colosseum" className="scroll-mt-24">
+      <UnitBanner
+        regionId="boss-arena"
+        index={null}
+        done={done}
+        total={arenaTopics.length}
+        title="Boss fights"
+        note={open ? 'Full design problems, scored stage by stage. Practise alongside the units.' : 'Clear Unit 1 to open. Then practise alongside the units.'}
+        collapsed={isCollapsed}
+        onToggle={() => setCollapsed((c) => !c)}
+      />
+      {!isCollapsed && (
+        <>
+          <ol className="relative mx-auto mt-6 flex max-w-[26.25rem] flex-col items-center gap-6">
+            {playbook && (
+              <PathNode topic={playbook} offset={0} status={statusMap.get(playbook.id) ?? 'locked'} current={false} completed={completed} />
+            )}
+            {shown.map((t, j) => (
+              <PathNode key={t.id} topic={t} offset={WIND[(j * 2) % WIND.length]!} status={statusMap.get(t.id) ?? 'locked'} current={false} completed={completed} boss />
+            ))}
+          </ol>
+          {!all && (
+            <div className="mt-5 text-center">
+              <button type="button" className="btn-quiet" onClick={onShowAll}>Show all {arenaTopics.length} bosses</button>
+            </div>
+          )}
+        </>
       )}
     </section>
   )
@@ -307,7 +373,7 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
   const labelSide = offset > 0 ? 'right-[calc(100%+14px)] text-right' : 'left-[calc(100%+14px)] text-left'
 
   return (
-    <li ref={ref} className={`relative ${current ? 'mt-7' : ''}`} style={{ transform: `translateX(${offset}px)` }}>
+    <li ref={ref} id={`station-anchor-${topic.id}`} className={`relative scroll-mt-32 ${current ? 'mt-7' : ''}`} style={{ transform: `translateX(${offset}px)` }}>
       {current && !open && (
         <span className="pointer-events-none absolute bottom-[calc(100%+14px)] left-1/2 -translate-x-1/2" aria-hidden>
           <span className="bubble-bob block">
@@ -396,7 +462,7 @@ function Onboarding() {
           ['Lessons', 'Each node is a short lesson, then a quiz. Pass to open the next one.', '#58CC02'],
           ['Hearts', 'You get 3 per quiz. A wrong answer costs one; blank answers never do.', '#FF4B4B'],
           ['Review', 'Cleared topics come back as flashcards on a schedule, so they stick.', '#1CB0F6'],
-          ['Bosses', `${arenaTopics.length} full design problems in the Colosseum. Each fight has stages (requirements, estimates, design on a canvas, deep dive) and is scored stage by stage.`, '#FFC800'],
+          ['Bosses', `A practice track that runs alongside the units: it opens after Unit 1 and you can switch between bosses and lessons at any time. ${arenaTopics.length} full design problems, each scored stage by stage (requirements, estimates, design on a canvas, deep dive).`, '#FFC800'],
         ].map(([h, b, c]) => (
           <li key={h} className="flex gap-3 rounded-2xl bg-[#f7f4ef] p-3">
             <span aria-hidden className="mt-1 h-4 w-4 shrink-0 rounded-full" style={{ background: c }} />
@@ -425,8 +491,8 @@ function Curriculum({ statusMap, needle }: { statusMap: Map<number, Status>; nee
             <div key={r.id} className="panel min-w-0 overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-3 text-white" style={{ background: p.deep }}>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-extrabold uppercase tracking-wider text-white">{r.id === 'boss-arena' ? 'Final unit' : `Unit ${i + 1}`}</p>
-                  <h3 className="font-display text-lg leading-tight">{r.subtitle}</h3>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-white">{r.id === 'boss-arena' ? 'Practice track' : `Unit ${i + 1}`}</p>
+                  <h3 className="font-display text-lg leading-tight">{r.id === 'boss-arena' ? 'Boss fights' : r.name}</h3>
                 </div>
                 <span className="text-sm font-extrabold tabular-nums">{done}/{all.length}</span>
               </div>

@@ -1,0 +1,67 @@
+import { expect, test } from '@playwright/test'
+import { seed } from './helpers'
+
+test('resume: map says Continue and reopens the last lesson card', async ({ page }) => {
+  await seed(page)
+  await expect(page.getByTestId('continue-link')).toHaveText('Start lesson')
+  await page.getByTestId('continue-link').click()
+  await page.getByRole('button', { name: 'Next card' }).click()
+  await page.getByRole('button', { name: 'Next card' }).click()
+  await expect(page.getByText(/^Card 3 of/)).toBeVisible()
+  await page.goto('/')
+  await expect(page.getByTestId('continue-quest')).toContainText('Continue')
+  await expect(page.getByTestId('continue-detail')).toContainText('card 3 of')
+  await expect(page.getByTestId('continue-link')).toHaveText('Continue lesson')
+  await page.reload()
+  await page.getByTestId('continue-link').click()
+  await expect(page.getByText(/^Card 3 of/)).toBeVisible()
+})
+
+test('resume: an unfinished quiz continues at the first unanswered question', async ({ page }) => {
+  await seed(page)
+  await page.goto('/quiz/the-system-design-interview')
+  await page.getByTestId('lesson-first').getByRole('button', { name: 'Skip' }).click()
+  await page.getByRole('radio').first().check()
+  await page.getByRole('button', { name: 'Submit' }).first().click()
+  await expect(page.getByText(/Not this time|Correct/).first()).toBeVisible()
+  await page.goto('/')
+  await expect(page.getByTestId('continue-link')).toHaveText('Continue quiz')
+  await expect(page.getByTestId('continue-detail')).toContainText('question 2 of')
+  await page.getByTestId('continue-link').click()
+  await expect(page.getByRole('button', { name: /^Question 2/ })).toHaveAttribute('aria-current', 'step')
+})
+
+test('lesson viewing: "read the lesson first" shows only until the lesson has been read', async ({ page }) => {
+  await seed(page)
+  await page.goto('/quiz/the-system-design-interview')
+  await expect(page.getByTestId('lesson-first')).toBeVisible()
+  await page.goto('/topic/the-system-design-interview')
+  const dots = page.getByRole('button', { name: /^Go to card/ })
+  await dots.last().click()
+  await page.goto('/quiz/the-system-design-interview')
+  await expect(page.getByRole('progressbar', { name: 'Quiz progress' })).toBeVisible()
+  await expect(page.getByTestId('lesson-first')).toHaveCount(0)
+})
+
+test('progression copy: bosses are a parallel practice track opened after Unit 1', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await seed(page)
+  await expect(page.getByText(/Final unit/)).toHaveCount(0)
+  await expect(page.getByTestId('practice-track-signpost')).toContainText('After Unit 1')
+  await expect(page.getByTestId('boss-sidebar')).toContainText('Opens after Unit 1 and runs alongside')
+  await expect(page.getByTestId('boss-sidebar-list')).toHaveCount(0)
+  await page.goto('/topic/interview-playbook')
+  await expect(page.getByText(/boss practice track/)).toBeVisible()
+})
+
+test('shorter path: locked units fold, jump to the current lesson', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await seed(page)
+  await expect(page.getByTestId('unit-1')).toHaveAttribute('data-collapsed', 'false')
+  await expect(page.getByTestId('unit-5')).toHaveAttribute('data-collapsed', 'true')
+  await expect(page.getByTestId('station-30')).toHaveCount(0)
+  await page.getByTestId('unit-toggle-r5-databases').click()
+  await expect(page.getByTestId('station-30')).toBeVisible()
+  await page.getByTestId('jump-current').click()
+  await expect(page.getByTestId('station-1')).toBeInViewport()
+})

@@ -30,7 +30,7 @@ export function getUnlockHint(topicId: number, _completedIds: Set<number>): stri
   const unit1Last = orderedTopicsInRegion('r1-foundations').at(-1)
   // Arena entrance: the playbook opens when Unit 1 is cleared
   if (topicId === PLAYBOOK_ID) {
-    return `Clear Unit 1 (finish Lesson ${unit1Last ? LESSON_N.get(unit1Last.id) : 3}: ${unit1Last?.title ?? 'the last lesson'}) to open the Architecture Colosseum.`
+    return `Clear Unit 1 (finish Lesson ${unit1Last ? LESSON_N.get(unit1Last.id) : 3}: ${unit1Last?.title ?? 'the last lesson'}) to open the boss practice track (Architecture Colosseum).`
   }
   if (BOSS_N.has(topicId)) {
     const n = BOSS_N.get(topicId)!
@@ -71,9 +71,10 @@ export function computeUnlocksAfterClear(
     const nxt = ordered[idx + 1]
     if (nxt) next.add(nxt.id)
   } else if (idx === ordered.length - 1) {
-    const regionIndex = regions.indexOf(region)
-    if (regionIndex >= 0 && regionIndex < regions.length - 1) {
-      const nextRegion = regions[regionIndex + 1]
+    // Units run in order; the boss arena is a parallel practice track (opened after Unit 1), so skip over it
+    const unitIndex = learningRegions.findIndex((r) => r.id === region.id)
+    if (unitIndex >= 0 && unitIndex < learningRegions.length - 1) {
+      const nextRegion = learningRegions[unitIndex + 1]
       if (nextRegion) {
         const first = orderedTopicsInRegion(nextRegion.id)[0]
         if (first) next.add(first.id)
