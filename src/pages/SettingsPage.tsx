@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { PageHero } from '../components/ui/PageHero'
 import { useGameStore } from '../stores/gameStore'
 
 type Notice = { tone: 'ok' | 'error'; text: string } | null
@@ -68,15 +69,9 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-5 max-w-2xl">
-      <header className="border-b border-[var(--color-rail)] pb-4">
-        <p className="text-sm font-semibold text-[var(--color-amber)]">Stored only in this browser</p>
-        <h1 className="font-display text-4xl font-extrabold text-chalk mt-1">Settings</h1>
-        <p className="text-[15px] text-dim mt-2">
-          Your XP, cleared stations, review schedule, quiz attempts, boss drafts and mock-interview notes live in this
-          browser's local storage. Nothing is sent to a server, so clearing site data or switching browsers loses it unless
-          you keep a backup.
-        </p>
-      </header>
+      <PageHero eyebrow="Stored only in this browser" title="Settings" icon="settings" tone="slate">
+        Your progress lives in this browser's local storage. Nothing is sent to a server, so keep a backup before clearing site data or switching browsers.
+      </PageHero>
 
       {notice && (
         <p className={`feedback ${notice.tone === 'ok' ? 'feedback-ok' : 'feedback-miss'} text-sm`} role={notice.tone === 'ok' ? 'status' : 'alert'}>
