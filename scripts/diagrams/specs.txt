@@ -870,3 +870,39 @@ App servers|private subnet {svc} [outbound only]> NAT gateway|public subnet {svc
 Production database {store} [snapshots + log archive]> Backup vault|same region {store}
 Backup vault|same region {store} [copy]> Immutable vault|other account and region {store}
 Immutable vault|other account and region {store} [scheduled test]> Restore check|measure RTO
+
+@235 HTTP caching: a client reuses a fresh copy with no request; when stale it sends If-None-Match with the ETag, and the origin answers 304 with no body if unchanged or 200 with a new body and ETag.
+Client [fresh: reuse copy]> Private cache
+Private cache [stale: If-None-Match v42]> Origin
+Origin [unchanged]> 304 Not Modified|no body
+Origin [changed]> 200 OK|new body, ETag v43
+
+@236 Keyset pagination: the client sends back an opaque cursor holding the last row's keys, and the API seeks the index on (created_at, id) to read only the next 20 rows.
+Client [GET ?cursor=abc]> API|validate cursor and filters
+API|validate cursor and filters [rows after (t, id), LIMIT 20]> Index on (created_at, id) {store}
+API|validate cursor and filters [20 rows + next cursor]> Client
+
+@237 Webhooks: the sender's dispatcher signs each event with an HMAC and retries with backoff; the receiver verifies the signature and timestamp, skips seen event ids, queues the work and replies 2xx.
+Event store {store} > Dispatcher|sign with HMAC
+Dispatcher|sign with HMAC [POST + signature]> Receiver|verify HMAC and timestamp
+Dispatcher|sign with HMAC [timeout or 5xx]~> Retry with backoff
+Receiver|verify HMAC and timestamp [new event id]> Work queue
+Receiver|verify HMAC and timestamp [2xx]~> Dispatcher|sign with HMAC
+
+@238 Transactional outbox: the service writes the order row and an outbox row in one database transaction; a relay publishes outbox rows to the broker, and consumers skip event ids they have already handled.
+Order service [one transaction]> Orders + outbox {store}
+Relay [read unsent rows]> Orders + outbox {store}
+Relay [publish]> Broker
+Broker ~> Consumer|skip seen event ids
+
+@239 Deadline propagation: the edge sets a 2,000 ms deadline; service A passes 1,700 ms left to B, and B passes 1,200 ms left to C, so no call outlives the user's request.
+Client > Edge|deadline 2,000 ms
+Edge|deadline 2,000 ms > Service A|300 ms used
+Service A|300 ms used [1,700 ms left]> Service B|500 ms used
+Service B|500 ms used [1,200 ms left]> Service C
+
+@240 Schema evolution: the writer adds an optional field; old readers skip the unknown tag, new readers use a default when it is missing, and removed field numbers are reserved.
+Writer v2|adds optional field 8 > Message bytes
+Message bytes [unknown tag 8: skip]> Reader v1
+Message bytes > Reader v2|default if field 8 missing
+Schema|field 4 reserved ~> Writer v2|adds optional field 8

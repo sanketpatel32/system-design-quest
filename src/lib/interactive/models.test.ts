@@ -114,4 +114,15 @@ describe('fundamentals models', () => {
     expect(val(o, 1)).toBe('30')
     expect(val(o, 2)).toBe('1.7')
   })
+  it('offset-scan: page 5,000 at 20 per page produces 100,000 rows', () => {
+    const o = MODELS['offset-scan'].run(5000, { pageSize: 20 })
+    expect(val(o, 1)).toBe('99,980')
+    expect(val(o, 2)).toBe('100,000')
+    expect(o.verdict!.ok).toBe(false)
+  })
+  it('deadline-chain: three 500 ms timeouts exceed a 1,000 ms deadline; 300 ms fits', () => {
+    expect(val(MODELS['deadline-chain'].run(500, { calls: 3, deadlineMs: 1000 }), 1)).toBe('1,500 ms')
+    expect(MODELS['deadline-chain'].run(500, { calls: 3, deadlineMs: 1000 }).verdict!.ok).toBe(false)
+    expect(MODELS['deadline-chain'].run(300, { calls: 3, deadlineMs: 1000 }).verdict!.ok).toBe(true)
+  })
 })
