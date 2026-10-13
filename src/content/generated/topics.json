@@ -85261,6 +85261,15 @@
         "teaches": [
           "constraints"
         ]
+      },
+      {
+        "id": "t261-c6",
+        "kind": "text",
+        "title": "Edge case: NULL in a unique column",
+        "body": "In standard SQL, NULL is not equal to NULL, so a UNIQUE constraint lets many rows hold NULL in that column. PostgreSQL behaves this way by default (version 15 added UNIQUE NULLS NOT DISTINCT to change it); SQL Server allows only one NULL in a unique index. If “at most one row without a value” matters, say so explicitly rather than relying on the default.",
+        "teaches": [
+          "relational-model"
+        ]
       }
     ],
     "questions": [
@@ -85652,7 +85661,7 @@
       "Explain the logical order of a query with GROUP BY and HAVING"
     ],
     "difficulty": 1,
-    "durationMinutes": 10,
+    "durationMinutes": 11,
     "prereqIds": [
       261
     ],
@@ -85715,6 +85724,15 @@
         "body": "Joining orders to order_items repeats each order once per item. Summing orders.total over that result counts each order’s total several times. Aggregate each table at its own level first, or sum item amounts instead.",
         "teaches": [
           "grouping"
+        ]
+      },
+      {
+        "id": "t262-c6",
+        "kind": "text",
+        "title": "Edge case: a WHERE clause that undoes a LEFT JOIN",
+        "body": "A LEFT JOIN keeps rows with no match, filling the right side with NULL. Adding WHERE right_table.status = 'active' then removes exactly those rows, because NULL = 'active' is not true, so the query behaves like an inner join. Put conditions on the right table in the ON clause when unmatched rows should stay.",
+        "teaches": [
+          "joins"
         ]
       }
     ],
@@ -86124,6 +86142,15 @@
         "body": "A column holding “12,15,19” cannot be indexed, joined or constrained per item, and updating one id means rewriting the string. Use a link table, or the database’s array or JSON type only when you never need to query items individually.",
         "teaches": [
           "normal-forms"
+        ]
+      },
+      {
+        "id": "t263-c6",
+        "kind": "text",
+        "title": "Edge case: denormalised counters drift",
+        "body": "Storing a comment_count on posts saves a COUNT query, but every code path that adds or deletes a comment must update it in the same transaction. A bulk delete, a manual fix or a retried job that skips the update leaves the count wrong with no error. Keep a periodic job that recomputes it from the source rows, or derive it with a trigger or materialised view.",
+        "teaches": [
+          "anomalies"
         ]
       }
     ],
@@ -86569,6 +86596,15 @@
         "teaches": [
           "index-cost"
         ]
+      },
+      {
+        "id": "t264-c6",
+        "kind": "text",
+        "title": "Edge case: an index the query cannot use",
+        "body": "A B-tree index on email does not help WHERE lower(email) = 'a@b.com', because the index stores email values, not lower(email). The same applies to LIKE '%term' (no fixed prefix) and to comparing a text column with a number when the database must convert each row. Index the expression itself, or change the query so it compares the stored column directly.",
+        "teaches": [
+          "btree"
+        ]
       }
     ],
     "questions": [
@@ -86969,6 +87005,15 @@
         "teaches": [
           "explain"
         ]
+      },
+      {
+        "id": "t265-c6",
+        "kind": "text",
+        "title": "Edge case: stale statistics",
+        "body": "The planner estimates row counts from sampled statistics. After a large bulk load or delete, those statistics can be far off, so it picks a nested-loop join for what is now millions of rows and a fast query becomes slow overnight. Run ANALYZE (or the database’s equivalent) after big data changes, and compare estimated with actual rows in EXPLAIN ANALYZE.",
+        "teaches": [
+          "planner"
+        ]
       }
     ],
     "questions": [
@@ -87310,7 +87355,7 @@
       "Use savepoints and retries correctly"
     ],
     "difficulty": 2,
-    "durationMinutes": 10,
+    "durationMinutes": 11,
     "prereqIds": [
       261
     ],
@@ -87366,6 +87411,15 @@
         "body": "A transaction that waits on an external HTTP call holds its locks and its connection for the whole wait. If the call takes seconds, other writers queue behind it. Do external calls before or after the transaction, and record the intent in the database (an outbox table) if both must happen.",
         "teaches": [
           "short-transactions"
+        ]
+      },
+      {
+        "id": "t266-c6",
+        "kind": "text",
+        "title": "Edge case: the commit succeeded but the reply was lost",
+        "body": "If the connection drops while COMMIT is in flight, the client cannot tell whether the transaction committed. Blindly retrying can apply it twice. Give the write an idempotency key or a unique business identifier so a retry is detected, or check for the row before trying again.",
+        "teaches": [
+          "atomicity"
         ]
       }
     ],
@@ -88341,6 +88395,15 @@
         "teaches": [
           "row-locks"
         ]
+      },
+      {
+        "id": "t268-c6",
+        "kind": "text",
+        "title": "Edge case: long transactions block cleanup",
+        "body": "MVCC keeps old row versions while any open transaction might still need them. One transaction left open for hours, such as an idle session in a forgotten console, stops PostgreSQL’s VACUUM from removing dead rows, so tables and indexes bloat and queries slow down. Set an idle-in-transaction timeout and alert on old open transactions.",
+        "teaches": [
+          "mvcc"
+        ]
       }
     ],
     "questions": [
@@ -88785,6 +88848,15 @@
         "teaches": [
           "write-ahead"
         ]
+      },
+      {
+        "id": "t269-c6",
+        "kind": "text",
+        "title": "Edge case: the disk says written but is not",
+        "body": "Durability depends on fsync reaching stable storage. Some consumer drives and misconfigured RAID controllers acknowledge a flush while data is still in a volatile cache, so a power cut loses commits the database reported as durable. Use drives with power-loss protection or a battery-backed cache, and test with a tool that pulls power, not just a clean shutdown.",
+        "teaches": [
+          "write-ahead"
+        ]
       }
     ],
     "questions": [
@@ -89135,7 +89207,7 @@
       "Handle reads from replicas correctly"
     ],
     "difficulty": 3,
-    "durationMinutes": 11,
+    "durationMinutes": 12,
     "prereqIds": [
       269
     ],
@@ -89195,6 +89267,15 @@
         "kind": "text",
         "title": "Trap: treating a replica as a backup",
         "body": "A replica copies every change, including mistakes: a dropped table or a bad UPDATE reaches the standby within seconds. Backups with point-in-time recovery (a base backup plus archived WAL) let you restore to the moment before the mistake.",
+        "teaches": [
+          "replication"
+        ]
+      },
+      {
+        "id": "t270-c6",
+        "kind": "text",
+        "title": "Failure story: one command on the wrong server",
+        "body": "Publicly reported by GitLab in its January 2017 post-mortem: while fixing replication lag, an engineer deleted the data directory on the primary database instead of the replica. Several backup methods turned out not to be working, and about six hours of database changes were lost. The lesson they drew: a replica is not a backup, and a backup is only real once a restore has been tested.",
         "teaches": [
           "replication"
         ]
@@ -89605,6 +89686,15 @@
         "body": "Models built around access patterns are fast for those patterns and awkward for new ones; adding a question can mean a new table and a backfill. If queries are still changing, a relational database (which also stores JSON and scales a long way) is often the safer start.",
         "teaches": [
           "nosql-tradeoffs"
+        ]
+      },
+      {
+        "id": "t271-c6",
+        "kind": "text",
+        "title": "Edge case: the partition key decides the hot spot",
+        "body": "Key-value and wide-column stores spread data by partition key. If many writes share one key, such as today’s date or a single popular tenant, they land on one partition and its limit becomes the whole system’s limit, however many nodes there are. Pick keys with many distinct, evenly used values, or add a suffix to spread a hot key.",
+        "teaches": [
+          "nosql-models"
         ]
       }
     ],
@@ -90077,6 +90167,15 @@
         "teaches": [
           "expand-contract"
         ]
+      },
+      {
+        "id": "t272-c6",
+        "kind": "text",
+        "title": "Edge case: a quick ALTER that waits in line",
+        "body": "Even a fast schema change needs a brief exclusive lock. If a long-running query holds a conflicting lock, the ALTER waits, and every new query on that table queues behind the ALTER, so an “instant” migration takes the table offline. Set a short lock timeout on migrations (for example lock_timeout in PostgreSQL) and retry, instead of waiting indefinitely.",
+        "teaches": [
+          "migrations"
+        ]
       }
     ],
     "questions": [
@@ -90478,6 +90577,15 @@
         "teaches": [
           "batching"
         ]
+      },
+      {
+        "id": "t273-c6",
+        "kind": "text",
+        "title": "Edge case: batching with a huge IN list",
+        "body": "Fixing N+1 by loading related rows with WHERE id IN (...) works until the list holds tens of thousands of ids: statements get large, some drivers cap the number of bind parameters (PostgreSQL’s protocol allows at most 65,535), and plans change. Batch in chunks of a few hundred to a few thousand, or join against the parent query instead.",
+        "teaches": [
+          "n-plus-one"
+        ]
       }
     ],
     "questions": [
@@ -90865,6 +90973,15 @@
         "kind": "text",
         "title": "Trap: session state with a transaction pooler",
         "body": "A shared pooler in transaction mode gives each transaction whichever server connection is free. Session-level state (temporary tables, session settings, advisory locks, some prepared statement setups) does not follow you to the next transaction. Use session mode for code that needs it, or avoid session state.",
+        "teaches": [
+          "pooling"
+        ]
+      },
+      {
+        "id": "t274-c6",
+        "kind": "text",
+        "title": "Edge case: pools multiplied by instances",
+        "body": "Each application instance has its own pool. Twenty instances with a pool of 20 each can open 400 connections, and autoscaling to 50 instances makes it 1,000, past the database’s max_connections. Size pools from the database’s limit divided by the maximum instance count, or put a shared pooler such as PgBouncer in front.",
         "teaches": [
           "pooling"
         ]
