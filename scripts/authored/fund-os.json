@@ -12,7 +12,7 @@
    "Choose processes or threads for isolation versus cheap sharing"
   ],
   "difficulty": 1,
-  "durationMinutes": 11,
+  "durationMinutes": 12,
   "prereqIds": [],
   "cards": [
    {
@@ -66,6 +66,15 @@
     "body": "fork copies only the calling thread into the child. If another thread held a lock at that moment, the child inherits the locked lock with no thread to release it. POSIX therefore allows only async-signal-safe calls in the child of a multi-threaded process until it calls exec.",
     "teaches": [
      "fork-exec"
+    ]
+   },
+   {
+    "id": "t281-c6",
+    "kind": "text",
+    "title": "Edge case: fork in a multithreaded program",
+    "body": "fork copies the whole address space but only the thread that called it. If another thread held a lock at that moment, such as the memory allocator’s, the child inherits the lock in its held state with no thread to release it, and can hang on its next allocation. POSIX allows only async-signal-safe calls in the child of a multithreaded fork until it calls exec; prefer posix_spawn or spawning before starting threads.",
+    "teaches": [
+     "process-model"
     ]
    }
   ],
@@ -516,6 +525,15 @@
     "teaches": [
      "scheduling"
     ]
+   },
+   {
+    "id": "t282-c6",
+    "kind": "text",
+    "title": "Edge case: the container sees every host core",
+    "body": "A container limited to 2 CPUs by a CFS quota may still report the host’s 64 cores. A runtime that sizes its thread pool or garbage collector from that number starts dozens of busy threads, uses up the quota early in each 100 ms period and is throttled for the rest, which shows up as latency spikes. Size pools from the cgroup limit; many modern runtimes now read it.",
+    "teaches": [
+     "scheduling"
+    ]
    }
   ],
   "questions": [
@@ -931,6 +949,15 @@
     "teaches": [
      "memory-pressure"
     ]
+   },
+   {
+    "id": "t283-c6",
+    "kind": "text",
+    "title": "Edge case: memory that fails later",
+    "body": "Linux overcommits memory by default: allocating a large block usually succeeds, and physical pages are assigned only when they are first written. If the system then runs out, the allocation does not fail; the out-of-memory killer ends a process, possibly a different one. In containers the cgroup memory limit triggers the same kill, so watch for exit code 137 rather than for allocation errors.",
+    "teaches": [
+     "address-translation"
+    ]
    }
   ],
   "questions": [
@@ -1321,6 +1348,15 @@
     "teaches": [
      "syscall-cost"
     ]
+   },
+   {
+    "id": "t284-c6",
+    "kind": "text",
+    "title": "Edge case: interrupted system calls",
+    "body": "A blocking system call such as read can return early with the error EINTR when a signal arrives. Code that treats every error as fatal then fails at random under signals used for timers or profilers. Retry on EINTR (or install handlers with SA_RESTART so the kernel restarts many calls), and handle partial reads and writes by looping until all bytes are done.",
+    "teaches": [
+     "syscall-boundary"
+    ]
    }
   ],
   "questions": [
@@ -1710,6 +1746,15 @@
     "teaches": [
      "blocking-the-loop"
     ]
+   },
+   {
+    "id": "t285-c6",
+    "kind": "text",
+    "title": "Edge case: edge-triggered readiness",
+    "body": "With epoll in edge-triggered mode, the kernel reports a socket once when new data arrives, not while data remains. A handler that reads one buffer and returns leaves the rest unread with no further notification, so the connection stalls. In edge-triggered mode, read until the call returns EAGAIN; level-triggered mode is simpler when unsure.",
+    "teaches": [
+     "io-models"
+    ]
    }
   ],
   "questions": [
@@ -2095,7 +2140,7 @@
    "Keep critical sections short and consistent"
   ],
   "difficulty": 3,
-  "durationMinutes": 10,
+  "durationMinutes": 11,
   "prereqIds": [
    281
   ],
@@ -2150,6 +2195,15 @@
     "body": "A lock held across a network call or a disk write makes every other thread that needs it wait for that I/O. Copy what you need under the lock, release it, then do the slow work.",
     "teaches": [
      "critical-section"
+    ]
+   },
+   {
+    "id": "t286-c6",
+    "kind": "text",
+    "title": "Failure story: a race in a radiation machine",
+    "body": "Documented by Leveson and Turner (IEEE Computer, 1993): between 1985 and 1987 the Therac-25 radiation therapy machine gave massive overdoses in six known accidents. One cause was a race between the operator’s fast edits and the task setting up the beam, so the machine could fire in a state the screen did not show, and hardware interlocks from earlier models had been removed. Races that tests rarely hit can still be fatal.",
+    "teaches": [
+     "race-condition"
     ]
    }
   ],
@@ -2536,7 +2590,7 @@
    "Tell deadlock from livelock and starvation"
   ],
   "difficulty": 3,
-  "durationMinutes": 10,
+  "durationMinutes": 11,
   "prereqIds": [
    286
   ],
@@ -2591,6 +2645,15 @@
     "body": "A callback, a logging hook or a plugin called under your lock may take other locks in an order you cannot see. Release your locks before calling out, or document and enforce which locks callers may hold.",
     "teaches": [
      "lock-ordering"
+    ]
+   },
+   {
+    "id": "t287-c6",
+    "kind": "text",
+    "title": "Failure story: priority inversion on Mars",
+    "body": "Publicly reported by the Mars Pathfinder team in 1997: a low-priority task held a mutex needed by a high-priority bus task, while medium-priority tasks kept the low one from running. The high-priority task missed its deadline, and a watchdog reset the lander repeatedly. Engineers enabled priority inheritance on that mutex from Earth, so the holder temporarily ran at the waiting task’s priority.",
+    "teaches": [
+     "deadlock"
     ]
    }
   ],
@@ -2968,7 +3031,7 @@
    "Build a bounded producer-consumer queue"
   ],
   "difficulty": 3,
-  "durationMinutes": 10,
+  "durationMinutes": 11,
   "prereqIds": [
    286
   ],
@@ -3022,6 +3085,15 @@
     "body": "An unbounded in-memory queue accepts work faster than it can be done, so latency and memory grow until the process falls over. Bound the queue and decide what happens when full: block, reject, or shed the oldest work.",
     "teaches": [
      "bounded-queue"
+    ]
+   },
+   {
+    "id": "t288-c6",
+    "kind": "text",
+    "title": "Edge case: waking up for no reason",
+    "body": "A condition-variable wait can return even though no one signalled (a spurious wakeup), and by the time a signalled thread runs, another may have taken the item. Check the condition in a loop: while the queue is empty, wait. A plain if-check works in tests and fails rarely in production.",
+    "teaches": [
+     "condition-variable"
     ]
    }
   ],
@@ -3394,7 +3466,7 @@
    "Write files atomically with rename"
   ],
   "difficulty": 3,
-  "durationMinutes": 10,
+  "durationMinutes": 11,
   "prereqIds": [
    284
   ],
@@ -3449,6 +3521,15 @@
     "body": "If fsync reports an I/O error, the kernel may already have dropped the dirty pages, so calling fsync again can return success without the data ever being written. After a failed fsync, treat the data as lost and recover from a known-good copy, as PostgreSQL now does by crashing and replaying its log.",
     "teaches": [
      "fsync"
+    ]
+   },
+   {
+    "id": "t289-c6",
+    "kind": "text",
+    "title": "Edge case: a failed fsync cannot be retried",
+    "body": "In 2018, PostgreSQL developers found that on Linux, when fsync fails, the kernel may drop the dirty pages and clear the error, so a retried fsync reports success although the data never reached disk. PostgreSQL changed to stop with a PANIC and recover from its write-ahead log instead. Treat an fsync failure as data loss, not as a temporary error.",
+    "teaches": [
+     "page-cache"
     ]
    }
   ],
@@ -3795,7 +3876,7 @@
    "Read exit codes when a process dies"
   ],
   "difficulty": 2,
-  "durationMinutes": 10,
+  "durationMinutes": 11,
   "prereqIds": [
    281
   ],
@@ -3848,6 +3929,15 @@
     "kind": "text",
     "title": "Trap: the main process does not receive the signal",
     "body": "If a container starts the server through a shell script, the shell may be process 1 and not forward SIGTERM to its child. The server never sees the signal and is killed after the grace period. Use exec to replace the shell, or a small init process that forwards signals.",
+    "teaches": [
+     "signals"
+    ]
+   },
+   {
+    "id": "t290-c6",
+    "kind": "text",
+    "title": "Edge case: PID 1 in a container ignores SIGTERM",
+    "body": "The first process in a container is PID 1, and the kernel does not apply default signal actions to it, so without its own handler it ignores SIGTERM. A shell-form start command also makes the shell PID 1, which may not forward signals to the app. The platform then waits out its grace period (10 seconds by default in Docker) and sends SIGKILL. Use exec form, handle SIGTERM, or run a small init such as tini.",
     "teaches": [
      "signals"
     ]
