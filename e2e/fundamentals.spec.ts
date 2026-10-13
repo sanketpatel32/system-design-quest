@@ -16,6 +16,8 @@ test('sections: overview rings, a map per section, and System Design unchanged',
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Choose a section', level: 1 })).toBeVisible()
   await expect(page.getByTestId('ring-system-design')).toHaveAttribute('data-done', '0')
+  // the overview is not any one section's page
+  await expect(page.locator('[data-testid^="section-tab-"][aria-current]')).toHaveCount(0)
   const by = await areas(page)
   for (const [region, list] of by) {
     const sec = SECTION_OF[region]!

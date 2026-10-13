@@ -54,11 +54,11 @@ function Slider({ item, onDone }: { item: InteractiveSlider; onDone?: () => void
         </dl>
         {out.verdict && (
           <p
-            className={`mt-3 rounded-xl px-3 py-2 text-sm font-extrabold ${out.verdict.ok ? 'bg-[#e9f8dc] text-[#2f7d00]' : 'bg-[#ffe9e9] text-[#b42318]'}`}
+            className={`mt-3 rounded-xl px-3 py-2 text-sm font-extrabold ${out.verdict.neutral ? 'bg-[#e6f4fb] text-[#12749f]' : out.verdict.ok ? 'bg-[#e9f8dc] text-[#2f7d00]' : 'bg-[#ffe9e9] text-[#b42318]'}`}
             data-testid="interactive-verdict"
             data-ok={out.verdict.ok}
           >
-            {out.verdict.ok ? '✓ ' : '✗ '}
+            {out.verdict.neutral ? '→ ' : out.verdict.ok ? '✓ ' : '✗ '}
             {out.verdict.text}
           </p>
         )}

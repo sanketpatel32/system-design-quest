@@ -115,6 +115,8 @@ export interface DragOrderQuestion extends BaseQuestion {
   type: 'drag_order'
   items: { id: string; label: string }[]
   correctOrder: string[]
+  /** Other complete orders that are equally valid (e.g. two independent steps that may swap) */
+  alternativeOrders?: string[][]
 }
 
 export interface EstimationQuestion extends BaseQuestion {
@@ -124,7 +126,14 @@ export interface EstimationQuestion extends BaseQuestion {
   assumptions: string[]
   formula: string
   workedAnswer: string
-  /** Accept if abs(ans-target)/target <= 0.5 */
+  /**
+   * Accepted relative error: accept if abs(ans - target) / target <= tolerance.
+   * Defaults to 0.5 for order-of-magnitude estimates; use 0 for exact counts
+   * (round trips, hosts, levels) and a tight value when a classic mistake is close.
+   */
+  tolerance?: number
+  /** Classic wrong answers this question is designed to catch; the audit checks they fall outside the tolerance */
+  trapAnswers?: number[]
 }
 
 export interface TradeoffQuestion extends BaseQuestion {

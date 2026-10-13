@@ -26,12 +26,12 @@ export function SectionsPage() {
         <h1 className="font-display text-3xl md:text-4xl text-chalk">Choose a section</h1>
         <p className="text-dim mt-1">Each section has its own map, progress and review deck. Your progress carries across; you can switch at any time.</p>
       </div>
-      <SectionPicker current={last} />
+      <SectionPicker current="all" recent={last} />
       <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Sections">
         {SECTIONS.map((s) => {
           const topics = sectionTopics(s.id)
           const done = topics.filter((t) => topicProgress[t.id]?.completed).length
-          const next = topics.find((t) => !topicProgress[t.id]?.completed && isTopicUnlocked(t.id, unlocked))
+          const next = topics.find((t) => !topicProgress[t.id]?.completed && isTopicUnlocked(t.id, unlocked, new Set(Object.keys(topicProgress).filter((k) => topicProgress[Number(k)]?.completed).map(Number))))
           const p = sectionPalette(s.id)
           return (
             <li key={s.id}>

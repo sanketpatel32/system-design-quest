@@ -20,9 +20,18 @@ export function devUnlockAll(): boolean {
   }
 }
 
-export function isTopicUnlocked(topicId: number, unlockedIds: number[]): boolean {
-  // Fundamentals: each area's first topic is open from the start (no stored unlock needed, so old saves just work)
-  return devUnlockAll() || unlockedIds.includes(topicId) || FUND_FIRST.has(topicId)
+/** Fundamentals prerequisites still to clear (empty when the topic is open). */
+export function missingFundPrereqs(topicId: number, completed?: Set<number>): number[] {
+  const pre = topicsById.get(topicId)?.prereqIds ?? []
+  return pre.filter((id) => !completed?.has(id))
+}
+
+export function isTopicUnlocked(topicId: number, unlockedIds: number[], completed?: Set<number>): boolean {
+  // Fundamentals: each area's first topic is open from the start, and any topic whose real prerequisites are
+  // cleared (or that has none) is open too, so revision does not force a strict line. No stored unlock is needed,
+  // so old saves just work.
+  if (devUnlockAll() || unlockedIds.includes(topicId) || FUND_FIRST.has(topicId)) return true
+  return FUND_N.has(topicId) && missingFundPrereqs(topicId, completed).length === 0
 }
 
 export function getUnlockHint(topicId: number, _completedIds: Set<number>): string {
@@ -40,9 +49,10 @@ export function getUnlockHint(topicId: number, _completedIds: Set<number>): stri
     return `Defeat Boss ${n - 1} (${prevBoss.title}) to unlock Boss ${n}.`
   }
   if (FUND_N.has(topicId)) {
-    const line = orderedTopicsInRegion(topic.region)
-    const prev = line[line.findIndex((t) => t.id === topicId) - 1]
-    return prev ? `Clear ${topicLabel(prev.id)} (${prev.title}) to unlock ${topicLabel(topicId)}.` : 'Open from the start.'
+    const missing = missingFundPrereqs(topicId, _completedIds)
+    if (missing.length === 0) return 'Open now.'
+    const names = missing.map((id) => `${topicLabel(id)} (${topicsById.get(id)?.title ?? 'a lesson'})`)
+    return `Clear ${names.join(' and ')} to unlock ${topicLabel(topicId)}; it builds on ${missing.length === 1 ? 'that lesson' : 'those lessons'}.`
   }
   const region = regions.find((r) => r.id === topic.region)
   if (!region) return 'Complete the previous lesson to unlock this one.'
@@ -88,6 +98,12 @@ export function computeUnlocksAfterClear(
     }
   }
 
+  // Fundamentals: clearing a topic also opens every topic in its area whose prerequisites are now all cleared
+  if (FUND_N.has(clearedTopicId)) {
+    const done = new Set([..._completed, clearedTopicId])
+    for (const t of ordered) if (t.id !== clearedTopicId && (t.prereqIds?.length ?? 0) > 0 && missingFundPrereqs(t.id, done).length === 0) next.add(t.id)
+  }
+
   if (topic.region === 'r1-foundations' && clearedTopicId === 3) {
     next.add(74)
   }
@@ -110,7 +126,7 @@ export function topicStatus(
   inProgress: boolean,
 ): TopicStatus {
   if (completed.has(topic.id)) return 'completed'
-  if (!isTopicUnlocked(topic.id, unlocked)) {
+  if (!isTopicUnlocked(topic.id, unlocked, completed)) {
     return 'locked'
   }
   if (inProgress) return 'in_progress'

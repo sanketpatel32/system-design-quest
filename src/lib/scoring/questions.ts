@@ -6,7 +6,7 @@ import type {
   SpotBottleneckQuestion,
   TradeoffQuestion,
 } from '../../content/types'
-import { gradeEstimation, normalizeEstimationInput } from './estimation'
+import { describeTolerance, gradeEstimation, normalizeEstimationInput } from './estimation'
 
 export interface GradeResult {
   correct: boolean
@@ -49,13 +49,12 @@ export function gradeSpotBottleneck(
 }
 
 export function gradeDragOrder(q: DragOrderQuestion, order: string[]): GradeResult {
-  const correct =
-    order.length === q.correctOrder.length &&
-    order.every((id, i) => id === q.correctOrder[i])
+  const matches = (ref: string[]) => order.length === ref.length && order.every((id, i) => id === ref[i])
+  const correct = matches(q.correctOrder) || (q.alternativeOrders ?? []).some(matches)
   return {
     correct,
     feedback: correct
-      ? 'Right order.'
+      ? q.alternativeOrders?.length ? 'Right order (more than one order is valid here).' : 'Right order.'
       : `${order.filter((id, i) => id !== q.correctOrder[i]).length} of ${q.correctOrder.length} steps are out of place. The correct sequence is shown below.`,
   }
 }
@@ -71,11 +70,11 @@ export function gradeEstimationQuestion(
       feedback: 'Enter a positive number with appropriate units in mind.',
     }
   }
-  const correct = gradeEstimation(n, q.target)
+  const correct = gradeEstimation(n, q.target, q.tolerance)
   return {
     correct,
     feedback: correct
-      ? `Within 50% of the target (${q.target} ${q.unit}) — solid back-of-envelope.`
+      ? `${describeTolerance(q.tolerance)} of the target (${q.target} ${q.unit}).`
       : `Off target. Assumptions: ${q.assumptions.join('; ')}`,
   }
 }

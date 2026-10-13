@@ -43,7 +43,7 @@ export function checkFundamentals(topics) {
     if (!t.cards.some((c) => /^Trap:/.test(c.title))) bad('needs a “Trap:” card')
     for (const s of t.seeAlso ?? []) {
       const o = byId.get(s.topicId)
-      if (!o || o.id > 120 || o.kind === 'boss') bad(`seeAlso ${s.topicId} must be a System Design lesson`)
+      if (!o || o.kind !== 'lesson' || o.id === t.id) bad(`seeAlso ${s.topicId} must be another lesson (System Design or Fundamentals)`)
       if (!s.why || s.why.length < 20) bad(`seeAlso ${s.topicId} needs a reason`)
     }
     const { sources, seeAlso, ...rest } = t

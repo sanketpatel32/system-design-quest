@@ -68,3 +68,25 @@ describe('gradeQuestion tradeoff', () => {
     ).toBe(true)
   })
 })
+
+describe('gradeDragOrder alternatives', () => {
+  const q = {
+    id: 'x', concept: 'c', type: 'drag_order' as const, prompt: 'p', explanation: 'e',
+    items: [{ id: 's1', label: 'a' }, { id: 's2', label: 'b' }, { id: 's3', label: 'c' }],
+    correctOrder: ['s1', 's2', 's3'],
+    alternativeOrders: [['s2', 's1', 's3']],
+  }
+  it('accepts the main order and listed alternatives only', () => {
+    expect(gradeQuestion(q, ['s1', 's2', 's3']).correct).toBe(true)
+    expect(gradeQuestion(q, ['s2', 's1', 's3']).correct).toBe(true)
+    expect(gradeQuestion(q, ['s3', 's1', 's2']).correct).toBe(false)
+  })
+})
+
+describe('gradeEstimationQuestion tolerance', () => {
+  const q = { id: 'e', concept: 'c', type: 'estimation' as const, prompt: 'p', explanation: 'e', unit: 'ms', target: 450, assumptions: [], formula: '', workedAnswer: '', tolerance: 0.1 }
+  it('uses the question tolerance', () => {
+    expect(gradeQuestion(q, '300').correct).toBe(false)
+    expect(gradeQuestion(q, '450').correct).toBe(true)
+  })
+})

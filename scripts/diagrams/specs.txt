@@ -431,9 +431,10 @@ Microtask queue|promise callbacks [2. run all]> Main thread
 Main thread [3. if a frame is due]> Render|animation callbacks, style, layout, paint
 
 @205 HTTP cache revalidation: a stale cached response is checked with If-None-Match; the server replies 304 Not Modified with headers only and the browser reuses its stored body.
-Browser [1. fresh: use copy, no request]> Browser cache|ETag "v7", max-age 60
-Browser [2. stale: If-None-Match "v7"]> Server
-Server [3. 304 Not Modified, no body]> Browser
+Browser [1. need /app.css]> HTTP cache|ETag "v7", now stale {store}
+HTTP cache|ETag "v7", now stale {store} [2. If-None-Match "v7"]> Server
+HTTP cache|ETag "v7", now stale {store} [3. 304, no body]< Server
+Browser [4. stored body reused]< HTTP cache|ETag "v7", now stale {store}
 
 @207 A CORS preflight: the browser sends OPTIONS with the requested method and headers; the API answers with the allowed origin, methods and headers; only then does the browser send the real PUT.
 Script on app.example > Browser
@@ -441,11 +442,11 @@ Browser [1. OPTIONS: method PUT, headers]> API on api.example
 API on api.example [2. Allow-Origin app.example, Allow-Methods PUT]> Browser
 Browser [3. real PUT]> API on api.example
 
-@214 A service worker sits between the page and the network: it answers hashed assets from its cache, fetches HTML network-first with a cache fallback, and lets other requests pass through the HTTP cache.
-Page > Service worker
-Service worker [hashed assets: cache first]> SW cache {store}
-Service worker [HTML: network first]> Network|HTTP cache
-Network|HTTP cache [offline: fall back]~> SW cache {store}
+@214 A service worker sits between the page and the network: it answers hashed assets from its cache, fetches HTML network-first and itself falls back to its cache when offline, and lets other requests pass through the HTTP cache.
+Page {client} > Service worker {svc}
+Service worker {svc} [hashed assets: cache first]> SW cache {store}
+Service worker {svc} [offline: fall back]?> SW cache {store}
+Service worker {svc} [HTML: network first]> HTTP cache {store} [miss]> Network|origin server {ext}
 
 @221 The life of a backend request: it passes through a load balancer and a middleware chain for auth and parsing, reaches the handler, which reads a store, then the response flows back.
 Client > Load balancer > Middleware|auth, parse, limits > Handler > Database {store}
@@ -477,13 +478,14 @@ Client [3. ACK + request]> Server
 Server [4. response]> Client
 
 @252 Finding the real client behind proxies: the CDN edge appends the client's address to X-Forwarded-For, the load balancer appends the edge's address, and the app skips trusted hops from the right.
-Client|203.0.113.50 > CDN edge|appends 203.0.113.50 > Load balancer|appends 192.0.2.10 > App|skip trusted hops from the right
+Client|203.0.113.50 {client} > CDN edge|appends 203.0.113.50 {svc} > Load balancer|appends 192.0.2.10 {svc} > App|skip trusted hops from the right {svc}
 
-@254 What happens after you press Enter: the browser parses the URL, resolves the name through DNS, opens TCP and TLS, sends the HTTP request through a CDN to the origin, then parses the HTML.
-Browser|parse URL, check cache [1. look up name]> DNS resolver {svc}
-Browser|parse URL, check cache [2. TCP + TLS]> CDN edge
-CDN edge [3. request on a warm connection]> Origin server
-Origin server [4. HTML]~> Browser|parse URL, check cache
+@254 What happens after you press Enter: the browser parses the URL, resolves the name through DNS, opens TCP and TLS to a CDN edge, which forwards the request to the origin on a warm connection, and the HTML comes back through the edge.
+Browser|parse URL, check cache {client} [1. look up name]> DNS resolver {svc}
+Browser|parse URL, check cache {client} [2. TCP + TLS, request]> CDN edge {svc}
+CDN edge {svc} [3. warm connection]> Origin server {svc}
+CDN edge {svc} [4. HTML]< Origin server {svc}
+Browser|parse URL, check cache {client} [5. HTML]< CDN edge {svc}
 
 # ---------- Fundamentals · Databases ----------
 @264 A B-tree lookup: the root page points to an inner page for the key's range, which points to a leaf page holding the key and a pointer to the table row.
@@ -518,9 +520,10 @@ CSR|empty shell + JS bundle > Browser builds HTML > Interactive
 SSR|HTML built per request > Hydration|attach JS > Interactive
 SSG|HTML built at deploy, served from CDN > Hydration|attach JS
 
-@206 Browser storage: cookies are sent with every matching request, Web Storage holds small synchronous key-value strings per origin, and IndexedDB holds larger structured data asynchronously.
-Cookies|~4 KB each, sent with requests > Server
-localStorage / sessionStorage|strings, synchronous, per origin > Page script
+@206 Browser storage: cookies are sent with every matching request and are readable by page script unless HttpOnly, Web Storage holds small synchronous key-value strings per origin, and IndexedDB holds larger structured data asynchronously.
+Cookies|~4 KB each {store} [sent with matching requests]> Server
+Cookies|~4 KB each {store} [readable unless HttpOnly]> Page script
+localStorage / sessionStorage|strings, synchronous, per origin {store} > Page script
 IndexedDB|structured, asynchronous, larger {store} > Page script
 
 @208 XSS and CSRF: in XSS, attacker input runs as script inside your page; in CSRF, another site makes the browser send a request that carries your cookies.
@@ -531,9 +534,10 @@ Evil site [auto-submit form]> Victim's browser|cookies attached > Your API|sees 
 HTML|button, label, alt, aria-* > Accessibility tree|role, name, state > Screen reader > User
 Keyboard|Tab, Enter, Space > Focused element > Accessibility tree|role, name, state
 
-@210 Core Web Vitals on one page load: LCP marks when the largest content element renders, CLS sums unexpected layout shifts, and INP measures how quickly the page responds to interactions.
-Navigation > Largest content painted|LCP: good ≤ 2.5 s > User clicks > Next paint|INP: good ≤ 200 ms
-Late ad or image without size ~> Layout shift|CLS: good ≤ 0.1
+@210 Core Web Vitals on one page load: LCP marks when the largest content element renders (good at 2.5 s or less), CLS sums unexpected layout shifts (good at 0.1 or less), and INP measures how quickly the page responds to interactions (good at 200 ms or less).
+%concept
+Navigation > Largest content painted|LCP good: 2.5 s or less > User clicks > Next paint|INP good: 200 ms or less
+Late ad or image without size ~> Layout shift|CLS good: 0.1 or less
 
 @211 Loading assets efficiently: critical CSS and the hero image are fetched early, scripts are deferred, below-the-fold images are lazy-loaded, and hashed files are cached for a long time.
 HTML > Critical CSS + hero image|preload, high priority > First render
@@ -541,10 +545,10 @@ HTML > Scripts|defer > Interactive
 HTML ~> Below-the-fold images|loading=lazy
 Hashed assets|long max-age, immutable > Browser cache {store}
 
-@212 Forms and validation: the browser checks constraints for quick feedback, but the server validates again because requests can bypass the page; after a successful POST it redirects to a GET.
-User input > Browser checks|required, type, pattern > POST to server
-POST to server > Server validation|the real check > 303 redirect > GET result page
-Server validation|the real check [errors]~> Form with messages
+@212 Forms and validation: the browser checks constraints for quick feedback, but the server validates again because requests can bypass the page; after a successful POST it redirects to a GET, and errors go back to the form.
+User input {client} > Browser checks|required, type, pattern {client} > POST to server
+POST to server > Server validation|the real check {svc} > 303 redirect > GET result page
+Server validation|the real check {svc} [errors]?> Form with messages {client}
 
 @213 Client state and data fetching: server data is fetched and cached by key, UI state stays local, and a stale-while-revalidate cache shows the cached copy while refetching.
 Component > Query cache|keyed by URL + params {store} [miss or stale]> API
@@ -565,8 +569,8 @@ API [first time: do the work]> Orders {store}
 Client [retry with k1]~> API [return stored result]> Client
 
 @225 Authentication then authorisation: the server first works out who the caller is from a session or token, then checks whether that identity may perform this action on this resource.
-Request|cookie or token > Authentication|who is this? > Authorisation|may user 42 refund order 9? > Handler
-Authorisation|may user 42 refund order 9? [no]~> 403 Forbidden
+Request|cookie or token {client} > Authentication|who is this? {svc} > Authorisation|may user 42 refund order 9? {svc} > Handler {svc}
+Authorisation|may user 42 refund order 9? {svc} [no]?> 403 Forbidden {concept}
 
 @226 Three concurrency models: separate processes with their own memory, threads sharing one process's memory, and one event loop multiplexing many sockets with non-blocking I/O.
 Processes|own memory each > Cores
@@ -583,10 +587,11 @@ Service > stdout|structured JSON logs > Log pipeline {store}
 Service > Metrics endpoint|counters, histograms > Metrics store {store}
 Service [trace id]> Downstream service
 
-@230 Retries with backoff: a failed call is retried only if it is safe and the error is transient, waiting longer with random jitter each time, up to a cap.
+@230 Retries with backoff: a failed call is retried only if it is safe and the error is transient, waiting longer with random jitter each time, up to a cap; otherwise the error is returned.
+%concept
 Call [timeout or 503]> Transient and idempotent?
 Transient and idempotent? [yes]> Wait|backoff × 2 + jitter > Call
-Transient and idempotent? [no, or attempts used up]~> Return error
+Transient and idempotent? [no, or attempts used up]?> Return error
 
 @231 Evolving an API: additive changes go into the current version, while breaking changes ship as a new version that runs alongside the old one until clients migrate.
 Clients on v1 > API v1|add optional fields only
@@ -599,26 +604,30 @@ Gateway [token available]> Service
 Gateway [bucket empty]~> 429 + Retry-After
 
 @234 Untrusted input: input is validated at the boundary, and data is kept separate from code with parameterised queries and output encoding rather than string concatenation.
-Untrusted input > Validate|type, length, allow-list > Parameterised query > Database {store}
-Untrusted input ~> String concatenation|injection risk
+Untrusted input {client} > Validate|type, length, allow-list {svc} > Parameterised query {svc} > Database {store}
+Untrusted input {client} [never]?> String concatenation|injection risk {concept}
 
 @241 Encapsulation down the stack: application data gets a TCP header, then an IP header, then an Ethernet frame header and trailer, and each layer reads only its own header.
+%concept
 HTTP request > TCP segment|ports, sequence numbers > IP packet|source + destination IP > Ethernet frame|MAC addresses > Wire
 
-@242 IPv4 and IPv6 addresses: IPv4 uses 32 bits written as four decimal numbers, IPv6 uses 128 bits written as eight hexadecimal groups, and private ranges are not routed on the internet.
+@242 IPv4 and IPv6 addresses: IPv4 uses 32 bits written as four decimal numbers, IPv6 uses 128 bits written as eight hexadecimal groups, and private IPv4 ranges reach the internet only through NAT.
+%concept
 IPv4|32 bits, 192.0.2.10 > Internet
 IPv6|128 bits, 2001:db8::10 > Internet
-Private ranges|10/8, 172.16/12, 192.168/16 ~> NAT
+Private ranges|10/8, 172.16/12, 192.168/16 [translated]> NAT {svc} > Internet
 
 @243 Splitting a network with CIDR: a /16 block is divided into /24 subnets, each with 256 addresses, of which the network and broadcast addresses are reserved in IPv4.
+%concept
 10.0.0.0/16|65,536 addresses > 10.0.1.0/24|256 addresses
 10.0.0.0/16|65,536 addresses > 10.0.2.0/24|256 addresses
 10.0.1.0/24|256 addresses > Usable hosts|254 (network + broadcast reserved)
 
-@245 Local delivery with ARP: to reach an IP on the same subnet, the sender broadcasts an ARP request, the owner replies with its MAC address, and the frame is then sent directly.
-Host A [1. who has 192.168.1.30? broadcast]> Switch > All hosts on segment
-Host B|192.168.1.30 [2. reply: my MAC]> Host A
-Host A [3. frame to B's MAC]> Host B|192.168.1.30
+@245 Local delivery with ARP: to reach an IP on the same subnet, the sender broadcasts an ARP request, the owner replies with its MAC address, and frames are then sent directly to that MAC.
+Host A|192.168.1.10 {client} [1. who has .30? (broadcast)]> Switch {svc}
+Switch {svc} [flooded]> Host B|192.168.1.30 {client}
+Switch {svc} [flooded]> Host C|not .30, ignores it {client}
+Host A|192.168.1.10 {client} [2. reply: my MAC; 3. frames to it]< Host B|192.168.1.30 {client}
 
 @246 DNS resolution: a recursive resolver asks a root server, then the .com TLD server, then example.com's authoritative server, and caches the answer for its TTL.
 Browser > Recursive resolver {svc}
@@ -648,10 +657,12 @@ Server [2. ServerHello + key share, certificate, Finished]> Client
 Client [3. Finished + first request]> Server
 
 @253 Latency versus bandwidth: a small request is dominated by round trips, while a large download is dominated by size divided by bandwidth.
-Small API call|few KB > Time ≈ round trips × RTT
-Large download|hundreds of MB > Time ≈ size ÷ bandwidth
+%concept
+Small API call|few KB > Time: about round trips × RTT
+Large download|hundreds of MB > Time: about size ÷ bandwidth
 
 @261 Keys and constraints: a primary key identifies each row, a foreign key requires the referenced row to exist, and unique and check constraints reject invalid data.
+%concept
 orders.customer_id|foreign key > customers.id|primary key
 customers.email|unique > Rejects duplicates
 orders.total|check total >= 0 > Rejects negatives
@@ -666,20 +677,23 @@ Orders with customer name, city|repeated per order > customers|id, name, city {s
 orders|customer_id {store} [foreign key]> customers|id, name, city {store}
 
 @265 How the planner chooses: it parses the query, considers plans such as an index scan or a sequential scan, estimates their costs from table statistics, and runs the cheapest.
-SQL > Parser > Planner
-Table statistics|row counts, value distribution {store} > Planner
-Planner [cost estimate]> Index scan
-Planner [cost estimate]> Sequential scan
-Planner [cheapest]> Executor
+SQL {concept} > Parser {svc} > Planner {svc}
+Table statistics|row counts, value distribution {store} > Planner {svc}
+Planner {svc} [cost estimate]> Index scan {concept}
+Planner {svc} [cost estimate]> Sequential scan {concept}
+Planner {svc} [cheapest]> Executor {svc}
 
 @266 A transaction: BEGIN starts it, the statements run, and COMMIT makes every change visible at once; an error before commit means ROLLBACK and no change is kept.
+%concept
 BEGIN > Debit account A > Credit account B > Insert transfer > COMMIT|all visible
-Credit account B [error]~> ROLLBACK|nothing kept
+Credit account B [error]?> ROLLBACK|nothing kept
 
-@267 Isolation levels by anomaly: Read Committed allows non-repeatable reads, snapshot-based Repeatable Read stops them but allows write skew, and Serializable prevents write skew too.
-Read Committed|new snapshot per statement > Repeatable Read|one snapshot per transaction > Serializable|detects dangerous cycles
-Read Committed|new snapshot per statement ~> Lost updates possible in read-then-write
-Repeatable Read|one snapshot per transaction ~> Write skew possible
+@267 Isolation levels in PostgreSQL: Read Committed takes a new snapshot per statement, so read-then-write code can lose updates; Repeatable Read keeps one snapshot and raises a serialisation error on a conflicting update but still allows write skew; Serializable (SSI) also detects the cycles behind write skew. InnoDB's Repeatable Read differs: its updates see the latest rows, so lost updates remain possible there.
+%concept
+Read Committed|new snapshot per statement > Repeatable Read (PostgreSQL)|one snapshot, conflicting update fails > Serializable (PostgreSQL)|SSI detects dangerous cycles
+Read Committed|new snapshot per statement ?> Lost updates possible|in read-then-write code
+Repeatable Read (PostgreSQL)|one snapshot, conflicting update fails ?> Write skew still possible
+Repeatable Read (PostgreSQL)|one snapshot, conflicting update fails [compare]> InnoDB Repeatable Read|updates see latest rows, so lost updates possible
 
 @268 MVCC: an update writes a new row version while readers keep seeing the version that matches their snapshot, and old versions are cleaned up once no snapshot needs them.
 Writer [UPDATE]> Row version 2 {store}
