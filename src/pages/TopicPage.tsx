@@ -40,7 +40,7 @@ export function TopicPage() {
         <p className="text-sm font-extrabold uppercase tracking-wide text-dim">Locked · {topicLabel(topic.id)}</p>
         <h1 className="font-display text-3xl text-chalk">{topic.title}</h1>
         <p className="font-bold text-chalk">{getUnlockHint(topic.id, completed)}</p>
-        <Link to="/" className="btn-cta">Back to the map</Link>
+        <Link to={sectionPath(sectionOfTopic(topic.id))} className="btn-cta">Back to the map</Link>
       </div>
     )
   }
