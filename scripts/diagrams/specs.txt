@@ -506,3 +506,195 @@ App {client} [stale-tolerant reads]> Async replica {store}
 App instance 1 {svc} > Pool 1|10 connections {svc} > Database|max_connections 200 {store}
 App instance 2 {svc} > Pool 2|10 connections {svc} > Database|max_connections 200 {store}
 App instance N {svc} > Pool N|10 connections {svc} > Database|max_connections 200 {store}
+
+# ---------- Fundamentals · more diagrams (round 4) ----------
+@202 The critical rendering path: HTML parsing pauses at a classic script, CSS blocks rendering until the CSSOM is built, and the first paint waits for both the DOM and the CSSOM.
+HTML bytes > Parser|builds DOM > DOM > First paint
+Parser|builds DOM [classic script: pause]> Script|download + run
+CSS file|render-blocking > CSSOM > First paint
+
+@204 Rendering models: client-side rendering sends an empty shell and builds HTML in the browser; server-side rendering builds HTML per request; static generation builds it once at deploy; hydration then attaches the JavaScript.
+CSR|empty shell + JS bundle > Browser builds HTML > Interactive
+SSR|HTML built per request > Hydration|attach JS > Interactive
+SSG|HTML built at deploy, served from CDN > Hydration|attach JS
+
+@206 Browser storage: cookies are sent with every matching request, Web Storage holds small synchronous key-value strings per origin, and IndexedDB holds larger structured data asynchronously.
+Cookies|~4 KB each, sent with requests > Server
+localStorage / sessionStorage|strings, synchronous, per origin > Page script
+IndexedDB|structured, asynchronous, larger {store} > Page script
+
+@208 XSS and CSRF: in XSS, attacker input runs as script inside your page; in CSRF, another site makes the browser send a request that carries your cookies.
+Attacker comment|<script>…</script> [stored unescaped]> Your page > Reader's tab|runs attacker script
+Evil site [auto-submit form]> Victim's browser|cookies attached > Your API|sees a valid session
+
+@209 How assistive technology reads a page: the browser turns the DOM's roles, names and states into an accessibility tree, which a screen reader announces and keyboard users navigate.
+HTML|button, label, alt, aria-* > Accessibility tree|role, name, state > Screen reader > User
+Keyboard|Tab, Enter, Space > Focused element > Accessibility tree|role, name, state
+
+@210 Core Web Vitals on one page load: LCP marks when the largest content element renders, CLS sums unexpected layout shifts, and INP measures how quickly the page responds to interactions.
+Navigation > Largest content painted|LCP: good ≤ 2.5 s > User clicks > Next paint|INP: good ≤ 200 ms
+Late ad or image without size ~> Layout shift|CLS: good ≤ 0.1
+
+@211 Loading assets efficiently: critical CSS and the hero image are fetched early, scripts are deferred, below-the-fold images are lazy-loaded, and hashed files are cached for a long time.
+HTML > Critical CSS + hero image|preload, high priority > First render
+HTML > Scripts|defer > Interactive
+HTML ~> Below-the-fold images|loading=lazy
+Hashed assets|long max-age, immutable > Browser cache {store}
+
+@212 Forms and validation: the browser checks constraints for quick feedback, but the server validates again because requests can bypass the page; after a successful POST it redirects to a GET.
+User input > Browser checks|required, type, pattern > POST to server
+POST to server > Server validation|the real check > 303 redirect > GET result page
+Server validation|the real check [errors]~> Form with messages
+
+@213 Client state and data fetching: server data is fetched and cached by key, UI state stays local, and a stale-while-revalidate cache shows the cached copy while refetching.
+Component > Query cache|keyed by URL + params {store} [miss or stale]> API
+API [fresh data]~> Query cache|keyed by URL + params {store}
+Component > Local UI state|open tabs, input text
+
+@223 Choosing a status code: success is 2xx, redirects 3xx, client mistakes 4xx and server failures 5xx; only some methods are safe or idempotent.
+Request > Handler
+Handler [created]> 201 + Location
+Handler [bad input]> 400 or 422
+Handler [not allowed]> 401 or 403
+Handler [overloaded]> 503 + Retry-After
+
+@224 An idempotent endpoint: the server stores the result under the client's idempotency key, so a retried request returns the stored result instead of acting twice.
+Client [POST + Idempotency-Key k1]> API
+API [insert k1 if absent]> Keys table {store}
+API [first time: do the work]> Orders {store}
+Client [retry with k1]~> API [return stored result]> Client
+
+@225 Authentication then authorisation: the server first works out who the caller is from a session or token, then checks whether that identity may perform this action on this resource.
+Request|cookie or token > Authentication|who is this? > Authorisation|may user 42 refund order 9? > Handler
+Authorisation|may user 42 refund order 9? [no]~> 403 Forbidden
+
+@226 Three concurrency models: separate processes with their own memory, threads sharing one process's memory, and one event loop multiplexing many sockets with non-blocking I/O.
+Processes|own memory each > Cores
+Threads|shared memory, need locks > Cores
+Event loop|one thread, non-blocking I/O > Many sockets
+
+@228 Twelve-factor configuration: the same build artefact runs in every environment, and only environment variables or a secrets store change between staging and production.
+One build artefact > Staging|env vars + secrets
+One build artefact > Production|env vars + secrets
+Secrets manager {store} > Production|env vars + secrets
+
+@229 Logs, metrics and traces: services write structured logs to standard output, expose counters and histograms for scraping, and propagate a trace id across calls.
+Service > stdout|structured JSON logs > Log pipeline {store}
+Service > Metrics endpoint|counters, histograms > Metrics store {store}
+Service [trace id]> Downstream service
+
+@230 Retries with backoff: a failed call is retried only if it is safe and the error is transient, waiting longer with random jitter each time, up to a cap.
+Call [timeout or 503]> Transient and idempotent?
+Transient and idempotent? [yes]> Wait|backoff × 2 + jitter > Call
+Transient and idempotent? [no, or attempts used up]~> Return error
+
+@231 Evolving an API: additive changes go into the current version, while breaking changes ship as a new version that runs alongside the old one until clients migrate.
+Clients on v1 > API v1|add optional fields only
+Clients on v2 > API v2|breaking changes
+API v1|add optional fields only [deprecation date]~> 410 Gone after sunset
+
+@233 Rate limiting in a backend: a shared store holds a token bucket per client, and the gateway admits a request only if a token is available, otherwise returns 429.
+Client > Gateway [take a token]> Token buckets|per client key {store}
+Gateway [token available]> Service
+Gateway [bucket empty]~> 429 + Retry-After
+
+@234 Untrusted input: input is validated at the boundary, and data is kept separate from code with parameterised queries and output encoding rather than string concatenation.
+Untrusted input > Validate|type, length, allow-list > Parameterised query > Database {store}
+Untrusted input ~> String concatenation|injection risk
+
+@241 Encapsulation down the stack: application data gets a TCP header, then an IP header, then an Ethernet frame header and trailer, and each layer reads only its own header.
+HTTP request > TCP segment|ports, sequence numbers > IP packet|source + destination IP > Ethernet frame|MAC addresses > Wire
+
+@242 IPv4 and IPv6 addresses: IPv4 uses 32 bits written as four decimal numbers, IPv6 uses 128 bits written as eight hexadecimal groups, and private ranges are not routed on the internet.
+IPv4|32 bits, 192.0.2.10 > Internet
+IPv6|128 bits, 2001:db8::10 > Internet
+Private ranges|10/8, 172.16/12, 192.168/16 ~> NAT
+
+@243 Splitting a network with CIDR: a /16 block is divided into /24 subnets, each with 256 addresses, of which the network and broadcast addresses are reserved in IPv4.
+10.0.0.0/16|65,536 addresses > 10.0.1.0/24|256 addresses
+10.0.0.0/16|65,536 addresses > 10.0.2.0/24|256 addresses
+10.0.1.0/24|256 addresses > Usable hosts|254 (network + broadcast reserved)
+
+@245 Local delivery with ARP: to reach an IP on the same subnet, the sender broadcasts an ARP request, the owner replies with its MAC address, and the frame is then sent directly.
+Host A [1. who has 192.168.1.30? broadcast]> Switch > All hosts on segment
+Host B|192.168.1.30 [2. reply: my MAC]> Host A
+Host A [3. frame to B's MAC]> Host B|192.168.1.30
+
+@246 DNS resolution: a recursive resolver asks a root server, then the .com TLD server, then example.com's authoritative server, and caches the answer for its TTL.
+Browser > Recursive resolver {svc}
+Recursive resolver {svc} [1. where is .com?]> Root server
+Recursive resolver {svc} [2. where is example.com?]> .com TLD server
+Recursive resolver {svc} [3. A record?]> Authoritative server
+Recursive resolver {svc} [cache for TTL]~> Browser
+
+@248 Flow control versus congestion control: the receiver's advertised window limits how much it can buffer, the congestion window limits what the network can carry, and the sender uses the smaller.
+Receiver window|what the receiver can buffer > Sender sends min of both
+Congestion window|what the network can carry > Sender sends min of both
+Packet loss ~> Congestion window|what the network can carry
+
+@249 Sockets and ports: each connection is identified by its four-tuple, so one server port can serve many clients, while UDP datagrams are delivered without a connection.
+Client A|203.0.113.5:51000 > Server|:443
+Client B|198.51.100.7:40001 > Server|:443
+DNS client|UDP > Resolver|UDP :53
+
+@250 HTTP versions: HTTP/1.1 sends one request at a time per connection, HTTP/2 multiplexes streams over one TCP connection, and HTTP/3 runs streams over QUIC on UDP so one loss stalls only its stream.
+HTTP/1.1|one request at a time > TCP connection|one exchange at a time
+HTTP/2|many streams > TCP|one loss stalls all streams
+HTTP/3|many streams > QUIC over UDP|loss stalls one stream
+
+@251 The TLS 1.3 handshake: the client sends its key share, the server replies with its key share, certificate and Finished, and application data can flow after one round trip.
+Client [1. ClientHello + key share]> Server
+Server [2. ServerHello + key share, certificate, Finished]> Client
+Client [3. Finished + first request]> Server
+
+@253 Latency versus bandwidth: a small request is dominated by round trips, while a large download is dominated by size divided by bandwidth.
+Small API call|few KB > Time ≈ round trips × RTT
+Large download|hundreds of MB > Time ≈ size ÷ bandwidth
+
+@261 Keys and constraints: a primary key identifies each row, a foreign key requires the referenced row to exist, and unique and check constraints reject invalid data.
+orders.customer_id|foreign key > customers.id|primary key
+customers.email|unique > Rejects duplicates
+orders.total|check total >= 0 > Rejects negatives
+
+@262 Joining and grouping: rows from orders and order items are matched on the key, filtered with WHERE, grouped by order, and the groups are filtered with HAVING.
+orders > JOIN on order_id > WHERE|filter rows > GROUP BY order > HAVING|filter groups > Result
+order_items > JOIN on order_id
+
+@263 Normalising a table: an orders table that repeats customer details is split so the customer facts live once in a customers table referenced by id.
+Orders with customer name, city|repeated per order > orders|customer_id {store}
+Orders with customer name, city|repeated per order > customers|id, name, city {store}
+orders|customer_id {store} [foreign key]> customers|id, name, city {store}
+
+@265 How the planner chooses: it parses the query, considers plans such as an index scan or a sequential scan, estimates their costs from table statistics, and runs the cheapest.
+SQL > Parser > Planner
+Table statistics|row counts, value distribution {store} > Planner
+Planner [cost estimate]> Index scan
+Planner [cost estimate]> Sequential scan
+Planner [cheapest]> Executor
+
+@266 A transaction: BEGIN starts it, the statements run, and COMMIT makes every change visible at once; an error before commit means ROLLBACK and no change is kept.
+BEGIN > Debit account A > Credit account B > Insert transfer > COMMIT|all visible
+Credit account B [error]~> ROLLBACK|nothing kept
+
+@267 Isolation levels by anomaly: Read Committed allows non-repeatable reads, snapshot-based Repeatable Read stops them but allows write skew, and Serializable prevents write skew too.
+Read Committed|new snapshot per statement > Repeatable Read|one snapshot per transaction > Serializable|detects dangerous cycles
+Read Committed|new snapshot per statement ~> Lost updates possible in read-then-write
+Repeatable Read|one snapshot per transaction ~> Write skew possible
+
+@268 MVCC: an update writes a new row version while readers keep seeing the version that matches their snapshot, and old versions are cleaned up once no snapshot needs them.
+Writer [UPDATE]> Row version 2 {store}
+Reader with older snapshot > Row version 1 {store}
+Row version 1 {store} [no snapshot needs it]~> Cleanup|vacuum
+
+@271 NoSQL families by query shape: key-value for lookups by key, document for nested records, wide-column for partitioned time-ordered data, and graph for relationships.
+Get by key > Key-value store {store}
+Nested record by id > Document store {store}
+Latest N by partition > Wide-column store {store}
+Friends of friends > Graph database {store}
+
+@272 Expand and contract: add the new column, write to both, backfill, switch reads, stop writing the old column, then drop it, with each step deployed separately.
+Add new column > Write both > Backfill old rows > Read new column > Stop writing old > Drop old column
+
+@273 The N+1 problem: one query loads a list, then one more query runs for each item; batching the lookups replaces N queries with one.
+Load 100 posts|1 query > Load author per post|100 queries
+Load 100 posts|1 query > Load authors WHERE id IN (…)|1 query
