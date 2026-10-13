@@ -213,7 +213,9 @@ if (warnings.length && !strict) {
     if (right > other) longest++
     if (right > 1.5 * other && right - other > 15) errors.push(`Topic ${t.id} ${q.id}: correct option is far longer than every distractor (${right} vs ${other} chars)`)
   }
-  console.log(`Option balance: correct option uniquely longest in ${Math.round((longest / n) * 100)}% of ${n} single-answer MCQs; none grossly longer (choices are shuffled per attempt)`)
+  const share = (longest / n) * 100
+  if (share > 35) errors.push(`Option balance: the correct option is uniquely longest in ${share.toFixed(1)}% of single-answer MCQs (limit 35%); rewrite distractors or answers, or add an entry to scripts/option-balance.json`)
+  console.log(`Option balance: correct option uniquely longest in ${share.toFixed(1)}% (${longest}) of ${n} single-answer MCQs (limit 35%); none grossly longer (choices are shuffled per attempt)`)
 }
 // Dead or off-topic sources must not return (review M5)
 for (const t of topics) for (const s of t.sources ?? []) if (/designing-distributed-systems|datastax\.com\/blog/.test(s.url)) errors.push(`Topic ${t.id}: dead source ${s.url}`)
