@@ -14,7 +14,7 @@ export type Section = {
 
 /** First-class sections. Topic IDs never move between sections, so saved progress (keyed by topic id) is unaffected. */
 export const ALL_SECTIONS: Section[] = [
-  { id: 'system-design', name: 'System Design', blurb: '79 lessons in 10 units, the Interview Playbook and 40 boss fights.', regionIds: regions.filter((r) => r.track !== 'fundamentals').map((r) => r.id) },
+  { id: 'system-design', name: 'System Design', blurb: 'Units of core lessons, the Interview Playbook and boss fights that put it all together.', regionIds: regions.filter((r) => r.track !== 'fundamentals').map((r) => r.id) },
   { id: 'frontend', name: 'Frontend', blurb: 'How the browser turns bytes into pixels, and how to keep it fast, safe and accessible.', regionIds: ['f1-frontend'] },
   { id: 'backend', name: 'Backend', blurb: 'How servers handle requests, failures, jobs and limits.', regionIds: ['f2-backend'] },
   { id: 'networking', name: 'Networking', blurb: 'How packets find their way: addressing, routing, TCP, HTTP and TLS.', regionIds: ['f3-networking'] },
