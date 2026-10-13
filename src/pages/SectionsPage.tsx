@@ -38,7 +38,8 @@ export function SectionsPage() {
               <Link to={sectionPath(s.id)} className="panel flex h-full items-center gap-4 p-5 hover:-translate-y-0.5 transition-transform" style={{ borderColor: p.bright, boxShadow: `0 4px 0 ${p.bright}` }} data-testid={`section-card-${s.id}`}>
                 <Ring done={done} total={topics.length} colour={p.bright} id={s.id} />
                 <div className="min-w-0 flex-1">
-                  <p className="font-display text-xl" style={{ color: p.deep }}>{s.name}{s.id === last ? <span className="ml-2 align-middle text-xs font-extrabold uppercase tracking-wide text-dim">last visited</span> : null}</p>
+                  <p className="font-display text-xl" style={{ color: p.deep }}>{s.name}</p>
+                  {s.id === last ? <p className="text-xs font-extrabold uppercase tracking-wide text-dim">Last visited</p> : null}
                   <p className="text-sm text-dim">{s.blurb}</p>
                   <p className="mt-1 text-sm font-extrabold tabular-nums text-chalk">{done} of {topics.length} cleared · {sectionXp(s.id, topicProgress)} XP</p>
                   {next && <p className="text-sm font-bold truncate" style={{ color: p.deep }}>Next: {next.title}</p>}
