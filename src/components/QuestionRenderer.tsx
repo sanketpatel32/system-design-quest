@@ -1,3 +1,4 @@
+import { describeTolerance } from '../lib/scoring/estimation'
 import { useEffect, useState } from 'react'
 import type { Question, TradeoffQuestion } from '../content/types'
 import { gradeQuestion, incompleteReason } from '../lib/scoring/questions'
@@ -363,7 +364,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
       )}
       {question.type === 'drag_order' && shown && !shown.correct && (
         <div className="rounded-2xl border border-[#79d634] bg-[#effbe5] p-3">
-          <p className="text-sm font-semibold text-[var(--color-clear)] mb-1.5">Correct sequence</p>
+          <p className="text-sm font-semibold text-[var(--color-clear)] mb-1.5">{question.alternativeOrders?.length ? 'One correct sequence' : 'Correct sequence'}</p>
           <ol className="list-decimal pl-5 text-sm text-chalk space-y-0.5">
             {question.correctOrder.map((id) => (
               <li key={id}>{question.items.find((i) => i.id === id)?.label}</li>
@@ -390,6 +391,9 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
               <span className="grid place-items-center rounded-r-2xl border-2 border-l-0 border-[var(--color-rail)] bg-[var(--color-sky)] px-4 font-extrabold text-[#12749f]">
                 {question.unit}
               </span>
+            </span>
+            <span className="mt-1.5 block text-xs text-dim" data-testid="estimation-tolerance">
+              {question.tolerance === 0 ? 'Needs the exact number.' : `${describeTolerance(question.tolerance)} of the target counts as correct.`}
             </span>
           </label>
           {submitted && (

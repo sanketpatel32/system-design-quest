@@ -70,6 +70,15 @@ describe('fundamentals models', () => {
     expect(val(MODELS['backoff'].run(7, { baseMs: 100, capMs: 2000 }), 1)).toMatch(/^2,?000 ms$/)
     expect(MODELS['backoff'].run(10, { baseMs: 100, capMs: 2000 }).verdict!.ok).toBe(false)
   })
+  it('backoff: the deadline comes from the lesson (2 s fits three retries of 200/400/800 ms, not four)', () => {
+    expect(MODELS['backoff'].run(3, { baseMs: 200, capMs: 5000, budgetMs: 2000 }).verdict!.ok).toBe(true)
+    expect(MODELS['backoff'].run(4, { baseMs: 200, capMs: 5000, budgetMs: 2000 }).verdict!.ok).toBe(false)
+    expect(MODELS['backoff'].run(4, { baseMs: 200, capMs: 5000, budgetMs: 2000 }).verdict!.text).toContain('2 s')
+  })
+  it('transfer-time: latency- and bandwidth-bound are neutral observations', () => {
+    expect(MODELS['transfer-time'].run(0.05, { rttMs: 100, roundTrips: 3, mbps: 8 }).verdict!.neutral).toBe(true)
+    expect(MODELS['transfer-time'].run(5, { rttMs: 100, roundTrips: 3, mbps: 8 }).verdict!.neutral).toBe(true)
+  })
   it('frame-budget: 60 Hz gives 16.7 ms, 90 Hz overruns 12 ms of work', () => {
     expect(val(MODELS['frame-budget'].run(60, { workMs: 12 }), 1)).toBe('16.7 ms')
     expect(MODELS['frame-budget'].run(90, { workMs: 12 }).verdict!.ok).toBe(false)

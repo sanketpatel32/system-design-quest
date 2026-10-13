@@ -25,7 +25,9 @@ describe('Fundamentals track', () => {
       const line = orderedTopicsInRegion(r.id)
       line.slice(0, -1).forEach((t, i) => {
         const next = computeUnlocksAfterClear(t.id, [1], new Set([t.id]))
-        expect(next.sort()).toEqual([1, line[i + 1]!.id].sort())
+        expect(next).toEqual(expect.arrayContaining([1, line[i + 1]!.id]))
+        // anything else it opens must have its prerequisites met
+        for (const id of next) if (id !== 1 && id !== line[i + 1]!.id) expect(topicsById.get(id)!.prereqIds).toEqual(expect.arrayContaining([t.id]))
       })
       expect(computeUnlocksAfterClear(line.at(-1)!.id, [1], new Set())).toEqual([1])
     }
@@ -36,6 +38,21 @@ describe('Fundamentals track', () => {
     const [a, b] = orderedTopicsInRegion(r.id)
     expect(topicLabel(a!.id)).toBe(`${r.name} 1`)
     expect(getUnlockHint(b!.id, new Set())).toContain(a!.title)
+  })
+
+  it('opens a fundamentals topic once its real prerequisites are cleared, without the strict line', () => {
+    const t = topicsById.get(251)!
+    expect(t.prereqIds).toContain(247)
+    expect(isTopicUnlocked(251, [1], new Set())).toBe(false)
+    expect(isTopicUnlocked(251, [1], new Set(t.prereqIds))).toBe(true)
+    // topics without prerequisites are open from the start
+    const open = [...FUND_N.keys()].filter((id) => (topicsById.get(id)!.prereqIds ?? []).length === 0)
+    for (const id of open) expect(isTopicUnlocked(id, [1], new Set())).toBe(true)
+    // prerequisites always point backwards inside the same area
+    for (const id of FUND_N.keys()) for (const p of topicsById.get(id)!.prereqIds ?? []) {
+      expect(p).toBeLessThan(id)
+      expect(topicsById.get(p)!.region).toBe(topicsById.get(id)!.region)
+    }
   })
 
   it('keeps an existing System Design save intact (no version bump needed)', () => {

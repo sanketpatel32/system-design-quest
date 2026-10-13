@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
+import type { Topic } from '../content/types'
 import { SECTION_BY_ID, sectionOfTopic, sectionPath } from '../content/sections'
 import { topicLabel } from '../content/numbering'
 import { allTopics, regions, topicsById } from '../content/catalog'
@@ -19,7 +20,9 @@ export function TopicPage() {
   const completed = completedTopicIds(state)
   const accent = topic ? transitLineColor(topic.region) : 'var(--color-amber)'
   /** Reverse index: section topics whose seeAlso points at this System Design lesson */
-  const deeperIn = topic ? allTopics.flatMap((t) => (t.seeAlso ?? []).filter((x) => x.topicId === topic.id).map((x) => ({ t, why: x.why }))) : []
+  const deeperIn = topic
+    ? allTopics.flatMap((t) => (t.seeAlso ?? []).filter((x) => x.topicId === topic.id && !(topic.seeAlso ?? []).some((y) => y.topicId === t.id)).map((x) => ({ t, why: x.why })))
+    : []
 
   if (!topic) {
     return (
@@ -116,16 +119,11 @@ export function TopicPage() {
         )}
         {topic.seeAlso?.length ? (
           <div data-testid="see-also">
-            <h2 className="font-display text-lg text-chalk mb-2">In the System Design section</h2>
+            <h2 className="font-display text-lg text-chalk mb-2">See also</h2>
             <ul className="space-y-2 text-sm">
               {topic.seeAlso.map((s) => {
                 const t = topicsById.get(s.topicId)
-                return t ? (
-                  <li key={s.topicId}>
-                    <Link className="font-bold text-[#12749f] hover:underline" to={`/topic/${t.slug}`}>{t.title}</Link>
-                    <span className="block text-dim">{s.why}</span>
-                  </li>
-                ) : null
+                return t ? <RelatedLink key={s.topicId} t={t} why={s.why} locked={topicStatus(t, state.unlockedTopicIds, completed, false) === 'locked'} /> : null
               })}
             </ul>
           </div>
@@ -135,11 +133,7 @@ export function TopicPage() {
             <h2 className="font-display text-lg text-chalk mb-2">Go deeper in other sections</h2>
             <ul className="space-y-2 text-sm">
               {deeperIn.map(({ t, why }) => (
-                <li key={t.id}>
-                  <span className="block text-xs font-extrabold uppercase tracking-wide text-dim">{SECTION_BY_ID.get(sectionOfTopic(t.id))?.name}</span>
-                  <Link className="font-bold text-[#12749f] hover:underline" to={`/topic/${t.slug}`}>{t.title}</Link>
-                  <span className="block text-dim">{why}</span>
-                </li>
+                <RelatedLink key={t.id} t={t} why={why} locked={topicStatus(t, state.unlockedTopicIds, completed, false) === 'locked'} />
               ))}
             </ul>
           </div>
@@ -158,5 +152,21 @@ export function TopicPage() {
         </div>
       </aside>
     </div>
+  )
+}
+
+/** A related-lesson link that names its section and shows when the target is still locked, so it never lands on a surprise lock screen */
+function RelatedLink({ t, why, locked }: { t: Topic; why: string; locked: boolean }) {
+  return (
+    <li data-testid={`related-${t.id}`} data-locked={locked ? 'true' : 'false'}>
+      <span className="block text-xs font-extrabold uppercase tracking-wide text-dim">{SECTION_BY_ID.get(sectionOfTopic(t.id))?.name}</span>
+      <Link className="font-bold text-[#12749f] hover:underline" to={`/topic/${t.slug}`}>{t.title}</Link>
+      {locked && (
+        <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-[#E5E0D8] px-1.5 py-0.5 align-middle text-xs font-bold text-[#5B6472]">
+          <IconLock size={12} color="#5B6472" /> Locked
+        </span>
+      )}
+      <span className="block text-dim">{why}</span>
+    </li>
   )
 }

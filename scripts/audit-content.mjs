@@ -2,6 +2,7 @@
 import { checkQuiz } from './audit/quiz-quality.mjs'
 import { checkR3 } from './audit/r3.mjs'
 import { checkFundamentals } from './audit/fund.mjs'
+import { checkGrading, loadGlyphCheck } from './audit/grading.mjs'
 import { checkDepth, checkBossDepth, DEEP_REGIONS } from './audit/depth.mjs'
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -229,6 +230,15 @@ for (const t of topics) for (const s of t.sources ?? []) if (/designing-distribu
   const f = checkFundamentals(topics)
   errors.push(...f.errors)
   f.info.forEach((m) => console.log(m))
+}
+{
+  const g = checkGrading(topics, {
+    optionEdits: JSON.parse(readFileSync(join(root, 'scripts/option-balance.json'), 'utf8')),
+    diagramSpecs: readFileSync(join(root, 'scripts/diagrams/specs.txt'), 'utf8'),
+    glyphOk: await loadGlyphCheck(root),
+  })
+  errors.push(...g.errors)
+  g.info.forEach((m) => console.log(m))
 }
 // All checks above push into `errors`; fail only after every check has run
 if (errors.length) {

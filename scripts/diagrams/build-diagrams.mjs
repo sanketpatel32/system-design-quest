@@ -27,8 +27,10 @@ const PALETTE = {
   queue: ['#fff3bf', '#e67700'],
   ext: ['#ffe3e3', '#c92a2a'],
   svc: ['#f3f0ff', '#6741d9'],
+  // neutral style for ideas rather than components (layers, address blocks, isolation levels); never in the legend
+  concept: ['#f8f9fa', '#495057'],
 }
-const KIND_ALIAS = { svc: 'svc', service: 'svc', store: 'store', client: 'client', queue: 'queue', ext: 'ext', external: 'ext' }
+const KIND_ALIAS = { svc: 'svc', service: 'svc', store: 'store', client: 'client', queue: 'queue', ext: 'ext', external: 'ext', concept: 'concept' }
 function kindOf(label, kind) {
   if (kind) return KIND_ALIAS[kind]
   const l = label.toLowerCase()
@@ -55,7 +57,12 @@ function cmdsToD(cmds) {
 }
 // Glyph-by-glyph layout: opentype.js's contextual substitution produces NaN paths for some strings with this font.
 const width = (t, s) => [...t].reduce((w, ch) => w + font.getAdvanceWidth(ch, s, { kerning: false }), 0)
+// every character must exist in the font: text is outlined, so a missing glyph silently renders as a blank
+function assertGlyphs(t, where) {
+  for (const ch of t) if (ch !== ' ' && font.charToGlyphIndex(ch) === 0) throw new Error(`diagram ${where}: the font has no glyph for "${ch}" (U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}) in "${t}"; use plain text such as "<=" or "about"`)
+}
 function textPath(t, cx, y, s) {
+  assertGlyphs(t, 'text')
   let x = cx - width(t, s) / 2
   let d = ''
   for (const ch of t) {
@@ -74,8 +81,10 @@ function parse(src) {
     const line = raw.trim()
     if (!line || line.startsWith('#')) continue
     const m = /^@(\d+)\s+(.+)$/.exec(line)
-    if (m) { cur = { id: Number(m[1]), alt: m[2], lines: [] }; out.push(cur); continue }
+    if (m) { cur = { id: Number(m[1]), alt: m[2], lines: [], defaultKind: null }; out.push(cur); continue }
     if (!cur) throw new Error('chain before @id: ' + line)
+    // "%concept": nodes without an explicit kind use the neutral concept style (for diagrams of ideas, not components)
+    if (line === '%concept') { cur.defaultKind = 'concept'; continue }
     cur.lines.push(line)
   }
   return out
@@ -91,17 +100,19 @@ function buildGraph(spec) {
     if (!nodes.has(label)) nodes.set(label, { id: 'n' + nodes.size, label, lines: label.split('|').map((s) => s.trim()) })
     const n = nodes.get(label)
     if (km) n.kind = KIND_ALIAS[km[1]]
+    else if (!n.kind && spec.defaultKind) n.kind = spec.defaultKind
     return n
   }
   for (const line of spec.lines) {
-    const parts = line.split(/\s+((?:\[[^\]]*\])?~?[<>])\s+/)
+    // ">" sync, "~>" async / later (dashed), "?>" error or alternative path (dotted, red)
+    const parts = line.split(/\s+((?:\[[^\]]*\])?[~?]?[<>])\s+/)
     for (let i = 0; i + 2 < parts.length; i += 2) {
       const a = node(parts[i].trim()), b = node(parts[i + 2].trim())
       const op = parts[i + 1]
       const lm = /^\[([^\]]*)\]/.exec(op)
       // "A [x]< B" draws B -> A but keeps A to the left of B in the layout
       const rev = op.endsWith('<')
-      edges.push({ from: rev ? b : a, to: rev ? a : b, rf: a, rt: b, dashed: /~[<>]$/.test(op), label: lm ? lm[1] : '' })
+      edges.push({ from: rev ? b : a, to: rev ? a : b, rf: a, rt: b, dashed: /~[<>]$/.test(op), alt: /\?[<>]$/.test(op), label: lm ? lm[1] : '' })
     }
     if (parts.length === 1) node(parts[0].trim())
     for (const p of parts) if (!p.trim()) throw new Error(`empty node in ${spec.id}: ${line}`)
@@ -224,9 +235,20 @@ function edgeGeom0(e, g) {
   if (e.back) {
     // route around: below (horizontal) or to the right (vertical)
     if (!g.vertical) {
-      const y = Math.max(a.y + a.h, b.y + b.h) + 22
-      const p0 = [a.x + a.w / 2, a.y + a.h + 4], p3 = [b.x + b.w / 2, b.y + b.h + 4]
-      return { pts: [p0, [p0[0], y], [p3[0], y], p3], curve: true }
+      // loop over or under every box between the two ends, whichever crosses fewer boxes (prefer under on a tie)
+      const lo = Math.min(a.x, b.x), hi = Math.max(a.x + a.w, b.x + b.w)
+      const span = g.nodes.filter((n) => n.x + n.w > lo && n.x < hi)
+      const opt = (under) => {
+        const y = under ? Math.max(...span.map((n) => n.y + n.h)) + 22 : Math.min(...span.map((n) => n.y)) - 22
+        const p0 = [a.x + a.w / 2, under ? a.y + a.h + 4 : a.y - 4], p3 = [b.x + b.w / 2, under ? b.y + b.h + 4 : b.y - 4]
+        const pts = [p0, [p0[0], y], [p3[0], y], p3]
+        let bad = 0
+        for (let i = 0; i < 3; i++) bad += g.nodes.filter((n) => n !== a && n !== b && hits(n, pts[i], pts[i + 1])).length
+        return { pts, bad, ok: under || y >= 8, under }
+      }
+      const best = [opt(true), opt(false)].filter((o) => o.ok).sort((x, y) => x.bad - y.bad)[0]
+      // a curve through the corners overshoots upwards and gets clipped, so loops over the top are drawn straight
+      return { pts: best.pts, curve: true, poly: !best.under }
     }
     const x = Math.max(a.x + a.w, b.x + b.w) + 30
     const p0 = [a.x + a.w + 4, a.y + a.h / 2], p3 = [b.x + b.w + 4, b.y + b.h / 2]
@@ -287,12 +309,13 @@ function renderSvg(spec, g) {
   for (const e of g.edges) {
     const { pts, curve, poly } = edgeGeom(e, g)
     for (const q of pts) maxY = Math.max(maxY, q[1] + 16)
-    const opts = { seed, roughness: 0.9, stroke: '#343a40', strokeWidth: 1.4, ...(e.dashed ? { strokeLineDash: [6, 5] } : {}) }
+    const ink = e.alt ? '#c92a2a' : '#343a40'
+    const opts = { seed, roughness: 0.9, stroke: ink, strokeWidth: 1.4, ...(e.dashed ? { strokeLineDash: [6, 5] } : e.alt ? { strokeLineDash: [2, 5] } : {}) }
     parts.push(d2path(poly ? gen.linearPath(pts, opts) : curve ? gen.curve(pts, opts) : gen.line(pts[0][0], pts[0][1], pts[1][0], pts[1][1], opts)))
     const [px, py] = pts[pts.length - 2], [qx, qy] = pts[pts.length - 1]
     const ang = Math.atan2(qy - py, qx - px), L = 11
     const hx = (da) => (qx - L * Math.cos(ang + da)).toFixed(1), hy = (da) => (qy - L * Math.sin(ang + da)).toFixed(1)
-    parts.push(`<path d="M${hx(0.45)} ${hy(0.45)}L${qx.toFixed(1)} ${qy.toFixed(1)}L${hx(-0.45)} ${hy(-0.45)}" stroke="#343a40" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`)
+    parts.push(`<path d="M${hx(0.45)} ${hy(0.45)}L${qx.toFixed(1)} ${qy.toFixed(1)}L${hx(-0.45)} ${hy(-0.45)}" stroke="${ink}" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`)
     if (e.label) {
       let mx, my
       const w = width(e.label, EFS) + 8
@@ -327,6 +350,12 @@ function renderSvg(spec, g) {
       parts.push(`<path d="${textPath('async / later', x + 32 + width('async / later', EFS) / 2, y + 12, EFS)}" fill="#495057"/>`)
       x += 32 + width('async / later', EFS) + 10
     }
+    if (g.edges.some((e) => e.alt)) {
+      const name = 'error / alternative path'
+      parts.push(`<path d="M${x} ${y + 7}H${x + 26}" stroke="#c92a2a" stroke-width="1.4" stroke-dasharray="2 5"/>`)
+      parts.push(`<path d="${textPath(name, x + 32 + width(name, EFS) / 2, y + 12, EFS)}" fill="#495057"/>`)
+      x += 32 + width(name, EFS) + 10
+    }
     g.legendW = x + MARGIN
   }
   const W = Math.max(g.W, Math.ceil(g.legendW), Math.ceil(maxX + MARGIN)), H = Math.ceil(g.legendY + 22)
@@ -356,7 +385,7 @@ function renderExcalidraw(spec, g) {
     const { pts } = edgeGeom(e, g)
     const [x0, y0] = pts[0]
     const a = base('arrow', {
-      x: x0, y: y0, width: Math.abs(pts.at(-1)[0] - x0), height: Math.abs(pts.at(-1)[1] - y0), strokeStyle: e.dashed ? 'dashed' : 'solid',
+      x: x0, y: y0, width: Math.abs(pts.at(-1)[0] - x0), height: Math.abs(pts.at(-1)[1] - y0), strokeStyle: e.dashed ? 'dashed' : e.alt ? 'dotted' : 'solid',
       points: pts.map(([x, y]) => [x - x0, y - y0]), startArrowhead: null, endArrowhead: 'arrow', roundness: { type: 2 },
       startBinding: { elementId: idOf.get(e.from).id, focus: 0, gap: 4 }, endBinding: { elementId: idOf.get(e.to).id, focus: 0, gap: 4 },
     })

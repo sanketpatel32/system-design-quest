@@ -38,7 +38,8 @@ export interface ModelRow {
 }
 export interface ModelOutput {
   rows: ModelRow[]
-  verdict?: { ok: boolean; text: string }
+  /** neutral: an observation, not a pass/fail (rendered without a tick or cross) */
+  verdict?: { ok: boolean; text: string; neutral?: boolean }
 }
 type Params = Record<string, number>
 
@@ -302,8 +303,8 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
           { label: 'Total', value: `${fmt(latency + transfer)} ms`, strong: true },
         ],
         verdict: latency >= transfer
-          ? { ok: true, text: 'Latency-bound: fewer round trips help more than a faster link' }
-          : { ok: false, text: 'Bandwidth-bound: a faster link or a smaller payload helps more' },
+          ? { ok: true, neutral: true, text: 'Latency-bound: fewer round trips help more than a faster link' }
+          : { ok: true, neutral: true, text: 'Bandwidth-bound: a faster link or a smaller payload helps more' },
       }
     },
   },
@@ -415,7 +416,7 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
   },
   // Fundamentals · Backend: exponential backoff, delay before retry n = min(cap, base × 2^(n − 1))
   'backoff': {
-    params: ['baseMs', 'capMs'],
+    params: ['baseMs', 'capMs', 'budgetMs'],
     run: (x, p) => {
       const delay = (n: number) => Math.min(p.capMs!, p.baseMs! * Math.pow(2, n - 1))
       let total = 0
@@ -426,9 +427,9 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
           { label: `Wait before retry ${x} (max, before jitter)`, value: `${fmt(delay(x))} ms`, strong: true },
           { label: 'Total waiting across all retries', value: `${fmt(total)} ms` },
         ],
-        verdict: total <= 10_000
-          ? { ok: true, text: 'Total wait fits a 10 s budget' }
-          : { ok: false, text: 'Total wait is over a 10 s budget: stop retrying sooner' },
+        verdict: total <= (p.budgetMs ?? 10_000)
+          ? { ok: true, text: `Total wait fits the caller’s ${fmt((p.budgetMs ?? 10_000) / 1000, 1)} s deadline` }
+          : { ok: false, text: `Total wait is over the caller’s ${fmt((p.budgetMs ?? 10_000) / 1000, 1)} s deadline: stop retrying sooner` },
       }
     },
   },
