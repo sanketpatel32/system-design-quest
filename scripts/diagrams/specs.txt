@@ -765,3 +765,60 @@ App [4. fsync directory]> Disk {store}
 Orchestrator [remove from endpoints]> Load balancer
 Orchestrator [SIGTERM]> Server|drain in-flight requests > Close pools + flush > Exit 0
 Orchestrator [after grace period: SIGKILL]~> Server|drain in-flight requests
+
+# ---------- Fundamentals · Security ----------
+@301 A data-flow diagram for threat modelling: the user's browser crosses the internet trust boundary to the API, which reads a database and calls a payment provider; a nightly job copies data to an analytics bucket.
+Browser {client} [trust boundary: internet]> API {svc} > Database {store}
+API {svc} [trust boundary: third party]> Payment provider {ext}
+Nightly job {svc} [long-lived key]~> Analytics bucket {store}
+Database {store} ~> Nightly job {svc}
+
+@302 Four primitives side by side: a hash fingerprints data with no key, a MAC proves origin with a shared key, AEAD encrypts and detects changes, and a signature lets anyone verify with the public key.
+%concept
+Message > Hash|no key: fingerprint
+Message [shared key]> MAC|integrity among key holders
+Message [shared key]> AEAD|secret + tamper-evident
+Message [private key]> Signature|anyone verifies with public key
+
+@303 Storing a password: a random salt and the password go through a slow, tunable hash; the algorithm, parameters, salt and hash are stored together, and login repeats the same computation.
+Password + random salt > Argon2id or bcrypt|slow, tunable > Stored: algorithm, params, salt, hash {store}
+Login attempt {client} > Argon2id or bcrypt|slow, tunable
+Stored: algorithm, params, salt, hash {store} [constant-time compare]> Accept or reject
+
+@304 Validating a JWT: the API checks the allowed algorithm, fetches the issuer's public key by key id, verifies the signature, then checks issuer, audience and expiry before authorising.
+Client {client} [Bearer token]> API {svc}
+API {svc} [1. alg on allowlist?]> Key set|issuer's public keys {ext}
+API {svc} [2. verify signature]> Claims check|iss, aud, exp
+Claims check|iss, aud, exp [3. ok]> Authorise by sub and scope
+Claims check|iss, aud, exp [fail]?> 401 Unauthorized
+
+@305 Authorisation code flow with PKCE: the app sends a code challenge, the user logs in and approves at the authorisation server, which redirects back with a code; the app exchanges code and verifier at the token endpoint for tokens.
+App {client} [1. code_challenge + state]> Authorisation server|user logs in, approves {ext} [2. redirect: code + state]> App callback {client} [3. code + code_verifier]> Token endpoint|checks the verifier {ext} [4. returns]> Access, refresh, ID tokens {store}
+
+@306 An object-level access check: the handler identifies the caller, loads the invoice scoped to the caller's account, and returns 404 when it does not belong to them.
+Caller {client} [GET /invoices/1044]> Handler {svc}
+Handler {svc} [WHERE id = 1044 AND account = caller]> Database {store}
+Database {store} [row found]> 200 with invoice
+Database {store} [no row]?> 404 Not Found
+
+@307 Secrets at runtime: a workload proves its identity to a secrets manager, receives a short-lived credential, and uses it to reach the database; every read is audited.
+Workload {svc} [workload identity]> Secrets manager {svc}
+Secrets manager {svc} [short-lived credential]> Workload {svc}
+Workload {svc} > Database {store}
+Secrets manager {svc} ~> Audit log {store}
+
+@308 Server-side request forgery: an attacker submits a URL, the server fetches it from inside the network and reaches the metadata service; an egress firewall blocks internal destinations.
+Attacker {client} [url=http://169.254.169.254/]> Fetcher {svc}
+Fetcher {svc} [without egress rules]?> Metadata service|role credentials {ext}
+Fetcher {svc} [allowed: public addresses]> Egress firewall > Internet site {ext}
+
+@309 A verifiable release: dependencies come from the lockfile, an isolated CI build signs the artefact and its provenance, and deployment verifies the signature first.
+Lockfile + internal mirror {store} > Isolated CI build {svc} [sign artefact + provenance]> Registry {store}
+Registry {store} [verify signature + provenance]> Deploy {svc}
+Unsigned image ?> Deploy {svc}
+
+@310 Passkey sign-in: the server sends a challenge, the browser checks the origin, the authenticator signs for that origin after the user unlocks it, and the server verifies with the stored public key.
+Server {svc} [1. challenge]> Browser {client}
+Browser {client} [2. origin = real site?]> Authenticator|unlocked by user
+Authenticator|unlocked by user [3. signature for origin]> Browser {client}
+Browser {client} [4. signed response]> Server {svc}
