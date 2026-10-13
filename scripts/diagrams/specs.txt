@@ -698,3 +698,56 @@ Add new column > Write both > Backfill old rows > Read new column > Stop writing
 @273 The N+1 problem: one query loads a list, then one more query runs for each item; batching the lookups replaces N queries with one.
 Load 100 posts|1 query > Load author per post|100 queries
 Load 100 posts|1 query > Load authors WHERE id IN (…)|1 query
+
+# ---------- Operating Systems & Concurrency ----------
+@281 Creating a process: the shell forks a child that shares pages copy-on-write, the child execs the new program, and the parent waits to collect its exit status.
+Shell {client} [1. fork]> Child process|copy-on-write pages
+Child process|copy-on-write pages [2. exec]> New program|same PID
+New program|same PID [3. exit status]~> Shell {client}
+
+@282 A core's run queue: runnable threads take turns in time slices, a context switch saves one thread's registers and restores the next, and blocked threads wait off the queue until I/O completes.
+Run queue|runnable threads > Core|runs one thread per slice
+Core|runs one thread per slice [slice ends: save + restore]> Run queue|runnable threads
+Core|runs one thread per slice [blocks on I/O]~> Waiting threads|use no CPU
+Waiting threads|use no CPU [I/O done: wake]~> Run queue|runnable threads
+
+@283 Address translation: the CPU checks the TLB for a virtual page; on a miss it walks the page tables; a missing page raises a fault that the kernel resolves from the page cache or disk.
+Virtual address {client} > TLB|cached translations [miss]> Page tables {store}
+Page tables {store} [not present: page fault]> Kernel {svc}
+Kernel {svc} [minor: in memory / major: read disk]> Physical page {store}
+
+@284 A system call: the program enters kernel mode, the kernel checks arguments and permissions, copies data through the page cache, and returns to user mode.
+Program|user mode {client} [read(fd, buf)]> Kernel|checks fd and buffer {svc}
+Kernel|checks fd and buffer {svc} > Page cache {store}
+Page cache {store} [miss]~> Disk {store}
+Kernel|checks fd and buffer {svc} [bytes copied, return]> Program|user mode {client}
+
+@285 An event loop: one thread waits on a readiness API for many sockets, handles each ready socket, and hands CPU-heavy or blocking work to a worker pool.
+Many sockets > Readiness API|epoll / kqueue > Event loop|one thread
+Event loop|one thread [heavy or blocking work]> Worker pool
+Worker pool [result]~> Event loop|one thread
+
+@286 A mutex around a shared counter: thread A holds the lock while it reads, adds and writes; thread B waits until A unlocks, so no update is lost.
+Thread A [lock]> Mutex > Counter|read, add, write {store}
+Thread B [waits]~> Mutex
+
+@287 A two-lock deadlock and its fix: thread 1 holds lock X and wants Y while thread 2 holds Y and wants X; locking by ascending id makes both take X first.
+Thread 1 [holds]> Lock X
+Thread 1 [wants]~> Lock Y
+Thread 2 [holds]> Lock Y
+Thread 2 [wants]~> Lock X
+
+@288 A bounded producer-consumer queue: producers wait on not-full, consumers wait on not-empty, and a full queue pushes back on producers.
+Producers [wait while full]> Bounded queue|capacity 100 {queue}
+Bounded queue|capacity 100 {queue} [wait while empty]> Consumers
+Bounded queue|capacity 100 {queue} [full: block or 503]~> Producers
+
+@289 Crash-safe file replacement: write a temporary file, fsync it, rename it over the original, then fsync the directory so the new name survives a crash.
+App [1. write]> config.tmp {store} [2. fsync]> Disk {store}
+App [3. rename over]> config {store}
+App [4. fsync directory]> Disk {store}
+
+@290 Graceful shutdown under an orchestrator: the pod leaves the load balancer and gets SIGTERM, drains in-flight requests, closes connections and exits before the grace period ends in SIGKILL.
+Orchestrator [remove from endpoints]> Load balancer
+Orchestrator [SIGTERM]> Server|drain in-flight requests > Close pools + flush > Exit 0
+Orchestrator [after grace period: SIGKILL]~> Server|drain in-flight requests

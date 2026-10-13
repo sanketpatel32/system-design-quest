@@ -27,6 +27,9 @@ export type ModelId =
   | 'frame-budget'
   | 'thread-pool'
   | 'backoff'
+  | 'context-switch'
+  | 'hash-cost'
+  | 'rollout'
 
 export interface ModelRow {
   label: string
@@ -426,6 +429,68 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
         verdict: total <= 10_000
           ? { ok: true, text: 'Total wait fits a 10 s budget' }
           : { ok: false, text: 'Total wait is over a 10 s budget: stop retrying sooner' },
+      }
+    },
+  },
+  // Fundamentals · OS: round-robin time slice vs context-switch overhead and the wait before a runnable thread runs again
+  'context-switch': {
+    params: ['switchUs', 'runnable'],
+    run: (x, p) => {
+      const overhead = (p.switchUs! / (x * 1000 + p.switchUs!)) * 100
+      const wait = (p.runnable! - 1) * x
+      return {
+        rows: [
+          { label: 'Time slice', value: `${fmt(x)} ms` },
+          { label: 'Context switches per second per core', value: fmt(1000 / x) },
+          { label: 'CPU time spent switching', value: `${fmt(overhead, 2)}%`, strong: true },
+          { label: `Longest wait to run again (${fmt(p.runnable!)} runnable threads)`, value: `${fmt(wait)} ms`, strong: true },
+        ],
+        verdict: overhead <= 1 && wait <= 100
+          ? { ok: true, text: 'Low overhead and responsive' }
+          : overhead > 1
+            ? { ok: false, text: 'Slices this short spend over 1% of the CPU just switching' }
+            : { ok: false, text: 'Slices this long make waiting threads stall for over 100 ms' },
+      }
+    },
+  },
+  // Fundamentals · Security: a work factor of c means 2^c iterations, so each +1 doubles the cost for both the server and an attacker
+  'hash-cost': {
+    params: ['msAt10', 'attackerPerSecAt10'],
+    run: (x, p) => {
+      const ms = p.msAt10! * Math.pow(2, x - 10)
+      const guesses = p.attackerPerSecAt10! / Math.pow(2, x - 10)
+      return {
+        rows: [
+          { label: 'Work factor', value: `${x} (2^${x} iterations)` },
+          { label: 'One hash on your server', value: `${fmt(ms, ms < 10 ? 1 : 0)} ms`, strong: true },
+          { label: 'Logins one core can check per second', value: fmt(1000 / ms, 1) },
+          { label: 'Attacker guesses per second (their rig)', value: short(guesses), strong: true },
+        ],
+        verdict: ms > 1000
+          ? { ok: false, text: 'Over a second per login: users wait and login floods can exhaust your CPU' }
+          : x < 10
+            ? { ok: false, text: 'Below the minimum work factor of 10 that OWASP gives for bcrypt' }
+            : { ok: true, text: 'Slow for attackers, still affordable per login' },
+      }
+    },
+  },
+  // Fundamentals · Cloud: a canary gets x% of traffic; the alarm fires after a fixed number of failed requests
+  'rollout': {
+    params: ['rpm', 'badPct', 'alarmFailures'],
+    run: (x, p) => {
+      const canary = (p.rpm! * x) / 100
+      const failPerMin = (canary * p.badPct!) / 100
+      const minutes = p.alarmFailures! / failPerMin
+      return {
+        rows: [
+          { label: 'Traffic on the new version', value: `${fmt(x)}% = ${short(canary)} requests/min` },
+          { label: 'Failed requests per minute if the build is bad', value: fmt(failPerMin, 1) },
+          { label: 'Minutes until the alarm fires', value: fmt(minutes, 1), strong: true },
+          { label: 'Failed requests before the alarm', value: fmt(p.alarmFailures!), strong: true },
+        ],
+        verdict: minutes <= 10
+          ? { ok: true, text: 'A bad build is caught within 10 minutes' }
+          : { ok: false, text: 'Too little traffic to detect a bad build within 10 minutes' },
       }
     },
   },

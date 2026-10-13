@@ -90,4 +90,19 @@ describe('fundamentals models', () => {
   it('bdp-window: 64 KiB over 100 ms is about 5.2 Mbit/s', () => {
     expect(val(MODELS['bdp-window'].run(64, { rttMs: 100, linkMbps: 100 }), 1)).toBe('5.2 Mbit/s')
   })
+  it('context-switch: 10 ms slice, 5 µs switch = 0.05%; 11 threads wait 100 ms', () => {
+    const o = MODELS['context-switch'].run(10, { switchUs: 5, runnable: 11 })
+    expect(val(o, 2)).toBe('0.05%')
+    expect(val(o, 3)).toBe('100 ms')
+  })
+  it('hash-cost: each +1 doubles the cost (50 ms at 10 -> 200 ms at 12)', () => {
+    const o = MODELS['hash-cost'].run(12, { msAt10: 50, attackerPerSecAt10: 100000 })
+    expect(val(o, 1)).toBe('200 ms')
+    expect(val(o, 3)).toBe('25K')
+  })
+  it('rollout: 1% of 60,000 rpm at 5% errors = 30 failures/min, alarm at 50 in 1.7 min', () => {
+    const o = MODELS['rollout'].run(1, { rpm: 60000, badPct: 5, alarmFailures: 50 })
+    expect(val(o, 1)).toBe('30')
+    expect(val(o, 2)).toBe('1.7')
+  })
 })

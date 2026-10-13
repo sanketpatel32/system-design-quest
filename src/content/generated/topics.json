@@ -90558,5 +90558,4135 @@
         "why": "Scaling app servers horizontally"
       }
     ]
+  },
+  {
+    "id": 281,
+    "slug": "processes-and-threads",
+    "region": "f5-os",
+    "order": 1,
+    "title": "Processes and Threads",
+    "kind": "lesson",
+    "objectives": [
+      "Say what a process owns and what its threads share",
+      "Explain what fork and exec each do",
+      "Choose processes or threads for isolation versus cheap sharing"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t281-c1",
+        "kind": "text",
+        "title": "A process is a container for a running program",
+        "body": "A process owns an address space (its memory), open file descriptors, credentials and at least one thread of execution. The kernel keeps these apart, so one process cannot read another’s memory unless both deliberately share it. A crash in one process normally leaves the others running.",
+        "teaches": [
+          "process-model"
+        ]
+      },
+      {
+        "id": "t281-c2",
+        "kind": "text",
+        "title": "Threads share almost everything",
+        "body": "Threads are separate paths of execution inside one process. Each has its own stack, registers and program counter, but all share the heap, global data and open files. That makes passing data between threads cheap and also makes it easy for one thread to corrupt data another is using.",
+        "teaches": [
+          "threads-share"
+        ]
+      },
+      {
+        "id": "t281-c3",
+        "kind": "diagram",
+        "title": "Worked example: starting a program with fork and exec",
+        "body": "Unix-like systems create processes in two steps.",
+        "teaches": [
+          "fork-exec"
+        ],
+        "steps": [
+          "The shell calls fork: the kernel creates a child process that is a copy of the parent, sharing memory pages copy-on-write",
+          "fork returns twice: the child’s process id to the parent and 0 to the child",
+          "The child calls exec with the program path: its memory is replaced by the new program, while open file descriptors (unless marked close-on-exec) stay",
+          "The parent calls wait to collect the child’s exit status",
+          "If the parent never waits, the finished child stays as a “zombie” entry in the process table"
+        ]
+      },
+      {
+        "id": "t281-c4",
+        "kind": "text",
+        "title": "Misconception: threads are always lighter, so always better",
+        "body": "Threads avoid copying address spaces and switch a little faster, but sharing memory means a bug in any thread can corrupt the whole process and a crash takes every thread down. Processes cost more memory but isolate failures and can run with different permissions, which is why browsers and many servers use several processes.",
+        "teaches": [
+          "process-model",
+          "threads-share"
+        ]
+      },
+      {
+        "id": "t281-c5",
+        "kind": "text",
+        "title": "Trap: forking a process that has many threads",
+        "body": "fork copies only the calling thread into the child. If another thread held a lock at that moment, the child inherits the locked lock with no thread to release it. POSIX therefore allows only async-signal-safe calls in the child of a multi-threaded process until it calls exec.",
+        "teaches": [
+          "fork-exec"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t281-a1",
+        "concept": "threads-share",
+        "type": "multiple_choice",
+        "prompt": "Two threads in one process both read a global variable. What does each see?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The same memory location"
+          },
+          {
+            "id": "b",
+            "label": "Nothing until the kernel syncs them"
+          },
+          {
+            "id": "c",
+            "label": "A copy-on-write page per thread"
+          },
+          {
+            "id": "d",
+            "label": "A private copy made at thread start"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Threads share the address space; only stacks and registers are per thread."
+      },
+      {
+        "id": "t281-a2",
+        "concept": "fork-exec",
+        "type": "multiple_choice",
+        "prompt": "What does exec do to the calling process?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Replaces its program image"
+          },
+          {
+            "id": "b",
+            "label": "Starts a thread in the same process"
+          },
+          {
+            "id": "c",
+            "label": "Creates a new child process"
+          },
+          {
+            "id": "d",
+            "label": "Closes every open file descriptor"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "exec keeps the process id but loads a new program; fork is what creates the process."
+      },
+      {
+        "id": "t281-a3",
+        "concept": "process-model",
+        "type": "multiple_choice",
+        "prompt": "A plugin with a history of crashes must not take the main app down. What is the safer home for it?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A separate thread in the app"
+          },
+          {
+            "id": "b",
+            "label": "A larger thread stack"
+          },
+          {
+            "id": "c",
+            "label": "A higher scheduling priority"
+          },
+          {
+            "id": "d",
+            "label": "A separate process"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "Process boundaries contain crashes and memory corruption; threads do not."
+      },
+      {
+        "id": "t281-a4",
+        "concept": "fork-exec",
+        "type": "multiple_choice",
+        "prompt": "A parent never calls wait on its finished children. What accumulates?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Orphaned memory pages"
+          },
+          {
+            "id": "b",
+            "label": "Leaked threads in the parent"
+          },
+          {
+            "id": "c",
+            "label": "Open sockets in the child"
+          },
+          {
+            "id": "d",
+            "label": "Zombie process table entries"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "A zombie keeps its exit status until the parent collects it."
+      },
+      {
+        "id": "t281-a5",
+        "concept": "fork-exec",
+        "type": "drag_order",
+        "prompt": "Order how a shell runs a command.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "fork a child process"
+          },
+          {
+            "id": "s4",
+            "label": "The parent waits and collects the exit status"
+          },
+          {
+            "id": "s2",
+            "label": "exec the program in the child"
+          },
+          {
+            "id": "s3",
+            "label": "The program runs and exits"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Create, replace, run, reap."
+      },
+      {
+        "id": "t281-a6",
+        "concept": "process-model",
+        "type": "tradeoff",
+        "prompt": "An image-conversion service runs third-party decoders that occasionally crash on malformed files.",
+        "constraints": [
+          "A crash must not drop other users’ requests",
+          "Conversions are CPU-heavy",
+          "Throughput matters but not microseconds"
+        ],
+        "approaches": [
+          {
+            "id": "p3",
+            "label": "Run decoders inside the request handler",
+            "description": "Inline"
+          },
+          {
+            "id": "p2",
+            "label": "One process with a thread per conversion",
+            "description": "Threads"
+          },
+          {
+            "id": "p1",
+            "label": "A pool of worker processes the main server hands jobs to",
+            "description": "Worker processes"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r2",
+            "label": "Each worker can run with fewer permissions"
+          },
+          {
+            "id": "r3",
+            "label": "Threads isolate crashes just as well"
+          },
+          {
+            "id": "r4",
+            "label": "Processes cannot use several CPU cores"
+          },
+          {
+            "id": "r1",
+            "label": "A decoder crash kills only one worker, which is restarted"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "A segmentation fault in one thread terminates the whole process.",
+          "r4": "Separate processes run on separate cores like threads do."
+        },
+        "explanation": "Use processes when isolation matters more than the small cost of copying data between them."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t281-f1",
+        "front": "What does a process own?",
+        "back": "An address space, file descriptors, credentials and one or more threads."
+      },
+      {
+        "id": "t281-f2",
+        "front": "What do threads in one process share?",
+        "back": "Heap, globals and open files; each has its own stack and registers."
+      },
+      {
+        "id": "t281-f3",
+        "front": "fork vs exec?",
+        "back": "fork copies the process; exec replaces the program in it."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Linux man-pages: fork(2)",
+        "url": "https://man7.org/linux/man-pages/man2/fork.2.html"
+      },
+      {
+        "title": "Linux man-pages: execve(2)",
+        "url": "https://man7.org/linux/man-pages/man2/execve.2.html"
+      },
+      {
+        "title": "Linux man-pages: pthreads(7)",
+        "url": "https://man7.org/linux/man-pages/man7/pthreads.7.html"
+      },
+      {
+        "title": "Linux man-pages: clone(2)",
+        "url": "https://man7.org/linux/man-pages/man2/clone.2.html"
+      },
+      {
+        "title": "Redis: Persistence (RDB snapshots use fork)",
+        "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "process-model",
+        "threads-share",
+        "fork-exec"
+      ],
+      "mechanism": {
+        "title": "How the kernel represents processes and threads",
+        "steps": [
+          "The kernel keeps a record for each process: its memory map, open file table, current directory, user and group ids, signal handlers and resource limits. Each process gets a process id (PID), and every process except the first has a parent.",
+          "A thread is the unit the scheduler runs. On Linux both processes and threads are created with clone; flags decide what the new task shares with its creator (memory, file table, signal handlers). A “process” is a group of tasks sharing one address space.",
+          "fork creates a child whose memory is a copy of the parent’s, but the copy is lazy: pages are shared read-only and copied only when one side writes (copy-on-write). That is why forking a large process is fast until both sides start writing.",
+          "exec loads a new program into the current process: new code, data, heap and stack, same PID. File descriptors stay open across exec unless they carry the close-on-exec flag, which is a common source of leaked descriptors in child programs.",
+          "When a process exits, the kernel keeps a small entry with its exit status until the parent reads it with wait. If the parent exits first, the child is re-parented to an init-like process that reaps it.",
+          "Choosing between them: threads suit work that shares large data structures and needs fast communication; processes suit isolation, different privileges and crash containment. Many servers combine both: a few processes, each with a pool of threads or an event loop."
+        ]
+      },
+      "useWhen": [
+        "Use processes to isolate untrusted or crash-prone code and to drop privileges.",
+        "Use threads when tasks share large in-memory data and need cheap communication."
+      ],
+      "avoidWhen": [
+        "Avoid forking a multi-threaded process and doing real work in the child before exec.",
+        "Avoid assuming a crash in one thread leaves the others running."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Aspect",
+          "Separate processes",
+          "Threads in one process"
+        ],
+        "rows": [
+          [
+            "Memory",
+            "Separate address spaces",
+            "One shared address space"
+          ],
+          [
+            "Crash impact",
+            "Usually only that process",
+            "Whole process"
+          ],
+          [
+            "Communication",
+            "Pipes, sockets, shared memory",
+            "Shared variables plus locks"
+          ],
+          [
+            "Creation cost",
+            "Higher (address space, copy-on-write)",
+            "Lower (new stack and task)"
+          ],
+          [
+            "Permissions",
+            "Can differ per process",
+            "Shared by all threads"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "What copy-on-write saves when forking a large process",
+        "assumptions": [
+          "A parent process uses 2 GB of memory in 4 KB pages (illustrative)",
+          "The child calls exec almost immediately"
+        ],
+        "steps": [
+          "2 GB ÷ 4 KB ≈ 524,000 pages would need copying with an eager fork.",
+          "With copy-on-write, fork copies only page tables and marks pages read-only; almost no data is copied.",
+          "The child execs at once, so its shared mappings are dropped before either side writes much.",
+          "If instead both keep running and the parent rewrites 25% of its pages, about 131,000 pages (≈ 512 MB) are copied over time."
+        ],
+        "result": "Copy-on-write makes fork-then-exec cheap, but a long-lived forked child that shares a write-heavy parent slowly duplicates its memory."
+      },
+      "india": {
+        "title": "Copy-on-write snapshots in an in-memory store",
+        "label": "Official documentation",
+        "body": "Redis documents that its RDB persistence forks the server process and lets the child write a snapshot while the parent keeps serving. Because of copy-on-write the child initially shares all memory, but every page the parent modifies during the snapshot is duplicated, so a write-heavy instance can need noticeably more memory while saving. The same effect appears whenever a long-running process forks a helper."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Threads are faster, so we run every plugin in a thread.”",
+          "say": "“Threads are cheaper, but a crashing plugin would take the whole process down; I’d isolate it in a worker process.”"
+        },
+        {
+          "trap": "“fork copies all memory, so it is too slow.”",
+          "say": "“fork is copy-on-write; the cost appears only as pages are written afterwards.”"
+        }
+      ],
+      "takeaways": [
+        "A process owns memory, files and credentials; threads share them.",
+        "fork copies lazily (copy-on-write); exec replaces the program.",
+        "Processes isolate crashes and privileges; threads share data cheaply.",
+        "Parents must wait on children or zombies accumulate."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What happens to the other threads?",
+      "prompt": "A web server process runs 16 worker threads. One thread dereferences an invalid pointer and the kernel sends a segmentation fault.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The whole process, all 16 threads, is terminated",
+          "feedback": "Right: the default action for SIGSEGV terminates the process, and threads share it."
+        },
+        {
+          "id": "b",
+          "label": "Only the faulting thread stops",
+          "feedback": "Signals like SIGSEGV act on the process unless handled; there is no per-thread crash by default."
+        },
+        {
+          "id": "c",
+          "label": "The kernel restarts the faulting thread",
+          "feedback": "Nothing restarts threads automatically; a supervisor would restart the process."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Threads share fate. Isolation from crashes needs separate processes plus a supervisor that restarts them."
+    },
+    "seeAlso": [
+      {
+        "topicId": 50,
+        "why": "Process boundaries scaled up: monolith vs services"
+      },
+      {
+        "topicId": 70,
+        "why": "Containers build on process isolation"
+      }
+    ]
+  },
+  {
+    "id": 282,
+    "slug": "cpu-scheduling-and-context-switching",
+    "region": "f5-os",
+    "order": 2,
+    "title": "CPU Scheduling and Context Switching",
+    "kind": "lesson",
+    "objectives": [
+      "Explain what a context switch saves and costs",
+      "Describe how a fair scheduler shares a CPU",
+      "Reason about time slices, run queues and latency"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t282-c1",
+        "kind": "text",
+        "title": "More runnable threads than cores",
+        "body": "A core runs one thread at a time. The scheduler decides which runnable thread runs next and for how long, and switches between them many times a second so each makes progress. Threads waiting for I/O or a lock are not runnable and use no CPU.",
+        "teaches": [
+          "scheduling"
+        ]
+      },
+      {
+        "id": "t282-c2",
+        "kind": "text",
+        "title": "What a context switch does",
+        "body": "To switch, the kernel saves the running thread’s registers and program counter, picks the next thread, and restores its state. Switching to a thread in another process also switches the memory mappings, which can flush cached address translations. The direct cost is commonly a few microseconds; the indirect cost of colder caches can be larger.",
+        "teaches": [
+          "context-switch"
+        ]
+      },
+      {
+        "id": "t282-c3",
+        "kind": "diagram",
+        "title": "Worked example: the time-slice trade-off",
+        "body": "Round-robin scheduling gives each runnable thread a slice of time in turn.",
+        "teaches": [
+          "time-slice"
+        ],
+        "steps": [
+          "Assume a context switch costs 5 µs and 11 threads are runnable on one core (illustrative)",
+          "With 1 ms slices: 5 ÷ (1,000 + 5) ≈ 0.5% of the CPU goes on switching; a thread waits up to 10 × 1 = 10 ms to run again",
+          "With 10 ms slices: overhead ≈ 0.05%; waiting can reach 100 ms",
+          "Shorter slices mean responsiveness, longer slices mean throughput"
+        ]
+      },
+      {
+        "id": "t282-c4",
+        "kind": "text",
+        "title": "Misconception: more threads means more throughput",
+        "body": "Once every core is busy, extra CPU-bound threads add no capacity. They only add switching, cache misses and memory for stacks. For CPU-heavy work, a thread count close to the number of cores is usually best; extra threads help only when threads spend time waiting on I/O.",
+        "teaches": [
+          "scheduling",
+          "context-switch"
+        ]
+      },
+      {
+        "id": "t282-c5",
+        "kind": "text",
+        "title": "Trap: a busy-waiting thread",
+        "body": "A thread that spins in a loop checking a flag stays runnable and burns its whole slice, slowing every other thread on that core. Waiting should block (on a lock, condition variable or I/O readiness) so the scheduler can run something useful.",
+        "teaches": [
+          "scheduling"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t282-a1",
+        "concept": "context-switch",
+        "type": "multiple_choice",
+        "prompt": "What must the kernel save when it switches threads?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Every open file’s contents"
+          },
+          {
+            "id": "b",
+            "label": "The process’s source code"
+          },
+          {
+            "id": "c",
+            "label": "The thread’s whole heap"
+          },
+          {
+            "id": "d",
+            "label": "Registers and the program counter"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "Execution state lives in registers; memory stays where it is."
+      },
+      {
+        "id": "t282-a2",
+        "concept": "scheduling",
+        "type": "multiple_choice",
+        "prompt": "A thread is blocked waiting for a disk read. How much CPU does it use?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Half a slice, to keep polling"
+          },
+          {
+            "id": "b",
+            "label": "A fixed 1% reserved for it"
+          },
+          {
+            "id": "c",
+            "label": "Its full time slice each round"
+          },
+          {
+            "id": "d",
+            "label": "None until the read completes"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "Blocked threads leave the run queue until woken."
+      },
+      {
+        "id": "t282-a3",
+        "concept": "time-slice",
+        "type": "multiple_choice",
+        "prompt": "Shrinking the time slice mostly trades what for what?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Fewer threads for more cores"
+          },
+          {
+            "id": "b",
+            "label": "Less memory for more CPU"
+          },
+          {
+            "id": "c",
+            "label": "Larger stacks for less I/O"
+          },
+          {
+            "id": "d",
+            "label": "More switching for lower latency"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "More frequent switches cost overhead but let waiting threads run sooner."
+      },
+      {
+        "id": "t282-a4",
+        "concept": "scheduling",
+        "type": "multiple_choice",
+        "prompt": "A 4-core machine runs a CPU-bound job. Which thread count is a sensible start?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Exactly 1"
+          },
+          {
+            "id": "b",
+            "label": "About 4"
+          },
+          {
+            "id": "c",
+            "label": "One per request in flight"
+          },
+          {
+            "id": "d",
+            "label": "About 400"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "More CPU-bound threads than cores only add switching."
+      },
+      {
+        "id": "t282-a5",
+        "concept": "time-slice",
+        "type": "estimation",
+        "prompt": "One core, 21 runnable CPU-bound threads, round robin with 5 ms slices. Worst-case milliseconds before a thread runs again?",
+        "unit": "ms",
+        "target": 100,
+        "assumptions": [
+          "Each other thread uses its full slice",
+          "Switch cost ignored"
+        ],
+        "formula": "(threads − 1) × slice",
+        "workedAnswer": "20 × 5 = 100 ms",
+        "explanation": "Design implication: interactive work stuck behind 20 CPU-bound threads waits about 100 ms, so latency-sensitive work needs fewer competitors or a higher priority."
+      },
+      {
+        "id": "t282-a6",
+        "concept": "scheduling",
+        "type": "tradeoff",
+        "prompt": "A request handler waits for a lock held by another thread for about 2 ms.",
+        "constraints": [
+          "Many threads per core",
+          "Latency matters",
+          "CPU is the bottleneck"
+        ],
+        "approaches": [
+          {
+            "id": "p3",
+            "label": "Sleep a fixed 10 ms, then try again",
+            "description": "Fixed sleep"
+          },
+          {
+            "id": "p2",
+            "label": "Spin in a loop checking the lock",
+            "description": "Spin"
+          },
+          {
+            "id": "p1",
+            "label": "Block on the lock so the thread sleeps until it is released",
+            "description": "Block"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r4",
+            "label": "A fixed sleep wakes exactly on time"
+          },
+          {
+            "id": "r3",
+            "label": "Spinning is faster for any wait"
+          },
+          {
+            "id": "r1",
+            "label": "Sleeping threads give their CPU to others"
+          },
+          {
+            "id": "r2",
+            "label": "The kernel wakes the thread when the lock is free"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "Spinning helps only for very short waits; 2 ms of spinning wastes a whole slice.",
+          "r4": "It adds up to 10 ms of extra latency after the lock is free."
+        },
+        "explanation": "Block for waits longer than a context switch; spin only for waits of a few microseconds."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t282-f1",
+        "front": "What is a context switch?",
+        "back": "Saving one thread’s CPU state and restoring another’s."
+      },
+      {
+        "id": "t282-f2",
+        "front": "Shorter time slice?",
+        "back": "Lower latency, more switching overhead."
+      },
+      {
+        "id": "t282-f3",
+        "front": "Do blocked threads use CPU?",
+        "back": "No, they leave the run queue until woken."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Linux man-pages: sched(7)",
+        "url": "https://man7.org/linux/man-pages/man7/sched.7.html"
+      },
+      {
+        "title": "Linux kernel docs: CFS scheduler design",
+        "url": "https://docs.kernel.org/scheduler/sched-design-CFS.html"
+      },
+      {
+        "title": "Linux kernel docs: EEVDF scheduler",
+        "url": "https://docs.kernel.org/scheduler/sched-eevdf.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "scheduling",
+        "context-switch",
+        "time-slice"
+      ],
+      "mechanism": {
+        "title": "How a general-purpose scheduler shares cores",
+        "steps": [
+          "Each core has a run queue of runnable threads. A thread leaves it when it blocks (I/O, lock, sleep) and rejoins when woken. Preemption happens on a timer tick or when a higher-priority thread wakes, so one thread cannot hold a core forever.",
+          "Linux’s CFS (Completely Fair Scheduler) tracked each thread’s weighted run time and always ran the one that had received the least; since kernel 6.6 the default policy uses EEVDF, which also accounts for how late each thread is. Both aim to share CPU in proportion to weights set by nice values.",
+          "Real-time policies (SCHED_FIFO, SCHED_RR) sit above normal threads: a runnable real-time thread always runs before normal ones. That is useful for audio or control loops and dangerous for anything that might spin.",
+          "A context switch saves registers, switches the kernel stack and, across processes, switches page tables. The CPU’s caches and translation buffers then hold the previous thread’s data, so the new thread runs slower until they warm up.",
+          "Waking a thread on another core and moving threads between cores to balance load both cost cache warmth. Schedulers prefer to keep a thread on the core it last ran on, and you can pin threads (CPU affinity) for latency-critical work.",
+          "Measure, do not guess: per-thread run time, voluntary versus involuntary context switches (reported per process by the kernel) and run-queue length show whether threads are starved of CPU or simply waiting on I/O."
+        ]
+      },
+      "useWhen": [
+        "Use a CPU-bound thread count near the core count.",
+        "Use blocking waits (locks, condition variables, readiness APIs) instead of spinning."
+      ],
+      "avoidWhen": [
+        "Avoid thousands of runnable threads per core; switching and cache misses dominate.",
+        "Avoid real-time priorities for code that might loop or block on others."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Setting",
+          "Effect on throughput",
+          "Effect on latency"
+        ],
+        "rows": [
+          [
+            "Short time slice",
+            "Lower (more switches)",
+            "Better for waiting threads"
+          ],
+          [
+            "Long time slice",
+            "Higher",
+            "Worse when many are runnable"
+          ],
+          [
+            "More CPU-bound threads than cores",
+            "No gain, more overhead",
+            "Worse"
+          ],
+          [
+            "Pinning a thread to a core",
+            "Better cache locality",
+            "Predictable, but less flexible"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How many context switches a busy server does",
+        "assumptions": [
+          "A server handles 20,000 requests a second (illustrative)",
+          "Each request blocks twice (database call, then network write), causing a switch each time it blocks and each time it wakes"
+        ],
+        "steps": [
+          "Switches ≈ 20,000 × 2 blocks × 2 (out and back in) = 80,000 per second.",
+          "At about 5 µs each, that is 0.4 CPU-seconds per second: 40% of one core.",
+          "Spread across 8 cores, about 5% of total CPU goes to switching.",
+          "An event loop that handles many sockets per thread avoids most of these switches, which is part of why it scales to many connections."
+        ],
+        "result": "Context switches are cheap one at a time but add up to a measurable share of CPU at tens of thousands of requests a second."
+      },
+      "india": {
+        "title": "The Linux scheduler moved from CFS to EEVDF",
+        "label": "Official documentation",
+        "body": "The Linux kernel documentation describes CFS as modelling an “ideal, precise multi-tasking CPU” by tracking virtual run time, and documents EEVDF (Earliest Eligible Virtual Deadline First), which replaced it as the default in Linux 6.6. EEVDF keeps proportional fairness but also gives each task a virtual deadline, which improves latency for tasks that run in short bursts."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Add more threads, the server will go faster.”",
+          "say": "“Only if threads are waiting on I/O; for CPU-bound work beyond the core count they just add switching.”"
+        },
+        {
+          "trap": "“Context switches are free.”",
+          "say": "“A few microseconds each plus cache effects; at 80,000 a second that is a noticeable share of a core.”"
+        }
+      ],
+      "takeaways": [
+        "The scheduler shares cores among runnable threads; blocked threads use no CPU.",
+        "A context switch saves and restores CPU state and cools caches.",
+        "Short slices favour latency; long slices favour throughput.",
+        "Match CPU-bound threads to cores; block rather than spin."
+      ]
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "Pick a time slice",
+      "prompt": "A core has 11 runnable threads and each context switch costs 5 µs. Slide the time slice and watch overhead against how long a thread waits to run again.",
+      "model": "context-switch",
+      "params": {
+        "switchUs": 5,
+        "runnable": 11
+      },
+      "control": {
+        "label": "Time slice",
+        "min": 0.5,
+        "max": 20,
+        "step": 0.5,
+        "initial": 4,
+        "unit": "ms"
+      },
+      "takeaway": "Below about 0.5 ms the CPU spends over 1% just switching; above 10 ms a thread can wait over 100 ms for its turn. Schedulers pick slices in the low milliseconds, and the real fix for long waits is fewer runnable threads."
+    },
+    "seeAlso": [
+      {
+        "topicId": 3,
+        "why": "Scaling servers vertically and horizontally"
+      },
+      {
+        "topicId": 119,
+        "why": "Latency numbers to keep in mind"
+      }
+    ]
+  },
+  {
+    "id": 283,
+    "slug": "virtual-memory-and-paging",
+    "region": "f5-os",
+    "order": 3,
+    "title": "Virtual Memory and Paging",
+    "kind": "lesson",
+    "objectives": [
+      "Explain how virtual addresses map to physical memory",
+      "Distinguish minor and major page faults",
+      "Predict what happens when memory runs out"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t283-c1",
+        "kind": "text",
+        "title": "Every process sees its own address space",
+        "body": "Programs use virtual addresses. The memory management unit translates them to physical addresses using page tables the kernel maintains, in fixed-size pages (commonly 4 KB). Two processes can use the same virtual address for different physical memory, which is how isolation works.",
+        "teaches": [
+          "address-translation"
+        ]
+      },
+      {
+        "id": "t283-c2",
+        "kind": "text",
+        "title": "Pages are loaded on demand",
+        "body": "The kernel does not load a program’s whole file or allocate all requested memory up front. The first touch of a page causes a page fault, and the kernel then maps a physical page. A minor fault finds the data already in memory (for example in the page cache); a major fault must read it from disk.",
+        "teaches": [
+          "page-faults"
+        ]
+      },
+      {
+        "id": "t283-c3",
+        "kind": "diagram",
+        "title": "Worked example: why a translation cache matters",
+        "body": "Each memory access needs a translation, so CPUs cache recent ones in a translation lookaside buffer (TLB).",
+        "teaches": [
+          "address-translation"
+        ],
+        "steps": [
+          "Assume 4 KB pages and a TLB with 1,536 entries (illustrative)",
+          "Memory covered without a page-table walk: 1,536 × 4 KB = 6 MB",
+          "A program touching 1 GB randomly misses the TLB often, and each miss walks several levels of page tables",
+          "With 2 MB “huge” pages, the same 1,536 entries cover 3 GB",
+          "That is why databases and JVM-style runtimes often offer huge-page settings"
+        ]
+      },
+      {
+        "id": "t283-c4",
+        "kind": "text",
+        "title": "Misconception: free memory is wasted memory, so the box is full",
+        "body": "Tools often show little “free” memory because the kernel uses spare RAM as a page cache for files. That memory is reclaimable: it is dropped when programs need it. The useful number is available memory, not free memory.",
+        "teaches": [
+          "memory-pressure"
+        ]
+      },
+      {
+        "id": "t283-c5",
+        "kind": "text",
+        "title": "Trap: assuming allocation means memory exists",
+        "body": "On Linux, allocations are usually overcommitted: asking for memory succeeds, and physical pages are assigned only when touched. If many processes then touch what they asked for, the system runs out and the out-of-memory killer terminates a process, often the largest, rather than the allocation failing cleanly.",
+        "teaches": [
+          "memory-pressure"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t283-a1",
+        "concept": "address-translation",
+        "type": "multiple_choice",
+        "prompt": "Two processes print the same pointer value. Do they share that memory?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Not necessarily; each has its own mapping"
+          },
+          {
+            "id": "b",
+            "label": "No, the kernel forbids equal addresses"
+          },
+          {
+            "id": "c",
+            "label": "Yes, addresses are global"
+          },
+          {
+            "id": "d",
+            "label": "Yes, unless one is a thread"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The same virtual address can map to different physical pages per process."
+      },
+      {
+        "id": "t283-a2",
+        "concept": "page-faults",
+        "type": "multiple_choice",
+        "prompt": "Which page fault is the expensive one?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A major fault that reads from disk"
+          },
+          {
+            "id": "b",
+            "label": "A fault on a page already mapped"
+          },
+          {
+            "id": "c",
+            "label": "A fault on the stack guard page"
+          },
+          {
+            "id": "d",
+            "label": "A minor fault on a cached page"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Major faults wait for storage; minor ones only update mappings."
+      },
+      {
+        "id": "t283-a3",
+        "concept": "memory-pressure",
+        "type": "multiple_choice",
+        "prompt": "A monitoring tool shows 200 MB free on a 16 GB server with 9 GB of page cache. Is it short of memory?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Probably not; page cache is reclaimable"
+          },
+          {
+            "id": "b",
+            "label": "Yes, it is about to swap"
+          },
+          {
+            "id": "c",
+            "label": "Yes, the OOM killer will fire"
+          },
+          {
+            "id": "d",
+            "label": "Only if swap is turned off"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Look at available memory, which counts reclaimable cache."
+      },
+      {
+        "id": "t283-a4",
+        "concept": "memory-pressure",
+        "type": "multiple_choice",
+        "prompt": "Processes touch more memory than RAM plus swap can hold. What usually happens on Linux?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The OOM killer ends a process"
+          },
+          {
+            "id": "b",
+            "label": "Every process pauses until memory frees"
+          },
+          {
+            "id": "c",
+            "label": "The kernel compresses all code pages"
+          },
+          {
+            "id": "d",
+            "label": "The allocation call returns an error"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "With overcommit the failure shows up at touch time, not at allocation."
+      },
+      {
+        "id": "t283-a5",
+        "concept": "address-translation",
+        "type": "estimation",
+        "prompt": "A TLB has 1,024 entries of 2 MB pages. How many MB of memory does it cover?",
+        "unit": "MB",
+        "target": 2048,
+        "assumptions": [
+          "Every entry holds a distinct 2 MB page"
+        ],
+        "formula": "entries × page size",
+        "workedAnswer": "1,024 × 2 MB = 2,048 MB",
+        "explanation": "Sanity check: the same TLB with 4 KB pages covers only 4 MB, which is why huge pages help large in-memory data sets."
+      },
+      {
+        "id": "t283-a6",
+        "concept": "page-faults",
+        "type": "drag_order",
+        "prompt": "Order what happens on the first read of a page from a memory-mapped file that is not cached.",
+        "items": [
+          {
+            "id": "s2",
+            "label": "The kernel finds the file page is not in memory"
+          },
+          {
+            "id": "s4",
+            "label": "The kernel maps the page and the instruction is retried"
+          },
+          {
+            "id": "s3",
+            "label": "The kernel reads the page from disk into the page cache"
+          },
+          {
+            "id": "s1",
+            "label": "The CPU finds no valid translation and raises a page fault"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Fault, look up, read, map, retry."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t283-f1",
+        "front": "What is a page fault?",
+        "back": "An access to a page with no valid mapping, handled by the kernel."
+      },
+      {
+        "id": "t283-f2",
+        "front": "Minor vs major fault?",
+        "back": "Minor: data already in memory; major: must read from disk."
+      },
+      {
+        "id": "t283-f3",
+        "front": "What is the TLB?",
+        "back": "A CPU cache of recent virtual-to-physical translations."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Linux kernel docs: Memory management concepts",
+        "url": "https://docs.kernel.org/admin-guide/mm/concepts.html"
+      },
+      {
+        "title": "Linux man-pages: mmap(2)",
+        "url": "https://man7.org/linux/man-pages/man2/mmap.2.html"
+      },
+      {
+        "title": "Linux man-pages: proc(5)",
+        "url": "https://man7.org/linux/man-pages/man5/proc.5.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "address-translation",
+        "page-faults",
+        "memory-pressure"
+      ],
+      "mechanism": {
+        "title": "From a virtual address to a physical page",
+        "steps": [
+          "A virtual address is split into a page number and an offset. The page number is looked up in multi-level page tables (four or five levels on 64-bit x86) to find the physical page; the offset selects the byte inside it.",
+          "The TLB caches recent translations. A TLB hit costs almost nothing; a miss triggers a page-table walk through memory. Huge pages (2 MB or 1 GB) reduce the number of entries needed for large data sets.",
+          "Mappings carry permissions (read, write, execute) and flags such as present and dirty. Writing to a read-only shared page (as after fork) causes a fault the kernel resolves by copying the page.",
+          "Memory comes in two kinds: anonymous memory (heap, stacks) and file-backed memory (program code, memory-mapped files, the page cache). Under pressure, clean file pages can simply be dropped and re-read later; anonymous pages must go to swap if there is any.",
+          "The kernel reclaims memory in the background when free memory falls below watermarks. If reclaim cannot keep up, allocations stall in direct reclaim, which shows up as latency spikes before any process is killed.",
+          "When memory is exhausted, the out-of-memory killer picks a victim using a badness score (mostly memory use, adjustable per process). In containers, a cgroup memory limit triggers the same mechanism for processes inside that group."
+        ]
+      },
+      "useWhen": [
+        "Use available memory (including reclaimable cache) to judge headroom.",
+        "Use huge pages for large, long-lived in-memory data such as database buffers."
+      ],
+      "avoidWhen": [
+        "Avoid sizing a heap to almost all of RAM; the page cache and other processes need room.",
+        "Avoid treating swap activity as harmless on latency-sensitive servers."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Event",
+          "Cost (order of magnitude)",
+          "Typical cause"
+        ],
+        "rows": [
+          [
+            "TLB hit",
+            "Under a nanosecond",
+            "Recently used page"
+          ],
+          [
+            "TLB miss + page walk",
+            "Tens of nanoseconds",
+            "Large or random access pattern"
+          ],
+          [
+            "Minor page fault",
+            "Around a microsecond",
+            "First touch, copy-on-write, cached file page"
+          ],
+          [
+            "Major page fault",
+            "Hundreds of µs (SSD) to ms (disk)",
+            "Data not in memory"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How major faults turn into latency",
+        "assumptions": [
+          "A service handles a request with 50 page touches, normally all in memory (illustrative)",
+          "Under memory pressure, 2% of touches become major faults costing 100 µs each on SSD"
+        ],
+        "steps": [
+          "Faulting touches per request: 50 × 0.02 = 1.",
+          "Added time: 1 × 100 µs = 0.1 ms on average.",
+          "But faults cluster: a request that hits 10 faults waits an extra 1 ms, and on spinning disks (about 10 ms per read) 10 faults add 100 ms.",
+          "So the tail latency grows long before average latency moves."
+        ],
+        "result": "Memory pressure hurts tail latency first; watch major faults, not only free memory."
+      },
+      "india": {
+        "title": "Kernel documentation on memory management concepts",
+        "label": "Official documentation",
+        "body": "The Linux kernel’s admin guide explains virtual memory, huge pages, zones, page cache, anonymous memory, reclaim and the OOM killer in one place. It notes that the kernel uses otherwise unused memory to cache file data and reclaims it under pressure, and that when reclaim fails the OOM killer selects a task to kill to free memory."
+      },
+      "pitfalls": [
+        {
+          "trap": "“The server has no free memory, we need more RAM.”",
+          "say": "“Most of it is page cache; I’d check available memory and major fault rates first.”"
+        },
+        {
+          "trap": "“If malloc succeeded, the memory is ours.”",
+          "say": "“With overcommit, pages are assigned on first touch; the failure can come later as an OOM kill.”"
+        }
+      ],
+      "takeaways": [
+        "Virtual addresses map to physical pages through page tables cached in the TLB.",
+        "Major page faults read from disk and hurt tail latency.",
+        "Page cache is reclaimable; judge headroom by available memory.",
+        "Overcommit moves out-of-memory failures to touch time and the OOM killer."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Which process is killed?",
+      "prompt": "A container has a 1 GB memory limit. Its app grows to 1.1 GB of touched heap. The host has 64 GB free.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "A process inside the container, by the OOM killer",
+          "feedback": "Right: the cgroup limit applies regardless of host memory."
+        },
+        {
+          "id": "b",
+          "label": "Nothing: the host has plenty of memory",
+          "feedback": "The limit is per cgroup, so host free memory does not help."
+        },
+        {
+          "id": "c",
+          "label": "The allocation call fails and the app handles it",
+          "feedback": "With overcommit, the failure comes at touch time as a kill."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Container memory limits are enforced by the same OOM mechanism, scoped to the container’s cgroup."
+    },
+    "seeAlso": [
+      {
+        "topicId": 17,
+        "why": "Eviction when a cache runs out of memory"
+      },
+      {
+        "topicId": 70,
+        "why": "Container memory limits in Kubernetes"
+      }
+    ]
+  },
+  {
+    "id": 284,
+    "slug": "system-calls-and-the-kernel",
+    "region": "f5-os",
+    "order": 4,
+    "title": "System Calls and the Kernel Boundary",
+    "kind": "lesson",
+    "objectives": [
+      "Explain why programs enter the kernel for I/O",
+      "Estimate the cost of crossing the boundary",
+      "Reduce the number of system calls on a hot path"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t284-c1",
+        "kind": "text",
+        "title": "User mode and kernel mode",
+        "body": "Applications run in user mode, where the CPU blocks direct access to hardware and other processes’ memory. To open a file, send on a socket or create a process, a program makes a system call: a controlled entry into the kernel, which checks permissions and does the work.",
+        "teaches": [
+          "syscall-boundary"
+        ]
+      },
+      {
+        "id": "t284-c2",
+        "kind": "text",
+        "title": "What a system call costs",
+        "body": "A system call switches privilege level, saves some state and runs kernel code. A trivial call costs on the order of a hundred nanoseconds to a microsecond on modern hardware, more with some security mitigations enabled. The work inside (copying data, waiting for I/O) usually dominates.",
+        "teaches": [
+          "syscall-cost"
+        ]
+      },
+      {
+        "id": "t284-c3",
+        "kind": "diagram",
+        "title": "Worked example: buffering cuts system calls",
+        "body": "Writing a 1 MB log one line at a time versus in blocks.",
+        "teaches": [
+          "syscall-cost"
+        ],
+        "steps": [
+          "Assume 100-byte lines and 1 µs per write call (illustrative)",
+          "Unbuffered: 1,000,000 ÷ 100 = 10,000 write calls ≈ 10 ms of call overhead",
+          "Buffered in 64 KB blocks: 1,000,000 ÷ 65,536 ≈ 16 calls ≈ 16 µs",
+          "Same bytes, about 600× fewer calls",
+          "The trade-off: buffered lines may be lost if the process crashes before the buffer is flushed"
+        ]
+      },
+      {
+        "id": "t284-c4",
+        "kind": "text",
+        "title": "Misconception: a write call means the data is on disk",
+        "body": "write copies data into the kernel’s page cache and usually returns at once. The kernel writes it to storage later. Only an explicit flush such as fsync waits for the device. A machine crash can lose data that write already “accepted”.",
+        "teaches": [
+          "syscall-boundary"
+        ]
+      },
+      {
+        "id": "t284-c5",
+        "kind": "text",
+        "title": "Trap: chatty I/O on a hot path",
+        "body": "Reading a file a byte at a time, or sending a response in many tiny socket writes, multiplies system calls and, for sockets, packets. Batch: read and write in larger buffers, gather several buffers in one call, or let the library buffer for you.",
+        "teaches": [
+          "syscall-cost"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t284-a1",
+        "concept": "syscall-boundary",
+        "type": "multiple_choice",
+        "prompt": "Why can a program not write to the disk controller directly?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "User mode blocks hardware access"
+          },
+          {
+            "id": "b",
+            "label": "Disk drivers run in the browser"
+          },
+          {
+            "id": "c",
+            "label": "Disks only accept kernel threads"
+          },
+          {
+            "id": "d",
+            "label": "The compiler removes such code"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The CPU enforces privilege levels; the kernel mediates devices."
+      },
+      {
+        "id": "t284-a2",
+        "concept": "syscall-cost",
+        "type": "multiple_choice",
+        "prompt": "A program writes 1 MB in 10-byte calls. What is the main waste?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The disk rotates more slowly"
+          },
+          {
+            "id": "b",
+            "label": "Per-call overhead on 100,000 calls"
+          },
+          {
+            "id": "c",
+            "label": "The page cache is disabled"
+          },
+          {
+            "id": "d",
+            "label": "Each byte is encrypted twice"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Overhead scales with the number of calls; buffer to reduce them."
+      },
+      {
+        "id": "t284-a3",
+        "concept": "syscall-boundary",
+        "type": "multiple_choice",
+        "prompt": "write returned success. Is the data safe from a power cut?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Yes, if the file was opened"
+          },
+          {
+            "id": "b",
+            "label": "Yes, write waits for the disk"
+          },
+          {
+            "id": "c",
+            "label": "Only on solid-state drives"
+          },
+          {
+            "id": "d",
+            "label": "No, not until it is flushed (fsync)"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "write lands in the page cache; durability needs an explicit flush."
+      },
+      {
+        "id": "t284-a4",
+        "concept": "syscall-cost",
+        "type": "multiple_choice",
+        "prompt": "Which change cuts system calls when serving many small responses?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Raising the process priority"
+          },
+          {
+            "id": "b",
+            "label": "Using smaller socket buffers"
+          },
+          {
+            "id": "c",
+            "label": "Combining buffers into one write"
+          },
+          {
+            "id": "d",
+            "label": "Adding a thread per response"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Gathering data into fewer calls cuts the fixed overhead."
+      },
+      {
+        "id": "t284-a5",
+        "concept": "syscall-cost",
+        "type": "estimation",
+        "prompt": "A loop makes 2 million system calls a second at 0.5 µs of overhead each. How many CPU-milliseconds of overhead per second?",
+        "unit": "ms",
+        "target": 1000,
+        "assumptions": [
+          "Overhead only, no work inside the calls"
+        ],
+        "formula": "calls × cost",
+        "workedAnswer": "2,000,000 × 0.5 µs = 1,000,000 µs = 1,000 ms",
+        "explanation": "Design implication: that is a whole core spent just crossing the boundary, so batching is worth more than tuning the work inside."
+      },
+      {
+        "id": "t284-a6",
+        "concept": "syscall-boundary",
+        "type": "drag_order",
+        "prompt": "Order a read from a file through the kernel.",
+        "items": [
+          {
+            "id": "s4",
+            "label": "The kernel returns the byte count and the CPU returns to user mode"
+          },
+          {
+            "id": "s3",
+            "label": "The kernel copies data from the page cache (reading the disk if needed)"
+          },
+          {
+            "id": "s1",
+            "label": "The program calls read with a buffer and length"
+          },
+          {
+            "id": "s2",
+            "label": "The CPU switches to kernel mode"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Enter, work, copy, return."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t284-f1",
+        "front": "What is a system call?",
+        "back": "A controlled entry into the kernel to request a privileged service."
+      },
+      {
+        "id": "t284-f2",
+        "front": "Does write make data durable?",
+        "back": "No; it reaches the page cache. fsync waits for the device."
+      },
+      {
+        "id": "t284-f3",
+        "front": "How to cut syscall overhead?",
+        "back": "Buffer and batch: fewer, larger calls."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Linux man-pages: syscalls(2)",
+        "url": "https://man7.org/linux/man-pages/man2/syscalls.2.html"
+      },
+      {
+        "title": "Linux man-pages: syscall(2)",
+        "url": "https://man7.org/linux/man-pages/man2/syscall.2.html"
+      },
+      {
+        "title": "Linux man-pages: vdso(7)",
+        "url": "https://man7.org/linux/man-pages/man7/vdso.7.html"
+      },
+      {
+        "title": "Linux man-pages: fsync(2)",
+        "url": "https://man7.org/linux/man-pages/man2/fsync.2.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "syscall-boundary",
+        "syscall-cost"
+      ],
+      "mechanism": {
+        "title": "Crossing into the kernel and back",
+        "steps": [
+          "The CPU has privilege levels. User code cannot execute privileged instructions or touch kernel memory; attempting to do so raises a fault. A system call uses a dedicated instruction that jumps to a fixed kernel entry point with arguments in registers.",
+          "The kernel validates every argument: file descriptors must belong to the process, pointers must point into its memory, and permissions are checked against its credentials. This is what lets many untrusting programs share one machine.",
+          "Data usually crosses the boundary by copying between user buffers and kernel buffers. Mechanisms such as memory mapping files or sending a file directly to a socket avoid some copies for large transfers.",
+          "Some frequent calls avoid the boundary entirely: on Linux the vDSO maps a small piece of kernel-provided code into every process so that reading the clock does not need a real system call.",
+          "Blocking calls such as read on an empty socket put the thread to sleep in the kernel until data arrives. Non-blocking calls return immediately with “would block”, and readiness APIs let one call wait for many descriptors.",
+          "Tracing tools count and time system calls per process, which is often the quickest way to see why a program is slow: thousands of tiny reads, repeated failed opens, or long waits in a single call."
+        ]
+      },
+      "useWhen": [
+        "Use buffered I/O for many small reads and writes.",
+        "Use tracing of system calls when a program is slow and its own logs say nothing."
+      ],
+      "avoidWhen": [
+        "Avoid one system call per byte or per tiny message on hot paths.",
+        "Avoid assuming a successful write survives a power cut."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Pattern",
+          "System calls for 1 MB",
+          "Risk"
+        ],
+        "rows": [
+          [
+            "Unbuffered 100-byte writes",
+            "10,000",
+            "Slow, CPU-bound on overhead"
+          ],
+          [
+            "Buffered 64 KB writes",
+            "≈ 16",
+            "Unflushed data lost on crash"
+          ],
+          [
+            "Buffered writes + fsync at end",
+            "≈ 17",
+            "One slow call, but data is durable"
+          ],
+          [
+            "Memory-mapped file",
+            "A few (map, sync)",
+            "Page faults instead of calls; errors arrive as signals"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "What a chatty logger costs at scale",
+        "assumptions": [
+          "A service writes 5,000 log lines a second, one write call each, at 2 µs per call including copying (illustrative)"
+        ],
+        "steps": [
+          "Overhead: 5,000 × 2 µs = 10 ms of CPU each second, about 1% of a core.",
+          "If each line is also fsynced at 1 ms, the logger needs 5 seconds of device time each second: it cannot keep up and the app blocks on logging.",
+          "Buffering lines and flushing every 100 ms cuts calls to about 10 per second.",
+          "The cost is up to 100 ms of log lines lost if the machine crashes, usually acceptable for logs, not for payments."
+        ],
+        "result": "Per-call overhead is small; per-call fsync is not. Batch the flush and decide how much loss is acceptable."
+      },
+      "india": {
+        "title": "The kernel’s published system-call interface",
+        "label": "Official documentation",
+        "body": "The Linux man-pages project documents every system call, its arguments, errors and caveats. Its syscalls(2) page lists hundreds of calls, and fsync(2) states that the call transfers modified data to the storage device and blocks until the device reports completion, which is the precise difference between writing a file and making it durable."
+      },
+      "pitfalls": [
+        {
+          "trap": "“We call write, so the data is saved.”",
+          "say": "“It is in the page cache; I’d fsync where durability matters, and batch to keep the cost down.”"
+        },
+        {
+          "trap": "“The kernel is a black box, we cannot see what the app does.”",
+          "say": "“Tracing system calls shows every read, write and wait the process makes.”"
+        }
+      ],
+      "takeaways": [
+        "System calls are controlled entries into the kernel for privileged work.",
+        "Each call has fixed overhead; batch to reduce it.",
+        "write reaches the page cache; fsync makes data durable.",
+        "Trace system calls to see what a slow program is waiting on."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Where does the time go?",
+      "prompt": "A program copies a 100 MB file by reading and writing 1 byte at a time. It takes minutes; the disk is idle most of that time.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Per-call overhead on 200 million system calls",
+          "feedback": "Right: 100 million reads and 100 million writes, each crossing the boundary."
+        },
+        {
+          "id": "b",
+          "label": "The disk is slow at sequential reads",
+          "feedback": "The disk is mostly idle; it is waiting for the program."
+        },
+        {
+          "id": "c",
+          "label": "The page cache is full",
+          "feedback": "The data fits easily; the problem is the number of calls."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Use large buffers (tens of KB or more). The same copy then needs a few thousand calls and is limited by the disk."
+    },
+    "seeAlso": [
+      {
+        "topicId": 4,
+        "why": "The OSI and TCP/IP layers above the kernel"
+      },
+      {
+        "topicId": 25,
+        "why": "Durability and commit in databases"
+      }
+    ]
+  },
+  {
+    "id": 285,
+    "slug": "io-models-and-event-loops",
+    "region": "f5-os",
+    "order": 5,
+    "title": "I/O Models: Blocking, Non-blocking and Event Loops",
+    "kind": "lesson",
+    "objectives": [
+      "Compare thread-per-connection with readiness-based event loops",
+      "Explain what a readiness API reports",
+      "Spot work that blocks an event loop"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t285-c1",
+        "kind": "text",
+        "title": "Most server time is waiting",
+        "body": "A request handler often spends milliseconds waiting for a database or network and microseconds computing. How a server waits decides how many connections it can hold: with one blocked thread each, or with one thread watching many sockets.",
+        "teaches": [
+          "io-models"
+        ]
+      },
+      {
+        "id": "t285-c2",
+        "kind": "text",
+        "title": "Readiness: ask the kernel which sockets are ready",
+        "body": "Instead of blocking on one socket, a thread registers many sockets with a readiness API (epoll on Linux, kqueue on BSD) and waits once. The kernel returns the sockets that can be read or written without blocking, and the thread handles each in turn.",
+        "teaches": [
+          "readiness"
+        ]
+      },
+      {
+        "id": "t285-c3",
+        "kind": "diagram",
+        "title": "Worked example: memory for 10,000 idle connections",
+        "body": "Compare one thread per connection with an event loop.",
+        "teaches": [
+          "io-models"
+        ],
+        "steps": [
+          "Assume each thread reserves a 1 MB stack and touches about 64 KB of it (illustrative)",
+          "Thread per connection: 10,000 threads ≈ 640 MB actually used, 10 GB of address space reserved",
+          "Event loop: one thread plus a few KB of state per connection ≈ 10,000 × 4 KB = 40 MB",
+          "Thread switching also grows with active connections",
+          "Result: event loops suit many mostly idle connections, such as chat or streaming"
+        ]
+      },
+      {
+        "id": "t285-c4",
+        "kind": "text",
+        "title": "Misconception: an event loop runs things in parallel",
+        "body": "One event-loop thread handles one callback at a time. It is concurrent (many connections in progress) but not parallel. Using several cores needs several loops or a worker pool for CPU-heavy work.",
+        "teaches": [
+          "io-models"
+        ]
+      },
+      {
+        "id": "t285-c5",
+        "kind": "text",
+        "title": "Trap: blocking the loop",
+        "body": "A callback that does a long computation, a blocking file read or a synchronous network call freezes every connection on that loop. Move CPU-heavy or blocking work to a worker pool and resume when it finishes.",
+        "teaches": [
+          "blocking-the-loop"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t285-a1",
+        "concept": "readiness",
+        "type": "multiple_choice",
+        "prompt": "What does a readiness API such as epoll report?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Which threads are currently idle"
+          },
+          {
+            "id": "b",
+            "label": "How much CPU each socket used"
+          },
+          {
+            "id": "c",
+            "label": "Which descriptors can proceed without blocking"
+          },
+          {
+            "id": "d",
+            "label": "Which requests have finished processing"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "It reports readiness; the program still does the reads and writes."
+      },
+      {
+        "id": "t285-a2",
+        "concept": "blocking-the-loop",
+        "type": "multiple_choice",
+        "prompt": "One callback on an event loop parses a 200 MB file synchronously. What do other clients see?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Faster replies from cached data"
+          },
+          {
+            "id": "b",
+            "label": "An immediate 503 from the kernel"
+          },
+          {
+            "id": "c",
+            "label": "Their requests stall until it finishes"
+          },
+          {
+            "id": "d",
+            "label": "Nothing; the loop runs them in parallel"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "A single loop thread runs one callback at a time."
+      },
+      {
+        "id": "t285-a3",
+        "concept": "io-models",
+        "type": "multiple_choice",
+        "prompt": "Which workload best suits an event loop over thread per connection?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "One connection doing heavy maths"
+          },
+          {
+            "id": "b",
+            "label": "Short scripts run once a day"
+          },
+          {
+            "id": "c",
+            "label": "Many idle long-lived connections"
+          },
+          {
+            "id": "d",
+            "label": "A few CPU-heavy batch jobs"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Event loops shine when connections mostly wait."
+      },
+      {
+        "id": "t285-a4",
+        "concept": "io-models",
+        "type": "multiple_choice",
+        "prompt": "An event-loop server pins one core at 100% while others idle. A fitting fix?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Add a thread per connection"
+          },
+          {
+            "id": "b",
+            "label": "Lower the loop’s priority"
+          },
+          {
+            "id": "c",
+            "label": "Run one loop per core"
+          },
+          {
+            "id": "d",
+            "label": "Make every socket blocking"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "One loop uses one core; scale out with a loop per core."
+      },
+      {
+        "id": "t285-a5",
+        "concept": "readiness",
+        "type": "drag_order",
+        "prompt": "Order one turn of a server’s readiness-based loop.",
+        "items": [
+          {
+            "id": "s4",
+            "label": "Queue responses and write what the sockets accept"
+          },
+          {
+            "id": "s2",
+            "label": "Read available bytes from each ready socket"
+          },
+          {
+            "id": "s1",
+            "label": "Wait on the readiness API for ready sockets"
+          },
+          {
+            "id": "s3",
+            "label": "Run the handlers for complete requests"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Wait, read, handle, write, repeat."
+      },
+      {
+        "id": "t285-a6",
+        "concept": "io-models",
+        "type": "tradeoff",
+        "prompt": "A notification service holds 200,000 mostly idle connections and sends small messages.",
+        "constraints": [
+          "Memory per connection matters",
+          "Messages are small and cheap to build",
+          "A few cores"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "An event loop per core using a readiness API",
+            "description": "Event loops"
+          },
+          {
+            "id": "p2",
+            "label": "One thread per connection",
+            "description": "Threads"
+          },
+          {
+            "id": "p3",
+            "label": "A new process per connection",
+            "description": "Processes"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r3",
+            "label": "Threads are always simpler to scale"
+          },
+          {
+            "id": "r1",
+            "label": "Idle connections cost only a little state"
+          },
+          {
+            "id": "r2",
+            "label": "No thread stack or switch per idle client"
+          },
+          {
+            "id": "r4",
+            "label": "Event loops make CPU work free"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "200,000 stacks and the switching between them cost far more memory and CPU.",
+          "r4": "CPU work still costs the same and blocks the loop if done inline."
+        },
+        "explanation": "Pick the I/O model by how connections spend their time: mostly waiting favours event loops."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t285-f1",
+        "front": "Blocking vs non-blocking I/O?",
+        "back": "Blocking waits in the call; non-blocking returns “would block” at once."
+      },
+      {
+        "id": "t285-f2",
+        "front": "What does epoll do?",
+        "back": "Waits on many descriptors and reports the ready ones."
+      },
+      {
+        "id": "t285-f3",
+        "front": "Main event-loop rule?",
+        "back": "Never block or compute for long in a callback."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Linux man-pages: epoll(7)",
+        "url": "https://man7.org/linux/man-pages/man7/epoll.7.html"
+      },
+      {
+        "title": "Linux man-pages: open(2) (O_NONBLOCK)",
+        "url": "https://man7.org/linux/man-pages/man2/open.2.html"
+      },
+      {
+        "title": "Linux man-pages: pthreads(7)",
+        "url": "https://man7.org/linux/man-pages/man7/pthreads.7.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "io-models",
+        "readiness",
+        "blocking-the-loop"
+      ],
+      "mechanism": {
+        "title": "How the kernel lets one thread wait on many sockets",
+        "steps": [
+          "Blocking I/O: read on a socket with no data puts the thread to sleep until data arrives. Simple to write, but each waiting connection holds a thread.",
+          "Non-blocking I/O: with O_NONBLOCK set, read returns immediately with EAGAIN when no data is available. On its own this would force polling, so it is paired with a readiness API.",
+          "epoll keeps an interest list of descriptors inside the kernel. epoll_wait returns only the ready ones, so the cost per wait depends on how many are ready, not how many are registered, unlike the older select and poll calls that scan every descriptor.",
+          "Edge-triggered mode reports a descriptor only when it becomes ready; the program must then read until EAGAIN or it may never be told again. Level-triggered mode keeps reporting while data remains, which is more forgiving.",
+          "Regular files do not fit the readiness model: select and poll always report them ready and epoll refuses to register them, even though a read may wait for the disk. Event-loop runtimes therefore send file I/O and other blocking calls to a thread pool. Completion-based interfaces (such as io_uring on Linux) let the kernel finish the operation and report completion instead.",
+          "Production servers usually combine models: one event loop per core for network I/O, plus a bounded worker pool for CPU-heavy or blocking work, with back-pressure when the pool’s queue fills."
+        ]
+      },
+      "useWhen": [
+        "Use event loops for many concurrent, mostly idle connections.",
+        "Use a worker pool alongside the loop for CPU-heavy or blocking calls."
+      ],
+      "avoidWhen": [
+        "Avoid long computations or blocking calls inside loop callbacks.",
+        "Avoid edge-triggered mode unless the code always drains reads until EAGAIN."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Model",
+          "Connections per thread",
+          "Good at",
+          "Watch out for"
+        ],
+        "rows": [
+          [
+            "Thread per connection, blocking",
+            "1",
+            "Simple code, CPU-heavy requests",
+            "Memory and switching at high connection counts"
+          ],
+          [
+            "Event loop + readiness",
+            "Thousands",
+            "Many idle connections",
+            "Blocking the loop stalls everyone"
+          ],
+          [
+            "Event loop + worker pool",
+            "Thousands",
+            "Mixed I/O and CPU work",
+            "Queue limits and back-pressure"
+          ],
+          [
+            "Completion-based I/O",
+            "Thousands",
+            "High I/O rates incl. files",
+            "Newer interfaces, more complex setup"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How long a blocking callback stalls a loop",
+        "assumptions": [
+          "One loop serves 5,000 active connections, each sending a request every second (illustrative)",
+          "A handler occasionally does a 50 ms synchronous computation"
+        ],
+        "steps": [
+          "The loop handles about 5,000 requests a second, about 0.2 ms each on average.",
+          "During a 50 ms stall about 250 requests arrive and wait.",
+          "Those 250 requests each gain up to 50 ms of latency, which shows in p99 even if stalls are rare.",
+          "Moving the computation to a worker pool keeps the loop’s turn time near 0.2 ms."
+        ],
+        "result": "One slow callback adds its full duration to every request waiting behind it."
+      },
+      "india": {
+        "title": "Readiness notification documented by the kernel",
+        "label": "Official documentation",
+        "body": "The epoll(7) manual describes the interest and ready lists, the difference between edge- and level-triggered modes, and gives an example loop. It warns that with edge-triggered mode a program should use non-blocking descriptors and wait only after a read or write returns EAGAIN, a rule many hand-written event loops have broken by accident."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Our event-loop server is single-threaded, so it cannot use 8 cores.”",
+          "say": "“Run one loop per core, or several processes, and spread connections across them.”"
+        },
+        {
+          "trap": "“The disk read is async because the file descriptor is non-blocking.”",
+          "say": "“Regular files ignore non-blocking mode; that read can block the loop, so it belongs in a worker pool.”"
+        }
+      ],
+      "takeaways": [
+        "Thread per connection is simple; event loops scale to many idle connections.",
+        "Readiness APIs report which descriptors can proceed without blocking.",
+        "Never block or compute for long inside a loop callback.",
+        "Combine loops with a worker pool and back-pressure."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Which is affected?",
+      "prompt": "An event-loop server has 3,000 open connections. One request triggers a 2-second synchronous image resize inside its callback.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "All 3,000 connections pause for about 2 seconds",
+          "feedback": "Right: the loop thread is busy and cannot service any other socket."
+        },
+        {
+          "id": "b",
+          "label": "Only the requesting connection waits",
+          "feedback": "That would be true with thread per connection, not a single loop."
+        },
+        {
+          "id": "c",
+          "label": "The kernel moves the work to another core",
+          "feedback": "The kernel schedules threads, not callbacks; nothing splits the work."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "CPU-heavy work belongs in a worker pool so the loop keeps serving other connections."
+    },
+    "seeAlso": [
+      {
+        "topicId": 10,
+        "why": "Long-lived connections: WebSockets and SSE"
+      },
+      {
+        "topicId": 5,
+        "why": "TCP and UDP from the system-design view"
+      }
+    ]
+  },
+  {
+    "id": 286,
+    "slug": "race-conditions-and-mutexes",
+    "region": "f5-os",
+    "order": 6,
+    "title": "Race Conditions and Mutual Exclusion",
+    "kind": "lesson",
+    "objectives": [
+      "Recognise a data race in read-modify-write code",
+      "Use a mutex to protect a critical section",
+      "Keep critical sections short and consistent"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t286-c1",
+        "kind": "text",
+        "title": "Two threads, one counter",
+        "body": "count = count + 1 is three steps: read, add, write. If two threads read the same value before either writes, one increment is lost. The result depends on timing, so the bug appears rarely in tests and often under load.",
+        "teaches": [
+          "race-condition"
+        ]
+      },
+      {
+        "id": "t286-c2",
+        "kind": "text",
+        "title": "A mutex makes a section exclusive",
+        "body": "A mutex (mutual-exclusion lock) lets only one thread at a time run a critical section. Threads that try to lock it while it is held wait. Every access to the shared data must go through the same lock, or the protection is incomplete.",
+        "teaches": [
+          "mutex"
+        ]
+      },
+      {
+        "id": "t286-c3",
+        "kind": "diagram",
+        "title": "Worked example: how many increments are lost",
+        "body": "Two threads each add 1 to a shared counter 1,000,000 times without a lock.",
+        "teaches": [
+          "race-condition"
+        ],
+        "steps": [
+          "Expected total: 2,000,000",
+          "Each lost update happens when both threads read the same value",
+          "Runs on a multi-core machine commonly print totals well below 2,000,000, and a different total each time",
+          "With a mutex around the increment, or an atomic add instruction, the total is exactly 2,000,000",
+          "The atomic version is faster here because the critical section is a single instruction"
+        ]
+      },
+      {
+        "id": "t286-c4",
+        "kind": "text",
+        "title": "Misconception: it only reads, so it needs no lock",
+        "body": "Reading while another thread writes can see a half-updated structure: a list whose pointer is updated but whose length is not, or a 64-bit value torn into two halves on some platforms. Readers of data that others write need the same lock, a read-write lock, or an atomic type.",
+        "teaches": [
+          "mutex"
+        ]
+      },
+      {
+        "id": "t286-c5",
+        "kind": "text",
+        "title": "Trap: holding a lock during slow work",
+        "body": "A lock held across a network call or a disk write makes every other thread that needs it wait for that I/O. Copy what you need under the lock, release it, then do the slow work.",
+        "teaches": [
+          "critical-section"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t286-a1",
+        "concept": "race-condition",
+        "type": "multiple_choice",
+        "prompt": "Why does count = count + 1 lose updates across threads?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "It is a read, an add and a write"
+          },
+          {
+            "id": "b",
+            "label": "Integers are not stored in memory"
+          },
+          {
+            "id": "c",
+            "label": "Threads have separate copies of globals"
+          },
+          {
+            "id": "d",
+            "label": "The compiler skips repeated additions"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Interleaving the three steps lets one write overwrite another."
+      },
+      {
+        "id": "t286-a2",
+        "concept": "mutex",
+        "type": "multiple_choice",
+        "prompt": "One code path updates a shared map under lock L; another reads it with no lock. Is the data protected?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Yes, writers hold the lock"
+          },
+          {
+            "id": "b",
+            "label": "Yes, reads are always atomic"
+          },
+          {
+            "id": "c",
+            "label": "Only on single-core machines"
+          },
+          {
+            "id": "d",
+            "label": "No, every access must use L"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "A lock protects data only if all accesses agree to use it."
+      },
+      {
+        "id": "t286-a3",
+        "concept": "critical-section",
+        "type": "multiple_choice",
+        "prompt": "A thread holds a lock while calling a payment API that takes 300 ms. What happens to others?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "They run the call in parallel"
+          },
+          {
+            "id": "b",
+            "label": "The lock times out after 1 ms"
+          },
+          {
+            "id": "c",
+            "label": "They wait up to 300 ms for the lock"
+          },
+          {
+            "id": "d",
+            "label": "Nothing; locks pause during I/O"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Locks do not release during I/O; keep slow work outside."
+      },
+      {
+        "id": "t286-a4",
+        "concept": "race-condition",
+        "type": "multiple_choice",
+        "prompt": "A race appears once in a million test runs. What does that suggest?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The test machine is faulty"
+          },
+          {
+            "id": "b",
+            "label": "It cannot happen in production"
+          },
+          {
+            "id": "c",
+            "label": "The compiler has a bug"
+          },
+          {
+            "id": "d",
+            "label": "A timing-dependent bug, not luck"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "Races depend on interleaving, which production load exercises far more."
+      },
+      {
+        "id": "t286-a5",
+        "concept": "race-condition",
+        "type": "drag_order",
+        "prompt": "Order the interleaving that loses an update (counter starts at 5).",
+        "items": [
+          {
+            "id": "s2",
+            "label": "Thread B reads 5"
+          },
+          {
+            "id": "s1",
+            "label": "Thread A reads 5"
+          },
+          {
+            "id": "s3",
+            "label": "Thread A writes 6"
+          },
+          {
+            "id": "s4",
+            "label": "Thread B writes 6"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Both computed from the same old value."
+      },
+      {
+        "id": "t286-a6",
+        "concept": "critical-section",
+        "type": "tradeoff",
+        "prompt": "Many threads increment per-endpoint request counters on every request.",
+        "constraints": [
+          "Very frequent updates",
+          "Only additions",
+          "Totals are read once a second"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "Use atomic add operations on each counter",
+            "description": "Atomics"
+          },
+          {
+            "id": "p2",
+            "label": "One global mutex around all counters",
+            "description": "Global lock"
+          },
+          {
+            "id": "p3",
+            "label": "No synchronisation; small errors are fine",
+            "description": "Unsynchronised"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r3",
+            "label": "A global mutex is always the safest choice"
+          },
+          {
+            "id": "r4",
+            "label": "Unsynchronised counters are only slightly off"
+          },
+          {
+            "id": "r2",
+            "label": "No thread waits behind another for an unrelated counter"
+          },
+          {
+            "id": "r1",
+            "label": "A single atomic instruction needs no lock"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "It is correct but serialises every request on one lock.",
+          "r4": "Lost updates grow with contention and can be large."
+        },
+        "explanation": "For single-variable updates use atomics; for multi-field invariants use a lock."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t286-f1",
+        "front": "What is a race condition?",
+        "back": "A result that depends on the timing of concurrent operations."
+      },
+      {
+        "id": "t286-f2",
+        "front": "What does a mutex guarantee?",
+        "back": "Only one thread at a time runs the protected section."
+      },
+      {
+        "id": "t286-f3",
+        "front": "Rule for lock scope?",
+        "back": "Protect every access; keep slow work outside."
+      }
+    ],
+    "sources": [
+      {
+        "title": "POSIX: pthread_mutex_lock",
+        "url": "https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_mutex_lock.html"
+      },
+      {
+        "title": "Linux man-pages: pthreads(7)",
+        "url": "https://man7.org/linux/man-pages/man7/pthreads.7.html"
+      },
+      {
+        "title": "Linux man-pages: futex(2)",
+        "url": "https://man7.org/linux/man-pages/man2/futex.2.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "race-condition",
+        "mutex",
+        "critical-section"
+      ],
+      "mechanism": {
+        "title": "How locks and atomics prevent races",
+        "steps": [
+          "A data race is two threads accessing the same memory at the same time, at least one writing, without synchronisation. Many language memory models make the whole program’s behaviour undefined when it happens, not merely the value of one variable.",
+          "CPUs and compilers reorder memory operations for speed. Locks and atomic operations include the barriers that stop reordering across them, so data written before an unlock is visible to the next thread that locks.",
+          "An uncontended mutex lock is cheap: on Linux it is an atomic instruction in user space, and only contended locks enter the kernel through futex calls to sleep and wake waiters.",
+          "Atomic operations (add, compare-and-swap) update a single word indivisibly. They fit counters and flags; protecting an invariant across several fields still needs a lock or a carefully designed lock-free structure.",
+          "Read-write locks let many readers in at once but writers alone. They help only when reads are long and frequent; for short sections a plain mutex is often faster.",
+          "Contention, not the lock itself, is the cost: when many threads want one lock they queue and the program runs serially. Splitting data (per-core counters, sharded maps) reduces contention."
+        ]
+      },
+      "useWhen": [
+        "Use a mutex for invariants across several fields.",
+        "Use atomics for independent counters and flags."
+      ],
+      "avoidWhen": [
+        "Avoid reading shared mutable data without the lock or an atomic type.",
+        "Avoid holding locks across I/O or calls into unknown code."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Tool",
+          "Protects",
+          "Cost when uncontended",
+          "Weak spot"
+        ],
+        "rows": [
+          [
+            "Mutex",
+            "Any critical section",
+            "An atomic instruction",
+            "Contention serialises threads"
+          ],
+          [
+            "Read-write lock",
+            "Read-mostly data",
+            "Slightly more than a mutex",
+            "Writer starvation, overhead on short sections"
+          ],
+          [
+            "Atomic variable",
+            "One word",
+            "One instruction",
+            "Cannot protect multi-field invariants"
+          ],
+          [
+            "Sharding (per-thread data)",
+            "Avoids sharing",
+            "None",
+            "Totals need combining"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "What contention does to a hot lock",
+        "assumptions": [
+          "8 threads, each request holds a shared lock for 20 µs (illustrative)",
+          "Work outside the lock is 180 µs per request"
+        ],
+        "steps": [
+          "The lock can serve at most 1,000,000 ÷ 20 = 50,000 requests a second, whatever the thread count.",
+          "Without contention, 8 threads at 200 µs per request could do 8 × 5,000 = 40,000 a second, close to the lock limit.",
+          "With 16 threads the demand would be 80,000 a second, but the lock caps throughput at 50,000.",
+          "Shrinking the section to 5 µs raises the cap to 200,000 a second."
+        ],
+        "result": "A lock turns its critical section into a serial bottleneck; throughput is capped at 1 ÷ hold time."
+      },
+      "india": {
+        "title": "Futexes: why uncontended locks stay in user space",
+        "label": "Official documentation",
+        "body": "The futex(2) manual explains that a futex is a 32-bit value in user memory plus a kernel wait queue. Lock and unlock are done with atomic instructions in user space, and the kernel is involved only when a thread must sleep because the lock is held, or must be woken. That design is why modern mutexes are cheap until they are contended."
+      },
+      "pitfalls": [
+        {
+          "trap": "“It works on my machine, so there is no race.”",
+          "say": "“Races depend on timing; I’d check every shared access is synchronised rather than trust tests.”"
+        },
+        {
+          "trap": "“Reads don’t need the lock.”",
+          "say": "“They do if anyone writes concurrently; otherwise readers can see torn or half-updated data.”"
+        }
+      ],
+      "takeaways": [
+        "Read-modify-write on shared data races without synchronisation.",
+        "A mutex protects data only if every access uses it.",
+        "Atomics suit single words; locks suit multi-field invariants.",
+        "Throughput through a lock is capped at 1 ÷ hold time."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What does it print?",
+      "prompt": "Two threads each run 1,000,000 unsynchronised increments of a shared counter on a 4-core machine, then the program prints the counter.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Usually less than 2,000,000, varying between runs",
+          "feedback": "Right: lost updates depend on how the threads interleave."
+        },
+        {
+          "id": "b",
+          "label": "Exactly 2,000,000 every time",
+          "feedback": "That needs a lock or an atomic add."
+        },
+        {
+          "id": "c",
+          "label": "Exactly 1,000,000 every time",
+          "feedback": "Losses are not that regular; they depend on timing."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Make the increment atomic or wrap it in a mutex and the total becomes exactly 2,000,000."
+    },
+    "seeAlso": [
+      {
+        "topicId": 72,
+        "why": "Optimistic and pessimistic locking in databases"
+      },
+      {
+        "topicId": 46,
+        "why": "Distributed locks across machines"
+      }
+    ]
+  },
+  {
+    "id": 287,
+    "slug": "deadlocks",
+    "region": "f5-os",
+    "order": 7,
+    "title": "Deadlocks and How to Avoid Them",
+    "kind": "lesson",
+    "objectives": [
+      "Name the four conditions for deadlock",
+      "Prevent deadlock with a global lock order",
+      "Tell deadlock from livelock and starvation"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t287-c1",
+        "kind": "text",
+        "title": "Each waits for the other",
+        "body": "Thread A holds lock 1 and waits for lock 2; thread B holds lock 2 and waits for lock 1. Neither can proceed, and nothing will change: a deadlock. The program does not crash, it just stops making progress on those threads.",
+        "teaches": [
+          "deadlock"
+        ]
+      },
+      {
+        "id": "t287-c2",
+        "kind": "text",
+        "title": "Four conditions, all required",
+        "body": "Deadlock needs mutual exclusion, hold-and-wait (holding one resource while asking for another), no preemption (resources cannot be taken away), and a circular wait. Break any one and deadlock cannot occur.",
+        "teaches": [
+          "deadlock-conditions"
+        ]
+      },
+      {
+        "id": "t287-c3",
+        "kind": "diagram",
+        "title": "Worked example: transfers between two accounts",
+        "body": "Transfer(a, b) locks a then b. Two transfers run in opposite directions.",
+        "teaches": [
+          "lock-ordering"
+        ],
+        "steps": [
+          "Thread 1: transfer(X, Y) locks X",
+          "Thread 2: transfer(Y, X) locks Y",
+          "Thread 1 waits for Y; thread 2 waits for X: circular wait",
+          "Fix: always lock the account with the smaller id first, whatever the direction",
+          "Both threads now try X first; one waits, the other finishes, and the cycle cannot form"
+        ]
+      },
+      {
+        "id": "t287-c4",
+        "kind": "text",
+        "title": "Misconception: timeouts fix deadlocks",
+        "body": "Giving up after a timeout turns a hang into an error, which is better than hanging forever, but under load both threads may time out, retry together and collide again (livelock). Timeouts are a safety net; a consistent lock order is the fix.",
+        "teaches": [
+          "deadlock-conditions"
+        ]
+      },
+      {
+        "id": "t287-c5",
+        "kind": "text",
+        "title": "Trap: calling unknown code while holding a lock",
+        "body": "A callback, a logging hook or a plugin called under your lock may take other locks in an order you cannot see. Release your locks before calling out, or document and enforce which locks callers may hold.",
+        "teaches": [
+          "lock-ordering"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t287-a1",
+        "concept": "deadlock-conditions",
+        "type": "multiple_choice",
+        "prompt": "Which condition does a global lock order break?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Hold-and-wait"
+          },
+          {
+            "id": "b",
+            "label": "Circular wait"
+          },
+          {
+            "id": "c",
+            "label": "Mutual exclusion"
+          },
+          {
+            "id": "d",
+            "label": "No preemption"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "If all threads acquire locks in one order, no cycle can form."
+      },
+      {
+        "id": "t287-a2",
+        "concept": "deadlock",
+        "type": "multiple_choice",
+        "prompt": "Two threads are deadlocked. What does CPU usage typically show?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "100% on both threads"
+          },
+          {
+            "id": "b",
+            "label": "Near zero for those threads"
+          },
+          {
+            "id": "c",
+            "label": "Rapid oscillation"
+          },
+          {
+            "id": "d",
+            "label": "A kernel panic"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Deadlocked threads sleep waiting; it is a silent hang."
+      },
+      {
+        "id": "t287-a3",
+        "concept": "deadlock-conditions",
+        "type": "multiple_choice",
+        "prompt": "Two threads keep backing off and retrying in step, never progressing, CPU busy. What is this?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Deadlock"
+          },
+          {
+            "id": "b",
+            "label": "Priority inversion"
+          },
+          {
+            "id": "c",
+            "label": "A memory leak"
+          },
+          {
+            "id": "d",
+            "label": "Livelock"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "Threads are active but make no progress."
+      },
+      {
+        "id": "t287-a4",
+        "concept": "lock-ordering",
+        "type": "multiple_choice",
+        "prompt": "transfer(a, b) must lock both accounts. Which rule prevents deadlock?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Lock the lower account id first"
+          },
+          {
+            "id": "b",
+            "label": "Lock the source account first"
+          },
+          {
+            "id": "c",
+            "label": "Lock whichever is less busy"
+          },
+          {
+            "id": "d",
+            "label": "Lock the destination first"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Direction-based order lets opposite transfers form a cycle."
+      },
+      {
+        "id": "t287-a5",
+        "concept": "deadlock",
+        "type": "drag_order",
+        "prompt": "Order the events in a two-lock deadlock.",
+        "items": [
+          {
+            "id": "s1",
+            "label": "Thread A locks L1"
+          },
+          {
+            "id": "s4",
+            "label": "Thread B requests L1 and waits"
+          },
+          {
+            "id": "s3",
+            "label": "Thread A requests L2 and waits"
+          },
+          {
+            "id": "s2",
+            "label": "Thread B locks L2"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Each holds one lock and waits for the other."
+      },
+      {
+        "id": "t287-a6",
+        "concept": "lock-ordering",
+        "type": "tradeoff",
+        "prompt": "An inventory service must update stock rows for every item in an order, several at once, concurrently with other orders.",
+        "constraints": [
+          "Orders share popular items",
+          "Correctness first",
+          "Moderate contention"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "Sort item ids and lock them in that order",
+            "description": "Ordered locking"
+          },
+          {
+            "id": "p2",
+            "label": "Lock items in the order they appear in the cart",
+            "description": "Cart order"
+          },
+          {
+            "id": "p3",
+            "label": "One global lock for all stock",
+            "description": "Global lock"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r4",
+            "label": "A global lock is the only safe choice"
+          },
+          {
+            "id": "r1",
+            "label": "Every order takes locks in the same global order"
+          },
+          {
+            "id": "r2",
+            "label": "Orders on different items still run in parallel"
+          },
+          {
+            "id": "r3",
+            "label": "Cart order is fine because carts are small"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "Two carts with the same items in different order can deadlock.",
+          "r4": "It avoids deadlock but serialises unrelated orders."
+        },
+        "explanation": "A consistent order across all code paths prevents cycles without serialising everything."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t287-f1",
+        "front": "Four deadlock conditions?",
+        "back": "Mutual exclusion, hold-and-wait, no preemption, circular wait."
+      },
+      {
+        "id": "t287-f2",
+        "front": "Simplest prevention?",
+        "back": "Acquire locks in one global order."
+      },
+      {
+        "id": "t287-f3",
+        "front": "Livelock?",
+        "back": "Threads stay busy reacting to each other but make no progress."
+      }
+    ],
+    "sources": [
+      {
+        "title": "POSIX: pthread_mutex_lock (EDEADLK, error-checking mutexes)",
+        "url": "https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_mutex_lock.html"
+      },
+      {
+        "title": "Linux kernel docs: lockdep, the lock validator",
+        "url": "https://docs.kernel.org/locking/lockdep-design.html"
+      },
+      {
+        "title": "PostgreSQL: Explicit Locking (deadlocks)",
+        "url": "https://www.postgresql.org/docs/current/explicit-locking.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "deadlock",
+        "deadlock-conditions",
+        "lock-ordering"
+      ],
+      "mechanism": {
+        "title": "Preventing, detecting and recovering from deadlock",
+        "steps": [
+          "Prevention removes one of the four conditions. Ordering locks removes circular wait; acquiring all locks at once (or none) removes hold-and-wait; try-lock with release removes no-preemption in practice.",
+          "Lock ordering needs a rule every code path follows: by address, by id, or by a documented hierarchy (for example, always the account lock before the ledger lock). Tools can check it: the Linux kernel’s lockdep records the order in which lock classes are taken and reports any path that could close a cycle.",
+          "Detection is how databases cope, because transactions take locks in an order the database cannot control. PostgreSQL checks for a cycle after a lock wait exceeds deadlock_timeout (1 second by default) and aborts one transaction, which the application must retry.",
+          "Livelock is the active cousin of deadlock: threads keep responding to each other without progress, for example both releasing and retrying in step. Randomised backoff breaks the symmetry.",
+          "Starvation is when one thread never gets a resource others keep taking. Priority inversion is a variant: a low-priority thread holds a lock a high-priority thread needs, while medium-priority threads keep the low one from running; priority inheritance fixes it.",
+          "Diagnosing a hang: take a thread dump or attach a debugger and list what each thread holds and waits for. A cycle in that graph is a deadlock; a long chain to one busy holder is contention."
+        ]
+      },
+      "useWhen": [
+        "Use one documented lock order across the codebase.",
+        "Use try-lock with backoff when a fixed order is impossible."
+      ],
+      "avoidWhen": [
+        "Avoid calling callbacks or external code while holding locks.",
+        "Avoid relying on timeouts alone; they turn hangs into retry storms."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Strategy",
+          "Breaks",
+          "Cost"
+        ],
+        "rows": [
+          [
+            "Global lock order",
+            "Circular wait",
+            "Discipline across all code"
+          ],
+          [
+            "Acquire all locks up front",
+            "Hold-and-wait",
+            "Must know every lock in advance"
+          ],
+          [
+            "Try-lock, release, back off",
+            "No preemption (in effect)",
+            "Retries and possible livelock"
+          ],
+          [
+            "Detect and abort (databases)",
+            "Recovers after the fact",
+            "Wasted work; callers must retry"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How often opposite-order locking collides",
+        "assumptions": [
+          "Two code paths take locks A and B in opposite orders (illustrative)",
+          "Each path runs 1,000 times a second and holds its first lock for 10 µs before taking the second"
+        ],
+        "steps": [
+          "A collision needs path 2 to grab its first lock inside path 1’s 10 µs window.",
+          "Fraction of time path 1 sits in that window: 1,000 × 10 µs = 1%.",
+          "Path 2 starts 1,000 times a second, so about 1,000 × 1% = 10 risky overlaps a second, a meaningful share of which deadlock.",
+          "In testing with 10 runs a second, the same bug might take minutes or never appear."
+        ],
+        "result": "Deadlocks that are rare in tests can be near-certain at production rates; prevent them by design."
+      },
+      "india": {
+        "title": "Deadlock detection in PostgreSQL",
+        "label": "Official documentation",
+        "body": "PostgreSQL’s documentation on explicit locking explains that it detects deadlock situations automatically and resolves them by aborting one of the transactions involved, and recommends acquiring locks on multiple objects in a consistent order in every application to avoid deadlocks in the first place. The aborted transaction gets an error and should be retried."
+      },
+      "pitfalls": [
+        {
+          "trap": "“We added a timeout, so deadlocks are handled.”",
+          "say": "“That limits the damage; I’d fix the lock order so the cycle cannot form.”"
+        },
+        {
+          "trap": "“The service hung but CPU was idle, so it was not our code.”",
+          "say": "“Idle CPU and stuck threads is the signature of a deadlock; a thread dump will show the cycle.”"
+        }
+      ],
+      "takeaways": [
+        "Deadlock needs all four conditions; break one to prevent it.",
+        "A global lock order removes circular wait.",
+        "Databases detect deadlocks and abort a transaction; retry it.",
+        "Livelock and starvation are progress failures without a full stop."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Will these two transfers deadlock?",
+      "prompt": "Transfers always lock the lower account id first. Thread 1 runs transfer(7 → 3); thread 2 runs transfer(3 → 7) at the same moment.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "No: both try to lock account 3 first",
+          "feedback": "Right: the same order in both threads means one simply waits."
+        },
+        {
+          "id": "b",
+          "label": "Yes: they run in opposite directions",
+          "feedback": "Direction no longer matters once locks follow id order."
+        },
+        {
+          "id": "c",
+          "label": "Only if the amounts are equal",
+          "feedback": "Amounts have nothing to do with lock order."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Ordering by a stable key turns a potential cycle into a simple queue on the first lock."
+    },
+    "seeAlso": [
+      {
+        "topicId": 72,
+        "why": "Locking strategies in databases"
+      },
+      {
+        "topicId": 26,
+        "why": "Isolation levels and locking"
+      }
+    ]
+  },
+  {
+    "id": 288,
+    "slug": "condition-variables-and-semaphores",
+    "region": "f5-os",
+    "order": 8,
+    "title": "Condition Variables, Semaphores and Bounded Queues",
+    "kind": "lesson",
+    "objectives": [
+      "Wait for a condition without busy-waiting",
+      "Use a semaphore to limit concurrency",
+      "Build a bounded producer-consumer queue"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t288-c1",
+        "kind": "text",
+        "title": "Waiting for something to become true",
+        "body": "A worker should sleep until a queue has items, not spin checking it. A condition variable lets a thread release a mutex and sleep atomically, then wake when another thread signals that the condition may have changed.",
+        "teaches": [
+          "condition-variable"
+        ]
+      },
+      {
+        "id": "t288-c2",
+        "kind": "text",
+        "title": "Semaphores count permits",
+        "body": "A counting semaphore holds a number of permits. Acquiring takes one, waiting if none are left; releasing returns one. With 10 permits, at most 10 threads use a resource at once: a natural limit for database connections or outbound calls.",
+        "teaches": [
+          "semaphore"
+        ]
+      },
+      {
+        "id": "t288-c3",
+        "kind": "diagram",
+        "title": "Worked example: a bounded queue between producers and consumers",
+        "body": "A queue with capacity 100 sits between request handlers and workers.",
+        "teaches": [
+          "bounded-queue"
+        ],
+        "steps": [
+          "Producer: lock; while the queue is full, wait on “not full”; add the item; signal “not empty”; unlock",
+          "Consumer: lock; while the queue is empty, wait on “not empty”; take an item; signal “not full”; unlock",
+          "When producers outpace consumers, the queue fills and producers block: back-pressure",
+          "The capacity bounds memory, unlike an unbounded queue that grows until the process runs out"
+        ]
+      },
+      {
+        "id": "t288-c4",
+        "kind": "text",
+        "title": "Misconception: a wake-up means the condition is true",
+        "body": "Condition variables can wake spuriously, and another thread may grab the item between the signal and your wake-up. Always re-check the condition in a while loop after waking, never with a single if.",
+        "teaches": [
+          "condition-variable"
+        ]
+      },
+      {
+        "id": "t288-c5",
+        "kind": "text",
+        "title": "Trap: an unbounded queue hides overload",
+        "body": "An unbounded in-memory queue accepts work faster than it can be done, so latency and memory grow until the process falls over. Bound the queue and decide what happens when full: block, reject, or shed the oldest work.",
+        "teaches": [
+          "bounded-queue"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t288-a1",
+        "concept": "condition-variable",
+        "type": "multiple_choice",
+        "prompt": "Why must a condition variable wait sit inside a while loop?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Wake-ups can be spurious or stale"
+          },
+          {
+            "id": "b",
+            "label": "The loop makes the wait faster"
+          },
+          {
+            "id": "c",
+            "label": "The mutex needs to be retaken"
+          },
+          {
+            "id": "d",
+            "label": "Signals are delivered twice"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Re-check the predicate every time you wake."
+      },
+      {
+        "id": "t288-a2",
+        "concept": "semaphore",
+        "type": "multiple_choice",
+        "prompt": "At most 20 threads may call a partner API at once. Which tool fits?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A semaphore with 20 permits"
+          },
+          {
+            "id": "b",
+            "label": "A single mutex"
+          },
+          {
+            "id": "c",
+            "label": "A condition variable alone"
+          },
+          {
+            "id": "d",
+            "label": "A read-write lock"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Permits count concurrent users directly."
+      },
+      {
+        "id": "t288-a3",
+        "concept": "bounded-queue",
+        "type": "multiple_choice",
+        "prompt": "Producers outpace consumers on a bounded queue. What happens?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Old items are silently reordered"
+          },
+          {
+            "id": "b",
+            "label": "Consumers speed up automatically"
+          },
+          {
+            "id": "c",
+            "label": "Producers block or are rejected"
+          },
+          {
+            "id": "d",
+            "label": "Memory grows until the OOM kill"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "That is the point of bounding: overload becomes visible back-pressure."
+      },
+      {
+        "id": "t288-a4",
+        "concept": "condition-variable",
+        "type": "multiple_choice",
+        "prompt": "What does waiting on a condition variable do with the mutex?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Releases it while asleep, retakes it on wake"
+          },
+          {
+            "id": "b",
+            "label": "Keeps holding it while asleep"
+          },
+          {
+            "id": "c",
+            "label": "Passes it to the signalling thread"
+          },
+          {
+            "id": "d",
+            "label": "Destroys it after the wait"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Atomic release-and-sleep avoids missing a signal."
+      },
+      {
+        "id": "t288-a5",
+        "concept": "bounded-queue",
+        "type": "drag_order",
+        "prompt": "Order a consumer taking one item from a bounded queue.",
+        "items": [
+          {
+            "id": "s2",
+            "label": "While the queue is empty, wait on “not empty”"
+          },
+          {
+            "id": "s1",
+            "label": "Lock the queue mutex"
+          },
+          {
+            "id": "s3",
+            "label": "Remove one item"
+          },
+          {
+            "id": "s4",
+            "label": "Signal “not full” and unlock"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Lock, wait in a loop, take, signal."
+      },
+      {
+        "id": "t288-a6",
+        "concept": "bounded-queue",
+        "type": "tradeoff",
+        "prompt": "An API enqueues image jobs for 8 workers. Traffic bursts reach 10× the processing rate for a few minutes.",
+        "constraints": [
+          "Memory is limited",
+          "Clients can retry",
+          "Latency should stay predictable"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "A bounded queue that rejects with 503 and Retry-After when full",
+            "description": "Bounded + reject"
+          },
+          {
+            "id": "p2",
+            "label": "An unbounded in-memory queue",
+            "description": "Unbounded"
+          },
+          {
+            "id": "p3",
+            "label": "Start a new thread per job",
+            "description": "Thread per job"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "Memory stays bounded during bursts"
+          },
+          {
+            "id": "r2",
+            "label": "Clients learn to slow down instead of timing out"
+          },
+          {
+            "id": "r3",
+            "label": "Unbounded queues never lose jobs"
+          },
+          {
+            "id": "r4",
+            "label": "Thread per job adds capacity"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "They lose all of them when the process runs out of memory.",
+          "r4": "The 8 workers’ CPU limit is unchanged; extra threads add contention."
+        },
+        "explanation": "Bound every queue and choose the overload behaviour deliberately."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t288-f1",
+        "front": "What is a condition variable for?",
+        "back": "Sleeping until another thread signals a change, with a mutex."
+      },
+      {
+        "id": "t288-f2",
+        "front": "Semaphore?",
+        "back": "A counter of permits that limits concurrent users."
+      },
+      {
+        "id": "t288-f3",
+        "front": "Why bound a queue?",
+        "back": "To turn overload into back-pressure instead of memory growth."
+      }
+    ],
+    "sources": [
+      {
+        "title": "POSIX: pthread_cond_wait",
+        "url": "https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_cond_wait.html"
+      },
+      {
+        "title": "Linux man-pages: sem_overview(7)",
+        "url": "https://man7.org/linux/man-pages/man7/sem_overview.7.html"
+      },
+      {
+        "title": "Linux man-pages: pthreads(7)",
+        "url": "https://man7.org/linux/man-pages/man7/pthreads.7.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "condition-variable",
+        "semaphore",
+        "bounded-queue"
+      ],
+      "mechanism": {
+        "title": "Coordinating threads without spinning",
+        "steps": [
+          "A condition variable is always used with a mutex and a predicate (“queue not empty”). The waiter locks, checks the predicate in a loop, and calls wait, which atomically releases the mutex and sleeps so that a signal sent after the check cannot be missed.",
+          "Signalling wakes one waiter; broadcasting wakes all. Signal is enough when any one waiter can make progress; broadcast is needed when waiters wait for different predicates on the same condition variable.",
+          "POSIX states that spurious wake-ups may occur, so the predicate must be re-checked after every wait returns. Even without spurious wake-ups, another thread may have consumed the item first.",
+          "A counting semaphore is a counter with blocking acquire and release. It needs no ownership: one thread can acquire and another release, which makes it suitable for signalling between threads and for limiting concurrency.",
+          "Bounded queues combine both ideas: two conditions (“not full”, “not empty”) or two semaphores (free slots, filled slots) plus a mutex. They are the in-process version of the message queues used between services.",
+          "Little’s law sizes them: items in the system = arrival rate × time in system. A queue that keeps growing means arrivals exceed service rate, and no capacity setting will fix it; only more workers or less work will."
+        ]
+      },
+      "useWhen": [
+        "Use condition variables for “wait until state changes” inside one process.",
+        "Use semaphores to cap concurrent access to a limited resource."
+      ],
+      "avoidWhen": [
+        "Avoid sleeping in a loop with a fixed delay to poll for work.",
+        "Avoid unbounded queues between stages that can run at different speeds."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Primitive",
+          "Best for",
+          "Common mistake"
+        ],
+        "rows": [
+          [
+            "Mutex",
+            "Exclusive access to shared state",
+            "Forgetting to lock on some path"
+          ],
+          [
+            "Condition variable",
+            "Waiting for a predicate",
+            "Using if instead of while"
+          ],
+          [
+            "Counting semaphore",
+            "Limiting concurrency",
+            "Releasing more often than acquiring"
+          ],
+          [
+            "Bounded queue",
+            "Hand-off with back-pressure",
+            "No policy for when it is full"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How big should the queue be?",
+        "assumptions": [
+          "Workers process 400 jobs a second in total; each job takes 20 ms to run (illustrative)",
+          "Bursts arrive at 1,000 jobs a second for up to 5 seconds; the target is under 2 seconds of queueing"
+        ],
+        "steps": [
+          "During a burst the backlog grows by 1,000 − 400 = 600 jobs a second.",
+          "After 5 seconds: 3,000 queued jobs, which take 3,000 ÷ 400 = 7.5 s to drain, far over the 2 s target.",
+          "A capacity of 2 s × 400 = 800 jobs keeps waits under 2 s; jobs beyond that are rejected and retried later.",
+          "A larger queue would only convert rejections into timeouts."
+        ],
+        "result": "Size a queue by the waiting time you can accept, not by how much memory you have."
+      },
+      "india": {
+        "title": "POSIX on spurious wake-ups",
+        "label": "Official documentation",
+        "body": "The POSIX specification of pthread_cond_wait says that spurious wakeups may occur and that because the return from wait does not imply anything about the predicate, it should be re-evaluated on return. It also specifies that the mutex is released atomically with blocking, which is the property that prevents a lost wake-up between checking and sleeping."
+      },
+      "pitfalls": [
+        {
+          "trap": "“The worker sleeps 10 ms between checks, that is fine.”",
+          "say": "“It adds up to 10 ms latency and wastes wake-ups; a condition variable wakes it exactly when work arrives.”"
+        },
+        {
+          "trap": "“Make the queue bigger so we never reject.”",
+          "say": "“A bigger queue just turns rejections into timeouts; I’d size it to the wait we can accept.”"
+        }
+      ],
+      "takeaways": [
+        "Condition variables sleep until signalled; always re-check in a while loop.",
+        "Semaphores cap how many threads use a resource.",
+        "Bounded queues turn overload into back-pressure.",
+        "Size queues by acceptable waiting time (Little’s law)."
+      ]
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "Fill the worker pool",
+      "prompt": "Requests arrive at 200 a second and a pool of 8 worker threads serves them. Slide how long each request holds a worker.",
+      "model": "thread-pool",
+      "params": {
+        "rps": 200,
+        "threads": 8
+      },
+      "control": {
+        "label": "Time per request",
+        "min": 5,
+        "max": 80,
+        "step": 5,
+        "initial": 20,
+        "unit": "ms"
+      },
+      "takeaway": "At 20 ms only 4 workers are busy on average. Past 40 ms every worker is busy and the queue starts growing without limit, which is when a bounded queue and rejection keep latency predictable."
+    },
+    "seeAlso": [
+      {
+        "topicId": 36,
+        "why": "Message queues between services"
+      },
+      {
+        "topicId": 53,
+        "why": "Timeouts and back-pressure across services"
+      }
+    ]
+  },
+  {
+    "id": 289,
+    "slug": "files-page-cache-and-fsync",
+    "region": "f5-os",
+    "order": 9,
+    "title": "Files, the Page Cache and fsync",
+    "kind": "lesson",
+    "objectives": [
+      "Explain how reads and writes use the page cache",
+      "Make a file write durable, including its directory entry",
+      "Write files atomically with rename"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t289-c1",
+        "kind": "text",
+        "title": "Files go through memory",
+        "body": "Reads and writes normally go through the page cache: reads are served from memory when cached, and writes update cached pages that the kernel writes to storage later. That makes repeated reads fast and writes cheap, at the cost of durability until the data is flushed.",
+        "teaches": [
+          "page-cache"
+        ]
+      },
+      {
+        "id": "t289-c2",
+        "kind": "text",
+        "title": "fsync is the durability point",
+        "body": "fsync on a file descriptor waits until the file’s data and metadata are on stable storage. Creating or renaming a file also changes the directory, so making a new file survive a crash means syncing the directory too.",
+        "teaches": [
+          "fsync"
+        ]
+      },
+      {
+        "id": "t289-c3",
+        "kind": "diagram",
+        "title": "Worked example: replacing a config file safely",
+        "body": "Overwriting a file in place can leave it half-written after a crash.",
+        "teaches": [
+          "atomic-rename"
+        ],
+        "steps": [
+          "Write the new contents to config.tmp in the same directory",
+          "fsync config.tmp so its data is on disk",
+          "rename config.tmp to config: on POSIX file systems this replaces the name atomically",
+          "fsync the directory so the rename itself is durable",
+          "After a crash, readers see either the old file or the new one, never a mix"
+        ]
+      },
+      {
+        "id": "t289-c4",
+        "kind": "text",
+        "title": "Misconception: closing the file flushes it to disk",
+        "body": "close releases the descriptor; it does not wait for the data to reach storage. Data written and closed can still be lost in a power cut until the kernel writes it back or someone calls fsync.",
+        "teaches": [
+          "fsync"
+        ]
+      },
+      {
+        "id": "t289-c5",
+        "kind": "text",
+        "title": "Trap: ignoring fsync errors",
+        "body": "If fsync reports an I/O error, the kernel may already have dropped the dirty pages, so calling fsync again can return success without the data ever being written. After a failed fsync, treat the data as lost and recover from a known-good copy, as PostgreSQL now does by crashing and replaying its log.",
+        "teaches": [
+          "fsync"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t289-a1",
+        "concept": "page-cache",
+        "type": "multiple_choice",
+        "prompt": "A 2 GB file is read twice in a row on a server with 16 GB free. Why is the second read faster?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "It is served from the page cache"
+          },
+          {
+            "id": "b",
+            "label": "The disk remembers recent reads"
+          },
+          {
+            "id": "c",
+            "label": "The second read skips checksums"
+          },
+          {
+            "id": "d",
+            "label": "The file was compressed first"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The kernel kept the pages in memory after the first read."
+      },
+      {
+        "id": "t289-a2",
+        "concept": "fsync",
+        "type": "multiple_choice",
+        "prompt": "Which call waits until written data is on stable storage?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "close"
+          },
+          {
+            "id": "b",
+            "label": "write"
+          },
+          {
+            "id": "c",
+            "label": "open"
+          },
+          {
+            "id": "d",
+            "label": "fsync"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "write and close return before the device has the data."
+      },
+      {
+        "id": "t289-a3",
+        "concept": "atomic-rename",
+        "type": "multiple_choice",
+        "prompt": "Why write to a temp file and rename it over the original?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "It avoids needing disk space"
+          },
+          {
+            "id": "b",
+            "label": "Readers see old or new, never half"
+          },
+          {
+            "id": "c",
+            "label": "rename skips the page cache"
+          },
+          {
+            "id": "d",
+            "label": "rename compresses the file"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "rename atomically switches which file the name points to."
+      },
+      {
+        "id": "t289-a4",
+        "concept": "fsync",
+        "type": "multiple_choice",
+        "prompt": "fsync returns an I/O error. What is the safe assumption?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Only metadata was affected"
+          },
+          {
+            "id": "b",
+            "label": "The data is safe in the cache"
+          },
+          {
+            "id": "c",
+            "label": "The written data may be lost"
+          },
+          {
+            "id": "d",
+            "label": "Retrying fsync will save it"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Dirty pages may have been discarded after the failure."
+      },
+      {
+        "id": "t289-a5",
+        "concept": "atomic-rename",
+        "type": "drag_order",
+        "prompt": "Order a crash-safe replacement of a file.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "rename it over the original"
+          },
+          {
+            "id": "s1",
+            "label": "Write the new contents to a temporary file"
+          },
+          {
+            "id": "s2",
+            "label": "fsync the temporary file"
+          },
+          {
+            "id": "s4",
+            "label": "fsync the containing directory"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Data durable, then switch the name, then make the switch durable."
+      },
+      {
+        "id": "t289-a6",
+        "concept": "fsync",
+        "type": "estimation",
+        "prompt": "A disk completes about 500 fsyncs a second. A service fsyncs after each of its 2,000 writes a second. What fraction of the writes can it keep up with, in percent?",
+        "unit": "%",
+        "target": 25,
+        "assumptions": [
+          "One fsync per write",
+          "No batching"
+        ],
+        "formula": "fsync capacity ÷ demand × 100",
+        "workedAnswer": "500 ÷ 2,000 = 0.25, which is 25%",
+        "explanation": "Design implication: per-write fsync caps throughput at the device’s flush rate, which is why databases batch commits into group commits."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t289-f1",
+        "front": "What does the page cache do?",
+        "back": "Keeps file data in memory for fast reads and deferred writes."
+      },
+      {
+        "id": "t289-f2",
+        "front": "How to make a new file durable?",
+        "back": "fsync the file, then fsync its directory."
+      },
+      {
+        "id": "t289-f3",
+        "front": "Atomic file replace?",
+        "back": "Write temp, fsync, rename over, fsync directory."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Linux man-pages: fsync(2)",
+        "url": "https://man7.org/linux/man-pages/man2/fsync.2.html"
+      },
+      {
+        "title": "Linux man-pages: open(2) (O_SYNC, O_DIRECT)",
+        "url": "https://man7.org/linux/man-pages/man2/open.2.html"
+      },
+      {
+        "title": "Linux kernel docs: Memory management concepts (page cache)",
+        "url": "https://docs.kernel.org/admin-guide/mm/concepts.html"
+      },
+      {
+        "title": "PostgreSQL: Reliability and the Write-Ahead Log",
+        "url": "https://www.postgresql.org/docs/current/wal-reliability.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "page-cache",
+        "fsync",
+        "atomic-rename"
+      ],
+      "mechanism": {
+        "title": "From write to stable storage",
+        "steps": [
+          "write copies data into page-cache pages and marks them dirty. Background writeback flushes dirty pages after a delay or when too much memory is dirty, so a crash can lose the last several seconds of writes that were never synced.",
+          "fsync flushes the file’s dirty data and the metadata needed to read it back, and asks the device to flush its own write cache. fdatasync skips metadata not needed for reading, such as the modification time, and can be cheaper.",
+          "A new file’s name lives in its directory. fsync on the file does not necessarily persist that name, so durable file creation and rename also need an fsync on the directory, as the fsync(2) manual notes.",
+          "rename within one file system atomically replaces the destination name, which gives the write-temp-then-rename pattern. It does not by itself guarantee the new contents are durable, which is why the temp file is synced first.",
+          "O_DIRECT bypasses the page cache for applications such as databases that manage their own cache; O_SYNC makes each write behave as if followed by a sync. Both trade throughput for control.",
+          "Errors are reported once: if writeback fails, the error is returned to the next fsync and the pages may be marked clean. Programs that ignore fsync errors, or retry and trust the second result, can silently lose data."
+        ]
+      },
+      "useWhen": [
+        "Use temp-file-plus-rename for files that must never be half-written.",
+        "Use batched fsyncs (group commit) when many writes need durability."
+      ],
+      "avoidWhen": [
+        "Avoid assuming close or a successful write means durable.",
+        "Avoid retrying fsync after an error and trusting the result."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Operation",
+          "Durable after a power cut?",
+          "Cost"
+        ],
+        "rows": [
+          [
+            "write",
+            "No (page cache only)",
+            "Memory copy"
+          ],
+          [
+            "write + close",
+            "No",
+            "Memory copy"
+          ],
+          [
+            "write + fsync",
+            "Data and file metadata, yes",
+            "One device flush"
+          ],
+          [
+            "create/rename + fsync file only",
+            "Contents yes, name not necessarily",
+            "One flush"
+          ],
+          [
+            "... + fsync directory",
+            "Yes",
+            "Two flushes"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Why group commit matters",
+        "assumptions": [
+          "A disk with a 2 ms flush latency (illustrative)",
+          "10,000 small transactions a second, each needing durability"
+        ],
+        "steps": [
+          "One fsync per transaction: at most 1,000 ÷ 2 = 500 flushes a second, far below 10,000.",
+          "Group commit: gather all transactions that arrive during a flush and sync them together.",
+          "With a flush every 2 ms, each flush carries about 20 transactions, so 10,000 a second fit in 500 flushes.",
+          "Each transaction waits at most about one flush interval longer."
+        ],
+        "result": "Batching durability turns a device-bound limit into a latency cost of about one flush."
+      },
+      "india": {
+        "title": "The fsync error-handling change in PostgreSQL",
+        "label": "Publicly reported",
+        "body": "In 2018 PostgreSQL developers publicly discussed that, on Linux, a failed fsync could clear the error and drop the dirty pages, so a later successful fsync did not mean the data was written. PostgreSQL changed its behaviour to treat an fsync failure as fatal (PANIC) and recover from the write-ahead log, as its reliability documentation now describes for data_sync_retry."
+      },
+      "pitfalls": [
+        {
+          "trap": "“We close the file, so it is saved.”",
+          "say": "“close does not flush; I’d fsync the file and, for new names, the directory.”"
+        },
+        {
+          "trap": "“fsync failed, so we just call it again.”",
+          "say": "“The kernel may have dropped those pages; a second success proves nothing. Treat it as data loss and recover.”"
+        }
+      ],
+      "takeaways": [
+        "Writes land in the page cache; fsync makes them durable.",
+        "New names need the directory synced too.",
+        "Write temp, fsync, rename, fsync directory for atomic replacement.",
+        "Treat fsync errors as data loss; batch fsyncs for throughput."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What survives the power cut?",
+      "prompt": "An app writes 10 MB to a new file, calls close, and prints “saved”. Two seconds later the power fails.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Possibly nothing: the data may still be only in the page cache",
+          "feedback": "Right: neither close nor write waits for storage."
+        },
+        {
+          "id": "b",
+          "label": "The whole file, because close flushes it",
+          "feedback": "close only releases the descriptor."
+        },
+        {
+          "id": "c",
+          "label": "The file name but no data",
+          "feedback": "Both the data and the directory entry may be missing."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Call fsync on the file (and its directory, for a new file) before saying “saved”."
+    },
+    "seeAlso": [
+      {
+        "topicId": 25,
+        "why": "Commit and durability in databases"
+      },
+      {
+        "topicId": 61,
+        "why": "Durability in object storage"
+      }
+    ]
+  },
+  {
+    "id": 290,
+    "slug": "signals-and-graceful-shutdown",
+    "region": "f5-os",
+    "order": 10,
+    "title": "Signals, Exit Codes and Graceful Shutdown",
+    "kind": "lesson",
+    "objectives": [
+      "Know what SIGTERM, SIGINT and SIGKILL do",
+      "Shut a server down without dropping requests",
+      "Read exit codes when a process dies"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [],
+    "cards": [
+      {
+        "id": "t290-c1",
+        "kind": "text",
+        "title": "Signals are asynchronous notifications",
+        "body": "The kernel or another process can send a signal to a process: SIGINT when you press Ctrl+C, SIGTERM as a polite request to stop, SIGKILL to end it immediately. Most signals can be caught by a handler; SIGKILL and SIGSTOP cannot.",
+        "teaches": [
+          "signals"
+        ]
+      },
+      {
+        "id": "t290-c2",
+        "kind": "text",
+        "title": "Graceful shutdown in four steps",
+        "body": "On SIGTERM a server should stop accepting new connections, let in-flight requests finish within a deadline, flush buffers and close connections to databases and queues, then exit with status 0. Orchestrators wait a grace period, then send SIGKILL.",
+        "teaches": [
+          "graceful-shutdown"
+        ]
+      },
+      {
+        "id": "t290-c3",
+        "kind": "diagram",
+        "title": "Worked example: a rolling deploy without errors",
+        "body": "An orchestrator replaces a pod while it still holds requests.",
+        "teaches": [
+          "graceful-shutdown"
+        ],
+        "steps": [
+          "The pod is removed from load-balancer endpoints and receives SIGTERM, roughly at the same time",
+          "The server keeps serving for a few seconds so traffic still routed to it is not refused",
+          "It stops accepting new connections and finishes in-flight requests, bounded by a deadline under the grace period (30 s by default in Kubernetes)",
+          "It closes pools and exits 0",
+          "Without this, every deploy drops the requests that were in flight"
+        ]
+      },
+      {
+        "id": "t290-c4",
+        "kind": "text",
+        "title": "Misconception: the process will get a chance to clean up",
+        "body": "SIGKILL ends a process without running any code, and power loss or an OOM kill do the same. Graceful shutdown handles the planned case; data integrity must still survive the unplanned one, through transactions, idempotent work and durable logs.",
+        "teaches": [
+          "signals"
+        ]
+      },
+      {
+        "id": "t290-c5",
+        "kind": "text",
+        "title": "Trap: the main process does not receive the signal",
+        "body": "If a container starts the server through a shell script, the shell may be process 1 and not forward SIGTERM to its child. The server never sees the signal and is killed after the grace period. Use exec to replace the shell, or a small init process that forwards signals.",
+        "teaches": [
+          "signals"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t290-a1",
+        "concept": "signals",
+        "type": "multiple_choice",
+        "prompt": "Which signal cannot be caught or ignored?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "SIGHUP"
+          },
+          {
+            "id": "b",
+            "label": "SIGKILL"
+          },
+          {
+            "id": "c",
+            "label": "SIGINT"
+          },
+          {
+            "id": "d",
+            "label": "SIGTERM"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "SIGKILL (and SIGSTOP) bypass handlers."
+      },
+      {
+        "id": "t290-a2",
+        "concept": "graceful-shutdown",
+        "type": "multiple_choice",
+        "prompt": "What should a server do first on SIGTERM?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Restart itself in place"
+          },
+          {
+            "id": "b",
+            "label": "Exit immediately with status 0"
+          },
+          {
+            "id": "c",
+            "label": "Stop taking new work, finish in-flight"
+          },
+          {
+            "id": "d",
+            "label": "Wait for a second SIGTERM"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Draining keeps requests from being dropped."
+      },
+      {
+        "id": "t290-a3",
+        "concept": "exit-codes",
+        "type": "multiple_choice",
+        "prompt": "A container exits with code 137. What does that usually mean?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "It hit a syntax error"
+          },
+          {
+            "id": "b",
+            "label": "It exited normally"
+          },
+          {
+            "id": "c",
+            "label": "It was killed by SIGKILL (128 + 9)"
+          },
+          {
+            "id": "d",
+            "label": "It received SIGTERM and handled it"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Shells report 128 + signal number; 137 often means an OOM kill or a grace-period expiry."
+      },
+      {
+        "id": "t290-a4",
+        "concept": "signals",
+        "type": "multiple_choice",
+        "prompt": "A server started by a shell script never logs “shutting down” on deploy. Likely cause?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The log buffer is too small"
+          },
+          {
+            "id": "b",
+            "label": "SIGTERM is not sent to containers"
+          },
+          {
+            "id": "c",
+            "label": "The shell does not forward SIGTERM"
+          },
+          {
+            "id": "d",
+            "label": "Deploys always use SIGKILL"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Make the server process 1 with exec, or use an init that forwards signals."
+      },
+      {
+        "id": "t290-a5",
+        "concept": "graceful-shutdown",
+        "type": "drag_order",
+        "prompt": "Order a graceful shutdown.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Finish in-flight requests within a deadline"
+          },
+          {
+            "id": "s5",
+            "label": "Exit with status 0"
+          },
+          {
+            "id": "s2",
+            "label": "Stop accepting new connections"
+          },
+          {
+            "id": "s4",
+            "label": "Close database and queue connections"
+          },
+          {
+            "id": "s1",
+            "label": "Receive SIGTERM"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Drain, then release, then exit."
+      },
+      {
+        "id": "t290-a6",
+        "concept": "exit-codes",
+        "type": "estimation",
+        "prompt": "A process is killed by signal 15 (SIGTERM) without handling it. What exit status does the shell report?",
+        "unit": "status",
+        "target": 143,
+        "assumptions": [
+          "Shell convention: 128 + signal number"
+        ],
+        "formula": "128 + signal",
+        "workedAnswer": "128 + 15 = 143",
+        "explanation": "Sanity check: 143 means the process was terminated before it could exit on its own, so a graceful handler was missing or never ran."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t290-f1",
+        "front": "SIGTERM vs SIGKILL?",
+        "back": "SIGTERM asks to stop and can be handled; SIGKILL ends the process at once."
+      },
+      {
+        "id": "t290-f2",
+        "front": "Exit status 137?",
+        "back": "128 + 9: killed by SIGKILL, often OOM or grace expiry."
+      },
+      {
+        "id": "t290-f3",
+        "front": "Graceful shutdown?",
+        "back": "Stop new work, drain in-flight, release resources, exit 0."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Linux man-pages: signal(7)",
+        "url": "https://man7.org/linux/man-pages/man7/signal.7.html"
+      },
+      {
+        "title": "Kubernetes: Pod lifecycle (termination of pods)",
+        "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+      },
+      {
+        "title": "The Twelve-Factor App: Disposability",
+        "url": "https://12factor.net/disposability"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "signals",
+        "graceful-shutdown",
+        "exit-codes"
+      ],
+      "mechanism": {
+        "title": "How processes are told to stop",
+        "steps": [
+          "Each signal has a default action: terminate, terminate with a core dump, ignore, stop or continue. A process can install handlers for most signals; SIGKILL and SIGSTOP always take their default action.",
+          "Handlers run asynchronously, interrupting whatever the thread was doing, so only async-signal-safe functions may be called in them. The usual pattern is to set a flag or write to a pipe in the handler and do the real shutdown in normal code.",
+          "Process 1 in a container (or on a host) is special: the kernel does not apply default terminate actions to it for signals it has not installed handlers for. A server running as process 1 without a SIGTERM handler may therefore ignore SIGTERM entirely.",
+          "Kubernetes termination: the pod is marked terminating, removed from Service endpoints, any preStop hook runs, SIGTERM is sent, and after terminationGracePeriodSeconds (default 30) remaining processes get SIGKILL. Endpoint removal propagates asynchronously, which is why servers keep serving briefly after SIGTERM.",
+          "Exit status: 0 means success, other small numbers are program-defined errors, and shells and orchestrators report death by signal as 128 + the signal number (130 for SIGINT, 137 for SIGKILL, 143 for SIGTERM).",
+          "Disposability (a twelve-factor principle) asks that processes start fast and shut down gracefully, and that work survives sudden death: jobs are returned to a queue if a worker dies, and requests are idempotent so clients can retry."
+        ]
+      },
+      "useWhen": [
+        "Use a SIGTERM handler that drains connections within a deadline.",
+        "Use exec or a minimal init so the server receives signals in containers."
+      ],
+      "avoidWhen": [
+        "Avoid long or unsafe work inside signal handlers.",
+        "Avoid relying on shutdown hooks for correctness; SIGKILL and crashes skip them."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Signal or event",
+          "Can be handled?",
+          "Typical source"
+        ],
+        "rows": [
+          [
+            "SIGINT (2)",
+            "Yes",
+            "Ctrl+C in a terminal"
+          ],
+          [
+            "SIGTERM (15)",
+            "Yes",
+            "Orchestrator or kill command asking to stop"
+          ],
+          [
+            "SIGKILL (9)",
+            "No",
+            "Grace period expired, OOM killer, kill -9"
+          ],
+          [
+            "SIGHUP (1)",
+            "Yes",
+            "Terminal closed; often reused to reload config"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Fitting a drain into the grace period",
+        "assumptions": [
+          "Grace period 30 s (Kubernetes default); endpoint removal takes up to 5 s to propagate (illustrative)",
+          "The slowest normal request takes 10 s; closing pools and flushing takes 2 s"
+        ],
+        "steps": [
+          "Keep serving for about 5 s after SIGTERM so late-routed requests still succeed.",
+          "Then stop accepting and let in-flight requests finish: up to 10 s.",
+          "Then close pools and flush: 2 s. Total ≈ 17 s, inside 30 s.",
+          "Set an internal deadline (say 25 s) after which remaining requests are cancelled, so the process exits before SIGKILL."
+        ],
+        "result": "Budget the shutdown explicitly; anything not finished by the grace period is killed mid-flight."
+      },
+      "india": {
+        "title": "Pod termination in the Kubernetes documentation",
+        "label": "Official documentation",
+        "body": "The Kubernetes Pod lifecycle documentation describes the termination sequence: the pod is marked for deletion, endpoints stop including it, the preStop hook runs, the container runtime sends SIGTERM to process 1 in each container, and after the grace period (30 seconds by default) any remaining processes receive SIGKILL. It also notes that endpoint removal and SIGTERM happen in parallel, so a server should expect a few late requests after the signal arrives."
+      },
+      "pitfalls": [
+        {
+          "trap": "“We handle shutdown, so no data can be lost.”",
+          "say": "“Only on SIGTERM; SIGKILL, OOM and power loss skip it, so the work itself must be idempotent and durable.”"
+        },
+        {
+          "trap": "“Exit code 137 means our code crashed.”",
+          "say": "“137 is SIGKILL, usually the OOM killer or an expired grace period; check memory limits and shutdown time.”"
+        }
+      ],
+      "takeaways": [
+        "SIGTERM can be handled; SIGKILL cannot.",
+        "Graceful shutdown: keep serving briefly, drain, release, exit 0.",
+        "Exit status 128 + n means death by signal n.",
+        "Make sure the server, not a wrapper shell, receives signals."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What happens on deploy?",
+      "prompt": "A container runs “sh -c ./server”. The server has a SIGTERM handler that drains requests. Kubernetes deletes the pod with the default grace period.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The shell gets SIGTERM, the server never does, and both are SIGKILLed after 30 s",
+          "feedback": "Right: the shell is process 1 and does not forward the signal by default."
+        },
+        {
+          "id": "b",
+          "label": "The server drains and exits 0",
+          "feedback": "Only if it receives SIGTERM, which it does not here."
+        },
+        {
+          "id": "c",
+          "label": "The pod is removed instantly with no wait",
+          "feedback": "Kubernetes waits the grace period before SIGKILL."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Start the server with exec (or a tiny init) so it is the process that receives SIGTERM."
+    },
+    "seeAlso": [
+      {
+        "topicId": 69,
+        "why": "Deploy strategies that rely on graceful shutdown"
+      },
+      {
+        "topicId": 70,
+        "why": "Kubernetes pod lifecycle"
+      }
+    ]
   }
 ]
