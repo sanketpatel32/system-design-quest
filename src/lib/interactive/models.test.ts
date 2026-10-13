@@ -58,6 +58,18 @@ describe('interactive models', () => {
 
 describe('fundamentals models', () => {
   const val = (o: { rows: { label: string; value: string }[] }, i: number) => o.rows[i]!.value
+  it('thread-pool: 400 rps × 50 ms = 20 busy threads; overflows a pool of 16', () => {
+    expect(val(MODELS['thread-pool'].run(50, { rps: 400, threads: 32 }), 1)).toBe('20')
+    expect(MODELS['thread-pool'].run(50, { rps: 400, threads: 32 }).verdict!.ok).toBe(true)
+    expect(MODELS['thread-pool'].run(50, { rps: 400, threads: 16 }).verdict!.ok).toBe(false)
+  })
+  it('backoff: base 100, cap 2000 doubles then caps', () => {
+    const r5 = MODELS['backoff'].run(5, { baseMs: 100, capMs: 2000 })
+    expect(val(r5, 1)).toMatch(/^1,?600 ms$/)
+    expect(val(r5, 2)).toMatch(/^3,?100 ms$/)
+    expect(val(MODELS['backoff'].run(7, { baseMs: 100, capMs: 2000 }), 1)).toMatch(/^2,?000 ms$/)
+    expect(MODELS['backoff'].run(10, { baseMs: 100, capMs: 2000 }).verdict!.ok).toBe(false)
+  })
   it('frame-budget: 60 Hz gives 16.7 ms, 90 Hz overruns 12 ms of work', () => {
     expect(val(MODELS['frame-budget'].run(60, { workMs: 12 }), 1)).toBe('16.7 ms')
     expect(MODELS['frame-budget'].run(90, { workMs: 12 }).verdict!.ok).toBe(false)

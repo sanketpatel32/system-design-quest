@@ -446,3 +446,20 @@ Page > Service worker
 Service worker [hashed assets: cache first]> SW cache {store}
 Service worker [HTML: network first]> Network|HTTP cache
 Network|HTTP cache [offline: fall back]~> SW cache {store}
+
+@221 The life of a backend request: it passes through a load balancer and a middleware chain for auth and parsing, reaches the handler, which reads a store, then the response flows back.
+Client > Load balancer > Middleware|auth, parse, limits > Handler > Database {store}
+Handler [response]> Client
+
+@222 Server-side sessions versus stateless tokens: a session id is looked up in a shared store on every request, while a signed token is verified locally with a key.
+Session cookie > Server A|look up id > Session store {store}
+Signed token > Server B|verify signature > Handler
+
+@227 A background job: the request handler enqueues a job and returns 202 at once; a worker pulls the job later, retries on failure and parks repeated failures in a dead-letter queue.
+Handler [enqueue]> Job queue {queue} > Worker > Done
+Worker ~> Dead-letter queue {queue}
+
+@232 File upload straight to object storage: the server issues a short-lived signed URL, the client uploads the bytes directly, and the server only records the metadata.
+Client [ask]> API server [signed URL]> Client
+Client [bytes]> Object storage {store}
+API server > Metadata DB {store}
