@@ -6,7 +6,7 @@ const AREA_SIZE = { 'f5-os': [10, 14], 'f6-security': [10, 14], 'f7-cloud': [10,
 export const FUND_SOURCE_HOSTS = [
   'developer.mozilla.org', 'web.dev', 'developer.chrome.com', 'www.rfc-editor.org', 'datatracker.ietf.org', 'www.w3.org', 'html.spec.whatwg.org',
   'fetch.spec.whatwg.org', 'dom.spec.whatwg.org', 'url.spec.whatwg.org', 'cheatsheetseries.owasp.org', 'owasp.org', 'www.postgresql.org', '12factor.net',
-  'www.iana.org', 'dl.acm.org', 'www.mongodb.com', 'cassandra.apache.org', 'redis.io', 'sre.google', 'opentelemetry.io', 'dev.mysql.com', 'sqlite.org', 'www.sqlite.org',
+  'www.iana.org', 'dl.acm.org', 'www.mongodb.com', 'cassandra.apache.org', 'redis.io', 'sre.google', 'opentelemetry.io', 'dev.mysql.com', 'learn.microsoft.com', 'docs.oracle.com', 'sqlite.org', 'www.sqlite.org',
 ]
 // Framework, library and language-API names: Fundamentals teach concepts with pseudocode, HTTP and diagrams only
 const LANG_SPECIFIC = /\b(React|Vue|Angular|Svelte|Next\.js|Nuxt|Express|Django|Flask|Rails|Laravel|Spring Boot|jQuery|axios|Redux|Workbox|Node\.js|npm|pip install|setTimeout|setInterval|offsetHeight|getBoundingClientRect|AbortController|AbortSignal|addEventListener|querySelector|innerHTML|textContent|console\.log|requestAnimationFrame|async def|public static void|System\.out|goroutine|Sequelize|Hibernate|SQLAlchemy|Prisma|ActiveRecord)\b/

@@ -85794,12 +85794,16 @@
         "url": "https://dl.acm.org/doi/10.1145/362384.362685"
       },
       {
-        "title": "PostgreSQL: Constraints",
-        "url": "https://www.postgresql.org/docs/current/ddl-constraints.html"
+        "title": "W. Kent: A Simple Guide to Five Normal Forms in Relational Database Theory (CACM, 1983)",
+        "url": "https://dl.acm.org/doi/10.1145/358024.358054"
       },
       {
-        "title": "PostgreSQL: Arrays",
-        "url": "https://www.postgresql.org/docs/current/arrays.html"
+        "title": "R. Fagin: Multivalued Dependencies and a New Normal Form for Relational Databases (ACM TODS, 1977)",
+        "url": "https://dl.acm.org/doi/10.1145/320557.320571"
+      },
+      {
+        "title": "PostgreSQL: Constraints",
+        "url": "https://www.postgresql.org/docs/current/ddl-constraints.html"
       }
     ],
     "deep": {
@@ -87226,6 +87230,15 @@
         "teaches": [
           "retry-serialisation"
         ]
+      },
+      {
+        "id": "t267-c6",
+        "kind": "text",
+        "title": "Same name, different behaviour: MySQL InnoDB",
+        "body": "InnoDB defaults to Repeatable Read. Plain SELECTs see a snapshot, but UPDATE and DELETE act on the latest committed row, so read-then-write code can still lose an update. Use an atomic UPDATE or SELECT … FOR UPDATE, which takes next-key locks.",
+        "teaches": [
+          "isolation-levels"
+        ]
       }
     ],
     "questions": [
@@ -87340,6 +87353,34 @@
           "a"
         ],
         "explanation": "The transaction was rolled back; re-run all of it."
+      },
+      {
+        "id": "t267-a7",
+        "concept": "isolation-levels",
+        "type": "multiple_choice",
+        "prompt": "At MySQL InnoDB’s default Repeatable Read, T1 reads stock = 10, T2 sets it to 9 and commits, then T1 runs UPDATE … SET stock = 9 (computed from its read). What happens?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The update succeeds and T2’s decrement is lost"
+          },
+          {
+            "id": "b",
+            "label": "T1 waits until T2’s snapshot expires"
+          },
+          {
+            "id": "c",
+            "label": "T1’s update is silently skipped"
+          },
+          {
+            "id": "d",
+            "label": "T1 fails with a serialisation error"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "InnoDB’s snapshot covers SELECTs; the UPDATE applies to the latest row, so the stale value overwrites T2’s change."
       },
       {
         "id": "t267-a5",
@@ -87462,6 +87503,26 @@
       {
         "title": "PostgreSQL: SET TRANSACTION",
         "url": "https://www.postgresql.org/docs/current/sql-set-transaction.html"
+      },
+      {
+        "title": "MySQL 8.4: InnoDB transaction isolation levels",
+        "url": "https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html"
+      },
+      {
+        "title": "MySQL 8.4: Consistent nonlocking reads",
+        "url": "https://dev.mysql.com/doc/refman/8.4/en/innodb-consistent-read.html"
+      },
+      {
+        "title": "MySQL 8.4: Phantom rows and next-key locking",
+        "url": "https://dev.mysql.com/doc/refman/8.4/en/innodb-next-key-locking.html"
+      },
+      {
+        "title": "SQL Server: SET TRANSACTION ISOLATION LEVEL",
+        "url": "https://learn.microsoft.com/en-us/sql/t-sql/statements/set-transaction-isolation-level-transact-sql"
+      },
+      {
+        "title": "Oracle Database Concepts: Data Concurrency and Consistency",
+        "url": "https://docs.oracle.com/en/database/oracle/oracle-database/19/cncpt/data-concurrency-and-consistency.html"
       }
     ],
     "deep": {
@@ -87478,7 +87539,7 @@
           "At Read Committed in PostgreSQL each statement takes a new snapshot. Two statements in one transaction can therefore see different data, and read-then-write logic in application code is exposed to lost updates.",
           "At Repeatable Read PostgreSQL uses one snapshot for the whole transaction (snapshot isolation). If it tries to update a row that a concurrent transaction changed after the snapshot, it is aborted with a serialisation failure instead of overwriting, which prevents lost updates.",
           "Snapshot isolation still allows write skew, because the two transactions write different rows. Serializable in PostgreSQL uses Serializable Snapshot Isolation: it tracks read/write dependencies and aborts one transaction when a cycle could make the result non-serial.",
-          "Other databases implement the same names differently, for example with locking instead of snapshots, so behaviour at “Repeatable Read” can differ between products. Read your database’s documentation for the level you use.",
+          "The same level names behave differently across products. MySQL’s InnoDB defaults to Repeatable Read, and its plain SELECTs read one snapshot taken at the first read. Its documentation notes that this snapshot applies to SELECTs, not necessarily to UPDATE and DELETE: those act on the latest committed rows. So an InnoDB read-then-write at Repeatable Read can still lose an update where PostgreSQL would raise a serialisation failure. Locking reads (SELECT … FOR UPDATE or FOR SHARE) and range updates in InnoDB take next-key locks (a row plus the gap before it) to block phantom inserts, and InnoDB’s Serializable turns plain SELECTs into SELECT … FOR SHARE when autocommit is off, so it is lock-based rather than SSI. SQL Server defaults to lock-based Read Committed, with an optional row-versioning mode (READ_COMMITTED_SNAPSHOT) and a separate SNAPSHOT level. Oracle offers Read Committed (default) and a Serializable level that is snapshot-based. Check the level in your database’s documentation rather than assuming the name tells you the behaviour.",
           "Alternatives to raising the level for one operation: atomic single-statement updates, SELECT … FOR UPDATE to lock the rows you will change, optimistic version columns checked in the UPDATE, or constraints that make the bad state impossible."
         ]
       },
@@ -87488,7 +87549,7 @@
       ],
       "avoidWhen": [
         "Avoid assuming the default level prevents lost updates in read-then-write code.",
-        "Avoid relying on level names meaning the same in every database product."
+        "Avoid relying on level names meaning the same in every database product (InnoDB’s Repeatable Read does not abort a stale UPDATE the way PostgreSQL’s does)."
       ],
       "tradeoffs": {
         "columns": [
@@ -87519,6 +87580,13 @@
             "Prevented",
             "Prevented",
             "Prevented"
+          ],
+          [
+            "For contrast: InnoDB Repeatable Read (MySQL default)",
+            "Prevented",
+            "Prevented for plain SELECTs",
+            "Plain SELECTs see the snapshot; locking reads use next-key locks",
+            "Possible; stale UPDATEs are not aborted"
           ]
         ]
       },
@@ -87555,7 +87623,8 @@
         "Isolation trades surprising results against blocking and aborts.",
         "Read Committed allows lost updates in read-then-write code.",
         "Snapshot isolation stops lost updates but allows write skew.",
-        "Serializable prevents all anomalies; retry on 40001."
+        "Serializable prevents all anomalies; retry on 40001.",
+        "Level names differ by product: InnoDB’s Repeatable Read does not abort stale UPDATEs."
       ]
     },
     "interactive": {
@@ -89149,16 +89218,28 @@
     ],
     "sources": [
       {
-        "title": "MongoDB Manual: Data Modeling",
-        "url": "https://www.mongodb.com/docs/manual/data-modeling/"
+        "title": "MongoDB Manual: Data Model Design (embedding vs references)",
+        "url": "https://www.mongodb.com/docs/manual/core/data-model-design/"
       },
       {
-        "title": "Apache Cassandra: Data Modeling",
+        "title": "MongoDB Manual: Write Concern",
+        "url": "https://www.mongodb.com/docs/manual/reference/write-concern/"
+      },
+      {
+        "title": "Apache Cassandra: Data Modeling (query-first design)",
         "url": "https://cassandra.apache.org/doc/latest/cassandra/developing/data-modeling/index.html"
       },
       {
-        "title": "Redis: Understand data types",
+        "title": "Apache Cassandra: Dynamo architecture and tunable consistency",
+        "url": "https://cassandra.apache.org/doc/latest/cassandra/architecture/dynamo.html"
+      },
+      {
+        "title": "Redis: Data types",
         "url": "https://redis.io/docs/latest/develop/data-types/"
+      },
+      {
+        "title": "Redis: Persistence (RDB and AOF)",
+        "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/"
       },
       {
         "title": "PostgreSQL: JSON Types",
