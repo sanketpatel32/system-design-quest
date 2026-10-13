@@ -1,0 +1,4397 @@
+[
+ {
+  "id": 321,
+  "slug": "containers-and-images",
+  "region": "f7-cloud",
+  "order": 1,
+  "title": "Containers and Images",
+  "kind": "lesson",
+  "objectives": [
+   "Explain what a container isolates and what it shares with the host",
+   "Read an image as layers addressed by digest",
+   "Build small, reproducible, non-root images"
+  ],
+  "difficulty": 1,
+  "durationMinutes": 11,
+  "prereqIds": [],
+  "cards": [
+   {
+    "id": "t321-c1",
+    "kind": "text",
+    "title": "A process with a fenced-off view",
+    "body": "A container is an ordinary process that the kernel gives its own view of the filesystem, process list and network (namespaces) and a resource budget (control groups). It shares the host’s kernel, which is why containers start in milliseconds and why a kernel bug can affect all of them.",
+    "teaches": [
+     "container-isolation"
+    ]
+   },
+   {
+    "id": "t321-c2",
+    "kind": "text",
+    "title": "Images are stacked layers",
+    "body": "An image is a list of filesystem layers plus configuration (command, environment, user). Each build step that changes files adds a layer. Layers are identified by the hash of their content, so identical layers are stored and downloaded once and shared between images.",
+    "teaches": [
+     "image-layers"
+    ]
+   },
+   {
+    "id": "t321-c3",
+    "kind": "diagram",
+    "title": "Worked example: a multi-stage build",
+    "body": "A service needs a compiler to build but only the binary to run.",
+    "teaches": [
+     "image-layers"
+    ],
+    "steps": [
+     "Stage 1 starts from a full build image, copies the dependency manifest and installs dependencies (cached while the manifest is unchanged)",
+     "It then copies the source and compiles the binary",
+     "Stage 2 starts from a minimal runtime image",
+     "It copies only the binary from stage 1 and sets a non-root user",
+     "The final image drops the compiler and source, often shrinking from about 1 GB to tens of MB (illustrative)"
+    ]
+   },
+   {
+    "id": "t321-c4",
+    "kind": "text",
+    "title": "Misconception: a container is a lightweight virtual machine",
+    "body": "A virtual machine runs its own kernel on virtual hardware; a container runs on the host kernel. That makes containers lighter but gives a weaker isolation boundary, so multi-tenant platforms often add a VM or sandbox layer around untrusted containers.",
+    "teaches": [
+     "container-isolation"
+    ]
+   },
+   {
+    "id": "t321-c5",
+    "kind": "text",
+    "title": "Trap: deploying by mutable tag",
+    "body": "Tags such as latest or v2 can be moved to point at a different image. Two nodes pulling “v2” an hour apart may run different code. Deploy by digest (sha256:…) or treat tags as immutable in your registry.",
+    "teaches": [
+     "image-layers"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t321-a1",
+    "concept": "container-isolation",
+    "type": "multiple_choice",
+    "prompt": "What do containers on one host share?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "One network address for each process"
+     },
+     {
+      "id": "b",
+      "label": "A single filesystem with no isolation"
+     },
+     {
+      "id": "c",
+      "label": "The host’s operating system kernel"
+     },
+     {
+      "id": "d",
+      "label": "One process id for all containers"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Namespaces separate views; the kernel is shared."
+   },
+   {
+    "id": "t321-a2",
+    "concept": "image-layers",
+    "type": "multiple_choice",
+    "prompt": "Why copy the dependency manifest and install before copying source code?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "So the image runs as root"
+     },
+     {
+      "id": "b",
+      "label": "So the dependency layer stays cached"
+     },
+     {
+      "id": "c",
+      "label": "So the build skips tests"
+     },
+     {
+      "id": "d",
+      "label": "So the source is encrypted"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Source changes often; dependencies rarely. Order layers from stable to volatile."
+   },
+   {
+    "id": "t321-a3",
+    "concept": "image-layers",
+    "type": "multiple_choice",
+    "prompt": "Which reference picks one exact image for every pull?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A sha256 digest"
+     },
+     {
+      "id": "b",
+      "label": "The repository name alone"
+     },
+     {
+      "id": "c",
+      "label": "The latest tag"
+     },
+     {
+      "id": "d",
+      "label": "A version tag such as v2"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Digests are content hashes; tags can move."
+   },
+   {
+    "id": "t321-a4",
+    "concept": "container-isolation",
+    "type": "multiple_choice",
+    "prompt": "Why run the container process as a non-root user?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Root processes cannot open network ports in containers"
+     },
+     {
+      "id": "b",
+      "label": "Images build faster that way"
+     },
+     {
+      "id": "c",
+      "label": "It reduces image size by half"
+     },
+     {
+      "id": "d",
+      "label": "An escape then gains fewer privileges"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Root in a container maps to powerful capabilities on many setups."
+   },
+   {
+    "id": "t321-a5",
+    "concept": "image-layers",
+    "type": "drag_order",
+    "prompt": "Order the steps of a cache-friendly multi-stage build.",
+    "items": [
+     {
+      "id": "s4",
+      "label": "Copy only the built artefact and set a non-root user"
+     },
+     {
+      "id": "s3",
+      "label": "Start a minimal runtime stage"
+     },
+     {
+      "id": "s1",
+      "label": "Copy the dependency manifest and install dependencies"
+     },
+     {
+      "id": "s2",
+      "label": "Copy the source and compile"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Stable layers first, then build, then a slim runtime."
+   },
+   {
+    "id": "t321-a6",
+    "concept": "container-isolation",
+    "type": "tradeoff",
+    "prompt": "A platform runs code uploaded by many different customers on shared hosts.",
+    "constraints": [
+     "Untrusted code",
+     "Many tenants per host",
+     "Startup under a second"
+    ],
+    "approaches": [
+     {
+      "id": "p3",
+      "label": "Run each customer’s code as a process on the host",
+      "description": "Bare processes"
+     },
+     {
+      "id": "p2",
+      "label": "Plain containers sharing the host kernel",
+      "description": "Plain containers"
+     },
+     {
+      "id": "p1",
+      "label": "Containers inside lightweight VMs or a sandboxed runtime",
+      "description": "Sandboxed containers"
+     }
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r3",
+      "label": "Namespaces alone isolate untrusted code well"
+     },
+     {
+      "id": "r4",
+      "label": "Processes on the host are as isolated as containers"
+     },
+     {
+      "id": "r2",
+      "label": "Lightweight VMs still start quickly"
+     },
+     {
+      "id": "r1",
+      "label": "A kernel exploit in one tenant does not reach the host directly"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": {
+     "r3": "All containers share one kernel, so a kernel bug crosses tenants.",
+     "r4": "They see the host’s filesystem and processes."
+    },
+    "explanation": "Containers package software; add a VM or sandbox boundary for untrusted tenants."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t321-f1",
+    "front": "Container?",
+    "back": "A process with its own namespaces and cgroup limits, sharing the host kernel."
+   },
+   {
+    "id": "t321-f2",
+    "front": "Image?",
+    "back": "Content-addressed layers plus configuration."
+   },
+   {
+    "id": "t321-f3",
+    "front": "Tag vs digest?",
+    "back": "Tags can move; a digest names exact content."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Open Container Initiative: Image Format Specification",
+    "url": "https://opencontainers.org/about/overview/"
+   },
+   {
+    "title": "Docker Docs: Building best practices",
+    "url": "https://docs.docker.com/build/building/best-practices/"
+   },
+   {
+    "title": "Docker Docs: Multi-stage builds",
+    "url": "https://docs.docker.com/build/building/multi-stage/"
+   },
+   {
+    "title": "Linux man-pages: namespaces(7)",
+    "url": "https://man7.org/linux/man-pages/man7/namespaces.7.html"
+   },
+   {
+    "title": "Linux man-pages: cgroups(7)",
+    "url": "https://man7.org/linux/man-pages/man7/cgroups.7.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "container-isolation",
+    "image-layers"
+   ],
+   "mechanism": {
+    "title": "What happens when a container starts",
+    "steps": [
+     "The runtime pulls the image manifest by tag or digest, then downloads any layers it does not already have. Each layer is verified against its content hash, so a corrupted or tampered layer is rejected.",
+     "Layers are stacked with a union filesystem: lower layers are read-only and shared by every container from that image; each container gets a thin writable layer on top. Files changed at run time are lost when the container is removed unless written to a volume.",
+     "The runtime creates namespaces (mount, process id, network, user, hostname, IPC) so the process sees its own filesystem root, its own process tree starting at PID 1 and its own network interfaces.",
+     "Control groups cap and account for CPU, memory and I/O. A memory limit is enforced by the kernel: exceeding it gets the process killed, which surfaces as exit code 137.",
+     "Security settings narrow what the process may do: dropping Linux capabilities, a seccomp filter on system calls, a read-only root filesystem and a non-root user. Each limits the damage of a compromised application.",
+     "Because the image fixes the filesystem and the configuration, the same digest behaves the same on a laptop, in CI and in production, which is the main operational benefit: environment drift moves into a versioned artefact.",
+     "Registries store images by repository and digest. Signing images and verifying signatures at deploy time, together with scanning layers for known vulnerabilities, ties what runs in production back to a trusted build."
+    ]
+   },
+   "useWhen": [
+    "Use containers to ship one reproducible artefact through every environment.",
+    "Use multi-stage builds and minimal base images for production."
+   ],
+   "avoidWhen": [
+    "Avoid relying on container isolation alone for untrusted code.",
+    "Avoid storing state in the container’s writable layer.",
+    "Avoid baking secrets or environment-specific configuration into images; inject them at run time."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Choice",
+     "Benefit",
+     "Cost"
+    ],
+    "rows": [
+     [
+      "Full OS base image",
+      "Familiar tools for debugging",
+      "Large, more packages to patch"
+     ],
+     [
+      "Minimal or distroless base",
+      "Small, fewer vulnerabilities",
+      "No shell; debug with separate tools"
+     ],
+     [
+      "Deploy by tag",
+      "Readable",
+      "Can change under you"
+     ],
+     [
+      "Deploy by digest",
+      "Exact and reproducible",
+      "Needs tooling to map to versions"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "What a smaller image saves at scale",
+    "assumptions": [
+     "Image shrinks from 900 MB to 60 MB with a multi-stage build (illustrative)",
+     "A scale-out event starts 200 new nodes, each pulling the image over 1 Gbit/s"
+    ],
+    "steps": [
+     "At 1 Gbit/s (about 125 MB/s), 900 MB takes about 7.2 s and 60 MB about 0.5 s per node.",
+     "Across 200 nodes the registry serves 180 GB versus 12 GB.",
+     "Fewer packages also means fewer vulnerability alerts to triage.",
+     "Faster pulls shorten how long new capacity takes to arrive during a spike."
+    ],
+    "result": "Image size shows up as startup time, registry load and patching work."
+   },
+   "india": {
+    "title": "The OCI image format",
+    "label": "Official documentation",
+    "body": "The Open Container Initiative maintains open specifications for container images, runtimes and distribution, so images built by one tool run on another runtime. An OCI image consists of a manifest, a configuration and a set of filesystem layers, each referenced by a cryptographic digest of its content. Docker’s documentation recommends multi-stage builds, minimal base images and pinning base images by digest for reproducible builds."
+   },
+   "pitfalls": [
+    {
+     "trap": "“Containers are as isolated as VMs.”",
+     "say": "“They share the host kernel; for untrusted code I’d add a VM or sandbox boundary.”"
+    },
+    {
+     "trap": "“We deploy latest so we always get the newest build.”",
+     "say": "“Latest can differ between nodes; I’d deploy an immutable digest.”"
+    }
+   ],
+   "takeaways": [
+    "A container is a fenced process sharing the host kernel.",
+    "Images are content-addressed layers; order them stable to volatile.",
+    "Deploy by digest; run as non-root.",
+    "Multi-stage builds ship only what runs."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "What happens to the secret?",
+   "prompt": "A build copies an .env file containing an API key in step 3, uses it, and deletes it in step 5. The image is pushed to a registry that several teams can pull from.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Anyone who can pull the image can extract the key from step 3’s layer",
+     "feedback": "Right: deleting a file adds a layer that hides it but does not remove it."
+    },
+    {
+     "id": "b",
+     "label": "The key is gone because step 5 deleted it",
+     "feedback": "Earlier layers stay in the image unchanged."
+    },
+    {
+     "id": "c",
+     "label": "Registries strip secrets automatically on push",
+     "feedback": "Registries store layers as they are."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Use build-time secret mounts that never enter a layer, and rotate the exposed key."
+  },
+  "seeAlso": [
+   {
+    "topicId": 70,
+    "why": "Containers and Kubernetes in system design"
+   },
+   {
+    "topicId": 281,
+    "why": "Processes, which containers are built from"
+   },
+   {
+    "topicId": 307,
+    "why": "Secrets must not be baked into container images"
+   }
+  ]
+ },
+ {
+  "id": 322,
+  "slug": "orchestration-and-probes",
+  "region": "f7-cloud",
+  "order": 2,
+  "title": "Running Containers on an Orchestrator",
+  "kind": "lesson",
+  "objectives": [
+   "Describe how an orchestrator reconciles desired state",
+   "Use liveness, readiness and startup probes correctly",
+   "Set resource requests and limits and read their effects"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 10,
+  "prereqIds": [
+   321
+  ],
+  "cards": [
+   {
+    "id": "t322-c1",
+    "kind": "text",
+    "title": "Declare what you want, not how",
+    "body": "You tell an orchestrator such as Kubernetes the desired state, for example “3 replicas of image X with 512 MiB each”. Controllers keep comparing actual with desired state and act on any difference: start a replacement for a crashed container, reschedule from a failed node.",
+    "teaches": [
+     "reconciliation"
+    ]
+   },
+   {
+    "id": "t322-c2",
+    "kind": "text",
+    "title": "Three different probes",
+    "body": "A readiness probe decides whether a container receives traffic; failing it removes the pod from load balancing without restarting it. A liveness probe decides whether to restart a stuck container. A startup probe holds the other probes off until a slow-starting app has finished initialising.",
+    "teaches": [
+     "probes"
+    ]
+   },
+   {
+    "id": "t322-c3",
+    "kind": "diagram",
+    "title": "Worked example: probes for a service that warms a cache",
+    "body": "The service takes 40 s to load a cache at start and depends on a database.",
+    "teaches": [
+     "probes"
+    ],
+    "steps": [
+     "Startup probe: check /healthz every 5 s, allow up to 12 failures (60 s) before giving up",
+     "Readiness probe: return ready only once the cache is loaded and the process can serve requests",
+     "Liveness probe: check only that the process is responsive, not the database",
+     "If the database is down, readiness may fail, but liveness keeps passing so pods are not restarted in a loop",
+     "Pods rejoin traffic as soon as readiness passes again"
+    ]
+   },
+   {
+    "id": "t322-c4",
+    "kind": "text",
+    "title": "Misconception: liveness should check dependencies",
+    "body": "If liveness fails when the database is slow, every pod restarts at once, adding cold starts to a database incident. Restarting the app cannot fix a dependency. Keep liveness about the process itself.",
+    "teaches": [
+     "probes"
+    ]
+   },
+   {
+    "id": "t322-c5",
+    "kind": "text",
+    "title": "Trap: no requests, or limits far below real use",
+    "body": "Without CPU and memory requests the scheduler packs pods blindly and nodes run out under load. A memory limit below real peak usage gets the container killed (OOMKilled); a low CPU limit throttles it, adding latency without any error.",
+    "teaches": [
+     "resources"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t322-a1",
+    "concept": "probes",
+    "type": "multiple_choice",
+    "prompt": "A pod is alive but temporarily cannot serve. Which probe should fail?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "None of the probes"
+     },
+     {
+      "id": "b",
+      "label": "Startup"
+     },
+     {
+      "id": "c",
+      "label": "Readiness"
+     },
+     {
+      "id": "d",
+      "label": "Liveness"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Readiness removes it from traffic without a restart."
+   },
+   {
+    "id": "t322-a2",
+    "concept": "probes",
+    "type": "multiple_choice",
+    "prompt": "Liveness checks the database. The database slows for 2 minutes. What happens?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Kubernetes repairs the database"
+     },
+     {
+      "id": "b",
+      "label": "Pods restart, adding load during the incident"
+     },
+     {
+      "id": "c",
+      "label": "Traffic shifts to another region"
+     },
+     {
+      "id": "d",
+      "label": "Pods keep serving from cache until the database recovers"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Restarts cannot fix a dependency and make recovery slower."
+   },
+   {
+    "id": "t322-a3",
+    "concept": "resources",
+    "type": "multiple_choice",
+    "prompt": "A container exceeds its memory limit. What does the kernel do?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Slows it down until usage drops"
+     },
+     {
+      "id": "b",
+      "label": "Writes the excess to swap quietly"
+     },
+     {
+      "id": "c",
+      "label": "Moves it to a larger node"
+     },
+     {
+      "id": "d",
+      "label": "Kills it; the pod reports OOMKilled"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Memory limits are enforced by killing; CPU limits by throttling."
+   },
+   {
+    "id": "t322-a4",
+    "concept": "reconciliation",
+    "type": "multiple_choice",
+    "prompt": "A node fails with 3 replicas of your service on it. What does the controller do?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Restarts the failed node’s kernel"
+     },
+     {
+      "id": "b",
+      "label": "Waits for an operator to approve new replicas"
+     },
+     {
+      "id": "c",
+      "label": "Reduces the desired replica count"
+     },
+     {
+      "id": "d",
+      "label": "Starts replacements on healthy nodes"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Controllers act to restore the declared replica count."
+   },
+   {
+    "id": "t322-a5",
+    "concept": "probes",
+    "type": "drag_order",
+    "prompt": "Order what happens as a new pod comes up.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "Readiness probe passes"
+     },
+     {
+      "id": "s4",
+      "label": "Pod is added to service endpoints and receives traffic"
+     },
+     {
+      "id": "s1",
+      "label": "Container starts"
+     },
+     {
+      "id": "s2",
+      "label": "Startup probe passes"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Start, initialise, become ready, receive traffic."
+   },
+   {
+    "id": "t322-a6",
+    "concept": "resources",
+    "type": "tradeoff",
+    "prompt": "A latency-sensitive API has occasional CPU bursts during traffic spikes.",
+    "constraints": [
+     "p99 latency matters",
+     "Nodes have spare CPU",
+     "Memory use is stable"
+    ],
+    "approaches": [
+     {
+      "id": "p3",
+      "label": "No requests or limits at all",
+      "description": "Unspecified"
+     },
+     {
+      "id": "p2",
+      "label": "Tight CPU limit equal to the request",
+      "description": "Tight CPU limit"
+     },
+     {
+      "id": "p1",
+      "label": "Set accurate CPU and memory requests, a memory limit, and a generous or no CPU limit",
+      "description": "Requests + memory limit"
+     }
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r4",
+      "label": "Leaving resources unspecified lets the scheduler optimise"
+     },
+     {
+      "id": "r1",
+      "label": "Scheduling reserves the CPU it needs"
+     },
+     {
+      "id": "r3",
+      "label": "A tight CPU limit protects latency"
+     },
+     {
+      "id": "r2",
+      "label": "Bursts use spare CPU instead of being throttled"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": {
+     "r3": "Throttling during bursts is what raises p99.",
+     "r4": "Without requests it cannot place pods sensibly."
+    },
+    "explanation": "Requests drive scheduling; memory limits prevent runaway use; tight CPU limits throttle bursts."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t322-f1",
+    "front": "Readiness vs liveness?",
+    "back": "Readiness gates traffic; liveness triggers restarts."
+   },
+   {
+    "id": "t322-f2",
+    "front": "Startup probe?",
+    "back": "Delays other probes until a slow app has started."
+   },
+   {
+    "id": "t322-f3",
+    "front": "Exceed memory vs CPU limit?",
+    "back": "Memory: killed. CPU: throttled."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Kubernetes: Liveness, Readiness and Startup Probes",
+    "url": "https://kubernetes.io/docs/concepts/configuration/liveness-readiness-startup-probes/"
+   },
+   {
+    "title": "Kubernetes: Resource Management for Pods and Containers",
+    "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+   },
+   {
+    "title": "Kubernetes: Controllers",
+    "url": "https://kubernetes.io/docs/concepts/architecture/controller/"
+   },
+   {
+    "title": "Kubernetes: Pod Lifecycle",
+    "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "reconciliation",
+    "probes",
+    "resources"
+   ],
+   "mechanism": {
+    "title": "The control loop behind an orchestrator",
+    "steps": [
+     "You submit objects (Deployments, Services) to an API server, which stores them. Nothing happens directly; controllers watch those objects and work to make reality match.",
+     "The Deployment controller creates a ReplicaSet, which creates pods. The scheduler assigns each pod to a node with enough unreserved CPU and memory, based on the pod’s requests, and on the node an agent (the kubelet) starts the containers.",
+     "The kubelet runs probes. A failing readiness probe removes the pod’s address from the Service’s endpoints; a failing liveness probe restarts the container; a startup probe disables the other two until it succeeds.",
+     "Requests are what the scheduler reserves; limits are what the kernel enforces. Over a memory limit the container is killed and restarted; over a CPU limit it is throttled within each scheduling period. Pods with requests equal to limits get the highest quality-of-service class and are evicted last under node pressure.",
+     "Rolling updates create new pods and remove old ones as new pods become ready, governed by maxSurge and maxUnavailable. Readiness is what makes a rolling update safe; a pod that reports ready too early receives traffic it cannot serve.",
+     "When a pod is deleted, it is removed from endpoints and sent SIGTERM at about the same time, then SIGKILL after the grace period. Applications should keep serving briefly and shut down cleanly within that window.",
+     "Pod disruption budgets limit how many replicas voluntary actions such as node upgrades may take down at once, so maintenance cannot remove all healthy copies of a service at the same time."
+    ]
+   },
+   "useWhen": [
+    "Use readiness probes on every service that receives traffic.",
+    "Use startup probes for slow initialisation instead of long liveness delays.",
+    "Use pod disruption budgets for services that must keep a minimum number of replicas during node maintenance."
+   ],
+   "avoidWhen": [
+    "Avoid liveness probes that test dependencies.",
+    "Avoid running production pods without resource requests."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Setting",
+     "Controls",
+     "Too low",
+     "Too high"
+    ],
+    "rows": [
+     [
+      "CPU request",
+      "Scheduling reservation",
+      "Overpacked nodes, contention",
+      "Wasted, idle capacity"
+     ],
+     [
+      "CPU limit",
+      "Throttling ceiling",
+      "Latency from throttling",
+      "Noisy neighbours can burst"
+     ],
+     [
+      "Memory request",
+      "Scheduling reservation",
+      "Evictions under pressure",
+      "Wasted capacity"
+     ],
+     [
+      "Memory limit",
+      "Kill threshold",
+      "OOMKilled restarts",
+      "One leak can starve the node"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "How many pods fit on a node",
+    "assumptions": [
+     "Node: 8 CPU and 32 GiB allocatable (illustrative)",
+     "Pod requests 500m CPU and 1.5 GiB memory"
+    ],
+    "steps": [
+     "By CPU: 8 ÷ 0.5 = 16 pods.",
+     "By memory: 32 ÷ 1.5 ≈ 21 pods.",
+     "CPU is the binding constraint: 16 pods per node.",
+     "For 100 pods you need at least 7 nodes, before headroom for failures and rolling updates."
+    ],
+    "result": "Requests decide packing; the scarcer resource sets how many pods fit."
+   },
+   "india": {
+    "title": "What the Kubernetes documentation says about probes",
+    "label": "Official documentation",
+    "body": "The Kubernetes documentation on probes describes the three types: liveness probes decide when to restart a container, readiness probes decide when a container is ready to start accepting traffic, and startup probes disable liveness and readiness checks until the application has started. It cautions that liveness probes must be configured carefully, because incorrect ones can cause cascading failures and restart containers under high load."
+   },
+   "pitfalls": [
+    {
+     "trap": "“Our liveness probe checks every dependency, to be safe.”",
+     "say": "“That restarts healthy pods when a dependency blips; I’d check dependencies in readiness, if at all.”"
+    },
+    {
+     "trap": "“We set CPU limits tight to protect latency.”",
+     "say": "“Tight CPU limits throttle bursts; I’d set accurate requests and loosen the CPU limit.”"
+    }
+   ],
+   "takeaways": [
+    "Orchestrators reconcile desired state continuously.",
+    "Readiness gates traffic; liveness restarts; startup delays both.",
+    "Requests schedule; memory limits kill; CPU limits throttle.",
+    "Graceful shutdown must fit the termination grace period."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "What happens during the database outage?",
+   "prompt": "Each pod’s liveness probe calls the database with a 1 s timeout. The database becomes slow for 3 minutes.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Pods fail liveness and restart repeatedly, adding cold-start load",
+     "feedback": "Right: liveness tied to a dependency turns its slowdown into a restart storm."
+    },
+    {
+     "id": "b",
+     "label": "Pods stop receiving traffic but stay running",
+     "feedback": "That would happen with readiness, not liveness."
+    },
+    {
+     "id": "c",
+     "label": "Nothing: probes ignore dependency timeouts",
+     "feedback": "The probe calls the database, so its timeouts fail the probe."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Move dependency checks out of liveness; keep liveness about the process."
+  },
+  "seeAlso": [
+   {
+    "topicId": 290,
+    "why": "SIGTERM and graceful shutdown"
+   },
+   {
+    "topicId": 70,
+    "why": "Kubernetes in system design"
+   }
+  ]
+ },
+ {
+  "id": 323,
+  "slug": "ci-cd-pipelines",
+  "region": "f7-cloud",
+  "order": 3,
+  "title": "CI/CD Pipelines",
+  "kind": "lesson",
+  "objectives": [
+   "Explain continuous integration, delivery and deployment",
+   "Design a pipeline that builds once and promotes the same artefact",
+   "Use the four DORA metrics to judge delivery performance"
+  ],
+  "difficulty": 1,
+  "durationMinutes": 10,
+  "prereqIds": [
+   321
+  ],
+  "cards": [
+   {
+    "id": "t323-c1",
+    "kind": "text",
+    "title": "Integrate small changes often",
+    "body": "Continuous integration means everyone merges small changes into the main branch frequently, at least daily, and each merge triggers an automated build and test. Problems surface within minutes of the change that caused them, while the author still remembers it.",
+    "teaches": [
+     "ci"
+    ]
+   },
+   {
+    "id": "t323-c2",
+    "kind": "text",
+    "title": "Delivery versus deployment",
+    "body": "Continuous delivery keeps main always releasable: every passing build produces an artefact that could go to production with one approval. Continuous deployment removes that approval: passing builds go out automatically, guarded by tests, canaries and fast rollback.",
+    "teaches": [
+     "cd"
+    ]
+   },
+   {
+    "id": "t323-c3",
+    "kind": "diagram",
+    "title": "Worked example: a build-once pipeline",
+    "body": "A service moves from merge to production.",
+    "teaches": [
+     "cd"
+    ],
+    "steps": [
+     "On merge, CI builds one container image and tags it with the commit hash",
+     "Unit and integration tests run against that image",
+     "The same image digest deploys to staging; smoke tests run",
+     "After approval or automatic checks, the same digest deploys to production gradually",
+     "Rollback redeploys the previous digest; nothing is rebuilt"
+    ]
+   },
+   {
+    "id": "t323-c4",
+    "kind": "text",
+    "title": "Misconception: more manual approval makes releases safer",
+    "body": "Long approval chains batch many changes into big, rare releases, and big releases are harder to test, review and roll back. Small, frequent, automated releases tend to fail less and recover faster, as DORA’s research has repeatedly found.",
+    "teaches": [
+     "cd"
+    ]
+   },
+   {
+    "id": "t323-c5",
+    "kind": "text",
+    "title": "Trap: rebuilding for each environment",
+    "body": "If staging and production each build from source, they can pick up different dependency versions or build flags, so what you tested is not what you ship. Build once and promote the artefact; inject environment differences as configuration.",
+    "teaches": [
+     "cd"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t323-a1",
+    "concept": "cd",
+    "type": "multiple_choice",
+    "prompt": "What separates continuous deployment from continuous delivery?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Deploys need a change board"
+     },
+     {
+      "id": "b",
+      "label": "Tests run only in production"
+     },
+     {
+      "id": "c",
+      "label": "Builds happen once a week"
+     },
+     {
+      "id": "d",
+      "label": "No manual approval before production"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Delivery keeps a releasable artefact; deployment releases it automatically."
+   },
+   {
+    "id": "t323-a2",
+    "concept": "cd",
+    "type": "multiple_choice",
+    "prompt": "Why promote one artefact through all environments?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Tests can then be skipped safely"
+     },
+     {
+      "id": "b",
+      "label": "Production runs exactly what was tested"
+     },
+     {
+      "id": "c",
+      "label": "Each environment no longer needs its own configuration"
+     },
+     {
+      "id": "d",
+      "label": "Builds become 10 times faster"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Rebuilding can change dependencies or flags between environments."
+   },
+   {
+    "id": "t323-a3",
+    "concept": "ci",
+    "type": "multiple_choice",
+    "prompt": "A team merges feature branches once a month. What problem is most likely?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Too many small builds to review"
+     },
+     {
+      "id": "b",
+      "label": "Large, painful merges and late test failures"
+     },
+     {
+      "id": "c",
+      "label": "Too little disk space on the build servers for branches"
+     },
+     {
+      "id": "d",
+      "label": "Faster feedback than they can use"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Long-lived branches drift apart; integration problems pile up."
+   },
+   {
+    "id": "t323-a4",
+    "concept": "dora",
+    "type": "multiple_choice",
+    "prompt": "Which is one of the four DORA delivery metrics?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Story points completed"
+     },
+     {
+      "id": "b",
+      "label": "Lines of code per week"
+     },
+     {
+      "id": "c",
+      "label": "Change failure rate"
+     },
+     {
+      "id": "d",
+      "label": "Number of meetings held"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "DORA measures deployment frequency, lead time, change failure rate and recovery time."
+   },
+   {
+    "id": "t323-a5",
+    "concept": "cd",
+    "type": "drag_order",
+    "prompt": "Order a build-once pipeline.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "Deploy the same digest to staging"
+     },
+     {
+      "id": "s1",
+      "label": "Build the image once from the merged commit"
+     },
+     {
+      "id": "s2",
+      "label": "Run tests against that image"
+     },
+     {
+      "id": "s4",
+      "label": "Promote the same digest to production"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Build, test, stage, promote, without rebuilding."
+   },
+   {
+    "id": "t323-a6",
+    "concept": "ci",
+    "type": "tradeoff",
+    "prompt": "A 40-person team ships monthly releases that often break and take days to fix.",
+    "constraints": [
+     "Monthly release train",
+     "Manual QA",
+     "Frequent rollbacks"
+    ],
+    "approaches": [
+     {
+      "id": "p3",
+      "label": "Release quarterly to allow more testing",
+      "description": "Slower releases"
+     },
+     {
+      "id": "p1",
+      "label": "Trunk-based development with automated tests and small daily deploys",
+      "description": "Small, frequent releases"
+     },
+     {
+      "id": "p2",
+      "label": "Add a second manual QA phase",
+      "description": "More QA gates"
+     }
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r2",
+      "label": "Problems are found while the change is fresh"
+     },
+     {
+      "id": "r1",
+      "label": "Smaller changes are easier to test and roll back"
+     },
+     {
+      "id": "r3",
+      "label": "More gates catch more bugs"
+     },
+     {
+      "id": "r4",
+      "label": "Releasing less often reduces failures"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": {
+     "r3": "They also batch more changes, making each release riskier.",
+     "r4": "Bigger batches fail in harder-to-diagnose ways."
+    },
+    "explanation": "Reduce batch size and automate checks; speed and stability improve together."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t323-f1",
+    "front": "Continuous integration?",
+    "back": "Merge small changes to main often; each merge is built and tested."
+   },
+   {
+    "id": "t323-f2",
+    "front": "Build once?",
+    "back": "One artefact promoted through every environment."
+   },
+   {
+    "id": "t323-f3",
+    "front": "Four DORA metrics?",
+    "back": "Deployment frequency, lead time for changes, change failure rate, time to restore service."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Martin Fowler: Continuous Integration",
+    "url": "https://martinfowler.com/articles/continuousIntegration.html"
+   },
+   {
+    "title": "Google Cloud: DORA’s software delivery metrics",
+    "url": "https://cloud.google.com/devops/state-of-devops"
+   },
+   {
+    "title": "Martin Fowler: Continuous Delivery",
+    "url": "https://martinfowler.com/bliki/ContinuousDelivery.html"
+   },
+   {
+    "title": "SLSA: Build track levels",
+    "url": "https://slsa.dev/spec/v1.0/levels"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "ci",
+    "cd",
+    "dora"
+   ],
+   "mechanism": {
+    "title": "Anatomy of a delivery pipeline",
+    "steps": [
+     "Trigger: each push or merge starts a pipeline defined as code in the repository, so its changes are reviewed like any other code.",
+     "Build: compile and package into one immutable artefact, recorded by digest. Fast feedback matters most here: aim for a commit-to-result time of minutes, splitting slow suites into later stages.",
+     "Test: unit tests first, then integration and contract tests against the built artefact, then security scans of dependencies and the image. Flaky tests must be fixed or quarantined quickly, or people learn to ignore failures.",
+     "Release: deploy the artefact to staging, run smoke tests, then to production with a progressive strategy (canary or rolling) and automatic rollback on bad health signals. Feature flags let code ship dark and be enabled separately from deploys.",
+     "Security of the pipeline: the pipeline holds deploy credentials, so restrict who can change it, avoid giving third-party build steps secrets, and record provenance so production can verify an artefact came from it.",
+     "Measure: DORA’s four keys, deployment frequency, lead time for changes, change failure rate and time to restore, show whether changes to the pipeline actually improve delivery rather than just adding steps.",
+     "Rollback must be a routine, tested path: redeploying the previous artefact digest should take minutes and need no rebuild. Teams that practise it recover faster, which shows up directly in the time-to-restore metric."
+    ]
+   },
+   "useWhen": [
+    "Use build-once, promote-everywhere pipelines.",
+    "Use trunk-based development with short-lived branches.",
+    "Use feature flags to separate deploying code from releasing a feature to users."
+   ],
+   "avoidWhen": [
+    "Avoid manual steps that must be repeated per release.",
+    "Avoid pipelines that take hours before the first failure shows.",
+    "Avoid giving third-party build steps access to deploy credentials or production secrets."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Practice",
+     "Speeds up",
+     "Needs"
+    ],
+    "rows": [
+     [
+      "Trunk-based development",
+      "Integration",
+      "Feature flags for unfinished work"
+     ],
+     [
+      "Build once, promote",
+      "Confidence in releases",
+      "Config separated from code"
+     ],
+     [
+      "Automated progressive deploys",
+      "Releases and recovery",
+      "Good health metrics"
+     ],
+     [
+      "Parallel test stages",
+      "Feedback time",
+      "Independent, non-flaky tests"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Batch size and the cost of a bad release",
+    "assumptions": [
+     "30 changes per month; each has a 3% chance of causing an incident (illustrative)",
+     "Monthly release versus daily releases of about 1–2 changes"
+    ],
+    "steps": [
+     "Monthly: a release carries 30 changes; chance at least one is bad ≈ 1 − 0.97^30 ≈ 60%.",
+     "Finding the culprit means searching 30 changes.",
+     "Daily: each release carries 1–2 changes, so about 3–6% fail, and the culprit is obvious.",
+     "The total number of bad changes is the same; small batches make each one cheaper to find and undo."
+    ],
+    "result": "Small batches do not remove defects; they make each one quick to locate and roll back."
+   },
+   "india": {
+    "title": "DORA’s four keys",
+    "label": "Official documentation",
+    "body": "Google Cloud’s DORA research programme has surveyed thousands of technology professionals over many years. It measures software delivery performance with four metrics: deployment frequency, lead time for changes, change failure rate and time to restore service. Its reports consistently find that the highest performers do well on both speed and stability, rather than trading one for the other, and link this to practices such as continuous integration, trunk-based development and deployment automation."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We test thoroughly, so we release quarterly.”",
+     "say": "“Large batches make releases riskier; I’d release smaller changes more often with automated checks.”"
+    },
+    {
+     "trap": "“Staging passed, so production is identical.”",
+     "say": "“Only if we promoted the same artefact; rebuilding per environment can change what ships.”"
+    }
+   ],
+   "takeaways": [
+    "Integrate small changes daily; build and test every merge.",
+    "Build once, promote the same digest.",
+    "Automate deploys with progressive rollout and rollback.",
+    "Track the four DORA metrics."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Why did production differ from staging?",
+   "prompt": "Staging and production each run “build from main” in their own pipeline step, an hour apart. A dependency published a new minor version in between.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Production picked up the new dependency version staging never tested",
+     "feedback": "Right: rebuilding per environment lets inputs drift."
+    },
+    {
+     "id": "b",
+     "label": "Staging and production hardware differ",
+     "feedback": "Possible in general, but this difference is in the build inputs."
+    },
+    {
+     "id": "c",
+     "label": "Nothing differs; builds from main are identical",
+     "feedback": "Only with a lockfile and a single build."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Build one artefact, pin dependencies, and promote that exact digest."
+  },
+  "seeAlso": [
+   {
+    "topicId": 69,
+    "why": "Blue-green, canary and feature flags"
+   },
+   {
+    "topicId": 309,
+    "why": "Securing the build as part of the supply chain"
+   }
+  ]
+ },
+ {
+  "id": 324,
+  "slug": "progressive-delivery",
+  "region": "f7-cloud",
+  "order": 4,
+  "title": "Progressive Delivery: Rolling, Blue-Green and Canary",
+  "kind": "lesson",
+  "objectives": [
+   "Compare rolling, blue-green and canary releases",
+   "Size a canary so it detects a bad build quickly",
+   "Automate rollback from health signals"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 10,
+  "prereqIds": [
+   323
+  ],
+  "cards": [
+   {
+    "id": "t324-c1",
+    "kind": "text",
+    "title": "Limit how many users meet a new version",
+    "body": "Progressive delivery exposes a change to a small share of traffic first, watches health signals, and widens exposure only if they stay good. The aim is that a bad build hurts a few users for a few minutes, not everyone at once.",
+    "teaches": [
+     "progressive-delivery"
+    ]
+   },
+   {
+    "id": "t324-c2",
+    "kind": "text",
+    "title": "Three common strategies",
+    "body": "Rolling updates replace instances a few at a time. Blue-green runs a full second environment and switches all traffic at once, keeping the old one for instant rollback. Canary sends a small percentage of traffic to the new version and compares its error rate and latency with the old.",
+    "teaches": [
+     "progressive-delivery"
+    ]
+   },
+   {
+    "id": "t324-c3",
+    "kind": "diagram",
+    "title": "Worked example: a canary plan",
+    "body": "A service handles 2,000 requests a minute.",
+    "teaches": [
+     "canary-analysis"
+    ],
+    "steps": [
+     "Stage 1: 5% of traffic for 15 minutes; compare error rate and p99 latency with the baseline",
+     "Stage 2: 25% for 15 minutes",
+     "Stage 3: 50%, then 100%",
+     "Any stage where errors exceed baseline by a set margin triggers automatic rollback",
+     "Database changes ship separately and stay compatible with both versions"
+    ]
+   },
+   {
+    "id": "t324-c4",
+    "kind": "text",
+    "title": "Misconception: a 1% canary is the safest choice",
+    "body": "A tiny canary limits exposure, but on a low-traffic service it sees so few requests that a bad build may produce too few errors to trip an alarm for a long time. Canary size must give enough traffic for a statistically clear signal in the time you allow.",
+    "teaches": [
+     "canary-analysis"
+    ]
+   },
+   {
+    "id": "t324-c5",
+    "kind": "text",
+    "title": "Trap: config and content pushed outside the pipeline",
+    "body": "Teams canary code but push configuration, feature flags or data files to every server at once. Many large outages came from exactly such global changes. Route them through the same staged rollout.",
+    "teaches": [
+     "progressive-delivery"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t324-a1",
+    "concept": "progressive-delivery",
+    "type": "multiple_choice",
+    "prompt": "Which strategy offers the fastest full rollback by switching traffic back?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Recreate (stop all, start all)"
+     },
+     {
+      "id": "b",
+      "label": "Manual server-by-server patching"
+     },
+     {
+      "id": "c",
+      "label": "Blue-green"
+     },
+     {
+      "id": "d",
+      "label": "Rolling update"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "The old environment stays intact and ready."
+   },
+   {
+    "id": "t324-a2",
+    "concept": "canary-analysis",
+    "type": "multiple_choice",
+    "prompt": "A canary at 1% on a low-traffic service shows no errors after 10 minutes. What is the risk?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The baseline gets slower"
+     },
+     {
+      "id": "b",
+      "label": "The canary wastes capacity that the baseline needs"
+     },
+     {
+      "id": "c",
+      "label": "Users notice the version change"
+     },
+     {
+      "id": "d",
+      "label": "Too little traffic to reveal a bad build"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Few requests mean few chances to see failures."
+   },
+   {
+    "id": "t324-a3",
+    "concept": "progressive-delivery",
+    "type": "multiple_choice",
+    "prompt": "What must hold for a canary and the old version to run side by side?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Both work with the same data schema"
+     },
+     {
+      "id": "b",
+      "label": "They share one process"
+     },
+     {
+      "id": "c",
+      "label": "They each use their own separate database"
+     },
+     {
+      "id": "d",
+      "label": "They have identical code"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Mixed versions need backward- and forward-compatible data."
+   },
+   {
+    "id": "t324-a4",
+    "concept": "canary-analysis",
+    "type": "multiple_choice",
+    "prompt": "What should a canary compare against?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Last month’s average error rate"
+     },
+     {
+      "id": "b",
+      "label": "The current version over the same period"
+     },
+     {
+      "id": "c",
+      "label": "The staging environment’s results from the same build"
+     },
+     {
+      "id": "d",
+      "label": "A fixed error budget for the year"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Comparing at the same time removes traffic and time-of-day effects."
+   },
+   {
+    "id": "t324-a5",
+    "concept": "progressive-delivery",
+    "type": "drag_order",
+    "prompt": "Order the stages of an automated canary rollout.",
+    "items": [
+     {
+      "id": "s1",
+      "label": "Deploy the new version to a small share of traffic"
+     },
+     {
+      "id": "s4",
+      "label": "Complete the rollout or roll back automatically"
+     },
+     {
+      "id": "s2",
+      "label": "Compare its health signals with the baseline"
+     },
+     {
+      "id": "s3",
+      "label": "Increase traffic in steps while signals stay healthy"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Expose, compare, widen, decide."
+   },
+   {
+    "id": "t324-a6",
+    "concept": "progressive-delivery",
+    "type": "tradeoff",
+    "prompt": "A security agent update is pushed to millions of customer machines.",
+    "constraints": [
+     "Bad updates can crash machines",
+     "Huge install base",
+     "Updates are urgent"
+    ],
+    "approaches": [
+     {
+      "id": "p3",
+      "label": "Let each customer test it themselves",
+      "description": "Customer testing"
+     },
+     {
+      "id": "p1",
+      "label": "Staged rings: internal, then a small customer share, then wider",
+      "description": "Staged rings"
+     },
+     {
+      "id": "p2",
+      "label": "Push to every machine at once for speed",
+      "description": "Global push"
+     }
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r2",
+      "label": "Urgent updates still move fast through short stages"
+     },
+     {
+      "id": "r4",
+      "label": "Customers will catch problems in their own tests"
+     },
+     {
+      "id": "r1",
+      "label": "A crash appears in a small ring before reaching everyone"
+     },
+     {
+      "id": "r3",
+      "label": "Urgent updates justify skipping stages"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": {
+     "r3": "A fast global push turns one bad file into a global outage.",
+     "r4": "Most customers cannot test every update."
+    },
+    "explanation": "Stage every change that can break machines, including content and config."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t324-f1",
+    "front": "Rolling vs blue-green vs canary?",
+    "back": "Replace gradually; switch environments; route a small share first."
+   },
+   {
+    "id": "t324-f2",
+    "front": "What sets canary size?",
+    "back": "Enough traffic to detect a bad build within the time you allow."
+   },
+   {
+    "id": "t324-f3",
+    "front": "What else needs staging?",
+    "back": "Config, flags and content, not just code."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Google SRE Workbook: Canarying Releases",
+    "url": "https://sre.google/workbook/canarying-releases/"
+   },
+   {
+    "title": "Martin Fowler: Blue-Green Deployment",
+    "url": "https://martinfowler.com/bliki/BlueGreenDeployment.html"
+   },
+   {
+    "title": "Martin Fowler: Canary Release",
+    "url": "https://martinfowler.com/bliki/CanaryRelease.html"
+   },
+   {
+    "title": "Kubernetes: Deployments (rolling updates)",
+    "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "progressive-delivery",
+    "canary-analysis"
+   ],
+   "mechanism": {
+    "title": "Turning rollouts into experiments",
+    "steps": [
+     "A canary is an experiment: the new version is the treatment, the old is the control, and both receive comparable traffic at the same time. Comparing at the same time removes the effect of traffic changes and time of day.",
+     "Choose metrics that reflect user harm: error rate, latency percentiles, saturation, and key business events such as successful checkouts. Crash loops and restarts are strong signals for agents and clients.",
+     "Detection time depends on traffic. The number of bad requests needed to trip an alert is roughly fixed, so a canary carrying 10 times more traffic trips it about 10 times faster, at the cost of exposing more users.",
+     "Rolling updates are progressive by instance count but often lack an explicit comparison; adding pauses and health gates between batches turns them into simple canaries. Blue-green trades double capacity during the switch for an instant rollback path.",
+     "Compatibility is a precondition: during a rollout both versions read and write the same data and talk to each other, so schema changes follow expand-then-contract and APIs stay backward compatible.",
+     "Everything that can break production deserves staging: binaries, configuration, feature-flag changes, security content and machine images. Global, instant pushes of any of them bypass the safety the pipeline provides."
+    ]
+   },
+   "useWhen": [
+    "Use canaries with automatic analysis for high-traffic services.",
+    "Use blue-green when instant rollback matters and capacity allows."
+   ],
+   "avoidWhen": [
+    "Avoid canaries too small to produce a signal in time.",
+    "Avoid pushing config or content globally while code goes through stages."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Strategy",
+     "Exposure",
+     "Rollback",
+     "Cost"
+    ],
+    "rows": [
+     [
+      "Rolling update",
+      "Grows batch by batch",
+      "Roll forward or back gradually",
+      "Little extra capacity"
+     ],
+     [
+      "Blue-green",
+      "All at once after switch",
+      "Instant switch back",
+      "Double capacity during release"
+     ],
+     [
+      "Canary",
+      "Small share first",
+      "Shift traffic back",
+      "Analysis tooling, longer releases"
+     ],
+     [
+      "Global push",
+      "Everyone at once",
+      "Only after damage",
+      "None, until it fails"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "How canary size sets detection time",
+    "assumptions": [
+     "Service: 2,000 requests a minute; a bad build fails 2% of its requests; the alarm fires after 20 failed requests (illustrative)"
+    ],
+    "steps": [
+     "At 1%: 20 requests a minute go to the canary, 0.4 fail a minute, so the alarm needs 50 minutes.",
+     "At 10%: 200 a minute, 4 fail a minute: 5 minutes.",
+     "At 50%: 1,000 a minute, 20 fail a minute: 1 minute, but half of users meet the bad build.",
+     "In every case about 20 users see an error before the alarm; size decides how long the experiment takes."
+    ],
+    "result": "Pick the canary share that detects within your time budget; the failures before the alarm stay about the same."
+   },
+   "india": {
+    "title": "A global content update",
+    "label": "Publicly reported",
+    "body": "Publicly reported by CrowdStrike and Microsoft in July 2024: a faulty configuration content update for CrowdStrike’s Falcon sensor was delivered to Windows hosts worldwide at once, crashing machines; Microsoft estimated about 8.5 million Windows devices were affected. CrowdStrike’s review said the content type had not gone through staged deployment and committed to staggered, ring-based rollouts with customer control over timing."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We did a canary, so the release was safe.”",
+     "say": "“Only if the canary saw enough traffic to show a difference; I’d size it for the detection time we need.”"
+    },
+    {
+     "trap": "“It’s just a config change, so we push it everywhere.”",
+     "say": "“Config breaks production as easily as code; I’d stage it the same way.”"
+    }
+   ],
+   "takeaways": [
+    "Expose changes gradually and compare with the old version.",
+    "Canary size sets how quickly a bad build is detected.",
+    "Both versions must work with the same data during rollout.",
+    "Stage config and content as well as code."
+   ]
+  },
+  "interactive": {
+   "kind": "slider",
+   "title": "Size the canary",
+   "prompt": "A service gets 2,000 requests a minute. A bad build fails 2% of its requests, and the alarm fires after 20 failed requests (illustrative). Slide the share of traffic on the new version.",
+   "model": "rollout",
+   "params": {
+    "rpm": 2000,
+    "badPct": 2,
+    "alarmFailures": 20
+   },
+   "control": {
+    "label": "Canary share",
+    "min": 1,
+    "max": 50,
+    "step": 1,
+    "initial": 1,
+    "unit": "%"
+   },
+   "takeaway": "Below about 5% this service needs over 10 minutes to detect a bad build; bigger canaries detect faster but expose more users per minute. About 20 users see errors before the alarm whatever the size."
+  },
+  "seeAlso": [
+   {
+    "topicId": 69,
+    "why": "Blue-green, canary and feature flags in system design"
+   },
+   {
+    "topicId": 272,
+    "why": "Schema changes compatible with both versions"
+   }
+  ]
+ },
+ {
+  "id": 325,
+  "slug": "infrastructure-as-code",
+  "region": "f7-cloud",
+  "order": 5,
+  "title": "Infrastructure as Code",
+  "kind": "lesson",
+  "objectives": [
+   "Describe infrastructure declaratively and review it like code",
+   "Explain plan, apply, state and drift",
+   "Structure changes to limit blast radius"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 10,
+  "prereqIds": [
+   323
+  ],
+  "cards": [
+   {
+    "id": "t325-c1",
+    "kind": "text",
+    "title": "Infrastructure in version control",
+    "body": "Infrastructure as code (IaC) describes networks, databases, permissions and services in files that are reviewed, versioned and applied by a tool. Environments become reproducible, changes have an author and a reason, and a lost region can be rebuilt from the repository.",
+    "teaches": [
+     "iac"
+    ]
+   },
+   {
+    "id": "t325-c2",
+    "kind": "text",
+    "title": "Plan, then apply",
+    "body": "Declarative tools compare the desired configuration with what exists (tracked in a state record) and produce a plan: create these, change those, destroy these. Reviewing the plan, not just the code diff, shows the real effect, including replacements that destroy data.",
+    "teaches": [
+     "plan-apply"
+    ]
+   },
+   {
+    "id": "t325-c3",
+    "kind": "diagram",
+    "title": "Worked example: a safe change to a database",
+    "body": "An engineer changes a database setting in code.",
+    "teaches": [
+     "plan-apply"
+    ],
+    "steps": [
+     "Open a pull request with the configuration change",
+     "CI runs the plan and posts it on the pull request",
+     "The plan shows “must be replaced” for the database: the change would destroy and recreate it",
+     "The team switches to a setting that can be updated in place, and enables deletion protection",
+     "After approval, CI applies the reviewed plan using a locked state file"
+    ]
+   },
+   {
+    "id": "t325-c4",
+    "kind": "text",
+    "title": "Misconception: the code is the truth",
+    "body": "Someone can change a resource by hand in the console, and the real infrastructure drifts from the code. The next apply may silently revert the fix or fail. Detect drift regularly and route every change through code.",
+    "teaches": [
+     "drift"
+    ]
+   },
+   {
+    "id": "t325-c5",
+    "kind": "text",
+    "title": "Trap: one huge state for everything",
+    "body": "Putting every environment and service in one configuration makes every plan slow and every apply risky: a typo can touch production networking while changing a test bucket. Split by environment and component so each apply has a small blast radius.",
+    "teaches": [
+     "iac"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t325-a1",
+    "concept": "plan-apply",
+    "type": "multiple_choice",
+    "prompt": "What should a reviewer check before an IaC change is applied?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The plan’s creates, updates and destroys"
+     },
+     {
+      "id": "b",
+      "label": "How clear the commit message is"
+     },
+     {
+      "id": "c",
+      "label": "Who wrote the change and how much experience they have"
+     },
+     {
+      "id": "d",
+      "label": "The size of the code diff in lines"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "The plan shows real effects such as replacements."
+   },
+   {
+    "id": "t325-a2",
+    "concept": "drift",
+    "type": "multiple_choice",
+    "prompt": "A security group was edited by hand in the console. What is this called?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Provisioning"
+     },
+     {
+      "id": "b",
+      "label": "Promotion"
+     },
+     {
+      "id": "c",
+      "label": "Rollback"
+     },
+     {
+      "id": "d",
+      "label": "Drift"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Reality no longer matches the declared configuration."
+   },
+   {
+    "id": "t325-a3",
+    "concept": "plan-apply",
+    "type": "multiple_choice",
+    "prompt": "Why does the tool lock its state during apply?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "To speed up resource creation"
+     },
+     {
+      "id": "b",
+      "label": "To encrypt the cloud resources"
+     },
+     {
+      "id": "c",
+      "label": "To stop two applies changing it at once"
+     },
+     {
+      "id": "d",
+      "label": "To hide the plan from reviewers"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Concurrent applies can corrupt state or race on resources."
+   },
+   {
+    "id": "t325-a4",
+    "concept": "iac",
+    "type": "multiple_choice",
+    "prompt": "Which change most limits the blast radius of an apply?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Applying from laptops for speed"
+     },
+     {
+      "id": "b",
+      "label": "One shared state covering all environments together"
+     },
+     {
+      "id": "c",
+      "label": "Skipping the plan for small changes"
+     },
+     {
+      "id": "d",
+      "label": "Separate states per environment and component"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Each apply then touches only one part."
+   },
+   {
+    "id": "t325-a5",
+    "concept": "plan-apply",
+    "type": "drag_order",
+    "prompt": "Order a reviewed infrastructure change.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "Reviewers approve the plan and code"
+     },
+     {
+      "id": "s1",
+      "label": "Edit the configuration in a branch"
+     },
+     {
+      "id": "s4",
+      "label": "CI applies the approved plan with a state lock"
+     },
+     {
+      "id": "s2",
+      "label": "CI generates the plan"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Change, plan, review, apply."
+   },
+   {
+    "id": "t325-a6",
+    "concept": "iac",
+    "type": "tradeoff",
+    "prompt": "A company has hand-built production infrastructure and needs a second region for disaster recovery.",
+    "constraints": [
+     "No current IaC",
+     "Region must match production",
+     "Team knows the console well"
+    ],
+    "approaches": [
+     {
+      "id": "p3",
+      "label": "Write a document listing every setting",
+      "description": "Runbook only"
+     },
+     {
+      "id": "p2",
+      "label": "Click through the console again in the new region",
+      "description": "Manual rebuild"
+     },
+     {
+      "id": "p1",
+      "label": "Import existing resources into code, then create the second region from it",
+      "description": "Codify then replicate"
+     }
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r2",
+      "label": "Future changes apply to both consistently"
+     },
+     {
+      "id": "r1",
+      "label": "Both regions come from one reviewed definition"
+     },
+     {
+      "id": "r4",
+      "label": "A settings document is as good as code"
+     },
+     {
+      "id": "r3",
+      "label": "Console familiarity makes manual rebuilds reliable"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": {
+     "r3": "Hundreds of settings make manual copies drift.",
+     "r4": "Documents go stale and are not applied automatically."
+    },
+    "explanation": "Codify first; replication and recovery then become an apply."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t325-f1",
+    "front": "Plan?",
+    "back": "The tool’s list of changes needed to reach the declared state."
+   },
+   {
+    "id": "t325-f2",
+    "front": "Drift?",
+    "back": "Real infrastructure differing from code because of out-of-band changes."
+   },
+   {
+    "id": "t325-f3",
+    "front": "State locking?",
+    "back": "Prevents concurrent applies corrupting the state."
+   }
+  ],
+  "sources": [
+   {
+    "title": "HashiCorp: Terraform state",
+    "url": "https://developer.hashicorp.com/terraform/language/state"
+   },
+   {
+    "title": "HashiCorp: Terraform plan command",
+    "url": "https://developer.hashicorp.com/terraform/cli/commands/plan"
+   },
+   {
+    "title": "HashiCorp: State locking",
+    "url": "https://developer.hashicorp.com/terraform/language/state/locking"
+   },
+   {
+    "title": "Martin Fowler: Infrastructure as Code",
+    "url": "https://martinfowler.com/bliki/InfrastructureAsCode.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "iac",
+    "plan-apply",
+    "drift"
+   ],
+   "mechanism": {
+    "title": "How declarative infrastructure tools work",
+    "steps": [
+     "You declare resources and their settings. The tool builds a dependency graph (a subnet before the server inside it) and keeps a state record mapping each declared resource to a real one by id.",
+     "Plan: the tool reads state, refreshes it from the provider’s APIs, and diffs against the configuration. Each resource gets an action: create, update in place, replace (destroy then create) or destroy.",
+     "Apply executes the plan in dependency order, in parallel where possible, and updates state. State must be stored remotely with locking, so two engineers or pipelines cannot apply at once.",
+     "Replacements are the dangerous action: some settings cannot change in place, so the tool destroys and recreates the resource. For data stores that means data loss unless protected by deletion protection or lifecycle rules that forbid destroy.",
+     "Drift happens through console edits, scripts and other tools. Scheduled plans that should show “no changes” detect it; the fix is to codify the change or revert it, then restrict console write access.",
+     "Modules package reusable patterns (a standard service, a network) with inputs, so teams compose infrastructure from reviewed building blocks instead of copying files.",
+     "Policy as code adds automated checks to plans before apply: no public storage buckets, encryption required on databases, approved instance types only. Violations fail the pipeline the same way a failing test does."
+    ]
+   },
+   "useWhen": [
+    "Use IaC for anything you would need to rebuild after a disaster.",
+    "Use remote state with locking and CI-driven applies.",
+    "Use deletion protection and lifecycle rules on data stores managed by IaC."
+   ],
+   "avoidWhen": [
+    "Avoid manual console changes in production.",
+    "Avoid one giant state covering every environment.",
+    "Avoid copying configuration between environments; use modules with per-environment inputs."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Approach",
+     "Repeatable",
+     "Reviewable",
+     "Risk"
+    ],
+    "rows": [
+     [
+      "Console clicks",
+      "No",
+      "No",
+      "Drift, undocumented changes"
+     ],
+     [
+      "Scripts calling cloud APIs",
+      "Partly",
+      "Yes",
+      "Scripts must handle every existing state"
+     ],
+     [
+      "Declarative IaC with plans",
+      "Yes",
+      "Yes, including effects",
+      "Replacements if plans are not read"
+     ],
+     [
+      "IaC plus policy checks",
+      "Yes",
+      "Yes, plus automated rules",
+      "Policy maintenance"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Rebuilding an environment",
+    "assumptions": [
+     "Production has about 400 resources (illustrative)",
+     "Manual creation: about 5 minutes each; IaC apply: about 40 minutes total"
+    ],
+    "steps": [
+     "Manual: 400 × 5 = 2,000 minutes, about 33 hours of focused work.",
+     "With a few mistakes per hundred settings, several resources will differ from the original.",
+     "IaC: about 40 minutes of apply time, identical to the definition.",
+     "In a regional disaster, the difference is days versus an afternoon."
+    ],
+    "result": "IaC turns a rebuild from days of manual work into one reviewed apply."
+   },
+   "india": {
+    "title": "State and locking in Terraform",
+    "label": "Official documentation",
+    "body": "HashiCorp’s documentation explains that Terraform stores state about managed infrastructure to map real resources to configuration, track metadata and improve performance, and that teams should use remote state. If supported by the backend, Terraform locks state for all operations that could write it, preventing others from acquiring the lock and potentially corrupting state. The plan command shows the actions Terraform would take before anything changes."
+   },
+   "pitfalls": [
+    {
+     "trap": "“The code was reviewed, so the apply is safe.”",
+     "say": "“The code diff can hide a replacement; I’d review the plan, especially for data stores.”"
+    },
+    {
+     "trap": "“It’s a quick fix, I’ll do it in the console.”",
+     "say": "“That creates drift; I’d make the change in code so the next apply does not undo it.”"
+    }
+   ],
+   "takeaways": [
+    "Declare infrastructure in code and apply through CI.",
+    "Review plans, especially replacements.",
+    "Use remote, locked state split by blast radius.",
+    "Detect and remove drift regularly."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "What does the next apply do?",
+   "prompt": "An engineer opened a firewall port by hand in the console during an incident. The code still lists the old rules. A colleague applies an unrelated change from the same configuration.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "It closes the hand-opened port again",
+     "feedback": "Right: the tool reverts drift to match the code."
+    },
+    {
+     "id": "b",
+     "label": "It leaves the port open because it is unrelated",
+     "feedback": "The plan includes every difference in that state."
+    },
+    {
+     "id": "c",
+     "label": "It fails until the console change is deleted",
+     "feedback": "It simply plans an update back to the declared rules."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Codify incident fixes promptly, and read plans for unexpected changes."
+  },
+  "seeAlso": [
+   {
+    "topicId": 228,
+    "why": "Configuration and environments"
+   },
+   {
+    "topicId": 330,
+    "why": "Rebuilding a region in disaster recovery"
+   }
+  ]
+ },
+ {
+  "id": 326,
+  "slug": "slos-and-error-budgets",
+  "region": "f7-cloud",
+  "order": 6,
+  "title": "SLIs, SLOs and Error Budgets",
+  "kind": "lesson",
+  "objectives": [
+   "Define service level indicators from the user’s point of view",
+   "Set an SLO and compute its error budget",
+   "Use burn-rate alerts and an error-budget policy"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 10,
+  "prereqIds": [
+   322
+  ],
+  "cards": [
+   {
+    "id": "t326-c1",
+    "kind": "text",
+    "title": "Measure what users feel",
+    "body": "A service level indicator (SLI) is a ratio of good events to valid events, such as the share of requests answered successfully within 300 ms. It should reflect user experience, not internal signals like CPU usage.",
+    "teaches": [
+     "sli"
+    ]
+   },
+   {
+    "id": "t326-c2",
+    "kind": "text",
+    "title": "Objectives and budgets",
+    "body": "A service level objective (SLO) is a target for an SLI over a window, such as 99.9% over 30 days. The remaining 0.1% is the error budget: the amount of unreliability you accept. While budget remains, teams ship; when it is spent, they prioritise reliability.",
+    "teaches": [
+     "error-budget"
+    ]
+   },
+   {
+    "id": "t326-c3",
+    "kind": "diagram",
+    "title": "Worked example: a 99.9% availability SLO",
+    "body": "An API serves 10 million requests in 30 days.",
+    "teaches": [
+     "error-budget"
+    ],
+    "steps": [
+     "SLI: successful responses ÷ valid requests, measured at the load balancer",
+     "SLO: 99.9% over a rolling 30 days",
+     "Error budget: 0.1% × 10,000,000 = 10,000 failed requests",
+     "In time terms: 0.1% of 30 days = 43.2 minutes of full outage",
+     "An incident that fails 4,000 requests uses 40% of the month’s budget"
+    ]
+   },
+   {
+    "id": "t326-c4",
+    "kind": "text",
+    "title": "Misconception: aim for 100%",
+    "body": "Users cannot tell 99.99% from 100% when their own network fails more often, and each extra nine costs far more engineering and slows releases. Pick the lowest target that keeps users happy; anything above it is budget for change.",
+    "teaches": [
+     "error-budget"
+    ]
+   },
+   {
+    "id": "t326-c5",
+    "kind": "text",
+    "title": "Trap: alerting on every error",
+    "body": "Paging someone for each error spike creates noise and fatigue. Alert on burn rate instead: how fast the error budget is being consumed. A fast burn pages; a slow burn files a ticket.",
+    "teaches": [
+     "burn-rate"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t326-a1",
+    "concept": "sli",
+    "type": "multiple_choice",
+    "prompt": "Which is the best SLI for a checkout API?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Number of checkout servers running"
+     },
+     {
+      "id": "b",
+      "label": "Share of checkout requests that succeed within 1 s"
+     },
+     {
+      "id": "c",
+      "label": "Average CPU use across all of the checkout servers"
+     },
+     {
+      "id": "d",
+      "label": "Size of the checkout database"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "SLIs measure user-visible outcomes."
+   },
+   {
+    "id": "t326-a2",
+    "concept": "error-budget",
+    "type": "estimation",
+    "prompt": "An SLO is 99.95% availability over 30 days. How many minutes of full outage does the error budget allow?",
+    "unit": "minutes",
+    "target": 21.6,
+    "assumptions": [
+     "30-day window",
+     "Full outage counts as all requests failing"
+    ],
+    "formula": "window minutes × (1 − SLO)",
+    "workedAnswer": "30 days is 43,200 minutes; 43,200 × 0.0005 = 21.6 minutes",
+    "explanation": "Design implication: one bad deploy that takes 15 minutes to roll back uses most of the month’s budget, so fast rollback matters as much as fewer incidents.",
+    "tolerance": 0.05,
+    "trapAnswers": [
+     43.2,
+     216
+    ]
+   },
+   {
+    "id": "t326-a3",
+    "concept": "error-budget",
+    "type": "multiple_choice",
+    "prompt": "The error budget for this month is spent. What does a typical error-budget policy say?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Keep shipping features as planned"
+     },
+     {
+      "id": "b",
+      "label": "Pause risky launches and fix reliability"
+     },
+     {
+      "id": "c",
+      "label": "Raise the SLO target to motivate the team next month"
+     },
+     {
+      "id": "d",
+      "label": "Delete the month’s error records"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "The budget balances feature work against reliability."
+   },
+   {
+    "id": "t326-a4",
+    "concept": "burn-rate",
+    "type": "multiple_choice",
+    "prompt": "What does a burn rate of 10 mean for a 30-day budget?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "10% of it has been used"
+     },
+     {
+      "id": "b",
+      "label": "10 incidents have happened"
+     },
+     {
+      "id": "c",
+      "label": "It lasts 10 times longer"
+     },
+     {
+      "id": "d",
+      "label": "It would be used up in about 3 days"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Burn rate is consumption speed relative to the steady rate that ends the window at zero."
+   },
+   {
+    "id": "t326-a5",
+    "concept": "sli",
+    "type": "drag_order",
+    "prompt": "Order the steps to set up an SLO.",
+    "items": [
+     {
+      "id": "s1",
+      "label": "Pick the user journey that matters"
+     },
+     {
+      "id": "s3",
+      "label": "Set the SLO target and window"
+     },
+     {
+      "id": "s4",
+      "label": "Alert on error-budget burn rate"
+     },
+     {
+      "id": "s2",
+      "label": "Define the SLI as good events over valid events"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Journey, indicator, objective, alerting."
+   },
+   {
+    "id": "t326-a6",
+    "concept": "burn-rate",
+    "type": "tradeoff",
+    "prompt": "An on-call team gets 40 pages a week, most for brief error spikes that resolve themselves.",
+    "constraints": [
+     "Pager fatigue",
+     "99.9% SLO",
+     "Real outages sometimes missed"
+    ],
+    "approaches": [
+     {
+      "id": "p1",
+      "label": "Multi-window burn-rate alerts on the SLO",
+      "description": "Burn-rate alerts"
+     },
+     {
+      "id": "p2",
+      "label": "Lower the error threshold so more spikes page",
+      "description": "Stricter thresholds"
+     },
+     {
+      "id": "p3",
+      "label": "Turn off paging and check dashboards daily",
+      "description": "No paging"
+     }
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r1",
+      "label": "Pages fire for sustained, budget-threatening problems"
+     },
+     {
+      "id": "r4",
+      "label": "Daily dashboard checks are enough"
+     },
+     {
+      "id": "r2",
+      "label": "Brief self-resolving spikes stop waking people"
+     },
+     {
+      "id": "r3",
+      "label": "More sensitive thresholds catch more outages"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": {
+     "r3": "They add noise, and noisy pagers get ignored.",
+     "r4": "A fast outage can burn the budget within hours."
+    },
+    "explanation": "Alert on what threatens the SLO, at a speed that matches the threat."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t326-f1",
+    "front": "SLI?",
+    "back": "Good events ÷ valid events, measured where users feel it."
+   },
+   {
+    "id": "t326-f2",
+    "front": "Error budget for 99.9% over 30 days?",
+    "back": "About 43 minutes of full outage."
+   },
+   {
+    "id": "t326-f3",
+    "front": "Burn rate?",
+    "back": "How many times faster than sustainable the budget is being spent."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Google SRE Book: Service Level Objectives",
+    "url": "https://sre.google/sre-book/service-level-objectives/"
+   },
+   {
+    "title": "Google SRE Workbook: Implementing SLOs",
+    "url": "https://sre.google/workbook/implementing-slos/"
+   },
+   {
+    "title": "Google SRE Workbook: Alerting on SLOs",
+    "url": "https://sre.google/workbook/alerting-on-slos/"
+   },
+   {
+    "title": "Google SRE Workbook: Error Budget Policy",
+    "url": "https://sre.google/workbook/error-budget-policy/"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "sli",
+    "error-budget",
+    "burn-rate"
+   ],
+   "mechanism": {
+    "title": "From indicators to decisions",
+    "steps": [
+     "Choose a few critical user journeys (log in, search, check out) and define one or two SLIs each, typically availability and latency. Measure as close to the user as practical: load balancer logs or client telemetry rather than server internals.",
+     "Define each SLI as a ratio of good to valid events. Excluding invalid events (such as requests rejected for bad input) keeps the indicator about the service’s own behaviour.",
+     "Set the SLO from user expectations and historical performance. Use a rolling window (often 28 or 30 days) so a bad day stays visible for a while, but not forever.",
+     "The error budget is 1 − SLO. It turns reliability into a shared, measurable quantity: product and engineering agree in advance what happens when it runs low, which removes arguments during incidents.",
+     "Alert on burn rate. A burn rate of 1 spends exactly the budget over the window; the SRE Workbook suggests paging when, for example, 2% of a 30-day budget is spent in one hour (burn rate about 14.4), and filing tickets for slower burns, using a long and a short window together to avoid flapping.",
+     "Review SLOs periodically: if users complain while the SLO is met, the SLI measures the wrong thing; if the budget is never touched, the target may be too strict and slowing delivery for no benefit."
+    ]
+   },
+   "useWhen": [
+    "Use SLOs to decide between feature work and reliability work.",
+    "Use burn-rate alerting for paging.",
+    "Use the same SLIs on dashboards, alerts and reviews."
+   ],
+   "avoidWhen": [
+    "Avoid SLIs based on machine metrics such as CPU.",
+    "Avoid targets stricter than users need or your dependencies can support."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Target",
+     "Budget per 30 days",
+     "Implication"
+    ],
+    "rows": [
+     [
+      "99%",
+      "About 7.2 hours",
+      "Room for frequent change and manual fixes"
+     ],
+     [
+      "99.9%",
+      "About 43 minutes",
+      "Automated rollback, on-call response in minutes"
+     ],
+     [
+      "99.99%",
+      "About 4.3 minutes",
+      "Redundancy everywhere; humans too slow to react"
+     ],
+     [
+      "99.999%",
+      "About 26 seconds",
+      "Rarely justified outside core infrastructure"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Burn rate in practice",
+    "assumptions": [
+     "SLO 99.9% over 30 days: budget 43.2 minutes of full outage",
+     "An incident fails 5% of requests"
+    ],
+    "steps": [
+     "Burn rate = error rate ÷ budget rate = 5% ÷ 0.1% = 50.",
+     "At burn rate 50, the 30-day budget lasts 30 days ÷ 50 = 0.6 days, about 14 hours.",
+     "In one hour it spends 1 ÷ 14.4 of the budget, about 7%, well above a 2%-per-hour paging threshold.",
+     "A 0.2% error rate is burn rate 2: a ticket, not a page."
+    ],
+    "result": "Burn rate converts any error rate into “how soon is the budget gone”, which sets alert urgency."
+   },
+   "india": {
+    "title": "Error budgets in Google’s SRE practice",
+    "label": "Official documentation",
+    "body": "Google’s Site Reliability Engineering book describes the error budget as one minus the SLO, and explains that as long as the measured uptime is above the SLO, new releases can be pushed. Its workbook includes an example error budget policy: if a service has exceeded its error budget for the preceding four-week window, all changes and releases other than urgent fixes and security patches are halted until the service is back within its SLO."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We target 100% uptime.”",
+     "say": "“That leaves no budget for change and isn’t measurable against real networks; I’d set an SLO users actually need.”"
+    },
+    {
+     "trap": "“We alert whenever errors exceed 1%.”",
+     "say": "“I’d alert on burn rate so short blips don’t page and sustained problems do.”"
+    }
+   ],
+   "takeaways": [
+    "SLIs measure user-visible good events over valid events.",
+    "Error budget = 1 − SLO; spend it on change.",
+    "Page on fast burn rates, ticket on slow ones.",
+    "Agree on an error-budget policy before incidents."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Should this page someone at 3 a.m.?",
+   "prompt": "SLO: 99.9% over 30 days. For the last 10 minutes, 0.3% of requests have failed; the previous hour was normal.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "No: burn rate 3 is worth a ticket, not a page",
+     "feedback": "Right: at that rate the budget would last 10 days."
+    },
+    {
+     "id": "b",
+     "label": "Yes: any error rate above the SLO pages",
+     "feedback": "That pages on noise; urgency depends on burn rate."
+    },
+    {
+     "id": "c",
+     "label": "No: errors under 1% never matter",
+     "feedback": "They matter if sustained; that is what the ticket is for."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Page on fast burns such as 2% of the budget in an hour; ticket on slow ones."
+  },
+  "seeAlso": [
+   {
+    "topicId": 229,
+    "why": "Logging and metrics for services"
+   },
+   {
+    "topicId": 327,
+    "why": "Incidents are where the error budget is spent"
+   }
+  ]
+ },
+ {
+  "id": 327,
+  "slug": "incident-response",
+  "region": "f7-cloud",
+  "order": 7,
+  "title": "Incident Response and Postmortems",
+  "kind": "lesson",
+  "objectives": [
+   "Run an incident with clear roles",
+   "Prioritise mitigation over diagnosis",
+   "Write a blameless postmortem with useful actions"
+  ],
+  "difficulty": 1,
+  "durationMinutes": 10,
+  "prereqIds": [
+   326
+  ],
+  "cards": [
+   {
+    "id": "t327-c1",
+    "kind": "text",
+    "title": "Roles stop chaos",
+    "body": "In an incident, an incident commander coordinates and decides; an operations lead makes changes; a communications lead updates stakeholders; someone keeps a timeline. Separating these lets the people fixing the system focus while others handle questions.",
+    "teaches": [
+     "incident-roles"
+    ]
+   },
+   {
+    "id": "t327-c2",
+    "kind": "text",
+    "title": "Mitigate first, diagnose later",
+    "body": "The first goal is to stop user harm: roll back the last deploy, fail over, shed load, disable a feature flag. Finding the root cause can wait until users are no longer affected; long investigations during an outage extend it.",
+    "teaches": [
+     "mitigation"
+    ]
+   },
+   {
+    "id": "t327-c3",
+    "kind": "diagram",
+    "title": "Worked example: the first 15 minutes",
+    "body": "Error rates jump on checkout shortly after a deploy.",
+    "teaches": [
+     "mitigation"
+    ],
+    "steps": [
+     "Page fires; the first responder declares an incident and becomes commander",
+     "Commander opens a channel, assigns an ops lead and a communications lead",
+     "Ops lead checks recent changes: a deploy 10 minutes ago",
+     "Commander decides to roll back now rather than debug the new version",
+     "Errors recover; the team keeps monitoring, updates the status page, then starts the timeline for the postmortem"
+    ]
+   },
+   {
+    "id": "t327-c4",
+    "kind": "text",
+    "title": "Misconception: postmortems find who made the mistake",
+    "body": "Blaming people makes others hide information, which hides the real weaknesses. Blameless postmortems assume people acted reasonably with what they knew, and ask which tools, checks and designs allowed a normal mistake to become an outage.",
+    "teaches": [
+     "postmortem"
+    ]
+   },
+   {
+    "id": "t327-c5",
+    "kind": "text",
+    "title": "Trap: action items nobody owns",
+    "body": "Postmortems often end with vague actions such as “be more careful” or “improve monitoring” with no owner or date. Good actions are specific, owned, tracked and prioritised, for example “add input validation to the capacity tool so it refuses to remove more than 5% of servers”.",
+    "teaches": [
+     "postmortem"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t327-a1",
+    "concept": "mitigation",
+    "type": "multiple_choice",
+    "prompt": "Errors spike 5 minutes after a deploy. What is usually the first move?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Write a postmortem draft"
+     },
+     {
+      "id": "b",
+      "label": "Add more logging and redeploy"
+     },
+     {
+      "id": "c",
+      "label": "Read the diff line by line"
+     },
+     {
+      "id": "d",
+      "label": "Roll back the deploy"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Rollback stops harm; diagnosis follows."
+   },
+   {
+    "id": "t327-a2",
+    "concept": "incident-roles",
+    "type": "multiple_choice",
+    "prompt": "What does the incident commander mainly do?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Answers each customer email about the outage"
+     },
+     {
+      "id": "b",
+      "label": "Types every fix into production"
+     },
+     {
+      "id": "c",
+      "label": "Writes the code for the fix"
+     },
+     {
+      "id": "d",
+      "label": "Coordinates people and makes decisions"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Commanders coordinate; others execute."
+   },
+   {
+    "id": "t327-a3",
+    "concept": "postmortem",
+    "type": "multiple_choice",
+    "prompt": "Which postmortem action is most useful?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Make the tool refuse large server removals"
+     },
+     {
+      "id": "b",
+      "label": "Record that the operator made an error"
+     },
+     {
+      "id": "c",
+      "label": "Remind all engineers to be more careful"
+     },
+     {
+      "id": "d",
+      "label": "Hold a meeting about staying focused"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Specific system changes prevent recurrence."
+   },
+   {
+    "id": "t327-a4",
+    "concept": "postmortem",
+    "type": "multiple_choice",
+    "prompt": "Why are postmortems blameless?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "So incidents need no review"
+     },
+     {
+      "id": "b",
+      "label": "So the timeline can be skipped"
+     },
+     {
+      "id": "c",
+      "label": "So nobody has to fix anything after the incident"
+     },
+     {
+      "id": "d",
+      "label": "So people share what really happened"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Honest detail reveals systemic causes."
+   },
+   {
+    "id": "t327-a5",
+    "concept": "incident-roles",
+    "type": "drag_order",
+    "prompt": "Order the incident lifecycle.",
+    "items": [
+     {
+      "id": "s4",
+      "label": "Resolve and verify recovery"
+     },
+     {
+      "id": "s1",
+      "label": "Detect and declare the incident"
+     },
+     {
+      "id": "s3",
+      "label": "Mitigate user impact"
+     },
+     {
+      "id": "s2",
+      "label": "Assign roles and communicate"
+     },
+     {
+      "id": "s5",
+      "label": "Write and review the postmortem"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Declare, organise, mitigate, resolve, learn."
+   },
+   {
+    "id": "t327-a6",
+    "concept": "mitigation",
+    "type": "tradeoff",
+    "prompt": "A database is overloaded and the cause is unclear. Customers cannot log in.",
+    "constraints": [
+     "Users affected now",
+     "Cause unknown",
+     "Feature flags available"
+    ],
+    "approaches": [
+     {
+      "id": "p3",
+      "label": "Restart the database primary immediately",
+      "description": "Blind restart"
+     },
+     {
+      "id": "p1",
+      "label": "Shed non-critical load (disable heavy features) while investigating",
+      "description": "Shed load first"
+     },
+     {
+      "id": "p2",
+      "label": "Keep everything on until the root cause is found",
+      "description": "Diagnose first"
+     }
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r3",
+      "label": "Changing anything before diagnosis is risky"
+     },
+     {
+      "id": "r1",
+      "label": "Restores logins quickly by reducing pressure"
+     },
+     {
+      "id": "r2",
+      "label": "Buys time to investigate safely"
+     },
+     {
+      "id": "r4",
+      "label": "A restart fixes overload"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": {
+     "r3": "Users are already affected; reversible mitigation is low risk.",
+     "r4": "Restarts can lose caches and make the overload worse."
+    },
+    "explanation": "Prefer reversible mitigations that reduce harm now."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t327-f1",
+    "front": "Incident commander?",
+    "back": "Coordinates the response and decides; does not do hands-on fixes."
+   },
+   {
+    "id": "t327-f2",
+    "front": "First priority?",
+    "back": "Mitigate user impact before root-causing."
+   },
+   {
+    "id": "t327-f3",
+    "front": "Blameless postmortem?",
+    "back": "Focus on systemic causes and owned actions, not on people."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Google SRE Book: Managing Incidents",
+    "url": "https://sre.google/sre-book/managing-incidents/"
+   },
+   {
+    "title": "Google SRE Book: Postmortem Culture",
+    "url": "https://sre.google/sre-book/postmortem-culture/"
+   },
+   {
+    "title": "Google SRE Workbook: Incident Response",
+    "url": "https://sre.google/workbook/incident-response/"
+   },
+   {
+    "title": "Google SRE Book: Emergency Response",
+    "url": "https://sre.google/sre-book/emergency-response/"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "incident-roles",
+    "mitigation",
+    "postmortem"
+   ],
+   "mechanism": {
+    "title": "Structure that holds up under pressure",
+    "steps": [
+     "Declare early. Declaring an incident is cheap and can be downgraded; waiting until certain wastes the first minutes, which are often the most valuable.",
+     "Set up roles and one communication channel. The commander keeps a running summary: what we know, what we are trying, the next update time. Status updates to customers go out on a regular cadence even when there is no news.",
+     "Mitigation options are prepared in advance: rollback, feature flags, failover, traffic shifting, load shedding, scaling out. Runbooks list them per service so responders choose rather than invent under stress.",
+     "Keep a timeline as you go: detection time, key observations, decisions and changes with timestamps. It is the backbone of the postmortem and avoids reconstructing events from memory.",
+     "After recovery, write a postmortem: impact, timeline, contributing factors, what went well, where we got lucky, and action items with owners and priorities. Review it widely; share lessons across teams.",
+     "Track metrics over time: time to detect, time to mitigate, and repeat incidents. Repeats mean action items are not being completed or not addressing the real weakness.",
+     "Paging and escalation policies decide who is woken and when: a primary on-call, a secondary if the primary does not acknowledge within minutes, and clear rules for pulling in other teams. Handovers at shift changes include the current summary, so context is not lost."
+    ]
+   },
+   "useWhen": [
+    "Use clear roles for any incident with user impact.",
+    "Use reversible mitigations before deep diagnosis.",
+    "Use a status page and a fixed update cadence for incidents customers can see."
+   ],
+   "avoidWhen": [
+    "Avoid one person both fixing and coordinating.",
+    "Avoid postmortems that name individuals as the cause.",
+    "Avoid closing action items without checking they removed the weakness they targeted."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Phase",
+     "Goal",
+     "Common mistake"
+    ],
+    "rows": [
+     [
+      "Detection",
+      "Know quickly",
+      "Waiting for certainty before declaring"
+     ],
+     [
+      "Mitigation",
+      "Stop user harm",
+      "Debugging while users suffer"
+     ],
+     [
+      "Resolution",
+      "Restore normal operation",
+      "Declaring victory without verifying"
+     ],
+     [
+      "Postmortem",
+      "Prevent recurrence",
+      "Blame and vague actions"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Where incident minutes go",
+    "assumptions": [
+     "Example incident: 8 minutes to detect, 25 to decide on rollback, 5 to roll back (illustrative)",
+     "Fixed costs: detection and rollback mechanics"
+    ],
+    "steps": [
+     "User impact lasts 8 + 25 + 5 = 38 minutes.",
+     "Most of it, 25 minutes, is deliberation before mitigating.",
+     "A rule “roll back first if a deploy happened in the last hour” cuts that to about 2 minutes: impact ≈ 15 minutes.",
+     "Faster detection helps, but decision rules often save more."
+    ],
+    "result": "Decide on mitigations by rule, not by debate, to cut user impact."
+   },
+   "india": {
+    "title": "One command, many servers",
+    "label": "Publicly reported",
+    "body": "Publicly reported by Amazon Web Services in its summary of the 28 February 2017 Amazon S3 disruption in the US-EAST-1 region: while debugging a billing system, an authorised team member ran a command intended to remove a small number of servers, but one input was entered incorrectly and a larger set was removed, including servers supporting critical subsystems. Restarting them took hours. AWS changed the tool to remove capacity more slowly and to block removals that would take a subsystem below its minimum capacity."
+   },
+   "pitfalls": [
+    {
+     "trap": "“Let’s find the root cause before touching anything.”",
+     "say": "“Users are affected now; I’d roll back or shed load first, then investigate.”"
+    },
+    {
+     "trap": "“The engineer made a typo; that’s the root cause.”",
+     "say": "“A typo was the trigger; the root cause is a tool that allowed it to remove that much capacity.”"
+    }
+   ],
+   "takeaways": [
+    "Declare early, assign roles, communicate on a cadence.",
+    "Mitigate user impact before diagnosing.",
+    "Keep a timeline during the incident.",
+    "Blameless postmortems with specific, owned actions."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "What should the commander do?",
+   "prompt": "Ten minutes into an outage, two engineers are debating which of three recent changes caused it. One of the changes is a deploy that can be rolled back in 2 minutes.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Roll back the deploy now, then continue investigating",
+     "feedback": "Right: a cheap, reversible mitigation beats more debate."
+    },
+    {
+     "id": "b",
+     "label": "Let the debate continue until there is agreement",
+     "feedback": "Users stay affected while it continues."
+    },
+    {
+     "id": "c",
+     "label": "Roll back all three changes and a week of others",
+     "feedback": "Broad rollbacks add risk; start with the cheapest likely fix."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Prefer the quickest reversible mitigation, then confirm its effect."
+  },
+  "seeAlso": [
+   {
+    "topicId": 230,
+    "why": "Error handling and retries"
+   },
+   {
+    "topicId": 326,
+    "why": "Error budgets that incidents consume"
+   }
+  ]
+ },
+ {
+  "id": 328,
+  "slug": "autoscaling",
+  "region": "f7-cloud",
+  "order": 8,
+  "title": "Autoscaling",
+  "kind": "lesson",
+  "objectives": [
+   "Scale horizontally from a metric and target",
+   "Compute the replica count a proportional autoscaler chooses",
+   "Avoid flapping and slow cold starts"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 10,
+  "prereqIds": [
+   322
+  ],
+  "cards": [
+   {
+    "id": "t328-c1",
+    "kind": "text",
+    "title": "Match capacity to demand",
+    "body": "An autoscaler adds instances when load rises and removes them when it falls, so you pay for what you use and keep latency steady. It works for stateless services that can run many identical copies behind a load balancer.",
+    "teaches": [
+     "autoscaling"
+    ]
+   },
+   {
+    "id": "t328-c2",
+    "kind": "text",
+    "title": "Target tracking",
+    "body": "Most autoscalers keep a metric near a target: average CPU at 60%, or 100 requests a second per instance. If the metric is above target they add instances in proportion; below target they remove them, usually more cautiously.",
+    "teaches": [
+     "autoscaling"
+    ]
+   },
+   {
+    "id": "t328-c3",
+    "kind": "diagram",
+    "title": "Worked example: the Kubernetes formula",
+    "body": "The horizontal pod autoscaler computes desired replicas = ceil(current replicas × current metric ÷ target).",
+    "teaches": [
+     "hpa-formula"
+    ],
+    "steps": [
+     "4 replicas, average CPU 90%, target 60%",
+     "desired = ceil(4 × 90 ÷ 60) = ceil(6.0) = 6",
+     "Two new pods start; until they pass readiness, the old four carry the load",
+     "Later CPU falls to 30%: ceil(6 × 30 ÷ 60) = 3",
+     "Scale-down waits out a stabilisation window (5 minutes by default) so a brief dip does not remove pods too early"
+    ]
+   },
+   {
+    "id": "t328-c4",
+    "kind": "text",
+    "title": "Misconception: autoscaling handles any spike",
+    "body": "New instances take time: scheduling, pulling the image, starting the process, warming caches. A spike that doubles traffic in 30 seconds arrives before capacity does. Keep headroom, pre-scale for known events, and shed load when overwhelmed.",
+    "teaches": [
+     "scaling-lag"
+    ]
+   },
+   {
+    "id": "t328-c5",
+    "kind": "text",
+    "title": "Trap: scaling on the wrong metric",
+    "body": "A queue worker scaled on CPU may sit idle at low CPU while its queue grows, because it waits on a slow dependency. Scale on the signal that reflects backlog or demand, such as queue depth or requests per instance.",
+    "teaches": [
+     "autoscaling"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t328-a1",
+    "concept": "hpa-formula",
+    "type": "estimation",
+    "prompt": "A service runs 5 replicas at 84% average CPU with a 60% target. How many replicas does the proportional formula choose?",
+    "unit": "replicas",
+    "target": 7,
+    "assumptions": [
+     "desired = ceil(current × metric ÷ target)"
+    ],
+    "formula": "ceil(5 × 84 ÷ 60)",
+    "workedAnswer": "5 × 84 ÷ 60 = 7.0, so ceil gives 7",
+    "explanation": "Sanity check: 7 replicas at the same total load average 5 × 84 ÷ 7 = 60% CPU, the target.",
+    "tolerance": 0,
+    "trapAnswers": [
+     6,
+     8
+    ]
+   },
+   {
+    "id": "t328-a2",
+    "concept": "scaling-lag",
+    "type": "multiple_choice",
+    "prompt": "Traffic triples in 20 seconds at a flash sale. Why might autoscaling not save the first minute?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "CPU metrics are not collected"
+     },
+     {
+      "id": "b",
+      "label": "New instances take time to start and warm"
+     },
+     {
+      "id": "c",
+      "label": "Autoscalers only run at midnight"
+     },
+     {
+      "id": "d",
+      "label": "Load balancers refuse to send traffic to new instances"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Scaling lag is the gap between demand and ready capacity."
+   },
+   {
+    "id": "t328-a3",
+    "concept": "autoscaling",
+    "type": "multiple_choice",
+    "prompt": "A queue worker waits on a slow API, so CPU stays at 15% while the backlog grows. What should it scale on?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Queue depth per worker"
+     },
+     {
+      "id": "b",
+      "label": "Memory used per worker"
+     },
+     {
+      "id": "c",
+      "label": "Average CPU utilisation"
+     },
+     {
+      "id": "d",
+      "label": "Network bytes per second"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Scale on the signal that reflects work waiting."
+   },
+   {
+    "id": "t328-a4",
+    "concept": "scaling-lag",
+    "type": "multiple_choice",
+    "prompt": "Why do autoscalers scale down more slowly than up?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "To avoid flapping when load dips briefly"
+     },
+     {
+      "id": "b",
+      "label": "Scale-down needs manual approval"
+     },
+     {
+      "id": "c",
+      "label": "Instances cannot stop quickly"
+     },
+     {
+      "id": "d",
+      "label": "Removing instances costs more money than adding them"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "A stabilisation window prevents remove-then-re-add cycles."
+   },
+   {
+    "id": "t328-a5",
+    "concept": "hpa-formula",
+    "type": "drag_order",
+    "prompt": "Order one autoscaling cycle.",
+    "items": [
+     {
+      "id": "s4",
+      "label": "New instances pass readiness and take traffic"
+     },
+     {
+      "id": "s2",
+      "label": "Compare with the target and compute desired replicas"
+     },
+     {
+      "id": "s3",
+      "label": "Create or remove instances"
+     },
+     {
+      "id": "s1",
+      "label": "Collect the metric across replicas"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Measure, compute, act, become ready."
+   },
+   {
+    "id": "t328-a6",
+    "concept": "scaling-lag",
+    "type": "tradeoff",
+    "prompt": "A ticketing site expects a 10× spike when a concert goes on sale at 10:00.",
+    "constraints": [
+     "Known start time",
+     "Spike within seconds",
+     "Cold start about 90 s"
+    ],
+    "approaches": [
+     {
+      "id": "p3",
+      "label": "Run 10× capacity all year",
+      "description": "Permanent peak"
+     },
+     {
+      "id": "p1",
+      "label": "Scale out on a schedule before 10:00, with autoscaling and a queue as backup",
+      "description": "Pre-scale + queue"
+     },
+     {
+      "id": "p2",
+      "label": "Rely on CPU-based autoscaling alone",
+      "description": "Reactive only"
+     }
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r3",
+      "label": "Reactive autoscaling is fast enough"
+     },
+     {
+      "id": "r1",
+      "label": "Capacity is ready before the spike arrives"
+     },
+     {
+      "id": "r2",
+      "label": "A waiting room absorbs any excess"
+     },
+     {
+      "id": "r4",
+      "label": "Permanent peak capacity is the only safe choice"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": {
+     "r3": "A 90 s cold start leaves the first minutes underprovisioned.",
+     "r4": "It costs about 10× for a few hours of need."
+    },
+    "explanation": "For known events, pre-scale; keep reactive scaling for the unknown."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t328-f1",
+    "front": "HPA formula?",
+    "back": "desired = ceil(current replicas × current metric ÷ target)."
+   },
+   {
+    "id": "t328-f2",
+    "front": "Why a scale-down window?",
+    "back": "To prevent flapping on brief dips."
+   },
+   {
+    "id": "t328-f3",
+    "front": "Scaling lag?",
+    "back": "Time from demand rising to new capacity serving traffic."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Kubernetes: Horizontal Pod Autoscaling",
+    "url": "https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/"
+   },
+   {
+    "title": "AWS: Target tracking scaling policies",
+    "url": "https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-scaling-target-tracking.html"
+   },
+   {
+    "title": "Google Cloud: Autoscaling groups of instances",
+    "url": "https://cloud.google.com/compute/docs/autoscaler"
+   },
+   {
+    "title": "Google SRE Book: Handling Overload",
+    "url": "https://sre.google/sre-book/handling-overload/"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "autoscaling",
+    "hpa-formula",
+    "scaling-lag"
+   ],
+   "mechanism": {
+    "title": "What an autoscaler actually does",
+    "steps": [
+     "Every period (15 seconds by default in Kubernetes) the autoscaler reads the metric for each replica, averages it, and computes the ratio to the target. If the ratio is within a tolerance (10% by default), it does nothing.",
+     "Otherwise it sets desired replicas proportionally, clamped between configured minimum and maximum counts. The maximum protects downstream systems and budgets; the minimum keeps enough capacity for sudden load and for losing a zone.",
+     "Scale-up is usually immediate; scale-down uses a stabilisation window that takes the highest recommendation over the last few minutes, so short dips do not remove capacity that will be needed again.",
+     "Cold start dominates response to spikes: node provisioning (if the cluster must grow too) can take minutes, image pulls seconds to minutes, and application warm-up more. Smaller images, warm pools of nodes and fast start-up all shorten it.",
+     "Metric choice matters: CPU suits CPU-bound services; request rate or concurrency per instance suits I/O-bound services; queue depth or age suits workers. Custom metrics need reliable pipelines, or the autoscaler acts on stale data.",
+     "Autoscaling interacts with everything downstream: doubling app instances doubles database connections and load on dependencies. Cap maximums to what dependencies can handle and protect them with pools and rate limits.",
+     "Cluster autoscalers add nodes when pods cannot be scheduled and remove under-used nodes, so pod autoscaling and node autoscaling work together; node scale-up is usually the slowest step and the main reason to keep spare capacity."
+    ]
+   },
+   "useWhen": [
+    "Use autoscaling for stateless services with variable load.",
+    "Use scheduled scaling for known events.",
+    "Use queue-based scaling for background workers."
+   ],
+   "avoidWhen": [
+    "Avoid scaling on metrics that do not reflect demand.",
+    "Avoid unbounded maximums that can overwhelm databases.",
+    "Avoid scaling stateful stores the same way as stateless services; they need data rebalancing."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Signal",
+     "Fits",
+     "Weak spot"
+    ],
+    "rows": [
+     [
+      "CPU utilisation",
+      "CPU-bound services",
+      "I/O-bound services look idle"
+     ],
+     [
+      "Requests per instance",
+      "Web APIs",
+      "Needs good per-instance metrics"
+     ],
+     [
+      "Queue depth or age",
+      "Background workers",
+      "Lags if producers burst"
+     ],
+     [
+      "Schedule",
+      "Predictable peaks",
+      "Misses unexpected spikes"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Headroom against scaling lag",
+    "assumptions": [
+     "Traffic can rise 40% within 2 minutes; new capacity needs 3 minutes to serve (illustrative)",
+     "Target CPU 60%"
+    ],
+    "steps": [
+     "During the 3-minute lag, existing instances must absorb the rise.",
+     "At 60% average, a 40% rise brings them to about 60% × 1.4 = 84%: still serving.",
+     "At an 80% target, the same rise would need 112%: overload and latency spikes.",
+     "Lower targets cost more instances but buy time for scaling to catch up."
+    ],
+    "result": "The target utilisation is your headroom: set it from how fast load can rise versus how fast capacity arrives."
+   },
+   "india": {
+    "title": "How the Kubernetes autoscaler decides",
+    "label": "Official documentation",
+    "body": "The Kubernetes documentation for horizontal pod autoscaling gives the algorithm as desiredReplicas = ceil[currentReplicas × (currentMetricValue ÷ desiredMetricValue)], skips scaling when the ratio is close enough to 1 (within a default tolerance of 0.1), and applies a default downscale stabilisation window of 300 seconds so that the number of replicas does not fluctuate frequently due to the dynamic nature of the metrics evaluated."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We have autoscaling, so spikes are handled.”",
+     "say": "“Only spikes slower than our cold start; I’d keep headroom and pre-scale for known events.”"
+    },
+    {
+     "trap": "“Scale everything on CPU.”",
+     "say": "“I’d scale I/O-bound services on requests or queue depth, which reflect demand.”"
+    }
+   ],
+   "takeaways": [
+    "Autoscalers keep a metric near a target, proportionally.",
+    "Scale-down is deliberately slower to avoid flapping.",
+    "Cold-start time sets how much headroom you need.",
+    "Cap maximums to what dependencies can take."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "What does the autoscaler pick?",
+   "prompt": "An autoscaled API runs 8 replicas at 30% average CPU. The target is 60%, the minimum is 5 replicas, and the stabilisation window has passed.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "4 by the formula, clamped up to the minimum of 5",
+     "feedback": "Right: ceil(8 × 30 ÷ 60) = 4, below the floor of 5."
+    },
+    {
+     "id": "b",
+     "label": "4 replicas exactly",
+     "feedback": "The minimum replica setting overrides the formula."
+    },
+    {
+     "id": "c",
+     "label": "8 replicas; it never scales down",
+     "feedback": "It scales down once the window has passed."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Minimum and maximum bounds clamp whatever the formula computes."
+  },
+  "seeAlso": [
+   {
+    "topicId": 3,
+    "why": "Vertical and horizontal scaling"
+   },
+   {
+    "topicId": 274,
+    "why": "Connection pools that scale with instance count"
+   }
+  ]
+ },
+ {
+  "id": 329,
+  "slug": "cloud-networking",
+  "region": "f7-cloud",
+  "order": 9,
+  "title": "Cloud Networking: VPCs, Subnets and Security Groups",
+  "kind": "lesson",
+  "objectives": [
+   "Lay out a VPC with public and private subnets",
+   "Tell stateful security groups from stateless network ACLs",
+   "Give private workloads outbound access without exposing them"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 10,
+  "prereqIds": [
+   321
+  ],
+  "cards": [
+   {
+    "id": "t329-c1",
+    "kind": "text",
+    "title": "Your own private network in the cloud",
+    "body": "A virtual private cloud (VPC) is an isolated network with an address range you choose, such as 10.0.0.0/16. You divide it into subnets, usually per availability zone, and attach route tables that decide where traffic goes.",
+    "teaches": [
+     "vpc"
+    ]
+   },
+   {
+    "id": "t329-c2",
+    "kind": "text",
+    "title": "Public and private subnets",
+    "body": "A public subnet has a route to an internet gateway, so resources with public addresses can be reached from the internet. A private subnet does not; databases and application servers live there, reachable only from inside the VPC or through load balancers.",
+    "teaches": [
+     "vpc"
+    ]
+   },
+   {
+    "id": "t329-c3",
+    "kind": "diagram",
+    "title": "Worked example: a three-tier layout",
+    "body": "A web application in two availability zones.",
+    "teaches": [
+     "vpc"
+    ],
+    "steps": [
+     "VPC 10.0.0.0/16 split into public and private subnets in each zone",
+     "Public subnets: the load balancer and a NAT gateway",
+     "Private app subnets: servers whose security group accepts traffic only from the load balancer’s group",
+     "Private data subnets: the database, whose group accepts only the app servers’ group on the database port",
+     "App servers reach the internet for updates through the NAT gateway, which allows outbound connections only"
+    ]
+   },
+   {
+    "id": "t329-c4",
+    "kind": "text",
+    "title": "Misconception: private subnets cannot reach the internet",
+    "body": "They can initiate outbound connections through a NAT gateway; the internet just cannot start connections to them. That is usually what you want for updates and third-party APIs, but egress should still be restricted where data exfiltration matters.",
+    "teaches": [
+     "nat-egress"
+    ]
+   },
+   {
+    "id": "t329-c5",
+    "kind": "text",
+    "title": "Trap: opening 0.0.0.0/0 on admin ports",
+    "body": "A security group that allows SSH or database ports from anywhere exposes them to constant internet scanning. Allow access from specific groups or ranges, and use a bastion or session manager for administration.",
+    "teaches": [
+     "security-groups"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t329-a1",
+    "concept": "vpc",
+    "type": "multiple_choice",
+    "prompt": "What makes a subnet “public”?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A route to an internet gateway"
+     },
+     {
+      "id": "b",
+      "label": "A larger address range"
+     },
+     {
+      "id": "c",
+      "label": "A public DNS name"
+     },
+     {
+      "id": "d",
+      "label": "Faster network cards"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Routing, not naming, decides reachability."
+   },
+   {
+    "id": "t329-a2",
+    "concept": "security-groups",
+    "type": "multiple_choice",
+    "prompt": "A security group allows inbound port 443. Do responses need an outbound rule?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Only when the port is above 1024"
+     },
+     {
+      "id": "b",
+      "label": "Yes, each reply needs a rule"
+     },
+     {
+      "id": "c",
+      "label": "No, security groups are stateful"
+     },
+     {
+      "id": "d",
+      "label": "Only for IPv6 traffic"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Return traffic for allowed connections is permitted automatically."
+   },
+   {
+    "id": "t329-a3",
+    "concept": "nat-egress",
+    "type": "multiple_choice",
+    "prompt": "Private app servers must call a payment API on the internet. What gives them access without exposing them?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Opening the security group to all"
+     },
+     {
+      "id": "b",
+      "label": "Public IPs on each server"
+     },
+     {
+      "id": "c",
+      "label": "Moving them to the public subnet"
+     },
+     {
+      "id": "d",
+      "label": "A NAT gateway in a public subnet"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "NAT allows outbound connections only."
+   },
+   {
+    "id": "t329-a4",
+    "concept": "security-groups",
+    "type": "multiple_choice",
+    "prompt": "How should the database’s security group allow the app servers?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Allow 0.0.0.0/0 on the port"
+     },
+     {
+      "id": "b",
+      "label": "Allow the whole VPC range"
+     },
+     {
+      "id": "c",
+      "label": "Reference the app servers’ security group"
+     },
+     {
+      "id": "d",
+      "label": "Allow the NAT gateway’s public address on the port"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Group references follow instances as they scale."
+   },
+   {
+    "id": "t329-a5",
+    "concept": "vpc",
+    "type": "drag_order",
+    "prompt": "Order the path of a user request in a three-tier VPC.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "App server to the database in a data subnet"
+     },
+     {
+      "id": "s2",
+      "label": "Load balancer to an app server in a private subnet"
+     },
+     {
+      "id": "s4",
+      "label": "Response returns along the same connection"
+     },
+     {
+      "id": "s1",
+      "label": "Internet to the load balancer in a public subnet"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Edge, app, data, back."
+   },
+   {
+    "id": "t329-a6",
+    "concept": "security-groups",
+    "type": "tradeoff",
+    "prompt": "Engineers need occasional shell access to private servers.",
+    "constraints": [
+     "Audit requirement",
+     "No public IPs on servers",
+     "Small team"
+    ],
+    "approaches": [
+     {
+      "id": "p1",
+      "label": "A managed session service or bastion with logged, identity-based access",
+      "description": "Brokered access"
+     },
+     {
+      "id": "p3",
+      "label": "Share one SSH key on a wiki page",
+      "description": "Shared key"
+     },
+     {
+      "id": "p2",
+      "label": "Open SSH to the internet with keys",
+      "description": "Public SSH"
+     }
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r3",
+      "label": "Key-based SSH from anywhere is secure enough"
+     },
+     {
+      "id": "r1",
+      "label": "No inbound ports open to the internet"
+     },
+     {
+      "id": "r4",
+      "label": "A shared key is simpler to manage"
+     },
+     {
+      "id": "r2",
+      "label": "Each session is tied to a person and logged"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": {
+     "r3": "Exposed ports invite scanning and key theft is common.",
+     "r4": "It cannot be attributed or revoked per person."
+    },
+    "explanation": "Broker admin access through identity and logging, not open ports."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t329-f1",
+    "front": "VPC?",
+    "back": "An isolated virtual network with your chosen address range."
+   },
+   {
+    "id": "t329-f2",
+    "front": "Security group vs network ACL?",
+    "back": "Groups are stateful, allow-only, per resource; ACLs are stateless, allow and deny, per subnet."
+   },
+   {
+    "id": "t329-f3",
+    "front": "NAT gateway?",
+    "back": "Lets private resources start outbound connections without being reachable."
+   }
+  ],
+  "sources": [
+   {
+    "title": "AWS: How Amazon VPC works",
+    "url": "https://docs.aws.amazon.com/vpc/latest/userguide/how-it-works.html"
+   },
+   {
+    "title": "AWS: Compare security groups and network ACLs",
+    "url": "https://docs.aws.amazon.com/vpc/latest/userguide/infrastructure-security.html"
+   },
+   {
+    "title": "AWS: NAT gateways",
+    "url": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html"
+   },
+   {
+    "title": "Google Cloud: VPC networks",
+    "url": "https://cloud.google.com/vpc/docs/vpc"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "vpc",
+    "security-groups",
+    "nat-egress"
+   ],
+   "mechanism": {
+    "title": "How packets move inside a VPC",
+    "steps": [
+     "Each subnet’s route table decides the next hop: local traffic within the VPC range stays inside; 0.0.0.0/0 goes to an internet gateway (public subnets) or a NAT gateway (private subnets); other routes may lead to peered VPCs or VPN connections.",
+     "Security groups attach to network interfaces and act as stateful firewalls: rules only allow, and if a connection is allowed in one direction, its replies are allowed back. Rules can reference other groups, so “app servers may reach the database” holds as instances come and go.",
+     "Network ACLs attach to subnets and are stateless: they evaluate inbound and outbound packets separately, support deny rules and are processed in rule-number order. They suit coarse subnet-wide blocks; most fine-grained control lives in security groups.",
+     "A NAT gateway translates private source addresses to its own public address for outbound connections and drops unsolicited inbound ones. It lives in a public subnet and is usually deployed per availability zone so one zone’s failure does not cut the others’ egress.",
+     "Private endpoints let workloads reach cloud services such as object storage without traversing the internet or a NAT gateway, which reduces cost and lets you restrict access to specific resources.",
+     "Plan address ranges up front: VPC and subnet ranges are hard to change, and overlapping ranges block peering and VPNs later. Leave space for more subnets and zones."
+    ]
+   },
+   "useWhen": [
+    "Use private subnets for application and data tiers.",
+    "Use security-group references instead of IP ranges inside a VPC.",
+    "Use private endpoints for cloud services such as object storage to keep traffic off the internet."
+   ],
+   "avoidWhen": [
+    "Avoid admin ports open to 0.0.0.0/0.",
+    "Avoid overlapping address ranges between networks you may connect."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Control",
+     "Scope",
+     "State",
+     "Rules"
+    ],
+    "rows": [
+     [
+      "Security group",
+      "Network interface",
+      "Stateful",
+      "Allow only"
+     ],
+     [
+      "Network ACL",
+      "Subnet",
+      "Stateless",
+      "Allow and deny, ordered"
+     ],
+     [
+      "Route table",
+      "Subnet",
+      "Not a filter",
+      "Decides next hop"
+     ],
+     [
+      "NAT gateway",
+      "Zone egress",
+      "Tracks outbound connections",
+      "Outbound only"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Sizing subnets",
+    "assumptions": [
+     "VPC 10.0.0.0/16; 3 zones × 3 tiers = 9 subnets of /20 (illustrative)",
+     "AWS reserves 5 addresses per subnet"
+    ],
+    "steps": [
+     "A /16 holds 65,536 addresses; a /20 holds 4,096.",
+     "Nine /20 subnets use 9 × 4,096 = 36,864 addresses, leaving room for more.",
+     "Each /20 gives 4,096 − 5 = 4,091 usable addresses on AWS.",
+     "Container platforms that give each pod a VPC address can use thousands of addresses per subnet, so size for pods, not servers."
+    ],
+    "result": "Plan ranges for growth and for platforms that consume an address per pod."
+   },
+   "india": {
+    "title": "Security groups and network ACLs in AWS",
+    "label": "Official documentation",
+    "body": "AWS’s VPC documentation compares the two controls: security groups operate at the instance level, support allow rules only and are stateful, so return traffic is automatically allowed; network ACLs operate at the subnet level, support allow and deny rules, are stateless so return traffic must be explicitly allowed, and process rules in order starting with the lowest number. AWS recommends using security groups as the primary control and ACLs as an additional layer."
+   },
+   "pitfalls": [
+    {
+     "trap": "“It’s in a private subnet, so it’s safe.”",
+     "say": "“Private stops inbound internet access; I’d still restrict security groups and egress.”"
+    },
+    {
+     "trap": "“Allow the whole VPC range to the database.”",
+     "say": "“I’d reference the app tier’s security group so only the app servers can connect.”"
+    }
+   ],
+   "takeaways": [
+    "VPCs split into public and private subnets per zone.",
+    "Security groups: stateful, allow-only, per interface.",
+    "NAT gives private workloads outbound-only access.",
+    "Plan address ranges for growth and peering."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Can the database be reached from the internet?",
+   "prompt": "The database sits in a private subnet with no internet gateway route. Its security group allows port 5432 from 0.0.0.0/0.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Not directly: there is no route from the internet, but the rule is still too broad",
+     "feedback": "Right: routing blocks the internet, but any VPC resource can connect."
+    },
+    {
+     "id": "b",
+     "label": "Yes: the security group allows everyone",
+     "feedback": "Without a route, internet packets never arrive."
+    },
+    {
+     "id": "c",
+     "label": "No, and the rule is harmless",
+     "feedback": "A compromised resource inside the VPC can reach it."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Use routing and narrow security groups together; neither alone is enough."
+  },
+  "seeAlso": [
+   {
+    "topicId": 243,
+    "why": "Subnets and CIDR notation"
+   },
+   {
+    "topicId": 244,
+    "why": "Routing and NAT, which cloud gateways implement"
+   },
+   {
+    "topicId": 308,
+    "why": "Egress rules and private subnets that limit SSRF"
+   }
+  ]
+ },
+ {
+  "id": 330,
+  "slug": "backups-and-disaster-recovery",
+  "region": "f7-cloud",
+  "order": 10,
+  "title": "Backups and Disaster Recovery",
+  "kind": "lesson",
+  "objectives": [
+   "Define RPO and RTO and pick strategies that meet them",
+   "Design backups that survive deletion, ransomware and regional loss",
+   "Test restores and failovers regularly"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 10,
+  "prereqIds": [
+   325
+  ],
+  "cards": [
+   {
+    "id": "t330-c1",
+    "kind": "text",
+    "title": "Two numbers drive the design",
+    "body": "The recovery point objective (RPO) is how much data you can afford to lose, measured in time. The recovery time objective (RTO) is how long you can be down. A nightly backup gives an RPO of up to 24 hours; continuous replication gives seconds.",
+    "teaches": [
+     "rpo-rto"
+    ]
+   },
+   {
+    "id": "t330-c2",
+    "kind": "text",
+    "title": "Replicas are not backups",
+    "body": "Replication copies every change, including mistakes: a dropped table or encrypted files arrive at the replica within seconds. Backups are point-in-time copies kept separately, so you can go back to before the mistake.",
+    "teaches": [
+     "backups"
+    ]
+   },
+   {
+    "id": "t330-c3",
+    "kind": "diagram",
+    "title": "Worked example: a point-in-time restore",
+    "body": "A bad migration deletes a column at 14:05.",
+    "teaches": [
+     "backups"
+    ],
+    "steps": [
+     "Identify the last good moment: 14:04",
+     "Restore the most recent full backup (from 02:00) to a new instance",
+     "Replay write-ahead logs from 02:00 to 14:04",
+     "Verify the data, then copy the missing column back or switch the app over",
+     "Record the restore time; it is a real measurement of your RTO"
+    ]
+   },
+   {
+    "id": "t330-c4",
+    "kind": "text",
+    "title": "Misconception: backups exist, so we can recover",
+    "body": "A backup that has never been restored is a hope. Backups fail silently: wrong paths, expired credentials, missing encryption keys. Only regular restore tests prove both that data is there and how long recovery takes.",
+    "teaches": [
+     "backups"
+    ]
+   },
+   {
+    "id": "t330-c5",
+    "kind": "text",
+    "title": "Trap: backups reachable with production credentials",
+    "body": "If the same credentials that run production can delete backups, ransomware or an attacker deletes both. Keep copies in a separate account with immutable (write-once) retention, and at least one copy in another region.",
+    "teaches": [
+     "backups"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t330-a1",
+    "concept": "rpo-rto",
+    "type": "multiple_choice",
+    "prompt": "A business can lose at most 15 minutes of orders. Which objective is that?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Mean time between failures"
+     },
+     {
+      "id": "b",
+      "label": "Recovery time objective"
+     },
+     {
+      "id": "c",
+      "label": "Recovery point objective"
+     },
+     {
+      "id": "d",
+      "label": "Service level indicator"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "RPO is acceptable data loss in time."
+   },
+   {
+    "id": "t330-a2",
+    "concept": "backups",
+    "type": "multiple_choice",
+    "prompt": "Someone runs DROP TABLE on the primary. What happens on a synchronous replica?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The replica keeps the table"
+     },
+     {
+      "id": "b",
+      "label": "The replica rejects the change"
+     },
+     {
+      "id": "c",
+      "label": "The table is dropped there too"
+     },
+     {
+      "id": "d",
+      "label": "The replica pauses replication"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Replicas copy mistakes; backups let you go back."
+   },
+   {
+    "id": "t330-a3",
+    "concept": "backups",
+    "type": "multiple_choice",
+    "prompt": "What best protects backups from ransomware that holds admin credentials?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Compressing the backup files"
+     },
+     {
+      "id": "b",
+      "label": "Daily backups kept in the same account as production"
+     },
+     {
+      "id": "c",
+      "label": "Larger backup disks"
+     },
+     {
+      "id": "d",
+      "label": "Immutable copies in a separate account"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Attackers cannot delete write-once copies they cannot reach."
+   },
+   {
+    "id": "t330-a4",
+    "concept": "dr-strategies",
+    "type": "multiple_choice",
+    "prompt": "Which strategy gives the lowest RTO?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Pilot light"
+     },
+     {
+      "id": "b",
+      "label": "Backup and restore"
+     },
+     {
+      "id": "c",
+      "label": "Weekly tape copies"
+     },
+     {
+      "id": "d",
+      "label": "Active-active in two regions"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Both regions already serve traffic."
+   },
+   {
+    "id": "t330-a5",
+    "concept": "dr-strategies",
+    "type": "drag_order",
+    "prompt": "Order DR strategies from slowest to fastest recovery.",
+    "items": [
+     {
+      "id": "s4",
+      "label": "Multi-site active-active"
+     },
+     {
+      "id": "s2",
+      "label": "Pilot light"
+     },
+     {
+      "id": "s3",
+      "label": "Warm standby"
+     },
+     {
+      "id": "s1",
+      "label": "Backup and restore"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "More pre-provisioned capacity means faster recovery at higher cost."
+   },
+   {
+    "id": "t330-a6",
+    "concept": "rpo-rto",
+    "type": "tradeoff",
+    "prompt": "An internal reporting tool can be down for a day and lose a day of data; a payments service needs RTO under 15 minutes and RPO near zero.",
+    "constraints": [
+     "Different needs",
+     "Limited budget",
+     "One cloud provider"
+    ],
+    "approaches": [
+     {
+      "id": "p2",
+      "label": "Active-active for both services",
+      "description": "Maximum everywhere"
+     },
+     {
+      "id": "p3",
+      "label": "Nightly backups for both services",
+      "description": "Minimum everywhere"
+     },
+     {
+      "id": "p1",
+      "label": "Backup and restore for reporting; warm standby with replication for payments",
+      "description": "Tiered DR"
+     }
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r2",
+      "label": "Payments meets its tight RTO and RPO"
+     },
+     {
+      "id": "r3",
+      "label": "Uniform DR is simpler, so use the strongest everywhere"
+     },
+     {
+      "id": "r1",
+      "label": "Spend matches each service’s objectives"
+     },
+     {
+      "id": "r4",
+      "label": "Nightly backups are fine if restores are practised"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": {
+     "r3": "It multiplies cost for services that do not need it.",
+     "r4": "Restore takes hours and loses up to a day: too much for payments."
+    },
+    "explanation": "Set RPO and RTO per service and pick the cheapest strategy that meets them."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t330-f1",
+    "front": "RPO?",
+    "back": "Maximum acceptable data loss, measured in time."
+   },
+   {
+    "id": "t330-f2",
+    "front": "RTO?",
+    "back": "Maximum acceptable downtime."
+   },
+   {
+    "id": "t330-f3",
+    "front": "Replica vs backup?",
+    "back": "Replicas copy mistakes immediately; backups keep earlier points in time."
+   }
+  ],
+  "sources": [
+   {
+    "title": "AWS: Disaster recovery options in the cloud",
+    "url": "https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html"
+   },
+   {
+    "title": "PostgreSQL: Continuous Archiving and Point-in-Time Recovery",
+    "url": "https://www.postgresql.org/docs/current/continuous-archiving.html"
+   },
+   {
+    "title": "Google Cloud: Disaster recovery planning guide",
+    "url": "https://cloud.google.com/architecture/dr-scenarios-planning-guide"
+   },
+   {
+    "title": "NIST SP 800-34: Contingency Planning Guide",
+    "url": "https://csrc.nist.gov/pubs/sp/800/34/r1/upd1/final"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "rpo-rto",
+    "backups",
+    "dr-strategies"
+   ],
+   "mechanism": {
+    "title": "Building recovery you can trust",
+    "steps": [
+     "Start from the business: for each service, agree RPO and RTO with its owners. These numbers decide the strategy and the cost; without them, teams either overspend or discover the gap during a disaster.",
+     "Backups: take full or incremental snapshots on a schedule, plus continuous log archiving for databases to allow point-in-time recovery. Encrypt them, keep the keys recoverable separately, and copy them to another region and another account.",
+     "Immutability: object-lock or write-once retention prevents deletion or modification until the retention period ends, even by administrators. This defeats ransomware and insider mistakes that target backups.",
+     "Strategies, from cheapest to fastest: backup and restore (hours), pilot light (core data replicated, servers off until needed), warm standby (a scaled-down copy running), and multi-site active-active (full capacity in each region, failover in seconds to minutes).",
+     "Dependencies matter: a recovered service also needs DNS, identity, secrets, configuration and its upstream and downstream services in the recovery region. Infrastructure as code and documented runbooks make the recovery environment reproducible.",
+     "Test: restore backups to a scratch environment on a schedule and verify the data; run failover game days. Measure actual RPO and RTO and compare with the objectives; untested plans usually take far longer than written.",
+     "Retention follows both recovery needs and rules: keep frequent recent copies for quick restores and fewer older copies for audits or late-discovered corruption, and delete data that law or policy says must not be kept longer."
+    ]
+   },
+   "useWhen": [
+    "Use point-in-time recovery for databases holding business data.",
+    "Use immutable, cross-account, cross-region backup copies.",
+    "Use scheduled restore tests whose results are reported like any other metric."
+   ],
+   "avoidWhen": [
+    "Avoid treating replicas or RAID as backups.",
+    "Avoid DR plans that have never been exercised."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Strategy",
+     "Typical RTO",
+     "Typical RPO",
+     "Relative cost"
+    ],
+    "rows": [
+     [
+      "Backup and restore",
+      "Hours",
+      "Hours (or minutes with log archiving)",
+      "Lowest"
+     ],
+     [
+      "Pilot light",
+      "Tens of minutes",
+      "Minutes",
+      "Low"
+     ],
+     [
+      "Warm standby",
+      "Minutes",
+      "Seconds to minutes",
+      "Medium"
+     ],
+     [
+      "Multi-site active-active",
+      "Near zero",
+      "Near zero",
+      "Highest"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "How long a restore really takes",
+    "assumptions": [
+     "Database size 2 TB; restore throughput 200 MB/s; 6 hours of logs to replay at 10× real time (illustrative)"
+    ],
+    "steps": [
+     "Copying 2 TB at 200 MB/s: 2,000,000 MB ÷ 200 = 10,000 s, about 2.8 hours.",
+     "Replaying 6 hours of logs at 10× takes about 36 minutes.",
+     "Add verification and switching the application over: say 30 minutes.",
+     "Total about 3.9 hours: if the RTO is 1 hour, backup and restore cannot meet it."
+    ],
+    "result": "Compute RTO from data size and throughput; large databases often need replicas or standby to meet tight targets."
+   },
+   "india": {
+    "title": "A data centre fire",
+    "label": "Publicly reported",
+    "body": "Publicly reported by OVHcloud in March 2021: a fire destroyed one data centre building at its Strasbourg site and damaged another, and the site was shut down. Customers whose only backups were stored in the same site lost data permanently, while those with copies in other regions could rebuild. The event is widely cited as a reminder that backups must be stored away from the systems they protect."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We have a replica, so we have backups.”",
+     "say": "“A replica copies a dropped table in seconds; I’d keep point-in-time backups separately too.”"
+    },
+    {
+     "trap": "“Our RTO is one hour.”",
+     "say": "“I’d check that against a timed restore; a 2 TB database can take hours to copy back.”"
+    }
+   ],
+   "takeaways": [
+    "Set RPO and RTO per service, then choose the strategy.",
+    "Replicas are not backups; keep point-in-time copies.",
+    "Make backups immutable and store them in another account and region.",
+    "Test restores and failovers; measure real times."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Can they recover?",
+   "prompt": "Ransomware with domain admin rights encrypts production servers and deletes the backup vault in the same cloud account. A weekly copy also goes to object storage with 30-day object lock in another account.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Yes, from the locked copy, losing up to a week of data",
+     "feedback": "Right: the immutable copy survives, but its RPO is a week."
+    },
+    {
+     "id": "b",
+     "label": "No: the attacker deleted all backups",
+     "feedback": "The locked copy in another account cannot be deleted."
+    },
+    {
+     "id": "c",
+     "label": "Yes, with no data loss",
+     "feedback": "The latest locked copy can be up to 7 days old."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Immutable, separate copies make recovery possible; their schedule sets how much you lose."
+  },
+  "seeAlso": [
+   {
+    "topicId": 270,
+    "why": "Replication is not a backup"
+   },
+   {
+    "topicId": 269,
+    "why": "Write-ahead logs make point-in-time recovery possible"
+   }
+  ]
+ }
+]

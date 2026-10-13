@@ -822,3 +822,51 @@ Server {svc} [1. challenge]> Browser {client}
 Browser {client} [2. origin = real site?]> Authenticator|unlocked by user
 Authenticator|unlocked by user [3. signature for origin]> Browser {client}
 Browser {client} [4. signed response]> Server {svc}
+
+# ---------- Fundamentals · Cloud & DevOps ----------
+@321 A multi-stage container build: the build stage installs dependencies and compiles, and only the binary is copied into a minimal runtime image run as a non-root user.
+Dependency manifest > Build stage|install + compile > Binary > Runtime stage|minimal base, non-root > Image|layers by digest {store}
+
+@322 An orchestrator's control loop: the desired state is stored, the scheduler places pods on nodes by their requests, and probes decide traffic and restarts.
+Desired state|3 replicas {store} > Controller {svc} > Scheduler|places by requests {svc} > Node agent {svc}
+Node agent {svc} [readiness passes]> Service endpoints|receives traffic
+Node agent {svc} [liveness fails]?> Restart container
+
+@323 A build-once pipeline: a merge triggers one image build, tests run against it, and the same digest is promoted to staging and then production.
+Merge to main {client} > Build image once {svc} > Tests on that image {svc} > Staging|same digest > Production|same digest
+Production|same digest [bad health]?> Redeploy previous digest
+
+@324 A canary rollout: a small share of traffic goes to the new version, its health is compared with the baseline, and traffic widens or rolls back.
+Users {client} > Load balancer {svc}
+Load balancer {svc} [95%]> Current version {svc}
+Load balancer {svc} [5%]> Canary {svc}
+Canary {svc} > Compare with baseline|errors, p99 [healthy]> Widen to 25%, 50%, 100%
+Compare with baseline|errors, p99 [worse]?> Roll back
+
+@325 Infrastructure as code: a change is planned in CI, the plan is reviewed, and the approved plan is applied with a locked remote state.
+Pull request {client} > CI plan {svc} [creates, updates, destroys]> Review {client} [approved]> CI apply {svc} > Cloud resources {ext}
+CI apply {svc} [lock + update]> Remote state {store}
+
+@326 From SLI to action: good events over valid events form the SLI, the SLO sets the target, the remainder is the error budget, and burn rate decides between a page and a ticket.
+%concept
+SLI|good ÷ valid events > SLO|99.9% over 30 days > Error budget|0.1% = 43 min
+Error budget|0.1% = 43 min [fast burn]> Page on-call
+Error budget|0.1% = 43 min [slow burn]> Ticket
+
+@327 Incident roles and flow: the commander coordinates, the ops lead mitigates, the communications lead updates stakeholders, and the timeline feeds the postmortem.
+Alert {ext} > Incident commander {svc}
+Incident commander {svc} > Ops lead|mitigate first {svc}
+Incident commander {svc} > Comms lead|status updates {svc}
+Ops lead|mitigate first {svc} ~> Timeline {store} ~> Blameless postmortem
+
+@328 Proportional autoscaling: metrics are averaged, the desired replica count is computed from the target, and new pods take traffic once ready.
+Pods|average CPU 90% {svc} > Autoscaler|ceil(4 × 90 ÷ 60) = 6 {svc} > Add 2 pods {svc} [ready]> Load balancer {svc}
+
+@329 A three-tier VPC: the internet reaches a load balancer in a public subnet, app servers in private subnets reach the database, and outbound calls leave through a NAT gateway.
+Internet {client} > Load balancer|public subnet {svc} > App servers|private subnet {svc} > Database|data subnet {store}
+App servers|private subnet {svc} [outbound only]> NAT gateway|public subnet {svc} > Payment API {ext}
+
+@330 Backups that survive disasters: production writes continuous logs and snapshots, copies go to an immutable vault in another account and region, and restores are tested.
+Production database {store} [snapshots + log archive]> Backup vault|same region {store}
+Backup vault|same region {store} [copy]> Immutable vault|other account and region {store}
+Immutable vault|other account and region {store} [scheduled test]> Restore check|measure RTO
