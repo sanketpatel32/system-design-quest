@@ -870,3 +870,35 @@ App servers|private subnet {svc} [outbound only]> NAT gateway|public subnet {svc
 Production database {store} [snapshots + log archive]> Backup vault|same region {store}
 Backup vault|same region {store} [copy]> Immutable vault|other account and region {store}
 Immutable vault|other account and region {store} [scheduled test]> Restore check|measure RTO
+
+# ---------- Frontend additions (215-220) ----------
+@215 Event propagation for one click: the event is captured from the window down to the clicked button, runs on the button, then bubbles back up, where one delegated listener on the table handles clicks for every row.
+Window > Document > Table|delegated listener {client} [capture]> Row > Button|target {client}
+Button|target {client} [bubble]~> Table|delegated listener {client}
+Table|delegated listener {client} [find closest button + row]> Handler|edit, delete, share
+
+@216 How a grid shares a 1000 px container with columns 200px 1fr 2fr and 20 px gaps: fixed tracks and gaps come out first, then 760 px is split into 1fr of about 253 px and 2fr of about 507 px.
+Container|1000 px > Fixed track + 2 gaps|240 px > Free space|760 px
+Free space|760 px [1 of 3 fr]> 1fr|about 253 px
+Free space|760 px [2 of 3 fr]> 2fr|about 507 px
+
+@217 Choosing a responsive image: the browser reads the candidates in srcset and the slot width in sizes, multiplies the slot width by the device pixel ratio, and downloads the closest file.
+srcset|480w, 960w, 1440w > Browser picks {client}
+sizes|slot = 100vw on phones > Browser picks {client}
+Device pixel ratio|DPR 2 or 3 > Browser picks {client} [slot x DPR]> Image file {store}
+
+@218 Real-time options: short polling repeats requests on a timer, server-sent events keep one HTTP response streaming text to the browser, and a WebSocket upgrades with 101 Switching Protocols into a two-way channel.
+Browser {client} [poll every N s]> API {svc}
+Browser {client} [GET text/event-stream]> SSE endpoint {svc} [events, Last-Event-ID on reconnect]~> Browser {client}
+Browser {client} [Upgrade: websocket]> WebSocket server {svc} [101, then frames both ways]~> Browser {client}
+
+@219 How an old view leaks: a global listener, a running timer and a growing cache are all reachable from a root, and each keeps the closed view's state and detached DOM alive.
+Root|window, globals > Global listener|never removed > Closed view state
+Root|window, globals > Timer|never cleared > Closed view state
+Root|window, globals > Module cache|only grows {store} > Detached DOM nodes
+Closed view state > Detached DOM nodes
+
+@220 Animation cost by property: width and left rerun layout, paint and composite; colours repaint and composite; transform and opacity on a layer only recomposite, often off the main thread.
+width, left, margin > Layout > Paint > Composite
+color, box-shadow > Paint
+transform, opacity|own layer > Composite
