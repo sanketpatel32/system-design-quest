@@ -30,6 +30,8 @@ export type ModelId =
   | 'context-switch'
   | 'hash-cost'
   | 'rollout'
+  | 'fr-tracks'
+  | 'heap-growth'
 
 export interface ModelRow {
   label: string
@@ -492,6 +494,41 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
         verdict: minutes <= 10
           ? { ok: true, text: 'A bad build is caught within 10 minutes' }
           : { ok: false, text: 'Too little traffic to detect a bad build within 10 minutes' },
+      }
+    },
+  },
+  // Fundamentals · Frontend: grid "fixed 1fr 2fr" - fr tracks share what is left after fixed tracks and gaps
+  'fr-tracks': {
+    params: ['fixedPx', 'gapPx', 'gaps', 'frTotal'],
+    run: (x, p) => {
+      const free = x - p.fixedPx! - p.gapPx! * p.gaps!
+      const oneFr = free / p.frTotal!
+      return {
+        rows: [
+          { label: 'Container width', value: `${fmt(x)} px` },
+          { label: 'Left for fr tracks (width - fixed - gaps)', value: `${fmt(Math.max(free, 0))} px` },
+          { label: 'One fr', value: `${fmt(Math.max(oneFr, 0), 1)} px`, strong: true },
+        ],
+        verdict: oneFr >= 120
+          ? { ok: true, text: 'Each fr column is at least 120 px wide' }
+          : { ok: false, text: 'fr columns are narrower than 120 px: switch to a single-column layout here' },
+      }
+    },
+  },
+  // Fundamentals · Frontend: retained memory after x route changes if each one leaks a fixed amount
+  'heap-growth': {
+    params: ['baseMb', 'leakMb', 'budgetMb'],
+    run: (x, p) => {
+      const heap = p.baseMb! + p.leakMb! * x
+      return {
+        rows: [
+          { label: 'Route changes in this session', value: fmt(x) },
+          { label: 'Leaked so far', value: `${fmt(p.leakMb! * x, 1)} MB` },
+          { label: 'Heap in use', value: `${fmt(heap, 1)} MB`, strong: true },
+        ],
+        verdict: heap <= p.budgetMb!
+          ? { ok: true, text: `Within the ${p.budgetMb} MB budget` }
+          : { ok: false, text: `Over the ${p.budgetMb} MB budget: on low-memory phones the tab may be discarded` },
       }
     },
   },

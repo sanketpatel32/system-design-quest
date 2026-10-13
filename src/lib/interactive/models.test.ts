@@ -109,6 +109,18 @@ describe('fundamentals models', () => {
     expect(val(o, 1)).toBe('200 ms')
     expect(val(o, 3)).toBe('25K')
   })
+  it('fr-tracks: 1000 px, 200 px fixed, two 20 px gaps, 3 fr -> 1fr = 253.3 px', () => {
+    const o = MODELS['fr-tracks'].run(1000, { fixedPx: 200, gapPx: 20, gaps: 2, frTotal: 3 })
+    expect(val(o, 2)).toBe('253.3 px')
+    expect(o.verdict!.ok).toBe(true)
+    expect(MODELS['fr-tracks'].run(560, { fixedPx: 200, gapPx: 20, gaps: 2, frTotal: 3 }).verdict!.ok).toBe(false)
+  })
+  it('heap-growth: 40 MB + 3 MB x 50 route changes = 190 MB, over a 150 MB budget', () => {
+    const o = MODELS['heap-growth'].run(50, { baseMb: 40, leakMb: 3, budgetMb: 150 })
+    expect(val(o, 2)).toBe('190 MB')
+    expect(o.verdict!.ok).toBe(false)
+    expect(MODELS['heap-growth'].run(30, { baseMb: 40, leakMb: 3, budgetMb: 150 }).verdict!.ok).toBe(true)
+  })
   it('rollout: 1% of 60,000 rpm at 5% errors = 30 failures/min, alarm at 50 in 1.7 min', () => {
     const o = MODELS['rollout'].run(1, { rpm: 60000, badPct: 5, alarmFailures: 50 })
     expect(val(o, 1)).toBe('30')
