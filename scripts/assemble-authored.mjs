@@ -92,6 +92,23 @@ try {
   if (e.code !== 'ENOENT') throw e
 }
 
+// Option-length balance edits (scripts/option-balance.json: { "<questionId>": [["old label", "new label"], ...] }).
+// Hand-written rewrites so the correct option does not stand out by length; a stale entry fails the build.
+{
+  const edits = JSON.parse(readFileSync(join(root, 'scripts/option-balance.json'), 'utf8'))
+  const byId = new Map()
+  for (const t of topics) for (const q of [...(t.questions ?? []), ...(t.bossStages ?? []).flatMap((st) => st.questions ?? [])]) byId.set(q.id, [...(byId.get(q.id) ?? []), q])
+  for (const [qid, pairs] of Object.entries(edits)) {
+    const qs = byId.get(qid)
+    if (!qs) throw new Error(`option-balance.json: unknown question ${qid}`)
+    for (const [from, to] of pairs) {
+      let hit = false
+      for (const q of qs) for (const c of q.choices ?? []) if (c.label === from) { c.label = to; hit = true }
+      if (!hit) throw new Error(`option-balance.json: ${qid} has no option "${from}"`)
+    }
+  }
+}
+
 // Render powers as real superscripts everywhere (10^5 -> 10⁵); the source keeps the ASCII form
 const SUP = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' }
 const supify = (v) =>
