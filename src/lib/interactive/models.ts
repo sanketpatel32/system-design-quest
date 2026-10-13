@@ -25,6 +25,8 @@ export type ModelId =
   | 'n-plus-one'
   | 'bdp-window'
   | 'frame-budget'
+  | 'thread-pool'
+  | 'backoff'
 
 export interface ModelRow {
   label: string
@@ -388,6 +390,42 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
         verdict: p.workMs! <= frame
           ? { ok: true, text: 'Fits in the frame' }
           : { ok: false, text: 'Overruns the frame: expect dropped frames' },
+      }
+    },
+  },
+  // Fundamentals · Backend: Little's law for a thread-per-request server, threads busy = arrival rate × time each request holds one
+  'thread-pool': {
+    params: ['rps', 'threads'],
+    run: (x, p) => {
+      const busy = (p.rps! * x) / 1000
+      return {
+        rows: [
+          { label: 'Time a request holds its thread', value: `${fmt(x)} ms` },
+          { label: 'Threads busy on average', value: fmt(busy, 1), strong: true },
+          { label: 'Threads in the pool', value: fmt(p.threads!) },
+        ],
+        verdict: busy < p.threads!
+          ? { ok: true, text: 'The pool keeps up on average' }
+          : { ok: false, text: 'Every thread is busy: new requests queue and latency climbs' },
+      }
+    },
+  },
+  // Fundamentals · Backend: exponential backoff, delay before retry n = min(cap, base × 2^(n − 1))
+  'backoff': {
+    params: ['baseMs', 'capMs'],
+    run: (x, p) => {
+      const delay = (n: number) => Math.min(p.capMs!, p.baseMs! * Math.pow(2, n - 1))
+      let total = 0
+      for (let n = 1; n <= x; n++) total += delay(n)
+      return {
+        rows: [
+          { label: 'Retries so far', value: `${x}` },
+          { label: `Wait before retry ${x} (max, before jitter)`, value: `${fmt(delay(x))} ms`, strong: true },
+          { label: 'Total waiting across all retries', value: `${fmt(total)} ms` },
+        ],
+        verdict: total <= 10_000
+          ? { ok: true, text: 'Total wait fits a 10 s budget' }
+          : { ok: false, text: 'Total wait is over a 10 s budget: stop retrying sooner' },
       }
     },
   },
