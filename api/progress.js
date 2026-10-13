@@ -25,9 +25,17 @@ export async function GET(request) {
   if (a.error) return a.error
   try {
     const user = await a.clerk.users.getUser(a.userId)
+    // First sign-in with no name: store the email's local part as the display name (never overwrites a real name)
+    let displayName = user.publicMetadata?.displayName
+    if (!displayName && !user.firstName && !user.lastName) {
+      const email = user.primaryEmailAddress?.emailAddress ?? user.emailAddresses?.[0]?.emailAddress ?? ''
+      const local = email.split('@')[0] ?? ''
+      displayName = (local.split('+')[0] || local).trim().slice(0, 64)
+      if (displayName) await a.clerk.users.updateUserMetadata(a.userId, { publicMetadata: { displayName } }).catch(() => {})
+    }
     const enc = user.privateMetadata?.sdq
     const progress = typeof enc === 'string' ? JSON.parse(gunzipSync(Buffer.from(enc, 'base64')).toString('utf8')) : null
-    return json(200, { progress, updatedAt: user.privateMetadata?.sdqAt ?? null })
+    return json(200, { progress, updatedAt: user.privateMetadata?.sdqAt ?? null, displayName: displayName ?? null })
   } catch {
     return json(502, { error: 'could not load progress' })
   }
