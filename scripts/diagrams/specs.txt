@@ -419,3 +419,30 @@ Scrubbers [repair]> Storage nodes|racks / AZs
 Like > Unique insert|(user, post) {store} > Counter service > INCR counter:post:7#r|r = 0..31
 Read > Sum 32 sub-keys|cache 1 s > INCR counter:post:7#r|r = 0..31
 Counter service ~> Kafka > Durable store
+
+# ---------- Fundamentals: Frontend ----------
+@201 The browser rendering pipeline: HTML is parsed into the DOM and CSS into the CSSOM; together they form the render tree, which goes through layout, paint and composite to reach the screen.
+HTML > DOM > Render tree|visible boxes + styles > Layout|size + position > Paint|pixels per layer > Composite|GPU > Screen
+CSS > CSSOM > Render tree|visible boxes + styles
+
+@203 One turn of the browser event loop: take one task from the task queue, run every microtask, then if a frame is due run animation callbacks, style, layout and paint.
+Task queue|clicks, timers, network [1. one task]> Main thread
+Microtask queue|promise callbacks [2. run all]> Main thread
+Main thread [3. if a frame is due]> Render|animation callbacks, style, layout, paint
+
+@205 HTTP cache revalidation: a stale cached response is checked with If-None-Match; the server replies 304 Not Modified with headers only and the browser reuses its stored body.
+Browser [1. fresh: use copy, no request]> Browser cache|ETag "v7", max-age 60
+Browser [2. stale: If-None-Match "v7"]> Server
+Server [3. 304 Not Modified, no body]> Browser
+
+@207 A CORS preflight: the browser sends OPTIONS with the requested method and headers; the API answers with the allowed origin, methods and headers; only then does the browser send the real PUT.
+Script on app.example > Browser
+Browser [1. OPTIONS: method PUT, headers]> API on api.example
+API on api.example [2. Allow-Origin app.example, Allow-Methods PUT]> Browser
+Browser [3. real PUT]> API on api.example
+
+@214 A service worker sits between the page and the network: it answers hashed assets from its cache, fetches HTML network-first with a cache fallback, and lets other requests pass through the HTTP cache.
+Page > Service worker
+Service worker [hashed assets: cache first]> SW cache {store}
+Service worker [HTML: network first]> Network|HTTP cache
+Network|HTTP cache [offline: fall back]~> SW cache {store}

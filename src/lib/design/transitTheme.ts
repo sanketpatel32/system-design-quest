@@ -17,6 +17,10 @@ export const REGION_PALETTE: Record<string, { bright: string; deep: string; soft
   'r8-microservices': { bright: '#3CB043', deep: '#2A7F30', soft: '#E1F5E2', shadow: '#2E8E34' },
   'r9-security-storage': { bright: '#E0A21B', deep: '#946A12', soft: '#FDF1D4', shadow: '#B5830F' },
   'r10-strategy': { bright: '#FF6FAE', deep: '#B04A78', soft: '#FFE6F1', shadow: '#D9558F' },
+  'f1-frontend': { bright: '#1CB0F6', deep: '#0F6D99', soft: '#DDF4FE', shadow: '#1590C9' },
+  'f2-backend': { bright: '#58CC02', deep: '#3A7D0A', soft: '#E5F8D4', shadow: '#46A302' },
+  'f3-networking': { bright: '#9B5DE5', deep: '#7A45BF', soft: '#F0E6FC', shadow: '#7D49BD' },
+  'f4-databases': { bright: '#5B7CFA', deep: '#4560D0', soft: '#E6ECFF', shadow: '#4560D0' },
   'boss-arena': { bright: '#FFC800', deep: '#8A5A00', soft: '#FFF6CC', shadow: '#E0A800' },
 }
 

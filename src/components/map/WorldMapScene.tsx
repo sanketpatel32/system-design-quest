@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { orderedTopicsInRegion, regions, topicsById } from '../../content/catalog'
 import type { Topic } from '../../content/types'
 import { regionPalette } from '../../lib/design/transitTheme'
@@ -9,7 +9,9 @@ import { RegionMotif } from './RegionMotif'
 import { Mascot, MascotSays } from '../art/Mascot'
 import { IconBook, IconCastle, IconCheck, IconLock, IconStar } from '../icons/HudIcons'
 
-import { bosses as arenaTopics, BOSS_N, LESSON_N as STATION_N, learningRegions, playbook, PLAYBOOK_ID } from '../../content/numbering'
+import { bosses as arenaTopics, BOSS_N, FUND_N, fundamentalRegions, LESSON_N as STATION_N, learningRegions, playbook, PLAYBOOK_ID, topicLabel } from '../../content/numbering'
+
+type Track = 'system-design' | 'fundamentals'
 /** Minutes: ~1 per lesson card, ~1.5 per question */
 export function topicMinutes(id: number) {
   const t = topicsById.get(id)
@@ -55,6 +57,11 @@ export function WorldMapScene() {
   const { statusMap, completed, unlocked } = useStatuses()
   const quizAttempts = useGameStore((s) => s.quizAttempts)
   const lessonProgress = useGameStore((s) => s.lessonProgress)
+  const [params, setParams] = useSearchParams()
+  const track: Track = params.get('track') === 'fundamentals' ? 'fundamentals' : 'system-design'
+  const fund = track === 'fundamentals'
+  const setTrack = (t: Track) => setParams(t === 'fundamentals' ? { track: t } : {}, { replace: true })
+  const trackIds = fund ? [...FUND_N.keys()] : [...STATION_N.keys()]
   const [view, setView] = useState<'path' | 'list'>('path')
   const [q, setQ] = useState('')
   const [allBosses, setAllBosses] = useState(false)
@@ -66,7 +73,7 @@ export function WorldMapScene() {
     requestAnimationFrame(() => document.getElementById('arena')?.scrollIntoView({ block: 'start' }))
   }
 
-  const nextId = [...STATION_N.keys()].find((id) => {
+  const nextId = trackIds.find((id) => {
     const st = statusMap.get(id)
     return st === 'available' || st === 'in_progress'
   })
@@ -77,8 +84,9 @@ export function WorldMapScene() {
   /** Resume the lesson on the card the learner left (or the quiz, once they've answered something) */
   const lessonStarted = Boolean(lp && (lp.card > 0 || lp.viewed))
   const nextQuestion = nextTopic ? nextTopic.questions.findIndex((x) => !(x.id in (quizAttempts[`topic-${nextTopic.id}`]?.results ?? {}))) : -1
-  const total = STATION_N.size
-  const doneCount = [...STATION_N.keys()].filter((id) => completed.has(id)).length
+  const total = trackIds.length
+  const doneCount = trackIds.filter((id) => completed.has(id)).length
+  const unitWord = (t: Topic) => (fund ? `Fundamentals · ${topicLabel(t.id)}` : `Unit ${learningRegions.findIndex((r) => r.id === t.region) + 1}`)
   const bossesDone = arenaTopics.filter((t) => completed.has(t.id)).length
   const playbookDone = completed.has(PLAYBOOK_ID) ? 1 : 0
   const arenaOpen = isTopicUnlocked(PLAYBOOK_ID, unlocked) || completed.has(PLAYBOOK_ID)
@@ -87,6 +95,21 @@ export function WorldMapScene() {
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_20.625rem] 2xl:grid-cols-[minmax(0,1fr)_23rem]">
       <section aria-labelledby="map-title" className="min-w-0">
         <Onboarding />
+        <div className="mb-5 grid grid-cols-2 gap-1 rounded-2xl border-2 border-[var(--color-rail)] bg-white p-1 sm:inline-grid" role="tablist" aria-label="Track">
+          {([['system-design', 'System Design'], ['fundamentals', 'Fundamentals']] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={track === id}
+              data-testid={`track-${id}`}
+              onClick={() => { setTrack(id); setQ(''); setView('path') }}
+              className={`min-h-[44px] rounded-xl px-5 text-sm font-extrabold uppercase tracking-wide ${track === id ? 'bg-[var(--color-sky)] text-[#12749f]' : 'text-dim hover:bg-[#f4f1ec]'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         {nextTopic && (
           <div
             className="panel mb-6 flex flex-wrap items-center gap-4 p-4 sm:p-5"
@@ -96,7 +119,7 @@ export function WorldMapScene() {
             <Mascot mood="idle" size={64} className="shrink-0 hidden sm:block" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-extrabold uppercase tracking-wide" style={{ color: regionPalette(nextTopic.region).deep }}>
-                {resume || lessonStarted ? 'Continue' : 'Up next'} · Unit {learningRegions.findIndex((r) => r.id === nextTopic.region) + 1}
+                {resume || lessonStarted ? 'Continue' : 'Up next'} · {unitWord(nextTopic)}
               </p>
               <p className="font-display text-xl text-chalk truncate">{nextTopic.title}</p>
               <p className="text-sm text-dim" data-testid="continue-detail">
@@ -106,7 +129,9 @@ export function WorldMapScene() {
                     ? lp.viewed && lp.card >= nextTopic.cards.length - 1
                       ? 'Lesson read · the quiz is next'
                       : `Lesson in progress · card ${lp.card + 1} of ${nextTopic.cards.length}`
-                    : `About ${topicMinutes(nextTopic.id)} min · lesson ${STATION_N.get(nextTopic.id)} of ${total}`}
+                    : fund
+                      ? `About ${topicMinutes(nextTopic.id)} min · ${doneCount} of ${total} fundamentals cleared`
+                      : `About ${topicMinutes(nextTopic.id)} min · lesson ${STATION_N.get(nextTopic.id)} of ${total}`}
               </p>
             </div>
             <Link
@@ -120,9 +145,9 @@ export function WorldMapScene() {
         )}
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 id="map-title" className="font-display text-3xl md:text-4xl text-chalk">The network</h1>
+            <h1 id="map-title" className="font-display text-3xl md:text-4xl text-chalk">{fund ? 'Fundamentals' : 'The network'}</h1>
             <p className="text-dim mt-1">
-              {doneCount} of {total} lessons cleared in {learningRegions.length} units · practice track: {playbookDone + bossesDone} of {1 + arenaTopics.length} (Interview Playbook and {arenaTopics.length} bosses, open after Unit 1, alongside the units)
+              {fund ? `${doneCount} of ${total} topics cleared in ${fundamentalRegions.map((r) => r.name).join(', ')}. Language-agnostic foundations; each area's first topic is open, so start wherever you like.` : <>{doneCount} of {total} lessons cleared in {learningRegions.length} units · practice track: {playbookDone + bossesDone} of {1 + arenaTopics.length} (Interview Playbook and {arenaTopics.length} bosses, open after Unit 1, alongside the units)</>}
             </p>
           </div>
           <div className="flex items-center gap-1 rounded-2xl border-2 border-[var(--color-rail)] bg-white p-1" role="group" aria-label="Map view">
@@ -162,7 +187,13 @@ export function WorldMapScene() {
             placeholder="Find a topic, e.g. caching, Kafka"
           />
         </label>
-        {view === 'path' ? (
+        {view === 'path' && fund ? (
+          <div className="space-y-6 overflow-x-clip pb-4" data-testid="fundamentals-path">
+            {fundamentalRegions.map((r, i) => (
+              <Unit key={r.id} index={i} regionId={r.id} statusMap={statusMap} completed={completed} nextId={nextId} kicker={`Fundamentals · ${r.subtitle}`} />
+            ))}
+          </div>
+        ) : view === 'path' ? (
           <div className="space-y-6 overflow-x-clip pb-4">
             {learningRegions.map((r, i) => (
               <div key={r.id} className="space-y-6">
@@ -179,7 +210,7 @@ export function WorldMapScene() {
             <ArenaUnit statusMap={statusMap} completed={completed} open={arenaOpen} all={allBosses} onShowAll={() => setAllBosses(true)} />
           </div>
         ) : (
-          <Curriculum statusMap={statusMap} needle={q.trim().toLowerCase()} />
+          <Curriculum statusMap={statusMap} needle={q.trim().toLowerCase()} fund={fund} />
         )}
       </section>
 
@@ -189,14 +220,14 @@ export function WorldMapScene() {
             <Mascot mood={doneCount > 0 ? 'happy' : 'idle'} size={72} />
             <div>
               <p className="font-display text-xl">{doneCount ? 'Nice work!' : 'Ready when you are'}</p>
-              <p className="text-dim text-sm">{doneCount} of {total} lessons cleared</p>
+              <p className="text-dim text-sm">{doneCount} of {total} {fund ? 'fundamentals' : 'lessons'} cleared</p>
             </div>
           </div>
           <div className="progress-track mt-4" aria-hidden>
             <div className="progress-fill" style={{ width: `${Math.max(4, (doneCount / total) * 100)}%` }} />
           </div>
         </section>
-        <section className={`panel ${arenaOpen ? 'p-5' : 'p-4'}`} aria-labelledby="arena-title" data-testid="boss-sidebar">
+        {!fund && <section className={`panel ${arenaOpen ? 'p-5' : 'p-4'}`} aria-labelledby="arena-title" data-testid="boss-sidebar">
           <div className="flex items-center gap-3">
             <IconCastle size={arenaOpen ? 44 : 32} />
             <div className="min-w-0 flex-1">
@@ -233,7 +264,7 @@ export function WorldMapScene() {
           <button type="button" className="mt-2 text-sm font-extrabold uppercase tracking-wide text-[#12749f]" onClick={showBossList} data-testid="see-all-bosses">
             {arenaOpen ? `See all ${arenaTopics.length} bosses` : `Preview the ${arenaTopics.length} bosses`}
           </button>
-        </section>
+        </section>}
       </aside>
     </div>
   )
@@ -244,7 +275,7 @@ function BossPip({ status }: { status: Status }) {
   return <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-full border-[3px]" style={{ background: bg, borderColor: status === 'locked' ? '#E6E0D6' : '#E0A800' }} />
 }
 
-function UnitBanner({ regionId, index, done, total, title, collapsed, onToggle, note }: { regionId: string; index: number | null; done: number; total: number; title: string; collapsed?: boolean; onToggle?: () => void; note?: string }) {
+function UnitBanner({ regionId, index, done, total, title, collapsed, onToggle, note, kicker }: { regionId: string; index: number | null; done: number; total: number; title: string; collapsed?: boolean; onToggle?: () => void; note?: string; kicker?: string }) {
   const p = regionPalette(regionId)
   const gold = regionId === 'boss-arena'
   return (
@@ -253,7 +284,7 @@ function UnitBanner({ regionId, index, done, total, title, collapsed, onToggle, 
         <RegionMotif regionId={regionId} color={gold ? '#3d2a00' : '#fff'} size={26} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-extrabold uppercase tracking-wider text-white">{index === null ? 'Practice track · opens after Unit 1' : `Unit ${index + 1}`}</p>
+        <p className="text-xs font-extrabold uppercase tracking-wider text-white">{kicker ?? (index === null ? 'Practice track · opens after Unit 1' : `Unit ${index + 1}`)}</p>
         <h2 className="font-display text-xl leading-tight text-white">{title}</h2>
         {note && <p className="text-sm font-bold text-white">{note}</p>}
       </div>
@@ -272,8 +303,8 @@ function UnitBanner({ regionId, index, done, total, title, collapsed, onToggle, 
   )
 }
 
-function Unit({ regionId, index, statusMap, completed, nextId }: { regionId: string; index: number; statusMap: Map<number, Status>; completed: Set<number>; nextId?: number }) {
-  const region = learningRegions.find((r) => r.id === regionId)!
+function Unit({ regionId, index, statusMap, completed, nextId, kicker }: { regionId: string; index: number; statusMap: Map<number, Status>; completed: Set<number>; nextId?: number; kicker?: string }) {
+  const region = regions.find((r) => r.id === regionId)!
   const topics = orderedTopicsInRegion(regionId as Topic['region'])
   const done = topics.filter((t) => completed.has(t.id)).length
   const hasCurrent = topics.some((t) => t.id === nextId)
@@ -284,8 +315,8 @@ function Unit({ regionId, index, statusMap, completed, nextId }: { regionId: str
   useEffect(() => setCollapsed(foldByDefault), [foldByDefault])
   const note = collapsed ? (done === topics.length ? `All ${topics.length} lessons cleared` : allLocked ? `${topics.length} lessons · locked` : `${topics.length} lessons`) : undefined
   return (
-    <section aria-label={`Unit ${index + 1}: ${region.name}`} id={`unit-${regionId}`} className="scroll-mt-24" data-testid={`unit-${index + 1}`} data-collapsed={collapsed}>
-      <UnitBanner regionId={regionId} index={index} done={done} total={topics.length} title={region.name} collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} note={note} />
+    <section aria-label={kicker ? `${region.name} fundamentals` : `Unit ${index + 1}: ${region.name}`} id={`unit-${regionId}`} className="scroll-mt-24" data-testid={kicker ? `area-${regionId}` : `unit-${index + 1}`} data-collapsed={collapsed}>
+      <UnitBanner regionId={regionId} index={index} done={done} total={topics.length} title={region.name} collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} note={note} kicker={kicker} />
       {!collapsed && (
         <ol className="relative mx-auto mt-6 flex max-w-[26.25rem] flex-col items-center gap-6">
           {topics.map((t, j) => (
@@ -344,7 +375,7 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
   const fill = locked ? '#E5E0D8' : boss ? '#FFC800' : p.bright
   const shadow = locked ? '#CFC7BA' : boss ? '#E0A800' : p.shadow
   const n = STATION_N.get(topic.id)
-  const nodeLabel = boss ? `Boss ${BOSS_N.get(topic.id)}` : n ? `Lesson ${n}` : 'Interview Playbook'
+  const nodeLabel = boss ? `Boss ${BOSS_N.get(topic.id)}` : n ? `Lesson ${n}` : topicLabel(topic.id)
 
   useEffect(() => {
     if (!open) return
@@ -475,11 +506,11 @@ function Onboarding() {
   )
 }
 
-function Curriculum({ statusMap, needle }: { statusMap: Map<number, Status>; needle: string }) {
-  const groups = [...learningRegions, ...regions.filter((r) => r.id === 'boss-arena')]
+function Curriculum({ statusMap, needle, fund }: { statusMap: Map<number, Status>; needle: string; fund?: boolean }) {
+  const groups = fund ? fundamentalRegions : [...learningRegions, ...regions.filter((r) => r.id === 'boss-arena')]
   return (
     <section aria-labelledby="curriculum-title">
-      <h2 id="curriculum-title" className="font-display text-2xl text-chalk mb-3">All lessons and bosses</h2>
+      <h2 id="curriculum-title" className="font-display text-2xl text-chalk mb-3">{fund ? 'All fundamentals' : 'All lessons and bosses'}</h2>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {groups.map((r, i) => {
           const all = orderedTopicsInRegion(r.id)
@@ -491,7 +522,7 @@ function Curriculum({ statusMap, needle }: { statusMap: Map<number, Status>; nee
             <div key={r.id} className="panel min-w-0 overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-3 text-white" style={{ background: p.deep }}>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-extrabold uppercase tracking-wider text-white">{r.id === 'boss-arena' ? 'Practice track' : `Unit ${i + 1}`}</p>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-white">{r.id === 'boss-arena' ? 'Practice track' : fund ? 'Fundamentals' : `Unit ${i + 1}`}</p>
                   <h3 className="font-display text-lg leading-tight">{r.id === 'boss-arena' ? 'Boss fights' : r.name}</h3>
                 </div>
                 <span className="text-sm font-extrabold tabular-nums">{done}/{all.length}</span>
@@ -502,7 +533,7 @@ function Curriculum({ statusMap, needle }: { statusMap: Map<number, Status>; nee
                   const body = (
                     <>
                       <span aria-hidden className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold" style={{ background: st === 'locked' ? '#EEE9E1' : p.soft, color: st === 'locked' ? '#5B6472' : p.deep }}>
-                        {STATION_N.get(t.id) ?? (BOSS_N.has(t.id) ? `B${BOSS_N.get(t.id)}` : '★')}
+                        {STATION_N.get(t.id) ?? FUND_N.get(t.id) ?? (BOSS_N.has(t.id) ? `B${BOSS_N.get(t.id)}` : '★')}
                       </span>
                       <span className={`flex-1 truncate ${st === 'locked' ? 'text-dim' : 'text-chalk'}`}>{t.title}</span>
                       <span className={`status-chip status-${st}`}>{STATUS_WORD[st]}</span>

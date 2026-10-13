@@ -43,7 +43,7 @@ export function TopicPage() {
   }
 
   const pal = regionPalette(topic.region)
-  const regionName = topic.region === 'boss-arena' ? 'Boss fights' : regions.find((r) => r.id === topic.region)?.name ?? ''
+  const regionName = topic.region === 'boss-arena' ? 'Boss fights' : regions.find((r) => r.id === topic.region)?.track === 'fundamentals' ? 'Fundamentals' : regions.find((r) => r.id === topic.region)?.name ?? ''
   const finalAction =
     topic.kind === 'boss' ? (
       <Link to={`/boss/${topic.slug}`} className="btn-cta flex-1 sm:flex-none">Enter the boss fight</Link>
@@ -111,6 +111,22 @@ export function TopicPage() {
             </ul>
           </div>
         )}
+        {topic.seeAlso?.length ? (
+          <div data-testid="see-also">
+            <h2 className="font-display text-lg text-chalk mb-2">In the System Design track</h2>
+            <ul className="space-y-2 text-sm">
+              {topic.seeAlso.map((s) => {
+                const t = topicsById.get(s.topicId)
+                return t ? (
+                  <li key={s.topicId}>
+                    <Link className="font-bold text-[#12749f] hover:underline" to={`/topic/${t.slug}`}>{t.title}</Link>
+                    <span className="block text-dim">{s.why}</span>
+                  </li>
+                ) : null
+              })}
+            </ul>
+          </div>
+        ) : null}
         <div>
           <h2 className="font-display text-lg text-chalk mb-2">Further reading</h2>
           <ul className="space-y-2 text-sm font-bold">

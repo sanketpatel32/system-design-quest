@@ -1,5 +1,5 @@
 // Lesson depth rules (see DESIGN.md "Lesson depth"). Regions listed in DEEP_REGIONS must meet them.
-export const DEEP_REGIONS = ['r1-foundations', 'r2-networking', 'r3-load-balancing', 'r4-caching', 'r5-databases', 'r6-messaging', 'r7-coordination', 'r8-microservices', 'r9-security-storage', 'r10-strategy']
+export const DEEP_REGIONS = ['r1-foundations', 'r2-networking', 'r3-load-balancing', 'r4-caching', 'r5-databases', 'r6-messaging', 'r7-coordination', 'r8-microservices', 'r9-security-storage', 'r10-strategy', 'f1-frontend', 'f2-backend', 'f3-networking', 'f4-databases']
 export const MIN_DEEP_WORDS = 550
 export const MIN_LESSON_WORDS = 650
 
