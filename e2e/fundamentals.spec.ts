@@ -60,7 +60,7 @@ test('every Fundamentals area: first topic has cards, Go deeper, and a Try it, a
     const t = list[0]!
     await page.goto(`/topic/${t.slug}`)
     await expect(page.getByText(/^Fundamentals · /).first()).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Go deeper' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Go deeper', exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Go to card 1', exact: true }).waitFor()
     const n = await page.getByRole('button', { name: /^Go to card/ }).count()
     await page.getByRole('button', { name: `Go to card ${n}`, exact: true }).click()
