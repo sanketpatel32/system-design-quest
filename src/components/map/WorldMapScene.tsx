@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { orderedTopicsInRegion, regions, topicsById } from '../../content/catalog'
 import type { Topic } from '../../content/types'
@@ -360,6 +361,9 @@ function ArenaUnit({ statusMap, completed, open, all, onShowAll }: { statusMap: 
 function PathNode({ topic, offset, status, current, completed, first, boss }: { topic: Topic; offset: number; status: Status; current: boolean; completed: Set<number>; first?: boolean; boss?: boolean }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLLIElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const popRef = useRef<HTMLDivElement>(null)
+  const pos = usePopoverPosition(open, btnRef, popRef)
   const p = regionPalette(topic.region)
   const locked = status === 'locked'
   const fill = locked ? '#E5E0D8' : boss ? '#FFC800' : p.bright
@@ -370,7 +374,7 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
   useEffect(() => {
     if (!open) return
     const close = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !ref.current?.contains(e.target as Node)) setOpen(false)
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !ref.current?.contains(e.target as Node) && !popRef.current?.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', close)
     document.addEventListener('keydown', close)
@@ -403,6 +407,7 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
         </span>
       )}
       <button
+        ref={btnRef}
         type="button"
         data-testid={boss ? `boss-node-${topic.id}` : `station-${topic.id}`}
         data-status={status}
@@ -417,14 +422,17 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
       <span className={`pointer-events-none absolute top-1/2 w-[7rem] sm:w-[8.25rem] -translate-y-1/2 text-[0.8125rem] font-extrabold leading-tight ${labelSide} ${locked ? 'text-dim' : 'text-chalk'}`}>
         {topic.title}
       </span>
-      {open && (
+      {open && createPortal(
         <div
-          className="anim-pop absolute top-[calc(100%+16px)] z-30 w-[min(290px,86vw)] -translate-x-1/2 rounded-2xl p-4 text-white"
-          style={{ left: `calc(50% - ${offset}px)`, background: locked ? '#5B6472' : boss ? '#8A5A00' : p.deep, boxShadow: `0 5px 0 ${locked ? '#3f4652' : boss ? '#5c3c00' : p.shadow}` }}
+          ref={popRef}
+          data-testid="node-popover"
+          data-placement={pos.placement}
+          className="fixed z-50 w-[min(290px,86vw)] rounded-2xl p-4 text-white"
+          style={{ left: pos.left, top: pos.top, visibility: pos.ready ? 'visible' : 'hidden', opacity: 1, background: locked ? '#5B6472' : boss ? '#8A5A00' : p.deep, boxShadow: `0 5px 0 ${locked ? '#3f4652' : boss ? '#5c3c00' : p.shadow}, 0 12px 28px rgba(0,0,0,0.18)` }}
           role="dialog"
           aria-label={topic.title}
         >
-          <span aria-hidden className="absolute -top-2 h-4 w-4 -translate-x-1/2 rotate-45" style={{ left: `calc(50% + ${offset}px)`, background: locked ? '#5B6472' : boss ? '#8A5A00' : p.deep }} />
+          <span aria-hidden className={`absolute h-4 w-4 -translate-x-1/2 rotate-45 ${pos.placement === 'below' ? '-top-2' : '-bottom-2'}`} style={{ left: pos.arrow, background: locked ? '#5B6472' : boss ? '#8A5A00' : p.deep }} />
           <p className="font-display text-lg leading-snug">{topic.title}</p>
           <p className="text-sm font-bold text-white">
             {nodeLabel} · {STATUS_WORD[status]} · about {topicMinutes(topic.id)} min
@@ -448,7 +456,8 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
               )}
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </li>
   )
@@ -548,4 +557,31 @@ function Curriculum({ statusMap, needle, fund, areas }: { statusMap: Map<number,
       </div>
     </section>
   )
+}
+
+/** Fixed-position popover anchored to a map node: kept inside the viewport, flipped above the node when there is no room below. */
+function usePopoverPosition(open: boolean, anchor: React.RefObject<HTMLElement | null>, pop: React.RefObject<HTMLElement | null>) {
+  const [pos, setPos] = useState({ left: 0, top: 0, arrow: 0, placement: 'below' as 'below' | 'above', ready: false })
+  useLayoutEffect(() => {
+    if (!open) { setPos((p) => ({ ...p, ready: false })); return }
+    const GAP = 16, MARGIN = 8
+    const place = () => {
+      const a = anchor.current, el = pop.current
+      if (!a || !el) return
+      const r = a.getBoundingClientRect()
+      const vw = document.documentElement.clientWidth, vh = window.innerHeight
+      const w = el.offsetWidth, h = el.offsetHeight
+      const cx = r.left + r.width / 2
+      const left = Math.min(Math.max(cx - w / 2, MARGIN), Math.max(MARGIN, vw - w - MARGIN))
+      const below = r.bottom + GAP + h + MARGIN <= vh || r.top - GAP - h < MARGIN
+      const top = below ? r.bottom + GAP : r.top - GAP - h
+      const arrow = Math.min(Math.max(cx - left, 18), w - 18)
+      setPos({ left, top, arrow, placement: below ? 'below' : 'above', ready: true })
+    }
+    place()
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place) }
+  }, [open, anchor, pop])
+  return pos
 }
