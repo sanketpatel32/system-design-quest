@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { checkQuiz } from './audit/quiz-quality.mjs'
 import { checkR3 } from './audit/r3.mjs'
+import { checkFundamentals } from './audit/fund.mjs'
 import { checkDepth, checkBossDepth, DEEP_REGIONS } from './audit/depth.mjs'
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -17,7 +18,9 @@ const strict = process.env.AUDIT_STRICT === '1'
 const ids = topics.map((t) => t.id)
 const idSet = new Set(ids)
 
-if (ids.length !== 120) errors.push(`Expected 120 topics, got ${ids.length}`)
+// System Design keeps IDs 1–120; the Fundamentals track adds topics with IDs 200+
+const coreCount = ids.filter((i) => i <= 120).length
+if (coreCount !== 120) errors.push(`Expected 120 System Design topics, got ${coreCount}`)
 for (let i = 1; i <= 120; i++) {
   if (!idSet.has(i)) errors.push(`Missing topic id ${i}`)
 }
@@ -220,10 +223,15 @@ for (const t of topics) for (const s of t.sources ?? []) if (/designing-distribu
   errors.push(...r3.errors)
   r3.info.forEach((m) => console.log(m))
 }
+{
+  const f = checkFundamentals(topics)
+  errors.push(...f.errors)
+  f.info.forEach((m) => console.log(m))
+}
 // All checks above push into `errors`; fail only after every check has run
 if (errors.length) {
   console.error('AUDIT FAILED')
   errors.forEach((e) => console.error(' -', e))
   process.exit(1)
 }
-console.log('AUDIT OK: 120 topics, 40 bosses, counts and keys valid')
+console.log(`AUDIT OK: ${topics.length} topics (120 System Design + ${topics.length - coreCount} Fundamentals), 40 bosses, counts and keys valid`)

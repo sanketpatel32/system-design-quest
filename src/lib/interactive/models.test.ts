@@ -55,3 +55,27 @@ describe('interactive models', () => {
     expect(v('rtt-handshake', 60, { roundTrips: 3, budgetMs: 200 }).rows[1]!.value).toBe('180 ms')
   })
 })
+
+describe('fundamentals models', () => {
+  const val = (o: { rows: { label: string; value: string }[] }, i: number) => o.rows[i]!.value
+  it('frame-budget: 60 Hz gives 16.7 ms, 90 Hz overruns 12 ms of work', () => {
+    expect(val(MODELS['frame-budget'].run(60, { workMs: 12 }), 1)).toBe('16.7 ms')
+    expect(MODELS['frame-budget'].run(90, { workMs: 12 }).verdict!.ok).toBe(false)
+  })
+  it('cidr-hosts: /24 has 254 usable, /31 has 2', () => {
+    expect(val(MODELS['cidr-hosts'].run(24, { need: 1 }), 2)).toBe('254')
+    expect(val(MODELS['cidr-hosts'].run(31, { need: 1 }), 2)).toBe('2')
+  })
+  it('transfer-time: 3 × 100 ms + 1 MB at 8 Mbit/s = 1,300 ms', () => {
+    expect(val(MODELS['transfer-time'].run(1, { rttMs: 100, roundTrips: 3, mbps: 8 }), 2)).toBe('1,300 ms')
+  })
+  it("pool-size: Little's law 500 qps × 20 ms = 10 busy", () => {
+    expect(val(MODELS['pool-size'].run(20, { qps: 500, pool: 20 }), 1)).toBe('10')
+  })
+  it('n-plus-one: 50 rows at 2 ms = 102 ms', () => {
+    expect(val(MODELS['n-plus-one'].run(50, { rttMs: 2 }), 1)).toBe('102 ms')
+  })
+  it('bdp-window: 64 KiB over 100 ms is about 5.2 Mbit/s', () => {
+    expect(val(MODELS['bdp-window'].run(64, { rttMs: 100, linkMbps: 100 }), 1)).toBe('5.2 Mbit/s')
+  })
+})

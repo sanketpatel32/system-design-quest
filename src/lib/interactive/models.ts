@@ -19,6 +19,12 @@ export type ModelId =
   | 'gossip-rounds'
   | 'queue-backlog'
   | 'btree-levels'
+  | 'transfer-time'
+  | 'cidr-hosts'
+  | 'pool-size'
+  | 'n-plus-one'
+  | 'bdp-window'
+  | 'frame-budget'
 
 export interface ModelRow {
   label: string
@@ -275,6 +281,113 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
           { label: `Levels with fan-out ${p.fanout}`, value: `${levels}`, strong: true },
           { label: 'Full scan instead', value: `${fmt(rows)} rows` },
         ],
+      }
+    },
+  },
+  // Fundamentals · Networking: time = round trips × RTT + size ÷ bandwidth
+  'transfer-time': {
+    params: ['rttMs', 'roundTrips', 'mbps'],
+    run: (x, p) => {
+      const latency = p.roundTrips! * p.rttMs!
+      const transfer = (x * 8 * 1000) / p.mbps! // x in MB → ms
+      return {
+        rows: [
+          { label: `Waiting on ${p.roundTrips} round trips`, value: `${fmt(latency)} ms` },
+          { label: `Sending ${fmt(x, 2)} MB at ${p.mbps} Mbit/s`, value: `${fmt(transfer)} ms` },
+          { label: 'Total', value: `${fmt(latency + transfer)} ms`, strong: true },
+        ],
+        verdict: latency >= transfer
+          ? { ok: true, text: 'Latency-bound: fewer round trips help more than a faster link' }
+          : { ok: false, text: 'Bandwidth-bound: a faster link or a smaller payload helps more' },
+      }
+    },
+  },
+  // Fundamentals · Networking: a /x IPv4 prefix leaves 32 − x host bits
+  'cidr-hosts': {
+    params: ['need'],
+    run: (x, p) => {
+      const total = Math.pow(2, 32 - x)
+      // /31 (RFC 3021) and /32 are special; for ordinary subnets the network and broadcast addresses are not usable
+      const usable = x >= 31 ? total : total - 2
+      return {
+        rows: [
+          { label: 'Prefix', value: `/${x}` },
+          { label: 'Addresses in the block', value: fmt(total) },
+          { label: 'Usable host addresses', value: fmt(usable), strong: true },
+        ],
+        verdict: usable >= p.need!
+          ? { ok: true, text: `Room for the ${fmt(p.need!)} hosts you need` }
+          : { ok: false, text: `Too small for ${fmt(p.need!)} hosts` },
+      }
+    },
+  },
+  // Fundamentals · Databases: Little's law, connections busy = arrival rate × time each holds one
+  'pool-size': {
+    params: ['qps', 'pool'],
+    run: (x, p) => {
+      const busy = (p.qps! * x) / 1000
+      return {
+        rows: [
+          { label: 'Query time', value: `${fmt(x)} ms` },
+          { label: 'Connections busy on average', value: fmt(busy, 1), strong: true },
+          { label: 'Pool size', value: fmt(p.pool!) },
+        ],
+        verdict: busy < p.pool!
+          ? { ok: true, text: 'The pool keeps up on average (bursts still queue briefly)' }
+          : { ok: false, text: 'Requests queue for a connection; latency climbs' },
+      }
+    },
+  },
+  // Fundamentals · Databases: one query per parent row vs one batched query
+  'n-plus-one': {
+    params: ['rttMs'],
+    run: (x, p) => {
+      const naive = (x + 1) * p.rttMs!
+      const batched = 2 * p.rttMs!
+      return {
+        rows: [
+          { label: 'Rows on the page', value: fmt(x) },
+          { label: `N + 1 queries (${fmt(x + 1)} round trips)`, value: `${fmt(naive, 1)} ms`, strong: true },
+          { label: 'Two queries (list, then all children at once)', value: `${fmt(batched, 1)} ms` },
+        ],
+        verdict: naive <= 100
+          ? { ok: true, text: 'Under a 100 ms budget, but it grows with every row' }
+          : { ok: false, text: 'Over a 100 ms budget from round trips alone' },
+      }
+    },
+  },
+  // Fundamentals · Networking: one connection's throughput ≤ window ÷ RTT
+  'bdp-window': {
+    params: ['rttMs', 'linkMbps'],
+    run: (x, p) => {
+      const mbps = (x * 1024 * 8) / (p.rttMs! / 1000) / 1e6 // x in KiB
+      const bdpKiB = (p.linkMbps! * 1e6 * (p.rttMs! / 1000)) / 8 / 1024
+      return {
+        rows: [
+          { label: 'Window', value: `${fmt(x)} KiB` },
+          { label: `Max throughput at ${p.rttMs} ms RTT`, value: `${fmt(Math.min(mbps, p.linkMbps!), 1)} Mbit/s`, strong: true },
+          { label: 'Window needed to fill the link (bandwidth × delay)', value: `${fmt(bdpKiB)} KiB` },
+        ],
+        verdict: mbps >= p.linkMbps!
+          ? { ok: true, text: `Fills the ${p.linkMbps} Mbit/s link` }
+          : { ok: false, text: 'The window, not the link, limits this connection' },
+      }
+    },
+  },
+  // Fundamentals · Frontend: one frame lasts 1000 ÷ refresh rate milliseconds
+  'frame-budget': {
+    params: ['workMs'],
+    run: (x, p) => {
+      const frame = 1000 / x
+      return {
+        rows: [
+          { label: 'Refresh rate', value: `${fmt(x)} Hz` },
+          { label: 'Time per frame', value: `${fmt(frame, 1)} ms`, strong: true },
+          { label: 'Your work per frame', value: `${fmt(p.workMs!, 1)} ms` },
+        ],
+        verdict: p.workMs! <= frame
+          ? { ok: true, text: 'Fits in the frame' }
+          : { ok: false, text: 'Overruns the frame: expect dropped frames' },
       }
     },
   },

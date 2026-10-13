@@ -10,6 +10,10 @@ export type RegionId =
   | 'r9-security-storage'
   | 'boss-arena'
   | 'r10-strategy'
+  | 'f1-frontend'
+  | 'f2-backend'
+  | 'f3-networking'
+  | 'f4-databases'
 
 export type TopicKind = 'lesson' | 'boss' | 'tutorial'
 
@@ -242,6 +246,8 @@ export interface BossDeep {
 
 export interface Topic {
   interactive?: Interactive
+  /** Fundamentals: existing system-design lessons that cover the same ground at the architecture level */
+  seeAlso?: { topicId: number; why: string }[]
   id: number
   slug: string
   region: RegionId
@@ -268,4 +274,6 @@ export interface RegionMeta {
   subtitle: string
   theme: string
   topicIds: number[]
+  /** 'fundamentals' regions live on the Fundamentals track, outside the numbered system-design units */
+  track?: 'fundamentals'
 }

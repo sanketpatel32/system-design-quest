@@ -1,6 +1,6 @@
 import type { Topic } from '../../content/types'
 import { regions, topicsById, orderedTopicsInRegion } from '../../content/catalog'
-import { BOSS_N, bosses, LESSON_N, learningRegions, PLAYBOOK_ID, unitOf } from '../../content/numbering'
+import { BOSS_N, bosses, FUND_FIRST, FUND_N, LESSON_N, learningRegions, PLAYBOOK_ID, topicLabel, unitOf } from '../../content/numbering'
 
 export type TopicStatus = 'locked' | 'available' | 'in_progress' | 'completed'
 
@@ -21,7 +21,8 @@ export function devUnlockAll(): boolean {
 }
 
 export function isTopicUnlocked(topicId: number, unlockedIds: number[]): boolean {
-  return devUnlockAll() || unlockedIds.includes(topicId)
+  // Fundamentals: each area's first topic is open from the start (no stored unlock needed, so old saves just work)
+  return devUnlockAll() || unlockedIds.includes(topicId) || FUND_FIRST.has(topicId)
 }
 
 export function getUnlockHint(topicId: number, _completedIds: Set<number>): string {
@@ -37,6 +38,11 @@ export function getUnlockHint(topicId: number, _completedIds: Set<number>): stri
     if (n === 1) return 'Finish the Interview Playbook to fight Boss 1.'
     const prevBoss = bosses[n - 2]!
     return `Defeat Boss ${n - 1} (${prevBoss.title}) to unlock Boss ${n}.`
+  }
+  if (FUND_N.has(topicId)) {
+    const line = orderedTopicsInRegion(topic.region)
+    const prev = line[line.findIndex((t) => t.id === topicId) - 1]
+    return prev ? `Clear ${topicLabel(prev.id)} (${prev.title}) to unlock ${topicLabel(topicId)}.` : 'Open from the start.'
   }
   const region = regions.find((r) => r.id === topic.region)
   if (!region) return 'Complete the previous lesson to unlock this one.'

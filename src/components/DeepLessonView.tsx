@@ -4,10 +4,12 @@ import { SectionNav } from './SectionNav'
 
 /** "Go deeper" material under the card deck: collapsible cards, callouts and a comparison table. */
 export function DeepLessonView({ deep, accent, topicId, numbersInCards = false }: { deep: DeepLesson; accent: string; topicId: number; numbersInCards?: boolean }) {
+  // Fundamentals topics use this slot for a real-world example rather than an India-market one
+  const exampleWord = topicId >= 200 ? 'Real-world example' : 'India example'
   return (
     <section aria-labelledby="deep-title" className="space-y-3" style={{ ['--accent' as string]: accent }}>
       <h2 id="deep-title" className="font-display text-2xl text-chalk">Go deeper</h2>
-      <SectionNav sections={[{ id: 'deep-how-it-works', label: 'How it works' }, { id: 'deep-when-to-use', label: 'When to use' }, { id: 'deep-trade-offs', label: 'Trade-offs' }, { id: 'deep-do-the-maths', label: 'Do the maths' }, { id: 'deep-india-example', label: 'India example' }, { id: 'deep-interview-pitfalls', label: 'Interview pitfalls' }]} />
+      <SectionNav sections={[{ id: 'deep-how-it-works', label: 'How it works' }, { id: 'deep-when-to-use', label: 'When to use' }, { id: 'deep-trade-offs', label: 'Trade-offs' }, { id: 'deep-do-the-maths', label: 'Do the maths' }, { id: 'deep-india-example', label: exampleWord }, { id: 'deep-interview-pitfalls', label: 'Interview pitfalls' }]} />
 
       <details id="deep-how-it-works" className="deep-card" open>
         <summary>How it works</summary>
@@ -71,7 +73,7 @@ export function DeepLessonView({ deep, accent, topicId, numbersInCards = false }
       </details>
 
       <details id="deep-india-example" className="deep-card">
-        <summary>India example: {deep.india.title}</summary>
+        <summary>{exampleWord}: {deep.india.title}</summary>
         <div className="deep-body">
           <div className="deep-callout deep-callout-india">
             <span className="deep-badge">{deep.india.label}</span>

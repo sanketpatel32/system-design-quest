@@ -85,7 +85,16 @@ export const regions: RegionMeta[] = [
     theme: 'lime',
     topicIds: [115, 116, 117, 118, 119, 120],
   },
+  // Fundamentals track: language-agnostic foundations, IDs 200+ so system-design progress (1–120) never moves
+  { id: 'f1-frontend', name: 'Frontend', subtitle: 'How the browser works', theme: 'sky', topicIds: range(201, 220), track: 'fundamentals' },
+  { id: 'f2-backend', name: 'Backend', subtitle: 'How servers handle work', theme: 'green', topicIds: range(221, 240), track: 'fundamentals' },
+  { id: 'f3-networking', name: 'Networking', subtitle: 'How packets get there', theme: 'violet', topicIds: range(241, 260), track: 'fundamentals' },
+  { id: 'f4-databases', name: 'Databases', subtitle: 'How data is stored and queried', theme: 'emerald', topicIds: range(261, 280), track: 'fundamentals' },
 ]
+
+function range(from: number, to: number) {
+  return Array.from({ length: to - from + 1 }, (_, i) => from + i)
+}
 
 export function orderedTopicsInRegion(regionId: RegionMeta['id']): Topic[] {
   const region = regions.find((r) => r.id === regionId)
