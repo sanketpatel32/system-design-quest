@@ -1,0 +1,2457 @@
+[
+ {
+  "id": 235,
+  "slug": "http-caching-and-conditional-requests",
+  "region": "f2-backend",
+  "order": 15,
+  "title": "HTTP Caching and Conditional Requests",
+  "kind": "lesson",
+  "objectives": [
+   "Choose Cache-Control directives for public, private and changing responses",
+   "Use ETags and conditional requests to revalidate cheaply",
+   "Avoid caching personal data in shared caches"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 12,
+  "prereqIds": [
+   223
+  ],
+  "cards": [
+   {
+    "id": "t235-c1",
+    "kind": "text",
+    "title": "From the browser cache to shared caches",
+    "body": "Browser Caching (205) covers freshness, no-cache versus no-store and 304 revalidation from the browser’s side. This lesson is about the server and shared caches such as CDNs and reverse proxies: which directives they obey, how they key responses, and how writes stay safe.",
+    "teaches": [
+     "freshness"
+    ]
+   },
+   {
+    "id": "t235-c2",
+    "kind": "text",
+    "title": "max-age vs s-maxage, private vs public",
+    "body": "max-age sets freshness for every cache; s-maxage overrides it for shared caches only, so a CDN can keep a copy for 10 minutes while browsers revalidate after 1. private forbids shared caches from storing a response at all; public lets them store it even when they otherwise would not, for example on an authenticated request.",
+    "teaches": [
+     "freshness"
+    ]
+   },
+   {
+    "id": "t235-c3",
+    "kind": "diagram",
+    "title": "Worked example: an API behind a CDN",
+    "body": "One service, three kinds of response, each with headers chosen for shared caches.",
+    "teaches": [
+     "freshness"
+    ],
+    "steps": [
+     "Product list, same for everyone: Cache-Control: public, max-age=60, s-maxage=600",
+     "Responses compressed per client: add Vary: Accept-Encoding so each encoding is cached separately",
+     "Per-user cart: Cache-Control: private, so the CDN never stores it",
+     "When a product changes, purge it from the CDN by URL, or by a tag that many CDNs let you attach to responses",
+     "Writes to a product use If-Match with its ETag, so concurrent edits fail with 412 instead of overwriting"
+    ]
+   },
+   {
+    "id": "t235-c4",
+    "kind": "text",
+    "title": "The Authorization rule",
+    "body": "RFC 9111 says a shared cache must not reuse a response to a request that carried an Authorization header unless the response explicitly allows it with public, s-maxage or must-revalidate. Adding any of those to an authenticated response is a decision to share it across users, so it is only safe when the content really is the same for everyone.",
+    "teaches": [
+     "freshness"
+    ]
+   },
+   {
+    "id": "t235-c5",
+    "kind": "text",
+    "title": "Trap: a shared cache storing personal pages",
+    "body": "A CDN or proxy is shared by many users. If an account page goes out with Cache-Control: public or a long s-maxage, one user’s data can be served to the next. Mark per-user responses private (or no-store for sensitive data), and use Vary when the response depends on a request header.",
+    "teaches": [
+     "cache-control"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t235-a1",
+    "concept": "cache-control",
+    "type": "multiple_choice",
+    "prompt": "A response has Cache-Control: max-age=60, s-maxage=600. How long may a CDN serve it without revalidating?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "60 seconds"
+     },
+     {
+      "id": "b",
+      "label": "600 seconds"
+     },
+     {
+      "id": "c",
+      "label": "660 seconds"
+     },
+     {
+      "id": "d",
+      "label": "Until it is purged by hand"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "s-maxage overrides max-age for shared caches; browsers still use 60 seconds."
+   },
+   {
+    "id": "t235-a2",
+    "concept": "cache-control",
+    "type": "multiple_choice",
+    "prompt": "A GET request carries an Authorization header and the response has only Cache-Control: max-age=300. May a CDN store and reuse it?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Yes: max-age alone allows any cache to store it"
+     },
+     {
+      "id": "b",
+      "label": "No: it needs public, s-maxage or must-revalidate"
+     },
+     {
+      "id": "c",
+      "label": "Yes, but only for requests from the same address"
+     },
+     {
+      "id": "d",
+      "label": "Only if the response also carries an ETag"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "RFC 9111 §3.5 forbids shared caches from reusing authenticated responses unless the response explicitly allows it."
+   },
+   {
+    "id": "t235-a3",
+    "concept": "etag",
+    "type": "multiple_choice",
+    "prompt": "Two editors load a document with ETag \"v7\". The first saves with If-Match: \"v7\". What should happen when the second saves with the same header?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The save succeeds and replaces the first editor’s text"
+     },
+     {
+      "id": "b",
+      "label": "The server merges both edits line by line"
+     },
+     {
+      "id": "c",
+      "label": "The server rejects it with 412 Precondition Failed"
+     },
+     {
+      "id": "d",
+      "label": "The server returns 304 Not Modified"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "After the first save the ETag changed, so the precondition fails and the lost update is prevented."
+   },
+   {
+    "id": "t235-a4",
+    "concept": "cache-control",
+    "type": "multiple_choice",
+    "prompt": "An API response depends on the Accept-Language header and sits behind a CDN. What must the response include so each language is cached separately?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Vary: Accept-Language"
+     },
+     {
+      "id": "b",
+      "label": "Cache-Control: public, max-age=3600"
+     },
+     {
+      "id": "c",
+      "label": "An ETag built from the request URL"
+     },
+     {
+      "id": "d",
+      "label": "Content-Language: en"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Vary tells caches which request headers form part of the cache key."
+   },
+   {
+    "id": "t235-a5",
+    "concept": "freshness",
+    "type": "drag_order",
+    "prompt": "Order a safe update that uses an ETag precondition.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "PUT it with If-Match set to that ETag"
+     },
+     {
+      "id": "s1",
+      "label": "GET the resource and note its ETag"
+     },
+     {
+      "id": "s4",
+      "label": "On 412, fetch again, reapply the edit and retry"
+     },
+     {
+      "id": "s2",
+      "label": "Edit the representation locally"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "If-Match makes the server refuse a write based on an old version, so the client must re-read before retrying."
+   },
+   {
+    "id": "t235-a6",
+    "concept": "freshness",
+    "type": "estimation",
+    "prompt": "A client asks for a resource every 60 seconds for one hour, starting at second 0. The response has max-age=600 and the client caches it. How many requests reach the server in that hour?",
+    "unit": "requests",
+    "target": 6,
+    "assumptions": [
+     "Requests at 0, 60, 120 … 3,540 seconds",
+     "Each server response is fresh for 600 s"
+    ],
+    "formula": "3,600 s ÷ 600 s per refresh",
+    "workedAnswer": "Server contacts at 0, 600, 1,200, 1,800, 2,400 and 3,000 s: 6",
+    "explanation": "Design implication: freshness cut 60 requests to 6, and if those 6 are conditional most of them are bodiless 304s, so the origin pays mostly for headers.",
+    "tolerance": 0,
+    "trapAnswers": [
+     60,
+     1
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t235-f1",
+    "front": "no-cache vs no-store?",
+    "back": "no-cache: store but revalidate before reuse. no-store: do not store."
+   },
+   {
+    "id": "t235-f2",
+    "front": "What does If-None-Match do?",
+    "back": "Asks for the body only if the ETag changed; otherwise 304."
+   },
+   {
+    "id": "t235-f3",
+    "front": "What does If-Match protect against?",
+    "back": "Lost updates: the write fails with 412 if the resource changed."
+   }
+  ],
+  "sources": [
+   {
+    "title": "RFC 9111: HTTP Caching",
+    "url": "https://www.rfc-editor.org/rfc/rfc9111"
+   },
+   {
+    "title": "RFC 9110: HTTP Semantics (conditional requests)",
+    "url": "https://www.rfc-editor.org/rfc/rfc9110"
+   },
+   {
+    "title": "MDN: HTTP caching",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "freshness",
+    "etag",
+    "cache-control"
+   ],
+   "mechanism": {
+    "title": "How HTTP caches decide to reuse, revalidate or refetch",
+    "steps": [
+     "A cache stores a response under a key built from the method and URL, plus any request headers named in Vary. Browsers have a private cache per user; CDNs and reverse proxies are shared caches that serve many users from one copy.",
+     "Freshness comes from Cache-Control: max-age gives seconds of freshness for any cache, s-maxage overrides it for shared caches only. While a copy is fresh, the cache answers without contacting the server. Without explicit freshness, caches may apply a heuristic based on Last-Modified, which is why important responses should state their policy.",
+     "When a copy goes stale, the cache can revalidate: it sends the request with If-None-Match (carrying the stored ETag) or If-Modified-Since (carrying Last-Modified). If nothing changed, the server sends 304 Not Modified with no body, and the cache refreshes the copy’s freshness from the new headers.",
+     "An ETag is an opaque version tag chosen by the server: a content hash or a version number from the database. Strong ETags mean byte-identical; weak ETags (W/\"...\") mean semantically equivalent and are used for revalidation, not for byte-range requests.",
+     "The same validators guard writes. If-Match on PUT, PATCH or DELETE makes the server apply the change only if the current ETag matches, otherwise 412 Precondition Failed. This is optimistic concurrency over HTTP.",
+     "When content changes before it expires, shared caches must be told. CDNs accept purges by URL, and many also by tags attached to responses, so updating one product can purge every page that shows it. Versioned URLs avoid purging for static files altogether."
+    ]
+   },
+   "useWhen": [
+    "Public, slowly changing responses such as product pages, images and configuration: explicit max-age plus an ETag.",
+    "Resources edited by several clients: If-Match to prevent lost updates."
+   ],
+   "avoidWhen": [
+    "Avoid public or s-maxage on responses that contain one user’s data.",
+    "Avoid long max-age on URLs whose content changes in place without a new name."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Policy",
+     "Requests to the server",
+     "Staleness risk"
+    ],
+    "rows": [
+     [
+      "no-store",
+      "Each use downloads the full body",
+      "None from caches"
+     ],
+     [
+      "no-cache + ETag",
+      "Each use, but unchanged responses are a 304 without a body",
+      "None: each reuse is confirmed"
+     ],
+     [
+      "max-age=N + ETag",
+      "At most one revalidation per N seconds per cache",
+      "Up to N seconds old"
+     ],
+     [
+      "Hashed file name + long max-age, immutable",
+      "Only on first use of each version",
+      "None: a new version gets a new URL"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "What revalidation saves on bandwidth",
+    "assumptions": [
+     "An API response body of 200 KB (illustrative)",
+     "A 304 response of about 300 bytes of headers (illustrative)",
+     "10,000 revalidations per minute, 95% unchanged"
+    ],
+    "steps": [
+     "Without validators: 10,000 × 200 KB = 2,000,000 KB, about 2 GB per minute.",
+     "With ETags: 9,500 × 0.3 KB ≈ 2,850 KB for the 304s.",
+     "The 500 changed responses still send 500 × 200 KB = 100,000 KB, about 100 MB.",
+     "Total is about 103 MB per minute instead of 2 GB."
+    ],
+    "result": "Under these assumptions, conditional requests cut transfer by about 95%. The request count is unchanged, so server CPU still matters; max-age is what removes requests."
+   },
+   "india": {
+    "title": "What RFC 9111 says about shared caches and Authorization",
+    "label": "Official documentation",
+    "body": "RFC 9111 states that a shared cache must not use a stored response to a request carrying an Authorization header unless the response explicitly allows it, for example with public, s-maxage or must-revalidate. It also defines private, which allows only the user’s own cache to store the response. RFC 9110 defines If-None-Match, If-Match and 412 Precondition Failed. Together they mean safety comes from explicit headers, not from hoping a CDN guesses correctly."
+   },
+   "pitfalls": [
+    {
+     "trap": "“no-cache disables caching.”",
+     "say": "“no-cache means revalidate before reuse; I’d use no-store when the data must not be stored.”"
+    },
+    {
+     "trap": "“The CDN will figure out which pages are personal.”",
+     "say": "“I’d mark per-user responses private and add Vary for headers that change the response.”"
+    }
+   ],
+   "takeaways": [
+    "max-age removes requests; ETags make the remaining ones cheap.",
+    "304 Not Modified has no body.",
+    "If-Match turns ETags into protection against lost updates.",
+    "Personal data: private or no-store, not public."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Which header leaks data?",
+   "prompt": "An account page is served through a CDN. Which response header can show one user’s page to another user?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Cache-Control: public, s-maxage=300",
+     "feedback": "Right: the shared cache may store it for 300 seconds and serve it to anyone who requests that URL."
+    },
+    {
+     "id": "b",
+     "label": "Cache-Control: private, max-age=300",
+     "feedback": "private allows only the user’s own browser cache to store it."
+    },
+    {
+     "id": "c",
+     "label": "Cache-Control: no-store",
+     "feedback": "no-store forbids any cache from storing it."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Shared caches key responses by URL and Vary headers, not by who is logged in. Per-user responses need private or no-store; public and s-maxage are for content that is the same for everyone."
+  },
+  "seeAlso": [
+   {
+    "topicId": 15,
+    "why": "Where caches sit across a whole system"
+   },
+   {
+    "topicId": 223,
+    "why": "The methods and status codes that caching builds on"
+   },
+   {
+    "topicId": 205,
+    "why": "Browser caching basics: freshness, no-cache vs no-store and 304 revalidation"
+   }
+  ]
+ },
+ {
+  "id": 236,
+  "slug": "pagination-and-filtering-apis",
+  "region": "f2-backend",
+  "order": 16,
+  "title": "Pagination and Filtering in APIs",
+  "kind": "lesson",
+  "objectives": [
+   "Compare offset and cursor (keyset) pagination",
+   "Design stable sort orders and opaque cursors",
+   "Validate filters and cap page sizes"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 12,
+  "prereqIds": [
+   223
+  ],
+  "cards": [
+   {
+    "id": "t236-c1",
+    "kind": "text",
+    "title": "Recap: offset versus cursor",
+    "body": "Offset vs Cursor Pagination (71) covers why OFFSET slows down with depth and how a keyset cursor continues after the last row seen, with a unique tiebreaker. This lesson assumes that and covers the contract around a list endpoint: filters, cursor integrity, page-size caps, links and counts.",
+    "teaches": [
+     "offset"
+    ]
+   },
+   {
+    "id": "t236-c2",
+    "kind": "diagram",
+    "title": "Worked example: a cursor bound to its filters",
+    "body": "A list of orders filtered by status, sorted by creation time.",
+    "teaches": [
+     "offset"
+    ],
+    "steps": [
+     "Request: ?status=paid&sort=created_at&limit=500",
+     "Server clamps limit to its documented maximum of 100 and checks sort is on the allowlist",
+     "Next cursor = the last (created_at, id), the sort and a hash of the filters, signed with a server key and base64url-encoded",
+     "Response: 100 rows, has_more: true, and Link: <…?cursor=…>; rel=\"next\"",
+     "A request that reuses the cursor with status=refunded fails the filter-hash check and gets 400"
+    ]
+   },
+   {
+    "id": "t236-c3",
+    "kind": "text",
+    "title": "Counts, has_more and going backwards",
+    "body": "An exact total needs every matching row counted, which can cost more than the page itself. Fetching limit + 1 rows tells you whether another page exists (has_more) for free; if a total is shown, label it as an estimate. Backward paging uses a previous cursor with the comparison and sort order reversed, then reverses the page before returning it.",
+    "teaches": [
+     "offset"
+    ]
+   },
+   {
+    "id": "t236-c4",
+    "kind": "text",
+    "title": "Filters are input too",
+    "body": "Filters and sort fields arrive as strings. Allowlist which fields can be filtered and sorted, cap the page size on the server, and fold the filter into the cursor or reject a cursor used with different filters, otherwise a page can mix two result sets.",
+    "teaches": [
+     "filters"
+    ]
+   },
+   {
+    "id": "t236-c5",
+    "kind": "text",
+    "title": "Trap: cursors clients can edit",
+    "body": "A cursor that is plain base64 JSON can be decoded and edited: a client can change the stored filter, jump to another tenant’s ids or force an expensive scan. Sign cursors or keep their state on the server, and still apply authorisation to every page, not just the first.",
+    "teaches": [
+     "offset"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t236-a1",
+    "concept": "offset",
+    "type": "multiple_choice",
+    "prompt": "A client reuses a next-page cursor but changes the status filter from paid to refunded. What should the server do?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Reject the cursor with 400"
+     },
+     {
+      "id": "b",
+      "label": "Apply the new filter from that position"
+     },
+     {
+      "id": "c",
+      "label": "Ignore the new filter and continue the old list"
+     },
+     {
+      "id": "d",
+      "label": "Restart from the first page silently"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "A cursor is only valid for the filters and sort it was made for; mixing them returns a list that matches neither."
+   },
+   {
+    "id": "t236-a2",
+    "concept": "cursor",
+    "type": "multiple_choice",
+    "prompt": "How can an endpoint tell the client whether another page exists without counting every match?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Run COUNT(*) on each request"
+     },
+     {
+      "id": "b",
+      "label": "Fetch limit + 1 rows and report has_more"
+     },
+     {
+      "id": "c",
+      "label": "Return an empty page at the end"
+     },
+     {
+      "id": "d",
+      "label": "Estimate it from the page number"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "One extra row answers “is there more?” at the cost of a single row."
+   },
+   {
+    "id": "t236-a3",
+    "concept": "cursor",
+    "type": "multiple_choice",
+    "prompt": "Where can an API put the next page’s URL so generic HTTP clients can follow it?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A Location header on the 200 response"
+     },
+     {
+      "id": "b",
+      "label": "A Retry-After header carrying the URL"
+     },
+     {
+      "id": "c",
+      "label": "A Link header with rel=\"next\""
+     },
+     {
+      "id": "d",
+      "label": "A cookie named next_page"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "RFC 8288 web links with rel=\"next\" are the standard way to point at the next page."
+   },
+   {
+    "id": "t236-a4",
+    "concept": "filters",
+    "type": "multiple_choice",
+    "prompt": "A client asks for ?limit=1000000. What should the server do?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Return all the rows the client asked for"
+     },
+     {
+      "id": "b",
+      "label": "Return a 500 error so the client retries"
+     },
+     {
+      "id": "c",
+      "label": "Stream the rows with no limit applied"
+     },
+     {
+      "id": "d",
+      "label": "Clamp to a documented maximum or reject with 400"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Page size is input: enforce a maximum so one request cannot exhaust memory or the database."
+   },
+   {
+    "id": "t236-a5",
+    "concept": "cursor",
+    "type": "drag_order",
+    "prompt": "Order the server’s work for a cursor page request.",
+    "items": [
+     {
+      "id": "s4",
+      "label": "Encode the last row’s keys as the next cursor"
+     },
+     {
+      "id": "s2",
+      "label": "Decode and validate the cursor and filters"
+     },
+     {
+      "id": "s1",
+      "label": "Parse the request and clamp the page size"
+     },
+     {
+      "id": "s3",
+      "label": "Query rows after the cursor keys, ordered, with the limit"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Validate input, seek past the cursor, then hand back where this page ended.",
+    "alternativeOrders": [
+     [
+      "s2",
+      "s1",
+      "s3",
+      "s4"
+     ]
+    ]
+   },
+   {
+    "id": "t236-a6",
+    "concept": "offset",
+    "type": "estimation",
+    "prompt": "An endpoint returns 50 items per page and fetches limit + 1 rows to set has_more. A client reads 7 full pages, then a final page of 12 items. How many rows does the database return across the 8 requests?",
+    "unit": "rows",
+    "target": 369,
+    "tolerance": 0,
+    "trapAnswers": [
+     362,
+     400
+    ],
+    "assumptions": [
+     "Each full page fetches 51 rows",
+     "The last page returns all 12 remaining rows"
+    ],
+    "formula": "7 × (50 + 1) + 12",
+    "workedAnswer": "7 × 51 = 357, plus 12 = 369 rows",
+    "explanation": "Sanity check: the extra row adds only 7 rows over 8 requests, far cheaper than counting the full result each time."
+   },
+   {
+    "id": "t236-a7",
+    "concept": "filters",
+    "type": "tradeoff",
+    "prompt": "A public API lists a merchant’s orders for an export tool and for a scrolling screen.",
+    "constraints": [
+     "Orders are inserted continuously",
+     "Users scroll far back in history",
+     "Jumping to an exact page number is not needed"
+    ],
+    "approaches": [
+     {
+      "id": "p2",
+      "label": "Offset pages with page numbers",
+      "description": "Simple to build"
+     },
+     {
+      "id": "p1",
+      "label": "Keyset cursor on (created_at, id)",
+      "description": "Opaque next cursor"
+     },
+     {
+      "id": "p3",
+      "label": "Return the full list once and let clients slice it",
+      "description": "One request"
+     }
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r3",
+      "label": "Page numbers are needed for scrolling"
+     },
+     {
+      "id": "r1",
+      "label": "Cost stays flat however far back the user goes"
+     },
+     {
+      "id": "r2",
+      "label": "Inserts do not shift or duplicate later pages"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3"
+    ],
+    "rationaleConflicts": {
+     "r3": "The constraints say exact page jumps are not needed, which is the main reason to keep offsets."
+    },
+    "explanation": "Use cursors when data changes and lists are deep; keep offsets for small, stable lists that need page numbers."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t236-f1",
+    "front": "Offset pagination cost?",
+    "back": "Grows with the offset: skipped rows are still computed."
+   },
+   {
+    "id": "t236-f2",
+    "front": "What goes in a cursor?",
+    "back": "The last row’s sort keys, including a unique tiebreaker, encoded opaquely."
+   },
+   {
+    "id": "t236-f3",
+    "front": "Page size from the client?",
+    "back": "Clamp to a documented maximum."
+   }
+  ],
+  "sources": [
+   {
+    "title": "PostgreSQL: LIMIT and OFFSET",
+    "url": "https://www.postgresql.org/docs/current/queries-limit.html"
+   },
+   {
+    "title": "Microsoft: Web API design best practices",
+    "url": "https://learn.microsoft.com/en-us/azure/architecture/best-practices/api-design"
+   },
+   {
+    "title": "RFC 8288: Web Linking",
+    "url": "https://www.rfc-editor.org/rfc/rfc8288"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "offset",
+    "cursor",
+    "filters"
+   ],
+   "mechanism": {
+    "title": "How offset and keyset pagination execute",
+    "steps": [
+     "Offset pagination translates page p into OFFSET (p − 1) × size LIMIT size. It is easy to build and allows jumping to any page number, but the database must walk past the skipped rows, so latency grows with depth, and inserts or deletes before the current page shift later pages.",
+     "Keyset (cursor) pagination sorts by a unique, stable key and asks for rows after the last key seen: WHERE (created_at, id) > (:t, :id) ORDER BY created_at, id LIMIT 20. Engines without row-value comparison (or that do not use the index for it) need the expanded form: created_at > :t OR (created_at = :t AND id > :id). With a matching index the database seeks directly to the start.",
+     "The server returns the cursor as an opaque token, often the keys encoded and optionally signed, so clients cannot depend on its format and the server can change it later. Links to the next page can go in the body or in a Link header with rel=next, as defined by RFC 8288.",
+     "Filters and sort options become part of the query. Allowlist fields, validate types and ranges, and bind values as parameters. A cursor should only be valid with the filters and sort it was created for; embed them or a hash of them in the cursor and reject mismatches.",
+     "Total counts are expensive on large tables because they need a scan or a maintained counter. Many APIs return has_more instead, or an approximate count labelled as such.",
+     "Cursor pagination gives up jumping to page 37, and going backwards needs a second cursor direction. For admin tables with a few thousand rows, offsets are often the simpler right choice."
+    ]
+   },
+   "useWhen": [
+    "Cursors for feeds, logs, exports and any list that is deep or changes while being read.",
+    "Offsets for small, mostly static lists where users need page numbers."
+   ],
+   "avoidWhen": [
+    "Avoid unbounded page sizes taken straight from the client.",
+    "Avoid sorting by a non-unique column without a tiebreaker."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Approach",
+     "Deep-page cost",
+     "Stable while data changes",
+     "Jump to page N"
+    ],
+    "rows": [
+     [
+      "Offset + limit",
+      "Grows with the offset",
+      "No: inserts shift pages",
+      "Yes"
+     ],
+     [
+      "Keyset cursor",
+      "Flat with a matching index",
+      "Yes, continues after the last key",
+      "No"
+     ],
+     [
+      "Snapshot then page",
+      "Cost paid at snapshot time",
+      "Yes, for the snapshot",
+      "Yes, within the snapshot"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "The cost of an exact total (illustrative)",
+    "assumptions": [
+     "A filtered list with 2,000,000 matching rows",
+     "An index scan reads about 500,000 entries a second",
+     "Pages of 50 rows"
+    ],
+    "steps": [
+     "An exact count reads all 2,000,000 matching entries: about 4 s per request.",
+     "A page with limit + 1 reads 51 rows: a few milliseconds.",
+     "So the count costs on the order of a thousand times more than the page.",
+     "has_more, or a cached estimate labelled as such, keeps every page fast."
+    ],
+    "result": "Exact totals on large filtered lists can cost more than the data; prefer has_more or labelled estimates."
+   },
+   "india": {
+    "title": "What the PostgreSQL manual says about OFFSET",
+    "label": "Official documentation",
+    "body": "The PostgreSQL documentation on LIMIT and OFFSET notes that the rows skipped by an OFFSET clause still have to be computed inside the server, so a large OFFSET might be inefficient. It also warns that without ORDER BY the order of rows is unpredictable, so different pages may not be consistent with each other. Both points are the reason to use a unique, indexed sort key and continue after it."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We page with OFFSET; it worked in testing.”",
+     "say": "“Test data is shallow; I’d use a keyset cursor for deep or changing lists.”"
+    },
+    {
+     "trap": "“The cursor is just the timestamp.”",
+     "say": "“I’d add the id as a tiebreaker so pages do not skip or repeat rows.”"
+    }
+   ],
+   "takeaways": [
+    "Cap page size and allowlist filter and sort fields.",
+    "Bind cursors to their filters and sort; sign them or keep them opaque.",
+    "Use Link rel=\"next\" and has_more instead of costly exact counts.",
+    "Keyset cursors need a unique, stable sort and a matching index."
+   ]
+  },
+  "interactive": {
+   "kind": "slider",
+   "title": "Scroll deeper",
+   "prompt": "A feed uses OFFSET pagination with 20 rows per page. Slide to the page the user has reached and watch the rows the database produces.",
+   "model": "offset-scan",
+   "params": {
+    "pageSize": 20
+   },
+   "control": {
+    "label": "Page number",
+    "min": 50,
+    "max": 10000,
+    "step": 50,
+    "initial": 50,
+    "unit": "page"
+   },
+   "takeaway": "Offset work grows with each page: page 5,000 produces 100,000 rows to return 20. A keyset cursor reads about 20 rows at any depth, because the index seeks straight to the last key seen."
+  },
+  "seeAlso": [
+   {
+    "topicId": 71,
+    "why": "The offset-versus-cursor basics this lesson builds on"
+   },
+   {
+    "topicId": 234,
+    "why": "Filters and sort fields are untrusted input"
+   }
+  ]
+ },
+ {
+  "id": 237,
+  "slug": "webhooks-delivery-signing-retries",
+  "region": "f2-backend",
+  "order": 17,
+  "title": "Sending and Receiving Webhooks",
+  "kind": "lesson",
+  "objectives": [
+   "Sign and verify webhook payloads with an HMAC and a timestamp",
+   "Design retries with backoff and receivers that tolerate duplicates",
+   "Protect the sender from server-side request forgery"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 13,
+  "prereqIds": [
+   224,
+   230
+  ],
+  "cards": [
+   {
+    "id": "t237-c1",
+    "kind": "text",
+    "title": "An HTTP call in the other direction",
+    "body": "A webhook is your server calling a URL that a customer registered, to tell them an event happened: a payment succeeded, a build finished. The receiver is someone else’s server, which may be slow, down or under attack, so delivery is designed like any unreliable network call.",
+    "teaches": [
+     "delivery"
+    ]
+   },
+   {
+    "id": "t237-c2",
+    "kind": "text",
+    "title": "Misconception: HTTPS proves who sent it",
+    "body": "HTTPS protects the connection, but anyone who learns the receiver’s URL can post to it. The sender signs each payload with a shared secret, typically an HMAC over the timestamp and body, and the receiver recomputes the signature before trusting anything.",
+    "teaches": [
+     "signing"
+    ]
+   },
+   {
+    "id": "t237-c3",
+    "kind": "diagram",
+    "title": "Verifying a signed delivery",
+    "body": "The receiver checks signature, freshness and duplicates before acting.",
+    "teaches": [
+     "signing",
+     "dedupe"
+    ],
+    "steps": [
+     "Read the raw body bytes and the signature and timestamp headers",
+     "Compute HMAC-SHA256(secret, timestamp + \".\" + body)",
+     "Compare with a constant-time comparison; reject on mismatch",
+     "Reject if the timestamp is outside a short window, to stop replays",
+     "Skip the event if its id was already processed, otherwise handle it and reply 2xx"
+    ]
+   },
+   {
+    "id": "t237-c4",
+    "kind": "text",
+    "title": "Retries mean duplicates",
+    "body": "The sender retries on timeouts and 5xx responses with growing delays, so the receiver can see the same event more than once, and out of order. Receivers store processed event ids and acknowledge quickly with 2xx, moving slow work to a queue.",
+    "teaches": [
+     "delivery",
+     "dedupe"
+    ]
+   },
+   {
+    "id": "t237-c5",
+    "kind": "text",
+    "title": "Trap: letting customers aim your server anywhere",
+    "body": "The sender calls whatever URL a customer saves. Without checks, a URL like http://169.254.169.254/ or an internal host turns the webhook system into a tool for server-side request forgery. Resolve the host, block private and link-local ranges in IPv4 and IPv6, connect to the address you checked, refuse redirects, and send from an isolated network.",
+    "teaches": [
+     "ssrf"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t237-a1",
+    "concept": "signing",
+    "type": "multiple_choice",
+    "prompt": "What lets a receiver confirm a webhook came from the real sender?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The request arrived over HTTPS"
+     },
+     {
+      "id": "b",
+      "label": "The source IP is in a cloud provider’s range"
+     },
+     {
+      "id": "c",
+      "label": "An HMAC of the body with a shared secret matches"
+     },
+     {
+      "id": "d",
+      "label": "The JSON body includes the sender’s name"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Only a holder of the secret can produce a matching HMAC over that exact body."
+   },
+   {
+    "id": "t237-a2",
+    "concept": "signing",
+    "type": "multiple_choice",
+    "prompt": "Why should the signed content include a timestamp that the receiver checks?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "It stops an old captured request being replayed"
+     },
+     {
+      "id": "b",
+      "label": "It lets the receiver sort events by arrival time"
+     },
+     {
+      "id": "c",
+      "label": "It makes the HMAC shorter to transmit"
+     },
+     {
+      "id": "d",
+      "label": "It removes the need for a shared secret"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "A captured request with a valid signature is rejected once its timestamp is outside the window."
+   },
+   {
+    "id": "t237-a3",
+    "concept": "dedupe",
+    "type": "multiple_choice",
+    "prompt": "A receiver awards loyalty points per payment webhook. Some payments get points twice. What is the most likely fix?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Ask the sender to stop retrying deliveries"
+     },
+     {
+      "id": "b",
+      "label": "Record processed event ids and skip repeats"
+     },
+     {
+      "id": "c",
+      "label": "Respond with 500 so the sender slows down"
+     },
+     {
+      "id": "d",
+      "label": "Verify the signature twice per request"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Retries create duplicates by design; idempotent handling keyed on the event id removes the double effect."
+   },
+   {
+    "id": "t237-a4",
+    "concept": "ssrf",
+    "type": "multiple_choice",
+    "prompt": "An endpoint has failed every delivery for three days. What should the sender do?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Keep retrying each event every minute"
+     },
+     {
+      "id": "b",
+      "label": "Drop events silently but keep it enabled"
+     },
+     {
+      "id": "c",
+      "label": "Disable it and notify its owner"
+     },
+     {
+      "id": "d",
+      "label": "Switch it to plain HTTP to save time"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Endless retries waste capacity; disabling with a notice lets the owner fix it and replay."
+   },
+   {
+    "id": "t237-a5",
+    "concept": "signing",
+    "type": "drag_order",
+    "prompt": "Order a signing-secret rotation that does not break deliveries.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "The receiver switches to verifying with the new secret"
+     },
+     {
+      "id": "s1",
+      "label": "Generate a new secret for the subscription"
+     },
+     {
+      "id": "s4",
+      "label": "Stop signing with the old secret and delete it"
+     },
+     {
+      "id": "s2",
+      "label": "Sign each delivery with both secrets, sending two signatures"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Overlap first, switch the receiver, then retire the old secret."
+   },
+   {
+    "id": "t237-a6",
+    "concept": "delivery",
+    "type": "estimation",
+    "prompt": "A sender retries a failed webhook after 1 minute, then doubles the wait each time (1, 2, 4 … minutes) for 9 retries. About how many minutes pass from the first failure to the last retry?",
+    "unit": "minutes",
+    "target": 511,
+    "assumptions": [
+     "Waits of 1, 2, 4, 8, 16, 32, 64, 128 and 256 minutes",
+     "Delivery time itself ignored"
+    ],
+    "formula": "2^9 − 1",
+    "workedAnswer": "1 + 2 + 4 + … + 256 = 511 minutes, about 8.5 hours",
+    "explanation": "Design implication: a receiver that is down for a long maintenance window can still miss events, so senders also offer a way to list or replay recent events.",
+    "tolerance": 0.05,
+    "trapAnswers": [
+     256,
+     1023
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t237-f1",
+    "front": "How is a webhook signed?",
+    "back": "HMAC with a shared secret over the timestamp and raw body."
+   },
+   {
+    "id": "t237-f2",
+    "front": "Why include a timestamp?",
+    "back": "So old captured requests cannot be replayed."
+   },
+   {
+    "id": "t237-f3",
+    "front": "Why do receivers dedupe?",
+    "back": "Retries deliver the same event more than once."
+   }
+  ],
+  "sources": [
+   {
+    "title": "RFC 2104: HMAC",
+    "url": "https://www.rfc-editor.org/rfc/rfc2104"
+   },
+   {
+    "title": "OWASP: Server-Side Request Forgery Prevention Cheat Sheet",
+    "url": "https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "delivery",
+    "signing",
+    "dedupe",
+    "ssrf"
+   ],
+   "mechanism": {
+    "title": "How a dependable webhook pipeline works end to end",
+    "steps": [
+     "When an event happens, the sender records it durably in the same transaction as the change, so an event is not lost if the process crashes before delivery. A separate dispatcher reads pending deliveries.",
+     "For each subscription the dispatcher builds the payload, adds an event id and timestamp, and signs timestamp and body with HMAC using that subscription’s secret. The signature goes in a header; the secret itself is not sent.",
+     "The dispatcher sends with a short timeout. A 2xx marks the delivery done. Timeouts, connection errors, 429 and 5xx are retried with exponential backoff and jitter up to a limit; whether other 4xx responses are retried is a design choice: many senders treat them as permanent, while others retry every non-2xx because a receiver’s 4xx is often a temporary misconfiguration. After the limit the delivery is marked failed, and repeated failures can disable the endpoint and notify its owner.",
+     "The receiver verifies over the raw bytes: re-serialising parsed JSON can change whitespace or key order and break the signature. It compares in constant time, checks the timestamp window, and deduplicates on the event id.",
+     "Because retries and parallel dispatch can reorder events, payloads carry enough to resolve order, such as a version or updated_at, or receivers fetch the current state from the sender’s API instead of trusting the payload’s snapshot.",
+     "On the sender side, customer-supplied URLs are validated at registration and at delivery time: resolve the name, reject private, loopback and link-local addresses (including IPv6 and IPv4-mapped forms), connect to the address that was validated so a second DNS answer cannot change it (DNS rebinding), do not follow redirects or re-check every hop, and send from a network segment with no route to internal services."
+    ]
+   },
+   "useWhen": [
+    "Notifying other systems of events they would otherwise poll for.",
+    "Integrations where the receiver can expose an HTTPS endpoint."
+   ],
+   "avoidWhen": [
+    "Avoid trusting a webhook body without verifying its signature.",
+    "Avoid doing slow work before replying; the sender will time out and retry."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Approach",
+     "Latency",
+     "Receiver effort",
+     "Failure handling"
+    ],
+    "rows": [
+     [
+      "Webhooks (push)",
+      "Seconds after the event",
+      "Public endpoint, verification, dedupe",
+      "Sender retries with backoff"
+     ],
+     [
+      "Polling an events API",
+      "Up to the polling interval",
+      "Store a cursor and poll",
+      "Receiver resumes from its cursor"
+     ],
+     [
+      "Push plus events API for catch-up",
+      "Seconds, with a recovery path",
+      "Both of the above",
+      "Missed pushes are recovered by listing events"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "How long a retry schedule keeps trying",
+    "assumptions": [
+     "First retry after 1 minute, doubling each time",
+     "9 retries",
+     "Jitter ignored for the calculation"
+    ],
+    "steps": [
+     "Waits: 1, 2, 4, 8, 16, 32, 64, 128, 256 minutes.",
+     "Sum of a doubling series: 2^9 − 1 = 511 minutes.",
+     "511 ÷ 60 ≈ 8.5 hours of retrying.",
+     "Capping each wait at 60 minutes instead: 1 + 2 + 4 + 8 + 16 + 32 + 60 + 60 + 60 = 243 minutes, about 4 hours, with more frequent tries later on."
+    ],
+    "result": "The schedule sets how long an outage a receiver can survive without losing events; outages longer than that need a replay or list-events path."
+   },
+   "india": {
+    "title": "A replayed and forged webhook",
+    "label": "Illustrative scenario",
+    "body": "Illustrative: a shop marks orders paid when a payment webhook arrives, but only checks that the JSON says status succeeded. Anyone who finds the endpoint can post a fake body and receive goods. Adding an HMAC check stops forgery, but an attacker who captures one real request can still replay it later, so the shop also signs the timestamp, rejects requests older than a few minutes, and records event ids so a genuine retry does not mark the order twice."
+   },
+   "pitfalls": [
+    {
+     "trap": "“Our endpoint URL is secret, so we skip verification.”",
+     "say": "“URLs leak through logs and screenshots; I’d verify an HMAC and a timestamp on each request.”"
+    },
+    {
+     "trap": "“Each event arrives once and in order.”",
+     "say": "“Retries cause duplicates and reordering, so I’d dedupe by event id and check versions.”"
+    }
+   ],
+   "takeaways": [
+    "Sign timestamp and raw body with HMAC; verify in constant time.",
+    "Retries with backoff mean duplicates; dedupe on event id.",
+    "Reply 2xx fast and queue the work.",
+    "Customer URLs are an SSRF risk: block internal addresses."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Why did verification fail?",
+   "prompt": "A receiver parses the JSON body, re-serialises it, then computes the HMAC over that string. Genuine webhooks often fail verification. Why?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Re-serialising changes bytes such as spacing or key order",
+     "feedback": "Right: HMAC is over exact bytes, so any change to whitespace or key order produces a different signature."
+    },
+    {
+     "id": "b",
+     "label": "The shared secret expires after each request",
+     "feedback": "Secrets are rotated deliberately, not per request; a wrong secret would fail on each request, not some."
+    },
+    {
+     "id": "c",
+     "label": "HMAC-SHA256 gives a different result on each run",
+     "feedback": "HMAC is deterministic: the same key and bytes give the same tag."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Verify over the raw body bytes as received, before any parsing. Parsing and printing JSON can change formatting, number representation and key order, and the HMAC is sensitive to each byte."
+  },
+  "seeAlso": [
+   {
+    "topicId": 224,
+    "why": "Idempotent handling makes duplicate deliveries harmless"
+   },
+   {
+    "topicId": 230,
+    "why": "The retry and backoff rules webhook senders follow"
+   },
+   {
+    "topicId": 302,
+    "why": "The HMAC and constant-time comparison behind webhook signatures"
+   },
+   {
+    "topicId": 308,
+    "why": "Server-side request forgery, which customer-supplied URLs invite"
+   }
+  ]
+ },
+ {
+  "id": 238,
+  "slug": "dual-writes-and-transactional-outbox",
+  "region": "f2-backend",
+  "order": 18,
+  "title": "Transactions in Code and the Dual-Write Problem",
+  "kind": "lesson",
+  "objectives": [
+   "Keep a transaction’s scope to one database and short",
+   "Explain why writing to a database and a broker separately loses or invents events",
+   "Apply the transactional outbox and idempotent consumers"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 13,
+  "prereqIds": [
+   227
+  ],
+  "cards": [
+   {
+    "id": "t238-c1",
+    "kind": "text",
+    "title": "One transaction, one resource",
+    "body": "A database transaction makes several changes to that database all happen or none happen. It does not cover a message broker, an email service or another database. Code that updates a row and then publishes an event is doing two separate writes, and either can fail alone.",
+    "teaches": [
+     "transaction-scope"
+    ]
+   },
+   {
+    "id": "t238-c2",
+    "kind": "text",
+    "title": "Recap: dual writes and the outbox",
+    "body": "Commit-then-publish can lose events and publish-then-commit can invent them; the outbox (Outbox Pattern & CDC, 44) writes the event in the same transaction and relays it later, at least once. Keep remote calls out of open transactions too (Transactions in Practice, 266). What remains is the consumer side and side effects that are not messages.",
+    "teaches": [
+     "transaction-scope"
+    ]
+   },
+   {
+    "id": "t238-c3",
+    "kind": "diagram",
+    "title": "Worked example: the consumer’s inbox table",
+    "body": "Make “have I handled this event?” and the effect commit together.",
+    "teaches": [
+     "transaction-scope"
+    ],
+    "steps": [
+     "Begin a transaction in the consumer’s own database",
+     "Insert the event id into processed_events, which has a unique key on it",
+     "If the insert conflicts, the event was handled: commit and acknowledge",
+     "Otherwise apply the state change",
+     "Commit: the id and the effect are stored together or not at all"
+    ]
+   },
+   {
+    "id": "t238-c4",
+    "kind": "text",
+    "title": "Side effects outside any database",
+    "body": "Emails and payment calls cannot join a transaction. Record the intent as a row with the change, then let a worker perform it with an idempotency key derived from the event id. Payment providers that support idempotency keys return the original result for a repeated key; for email, record the send against the event id before acknowledging.",
+    "teaches": [
+     "transaction-scope"
+    ]
+   },
+   {
+    "id": "t238-c5",
+    "kind": "text",
+    "title": "Trap: polling the outbox by id",
+    "body": "A relay that polls WHERE id > last_seen can skip rows for good. Ids are assigned when a row is inserted, but transactions commit in a different order: if id 101 commits after id 102 has been read, the watermark has already moved past it. Read the change log (CDC), track a sent flag per row, or re-scan a recent window.",
+    "teaches": [
+     "transaction-scope"
+    ]
+   },
+   {
+    "id": "t238-c6",
+    "kind": "text",
+    "title": "Ordering and cleanup",
+    "body": "Events for one entity should be applied in order: carry a per-entity sequence number and route all events for an entity through one partition or queue key. Sent outbox rows are only needed briefly; delete or archive them on a schedule so the table and its index stay small.",
+    "teaches": [
+     "transaction-scope"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t238-a1",
+    "concept": "dual-write",
+    "type": "multiple_choice",
+    "prompt": "A consumer records handled event ids in a separate cache and updates its database separately. It crashes after the database commit, before recording the id. What happens on redelivery?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The broker skips the redelivered event"
+     },
+     {
+      "id": "b",
+      "label": "The effect is applied a second time"
+     },
+     {
+      "id": "c",
+      "label": "The database rolls back the first change"
+     },
+     {
+      "id": "d",
+      "label": "The event id is recorded automatically"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Dedupe and effect must commit together, or a crash between them causes a repeat."
+   },
+   {
+    "id": "t238-a2",
+    "concept": "outbox",
+    "type": "multiple_choice",
+    "prompt": "Why does the outbox row need to be written in the same transaction as the business change?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "So the event exists if and only if the change commits"
+     },
+     {
+      "id": "b",
+      "label": "So the broker can read the database directly"
+     },
+     {
+      "id": "c",
+      "label": "So the event reaches consumers with lower latency"
+     },
+     {
+      "id": "d",
+      "label": "So the relay does not need an index to find rows"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Atomic commit ties the event’s existence to the change’s existence."
+   },
+   {
+    "id": "t238-a3",
+    "concept": "idempotent-consumer",
+    "type": "multiple_choice",
+    "prompt": "A relay polls WHERE id > last_seen. Transaction A gets id 101 but commits after transaction B, which has id 102. What can go wrong?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Row 101 is skipped for good"
+     },
+     {
+      "id": "b",
+      "label": "Row 102 is published twice"
+     },
+     {
+      "id": "c",
+      "label": "Both rows wait for a restart"
+     },
+     {
+      "id": "d",
+      "label": "The relay locks the whole table"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "The watermark moved past 101 before it was visible."
+   },
+   {
+    "id": "t238-a4",
+    "concept": "transaction-scope",
+    "type": "multiple_choice",
+    "prompt": "A worker sends a confirmation email for each OrderPlaced event and may see the same event twice. What makes the email go out once?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Record the send in a table keyed by event id"
+     },
+     {
+      "id": "b",
+      "label": "Send only when the broker queue is idle"
+     },
+     {
+      "id": "c",
+      "label": "Add a random delay before each send"
+     },
+     {
+      "id": "d",
+      "label": "Turn on the broker’s exactly-once mode"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "An idempotency record keyed by the event id turns a repeat into a no-op."
+   },
+   {
+    "id": "t238-a5",
+    "concept": "outbox",
+    "type": "drag_order",
+    "prompt": "Order what a consumer does with one event so a redelivery changes nothing.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "Insert the event id into the inbox table (unique key)"
+     },
+     {
+      "id": "s5",
+      "label": "Commit, then acknowledge the broker"
+     },
+     {
+      "id": "s1",
+      "label": "Receive the event from the broker"
+     },
+     {
+      "id": "s4",
+      "label": "Apply the change to its own tables"
+     },
+     {
+      "id": "s2",
+      "label": "Begin a local transaction"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "The inbox insert and the change commit together; acknowledging only after commit means a crash leads to redelivery, and the unique key turns that redelivery into a no-op."
+   },
+   {
+    "id": "t238-a6",
+    "concept": "dual-write",
+    "type": "estimation",
+    "prompt": "A service places 10,000 orders a day with commit-then-publish. In 0.1% of orders the publish fails after the commit and is not retried. About how many OrderPlaced events are lost per day?",
+    "unit": "events",
+    "target": 10,
+    "assumptions": [
+     "10,000 orders per day",
+     "0.1% publish failures after commit (illustrative)"
+    ],
+    "formula": "10,000 × 0.001",
+    "workedAnswer": "10,000 × 0.001 = 10 lost events per day",
+    "explanation": "Design implication: ten silent gaps a day means ten customers with no confirmation email or warehouse pick; an outbox turns them into retries instead of losses.",
+    "tolerance": 0,
+    "trapAnswers": [
+     100,
+     1
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t238-f1",
+    "front": "What is the dual-write problem?",
+    "back": "Writing to two systems separately; a failure between them leaves them inconsistent."
+   },
+   {
+    "id": "t238-f2",
+    "front": "Transactional outbox?",
+    "back": "Store the event in the same DB transaction, then relay it."
+   },
+   {
+    "id": "t238-f3",
+    "front": "Outbox delivery guarantee?",
+    "back": "At least once; consumers dedupe by event id."
+   }
+  ],
+  "sources": [
+   {
+    "title": "AWS Prescriptive Guidance: Transactional outbox pattern",
+    "url": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+   },
+   {
+    "title": "Microsoft: Transactional outbox pattern",
+    "url": "https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "transaction-scope",
+    "dual-write",
+    "outbox",
+    "idempotent-consumer"
+   ],
+   "mechanism": {
+    "title": "Why dual writes break and how the outbox fixes them",
+    "steps": [
+     "A transaction is atomic only inside one resource manager. The database makes the order row and its order lines commit together; it knows nothing about a message broker. Any sequence of two independent writes has a window where one has happened and the other has not.",
+     "Commit then publish can lose events (crash after commit). Publish then commit can invent events (commit fails after publish). Retrying the publish on error helps with transient failures but not with a crash, because the intent to publish lived only in memory.",
+     "Polling relays must not rely on a monotonically advancing id: ids are assigned at insert time, transactions commit in another order, so a row can become visible behind the watermark. Change data capture reads the commit log in commit order; pollers can track a sent flag or re-scan a recent window instead.",
+     "A relay moves outbox rows to the broker. It can poll for unsent rows in order, or read the database’s change log (change data capture). It publishes, then marks the row sent or advances its position; a crash between those two steps causes a re-publish rather than a loss.",
+     "Consumers therefore receive each event at least once. They store handled event ids, ideally in the same transaction as their own state change, so the effect is applied once. Events carry ids and, where order matters, a per-entity sequence number.",
+     "The same reasoning applies to other side effects: sending email, calling a payment provider, updating a search index. Record the intent durably with the change, then perform the effect with retries and idempotency keys."
+    ]
+   },
+   "useWhen": [
+    "A state change must reliably produce an event or side effect in another system.",
+    "The broker or service cannot join a distributed transaction."
+   ],
+   "avoidWhen": [
+    "Avoid commit-then-publish for events other systems depend on.",
+    "Avoid holding database transactions open across remote calls."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Approach",
+     "Lost events",
+     "Phantom events",
+     "Cost"
+    ],
+    "rows": [
+     [
+      "Commit, then publish",
+      "Possible on crash",
+      "No",
+      "Simplest"
+     ],
+     [
+      "Publish, then commit",
+      "No",
+      "Possible if the commit fails",
+      "Simple"
+     ],
+     [
+      "Two-phase commit",
+      "No",
+      "No",
+      "Needs support in each resource; blocking coordinator"
+     ],
+     [
+      "Transactional outbox",
+      "No",
+      "No",
+      "Outbox table, relay, idempotent consumers"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "How small failure rates add up",
+    "assumptions": [
+     "10,000 orders per day",
+     "0.1% of publishes fail after the commit and are not retried (illustrative)",
+     "30 days per month"
+    ],
+    "steps": [
+     "Lost per day: 10,000 × 0.001 = 10.",
+     "Lost per month: 10 × 30 = 300 orders with no downstream event.",
+     "With an outbox, failed publishes are retried by the relay, so losses go to zero and duplicates appear instead.",
+     "If 0.1% of publishes are duplicated, consumers see about 10 repeats a day, which idempotent handling absorbs."
+    ],
+    "result": "The outbox converts silent losses into visible, harmless duplicates, which is why it is paired with idempotent consumers."
+   },
+   "india": {
+    "title": "How cloud providers document the dual-write problem",
+    "label": "Official documentation",
+    "body": "AWS Prescriptive Guidance describes the transactional outbox pattern as a fix for the dual-write problem that occurs when one operation writes to a database and sends a message: if one write fails, the two systems disagree. It stores the event in an outbox table in the same transaction and relays it separately. Microsoft’s architecture guide describes the same pattern and notes that consumers must handle duplicates because messages can be delivered more than once."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We publish inside the transaction, so it is atomic.”",
+     "say": "“The broker is outside the transaction; I’d write an outbox row and relay it.”"
+    },
+    {
+     "trap": "“The outbox gives exactly-once delivery.”",
+     "say": "“It gives at-least-once delivery; consumers dedupe by event id so the effect happens once.”"
+    }
+   ],
+   "takeaways": [
+    "A transaction covers one database, not the broker.",
+    "Two independent writes can end half done.",
+    "Outbox: event row in the same transaction, relayed later.",
+    "At-least-once delivery plus idempotent consumers."
+   ]
+  },
+  "interactive": {
+   "kind": "tradeoff",
+   "title": "Pick the order of writes",
+   "prompt": "An order service must update its database and notify the warehouse through a broker. Which design keeps both in agreement through crashes?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Commit the order, then publish to the broker",
+     "feedback": "A crash after the commit loses the event, so the warehouse does not ship."
+    },
+    {
+     "id": "b",
+     "label": "Publish to the broker, then commit the order",
+     "feedback": "If the commit fails, the warehouse ships an order that does not exist."
+    },
+    {
+     "id": "c",
+     "label": "Commit the order and an outbox row together; relay later",
+     "feedback": "Right: the event exists if and only if the order does, and the relay retries until published."
+    }
+   ],
+   "correctId": "c",
+   "reveal": "Any two independent writes have a failure window. The outbox moves the second write into the same transaction as the first, and the relay’s retries plus idempotent consumers deal with the duplicates that remain."
+  },
+  "seeAlso": [
+   {
+    "topicId": 44,
+    "why": "The outbox pattern and change data capture this lesson builds on"
+   },
+   {
+    "topicId": 227,
+    "why": "The background workers that relay and consume events"
+   },
+   {
+    "topicId": 266,
+    "why": "Why remote calls stay out of open transactions"
+   }
+  ]
+ },
+ {
+  "id": 239,
+  "slug": "timeouts-and-deadline-propagation",
+  "region": "f2-backend",
+  "order": 19,
+  "title": "Timeouts and Deadline Propagation",
+  "kind": "lesson",
+  "objectives": [
+   "Set a time limit on each remote call",
+   "Propagate a request deadline so downstream work stops when nobody is waiting",
+   "Size per-call timeouts from the remaining budget"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 12,
+  "prereqIds": [
+   221,
+   230
+  ],
+  "cards": [
+   {
+    "id": "t239-c1",
+    "kind": "text",
+    "title": "Each remote call needs a limit",
+    "body": "A call with no timeout can wait as long as the connection stays open. While it waits it holds a thread, a connection and memory. Under a slow dependency, those pile up until the service itself stops answering, which spreads the outage upstream.",
+    "teaches": [
+     "timeouts"
+    ]
+   },
+   {
+    "id": "t239-c2",
+    "kind": "text",
+    "title": "Worked example: the remaining budget",
+    "body": "A client gives the request 2,000 ms. Service A spends 300 ms, so it passes a deadline of 1,700 ms left to B. B spends 500 ms before calling C, so C gets 1,200 ms. If C sees its budget is already too small for its work, it fails fast instead of starting.",
+    "teaches": [
+     "deadline"
+    ]
+   },
+   {
+    "id": "t239-c3",
+    "kind": "diagram",
+    "title": "Passing the deadline down the chain",
+    "body": "Each hop learns how long is left, not a fresh fixed timeout.",
+    "teaches": [
+     "deadline"
+    ],
+    "steps": [
+     "The edge sets a deadline: now + 2,000 ms",
+     "Each service sends the remaining time (or the absolute deadline) in a request header",
+     "Each call uses min(its own timeout, time remaining)",
+     "Work stops once the deadline passes; queued requests already past it are dropped",
+     "The caller gets one clear timeout error instead of late results"
+    ]
+   },
+   {
+    "id": "t239-c4",
+    "kind": "text",
+    "title": "Connect, read and total timeouts",
+    "body": "A connect timeout bounds how long establishing a connection may take; a read timeout bounds the gap between bytes; neither bounds the whole call, because a server can trickle one byte at a time. Set an overall per-call limit as well, derived from the request deadline.",
+    "teaches": [
+     "timeouts"
+    ]
+   },
+   {
+    "id": "t239-c5",
+    "kind": "text",
+    "title": "Trap: nested timeouts that do not fit",
+    "body": "If a front service times out at 1 s but calls a service that retries three times with 1 s timeouts each, the inner work runs long after the caller gave up. Inner timeouts and retries must fit inside the outer budget, or the extra work only adds load.",
+    "teaches": [
+     "deadline",
+     "timeouts"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t239-a1",
+    "concept": "timeouts",
+    "type": "multiple_choice",
+    "prompt": "A dependency starts answering in 30 s instead of 50 ms, and the caller has no timeout. What usually fails first?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The dependency’s disk fills up"
+     },
+     {
+      "id": "b",
+      "label": "The caller runs out of threads or connections"
+     },
+     {
+      "id": "c",
+      "label": "The network drops the slow packets"
+     },
+     {
+      "id": "d",
+      "label": "The load balancer restarts the dependency"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Waiting requests hold resources; without a limit they accumulate until the caller is exhausted."
+   },
+   {
+    "id": "t239-a2",
+    "concept": "deadline",
+    "type": "multiple_choice",
+    "prompt": "Why pass the remaining deadline downstream instead of giving each service its own fixed timeout?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Fixed timeouts are rejected by HTTP servers"
+     },
+     {
+      "id": "b",
+      "label": "It makes each call send fewer bytes"
+     },
+     {
+      "id": "c",
+      "label": "It lets servers skip authentication checks"
+     },
+     {
+      "id": "d",
+      "label": "Downstream work can stop once the caller gave up"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Work done after the original caller timed out is wasted load."
+   },
+   {
+    "id": "t239-a3",
+    "concept": "timeouts",
+    "type": "multiple_choice",
+    "prompt": "A server sends one byte every 9 s and the client has a 10 s read timeout. What bounds the total call time?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The read timeout, as no gap exceeds it"
+     },
+     {
+      "id": "b",
+      "label": "Only an overall per-call time limit"
+     },
+     {
+      "id": "c",
+      "label": "The connect timeout of 2 s"
+     },
+     {
+      "id": "d",
+      "label": "The server’s keep-alive setting"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Read timeouts reset with each byte; only a total limit caps the whole call."
+   },
+   {
+    "id": "t239-a4",
+    "concept": "deadline",
+    "type": "multiple_choice",
+    "prompt": "A request waits 3 s in a queue; its deadline was 2 s. What should the worker do when it dequeues it?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Process it quickly to make up for the wait"
+     },
+     {
+      "id": "b",
+      "label": "Process it and log a slow-request warning"
+     },
+     {
+      "id": "c",
+      "label": "Drop it, since nobody is waiting for the answer"
+     },
+     {
+      "id": "d",
+      "label": "Put it back at the end of the queue"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Checking the deadline before starting avoids spending capacity on answers nobody will read."
+   },
+   {
+    "id": "t239-a5",
+    "concept": "deadline",
+    "type": "drag_order",
+    "prompt": "Order how a mid-chain service handles a call to the next service.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "Set the call timeout to the smaller of its default and the time left"
+     },
+     {
+      "id": "s1",
+      "label": "Read the incoming deadline"
+     },
+     {
+      "id": "s4",
+      "label": "Send the call with the deadline header"
+     },
+     {
+      "id": "s2",
+      "label": "Subtract the time already spent here"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Know the budget, account for local work, cap the call, pass the deadline on."
+   },
+   {
+    "id": "t239-a6",
+    "concept": "deadline",
+    "type": "estimation",
+    "prompt": "A client sets a 2,000 ms deadline. Service A uses 300 ms, then calls B; B uses 500 ms, then calls C. How many milliseconds does C have left?",
+    "unit": "ms",
+    "target": 1200,
+    "assumptions": [
+     "Network time is counted in each service’s time",
+     "The deadline is passed down"
+    ],
+    "formula": "2,000 − 300 − 500",
+    "workedAnswer": "2,000 − 300 − 500 = 1,200 ms",
+    "explanation": "Sanity check: if C normally needs 1,500 ms, failing at once is better than starting work that cannot finish in time.",
+    "tolerance": 0,
+    "trapAnswers": [
+     2000,
+     1700
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t239-f1",
+    "front": "Why a timeout on each call?",
+    "back": "A slow dependency otherwise holds threads and connections until the caller fails."
+   },
+   {
+    "id": "t239-f2",
+    "front": "Deadline propagation?",
+    "back": "Pass the remaining time downstream so work stops when the caller gives up."
+   },
+   {
+    "id": "t239-f3",
+    "front": "Read timeout vs total timeout?",
+    "back": "A read timeout resets per byte; only a total limit caps the whole call."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Google SRE book: Addressing Cascading Failures",
+    "url": "https://sre.google/sre-book/addressing-cascading-failures/"
+   },
+   {
+    "title": "gRPC: Deadlines",
+    "url": "https://grpc.io/docs/guides/deadlines/"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "timeouts",
+    "deadline"
+   ],
+   "mechanism": {
+    "title": "How timeouts and deadlines contain slow failures",
+    "steps": [
+     "Each in-flight request holds resources for its whole duration. By Little’s law, busy resources = arrival rate × time in system, so when a dependency slows from 50 ms to 5 s, the same traffic needs 100 times the threads and connections. A timeout caps the time term.",
+     "A per-call timeout is chosen from the dependency’s observed latency, for example a little above its p99, so normal slow requests succeed but stuck ones are cut off. Too tight causes false failures and retries; too loose gives no protection.",
+     "A deadline is a property of the whole request: the time after which the result is useless. The edge sets it and each hop forwards it, as gRPC does with its deadline and as HTTP services can with a header carrying the remaining milliseconds. Absolute times need reasonably synchronised clocks; remaining-time values avoid that by being recomputed at each hop.",
+     "Each hop uses the smaller of its own timeout and the time left. Before expensive work, it checks whether enough budget remains and fails fast if not. Requests that waited in a queue past their deadline are dropped instead of processed.",
+     "Retries must fit in the budget too. A retry is attempted only if the remaining time can cover another attempt, and ideally only one layer retries, so attempts do not multiply.",
+     "When a deadline expires, the caller should cancel the in-flight downstream calls so they free their resources, and return a clear error such as 504 or a deadline-exceeded status."
+    ]
+   },
+   "useWhen": [
+    "Services that call other services, databases or third-party APIs.",
+    "Request chains where the user stops waiting after a known time."
+   ],
+   "avoidWhen": [
+    "Avoid calls with no timeout, including database queries.",
+    "Avoid inner timeouts and retries that add up to more than the outer budget."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Setting",
+     "If too short",
+     "If too long"
+    ],
+    "rows": [
+     [
+      "Per-call timeout",
+      "Healthy slow calls fail and are retried",
+      "Stuck calls hold resources and pile up"
+     ],
+     [
+      "Request deadline",
+      "Users see errors for work that would have finished",
+      "Downstream keeps working after the user left"
+     ],
+     [
+      "Retries within the deadline",
+      "Too few to ride out a blip",
+      "Retries amplify load on a struggling service"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Why a missing timeout exhausts a pool",
+    "assumptions": [
+     "200 requests per second reach a handler",
+     "Normal dependency latency 50 ms",
+     "During an incident the dependency takes 30 s"
+    ],
+    "steps": [
+     "Normal: 200 × 0.05 = 10 requests waiting on the dependency at a time.",
+     "Incident, no timeout: 200 × 30 = 6,000 requests waiting at a time.",
+     "With a 500 ms timeout: 200 × 0.5 = 100 at most, and each fails fast.",
+     "A pool of a few hundred threads survives the 500 ms case and is exhausted in the no-timeout case."
+    ],
+    "result": "The timeout does not fix the dependency, but it caps how much of the caller the dependency can tie up."
+   },
+   "india": {
+    "title": "What the Google SRE book recommends",
+    "label": "Official documentation",
+    "body": "The Google SRE book’s chapter on addressing cascading failures recommends setting deadlines on requests and propagating them, so that servers deep in the stack stop working on requests whose callers have already given up. It also recommends checking the remaining deadline before each stage of work, and it describes how unlimited retries multiply load. The gRPC deadlines guide describes the same practice of propagating deadlines between services."
+   },
+   "pitfalls": [
+    {
+     "trap": "“The library default timeout is fine.”",
+     "say": "“Defaults are often very long or absent; I’d set connect, read and total limits from measured latency.”"
+    },
+    {
+     "trap": "“Each service has a 5 s timeout, so we are covered.”",
+     "say": "“I’d propagate one request deadline so inner calls do not outlive the caller.”"
+    }
+   ],
+   "takeaways": [
+    "Each remote call needs a total time limit.",
+    "Propagate the remaining deadline; use min(own timeout, time left).",
+    "Check the budget before work; drop expired queued requests.",
+    "Retries and inner timeouts must fit inside the outer deadline."
+   ]
+  },
+  "interactive": {
+   "kind": "slider",
+   "title": "Fit the chain into the deadline",
+   "prompt": "A handler makes 3 calls one after another and the user’s deadline is 1,000 ms. Slide the timeout each call is given and see the worst case.",
+   "model": "deadline-chain",
+   "params": {
+    "calls": 3,
+    "deadlineMs": 1000
+   },
+   "control": {
+    "label": "Per-call timeout",
+    "min": 100,
+    "max": 1000,
+    "step": 50,
+    "initial": 500,
+    "unit": "ms"
+   },
+   "takeaway": "Fixed per-call timeouts add up: three 500 ms limits allow 1,500 ms, past a 1,000 ms deadline. About 300 ms each fits, or better, give each call whatever time is left so the total cannot exceed the budget."
+  },
+  "seeAlso": [
+   {
+    "topicId": 53,
+    "why": "Timeouts, retries and circuit breakers across a system"
+   },
+   {
+    "topicId": 230,
+    "why": "Retries that must fit inside the deadline"
+   }
+  ]
+ },
+ {
+  "id": 240,
+  "slug": "serialisation-and-schema-evolution",
+  "region": "f2-backend",
+  "order": 20,
+  "title": "Serialisation Formats and Schema Evolution",
+  "kind": "lesson",
+  "objectives": [
+   "Compare text formats like JSON with schema-based binary formats",
+   "Make changes old and new readers can both handle",
+   "Avoid number-precision and field-reuse pitfalls"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 12,
+  "prereqIds": [
+   231
+  ],
+  "cards": [
+   {
+    "id": "t240-c1",
+    "kind": "text",
+    "title": "Bytes on the wire outlive the code",
+    "body": "Serialisation turns in-memory data into bytes for a network message, a queue or a file. Those bytes are often read by a different version of the program, written months ago or deployed tomorrow, so the format has to survive change.",
+    "teaches": [
+     "formats"
+    ]
+   },
+   {
+    "id": "t240-c2",
+    "kind": "text",
+    "title": "Misconception: binary formats are just smaller JSON",
+    "body": "Schema-based binary formats replace field names with numbered tags defined in a shared schema. That makes messages smaller and parsing faster, but a reader needs the schema to interpret them, and the tag numbers become a permanent contract.",
+    "teaches": [
+     "formats",
+     "field-numbers"
+    ]
+   },
+   {
+    "id": "t240-c3",
+    "kind": "diagram",
+    "title": "Adding a field safely",
+    "body": "Old and new versions must keep working during a rolling deploy.",
+    "teaches": [
+     "compatibility"
+    ],
+    "steps": [
+     "Add the new field as optional with a sensible default",
+     "Deploy readers that understand the field but do not require it",
+     "Deploy writers that start sending it",
+     "Old readers skip the unknown field; new readers default it when absent",
+     "Only after all readers are updated may the field be relied on"
+    ]
+   },
+   {
+    "id": "t240-c4",
+    "kind": "text",
+    "title": "Backward and forward compatibility",
+    "body": "Backward compatible: new code reads data written by old code. Forward compatible: old code reads data written by new code, usually by ignoring unknown fields. Rolling deploys and queued messages need both at once.",
+    "teaches": [
+     "compatibility"
+    ]
+   },
+   {
+    "id": "t240-c5",
+    "kind": "text",
+    "title": "Trap: reusing a deleted field’s number",
+    "body": "If field 7 once meant price in paise and is deleted, a later field 7 meaning quantity will make old messages and old readers misread data silently. Reserve removed field numbers and names so they cannot be reused.",
+    "teaches": [
+     "field-numbers"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t240-a1",
+    "concept": "compatibility",
+    "type": "multiple_choice",
+    "prompt": "Old consumers are still running when a producer adds a new optional field. What lets the old consumers keep working?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "They skip fields they do not recognise"
+     },
+     {
+      "id": "b",
+      "label": "The producer sends both versions of each message"
+     },
+     {
+      "id": "c",
+      "label": "The field is placed at the end of the message"
+     },
+     {
+      "id": "d",
+      "label": "The broker strips unknown fields before delivery"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Forward compatibility comes from readers skipping unknown fields."
+   },
+   {
+    "id": "t240-a2",
+    "concept": "field-numbers",
+    "type": "multiple_choice",
+    "prompt": "A field with tag 4 is removed from a binary schema. What should happen to tag 4?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Give it to the next new field to keep tags compact"
+     },
+     {
+      "id": "b",
+      "label": "Reserve it so no later field can use it"
+     },
+     {
+      "id": "c",
+      "label": "Renumber the remaining fields to close the gap"
+     },
+     {
+      "id": "d",
+      "label": "Move it to the end of the message definition"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Old data and old readers still associate tag 4 with the removed meaning."
+   },
+   {
+    "id": "t240-a3",
+    "concept": "formats",
+    "type": "multiple_choice",
+    "prompt": "A JSON API returns a 64-bit order id of 9007199254740993. Some clients show it ending in 992. Why?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "JSON forbids integers above 32 bits"
+     },
+     {
+      "id": "b",
+      "label": "The server rounds ids to even numbers"
+     },
+     {
+      "id": "c",
+      "label": "Clients parse numbers as doubles, which cannot hold it"
+     },
+     {
+      "id": "d",
+      "label": "The id overflowed while being serialised"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Many JSON parsers use IEEE 754 doubles, exact only up to 2^53; RFC 8259 warns about this. Send large ids as strings."
+   },
+   {
+    "id": "t240-a4",
+    "concept": "compatibility",
+    "type": "multiple_choice",
+    "prompt": "Which schema change is usually breaking for existing readers?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Adding an optional field with a default"
+     },
+     {
+      "id": "b",
+      "label": "Adding an enum value readers map to unknown"
+     },
+     {
+      "id": "c",
+      "label": "Changing a field’s type from integer to string"
+     },
+     {
+      "id": "d",
+      "label": "Adding a comment to the schema file"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Readers built for the old type misread or reject the new one."
+   },
+   {
+    "id": "t240-a5",
+    "concept": "formats",
+    "type": "tradeoff",
+    "prompt": "Choose a format for a high-volume internal event stream read by many services.",
+    "constraints": [
+     "Hundreds of thousands of messages per second",
+     "Producers and consumers deploy independently",
+     "Engineers sometimes inspect messages by hand"
+    ],
+    "approaches": [
+     {
+      "id": "p2",
+      "label": "Plain JSON with no schema",
+      "description": "Readable, no tooling"
+     },
+     {
+      "id": "p1",
+      "label": "Schema-based binary format with a schema registry",
+      "description": "Compact, checked changes"
+     },
+     {
+      "id": "p3",
+      "label": "Each language’s native object serialiser",
+      "description": "No extra code"
+     }
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r1",
+      "label": "Field names are not repeated in each message"
+     },
+     {
+      "id": "r2",
+      "label": "Schema changes can be checked for compatibility before deploy"
+     },
+     {
+      "id": "r3",
+      "label": "Binary messages cannot be inspected by people"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3"
+    ],
+    "rationaleConflicts": {
+     "r3": "Binary messages can be decoded for inspection with the schema and tooling."
+    },
+    "explanation": "For high-volume internal streams, a schema plus binary encoding saves bytes and catches breaking changes; JSON stays a good choice for public, low-volume APIs."
+   },
+   {
+    "id": "t240-a6",
+    "concept": "field-numbers",
+    "type": "estimation",
+    "prompt": "Each JSON message repeats key text totalling 27 bytes. A binary format uses a 1-byte tag for each of its 3 fields instead. About how many MB of key overhead are saved per million messages?",
+    "unit": "MB",
+    "target": 24,
+    "assumptions": [
+     "27 bytes of key text per JSON message",
+     "3 bytes of tags per binary message",
+     "1 MB = 1,000,000 bytes"
+    ],
+    "formula": "(27 − 3) × 1,000,000 bytes",
+    "workedAnswer": "24 bytes × 1,000,000 = 24,000,000 bytes = 24 MB",
+    "explanation": "Sanity check: compression such as gzip removes much of this repetition in JSON too, so measure compressed sizes before switching formats for size alone.",
+    "tolerance": 0.1,
+    "trapAnswers": [
+     27,
+     3
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t240-f1",
+    "front": "Backward vs forward compatibility?",
+    "back": "New reads old vs old reads new."
+   },
+   {
+    "id": "t240-f2",
+    "front": "Removed field number?",
+    "back": "Reserve it; do not reuse it."
+   },
+   {
+    "id": "t240-f3",
+    "front": "Large integer ids in JSON?",
+    "back": "Send as strings; doubles are exact only to 2^53."
+   }
+  ],
+  "sources": [
+   {
+    "title": "RFC 8259: The JSON Data Interchange Format",
+    "url": "https://www.rfc-editor.org/rfc/rfc8259"
+   },
+   {
+    "title": "Protocol Buffers: Language Guide (proto3)",
+    "url": "https://protobuf.dev/programming-guides/proto3/"
+   },
+   {
+    "title": "Protocol Buffers: Encoding",
+    "url": "https://protobuf.dev/programming-guides/encoding/"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "formats",
+    "compatibility",
+    "field-numbers"
+   ],
+   "mechanism": {
+    "title": "How formats encode data and how schemas evolve",
+    "steps": [
+     "Text formats such as JSON carry field names and values as text in each message. They are self-describing and readable, but repeat names, need parsing of digits and escapes, and leave number precision to each parser. RFC 8259 notes that numbers beyond the range or precision of IEEE 754 doubles may not be handled interoperably; integers are exact only up to 2^53 − 1.",
+     "Schema-based binary formats define fields in a schema file and encode each value with a small tag naming the field number and wire type. In Protocol Buffers, field numbers 1 to 15 take one byte to encode with their type. Readers decode by tag, so field order and names in code do not matter, but numbers do.",
+     "A reader that meets an unknown tag can skip it because the wire type says how long the value is. That is what gives forward compatibility: old readers ignore fields added later.",
+     "Safe changes are generally: add optional fields with defaults, add enum values that readers handle with an unknown fallback, and remove fields while reserving their numbers. Unsafe changes include changing a field’s type, changing a field’s number, reusing a number, and making an optional field required.",
+     "Schema registries store versions of each schema and check a proposed change against a compatibility rule before it is deployed. For JSON APIs the same discipline is applied by convention and tests: tolerant readers that ignore unknown fields, and additive changes only within a version.",
+     "Language-native object serialisers tie the format to one language and can run code during deserialisation; OWASP warns that deserialising untrusted data this way can lead to remote code execution."
+    ]
+   },
+   "useWhen": [
+    "JSON for public APIs, browsers, configuration and debugging-heavy paths.",
+    "Schema-based binary formats for high-volume internal traffic and long-lived stored events."
+   ],
+   "avoidWhen": [
+    "Avoid language-native object serialisers for data crossing a trust boundary.",
+    "Avoid changing a field’s type or number in place."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Format",
+     "Size and speed",
+     "Readability",
+     "Change safety"
+    ],
+    "rows": [
+     [
+      "JSON",
+      "Larger; text parsing",
+      "Readable as-is",
+      "By convention: tolerant readers, additive changes"
+     ],
+     [
+      "Schema-based binary",
+      "Compact tags; fast decode",
+      "Needs the schema to read",
+      "Checked against schema rules"
+     ],
+     [
+      "Language-native serialisers",
+      "Varies",
+      "Opaque",
+      "Tied to one language; unsafe on untrusted input"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Where the bytes go in a small message",
+    "assumptions": [
+     "A message with user_id, amount and currency",
+     "Key text in JSON including quotes: 27 bytes (illustrative count)",
+     "Binary tags for field numbers under 16: 1 byte each"
+    ],
+    "steps": [
+     "JSON key overhead per message: 27 bytes.",
+     "Binary tag overhead per message: 3 × 1 = 3 bytes.",
+     "Saving per message: 24 bytes; per million messages: 24 MB.",
+     "Values also differ: a small integer such as 250 is 3 text bytes in JSON and 2 bytes as a varint."
+    ],
+    "result": "Field names dominate the overhead of small JSON messages; whether that matters depends on volume and on whether the traffic is already compressed."
+   },
+   "india": {
+    "title": "What the Protocol Buffers guide says about field numbers",
+    "label": "Official documentation",
+    "body": "The Protocol Buffers language guide says a field number should not be changed once the message type is in use, because the number identifies the field in the encoded data. When a field is deleted, it advises reserving its number, and its name, so that future edits cannot reuse them, since reuse can cause data corruption or privacy bugs when old data is decoded. It also explains that numbers 1 to 15 encode in one byte and should go to frequent fields."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We renamed the field, so we bumped its number too.”",
+     "say": "“Names can change; the number is the contract, so it stays and old numbers are reserved.”"
+    },
+    {
+     "trap": "“Ids are numbers, so we send them as JSON numbers.”",
+     "say": "“Ids above 2^53 lose precision in many parsers; I’d send them as strings.”"
+    }
+   ],
+   "takeaways": [
+    "Readers must ignore unknown fields to allow additive change.",
+    "Field numbers are permanent; reserve removed ones.",
+    "Add optional fields; do not change type or number in place.",
+    "Large integers in JSON travel safely as strings."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Which deploy order is safe?",
+   "prompt": "A new field, discount, is being added to order events. Producers and consumers deploy separately. Which rollout order keeps each message readable?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Update consumers to accept the optional field, then update producers",
+     "feedback": "Right: consumers tolerate both shapes before any producer sends the new one."
+    },
+    {
+     "id": "b",
+     "label": "Update producers first so the data is ready for consumers",
+     "feedback": "Old consumers that reject unknown fields would fail on the new messages."
+    },
+    {
+     "id": "c",
+     "label": "Update both at the same moment",
+     "feedback": "Rolling deploys and queued messages mean old and new versions overlap anyway."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Readers first is the safe default, because some readers are strict about unknown fields or must act on the new one. With tolerant readers, either order works for an optional field."
+  },
+  "seeAlso": [
+   {
+    "topicId": 231,
+    "why": "Versioning the API that these messages travel through"
+   },
+   {
+    "topicId": 234,
+    "why": "Deserialising untrusted input safely"
+   }
+  ]
+ }
+]

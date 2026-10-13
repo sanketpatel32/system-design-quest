@@ -44,9 +44,9 @@
      "phases"
     ],
     "steps": [
-     "Capture: window, document, html, body, table, row (top down)",
+     "Capture: window, document, html, body, table, tbody, row, cell (top down)",
      "Target: the clicked button runs its own listeners",
-     "Bubble: row, table, body, html, document, window (bottom up)",
+     "Bubble: cell, row, tbody, table, body, html, document, window (bottom up)",
      "Default action: if nothing cancelled it, the browser does its normal behaviour, such as following a link"
     ]
    },
@@ -54,7 +54,7 @@
     "id": "t215-c4",
     "kind": "text",
     "title": "Stop the journey or stop the default: two separate switches",
-    "body": "Stopping propagation ends the trip through ancestors, but the browser still follows the link or submits the form. Cancelling the default (preventDefault) stops the link or submission, but ancestors still hear the event. They are independent; code that needs both must ask for both.",
+    "body": "Stopping propagation ends the trip through ancestors, but the browser still follows the link or submits the form. Cancelling the default action stops the link or submission, but ancestors still hear the event. They are independent; code that needs both must ask for both.",
     "teaches": [
      "default-vs-propagation"
     ]
@@ -130,7 +130,7 @@
     "id": "t215-a3",
     "concept": "default-vs-propagation",
     "type": "multiple_choice",
-    "prompt": "A link's click listener calls stopPropagation but not preventDefault. What happens?",
+    "prompt": "A link's click listener stops propagation but does not cancel the default action. What happens?",
     "choices": [
      {
       "id": "a",
@@ -243,7 +243,7 @@
    },
    {
     "id": "t215-f3",
-    "front": "stopPropagation vs preventDefault?",
+    "front": "Stopping propagation vs cancelling the default action?",
     "back": "One stops the trip through ancestors; the other cancels the browser's default action."
    },
    {
@@ -346,7 +346,7 @@
      "say": "“I'd put one delegated listener on the table and find the row from the event target, so added rows work and nothing needs unregistering.”"
     },
     {
-     "trap": "“stopPropagation will stop the link from navigating.”",
+     "trap": "“Stopping propagation will stop the link from navigating.”",
      "say": "“That only stops ancestors hearing it; I'd cancel the default action to stop navigation.”"
     },
     {
@@ -374,7 +374,7 @@
     {
      "id": "b",
      "label": "Save runs, then the modal closes",
-     "feedback": "That would happen without stopPropagation, because the click bubbles to the backdrop."
+     "feedback": "That would happen if propagation were not stopped, because the click bubbles to the backdrop."
     },
     {
      "id": "c",
@@ -732,7 +732,7 @@
    "india": {
     "title": "Edge case: the minimum size of an fr track",
     "label": "Official documentation",
-    "body": "The CSS Grid specification defines a flexible track sized with fr as having an automatic minimum unless the author sets one, which is why MDN's grid guides recommend minmax(0, 1fr) when columns must stay equal. In practice a single long product code, URL or untranslated word in one cell can make a two-column layout lopsided on narrow screens. Testing layouts with long, unbreakable strings and large text sizes catches this before users do."
+    "body": "The CSS Grid specification defines a flexible track sized with fr as having an automatic minimum unless the author sets one, (a bare 1fr means minmax(auto, 1fr)), so a common fix when columns must stay equal is minmax(0, 1fr). In practice a single long product code, URL or untranslated word in one cell can make a two-column layout lopsided on narrow screens. Testing layouts with long, unbreakable strings and large text sizes catches this before users do."
    },
    "pitfalls": [
     {
@@ -1082,7 +1082,7 @@
      "CSS pixels are a unit of layout, not hardware. The device pixel ratio says how many physical pixels draw one CSS pixel along each axis. Text and vector graphics are drawn crisply at any DPR; bitmap images need more pixels to stay sharp, which is why image choice depends on DPR.",
      "Media queries apply styles when conditions on the viewport or device are true: width ranges, orientation, prefers-color-scheme, prefers-reduced-motion, hover capability. Breakpoints in rem units scale with the user's font size, so a user with larger text gets the narrower layout sooner.",
      "Container queries apply styles based on the size of a declared container. This lets a component adapt to the space it actually has, which matters in design systems where the same card sits in sidebars, modals and full-width sections.",
-     "For images, srcset lists candidate files with their intrinsic widths and sizes tells the browser the slot width under each condition. The browser computes slot width × DPR and picks a candidate, possibly a smaller one on a constrained connection. The picture element with source media conditions is for art direction, such as a tighter crop on phones, and for offering newer formats with a fallback.",
+     "For images, srcset lists candidate files with their intrinsic widths and sizes tells the browser the slot width under each condition. The browser computes slot width × DPR and picks a candidate, possibly a smaller one on a constrained connection. The picture element is for art direction, through media conditions on its sources (such as a tighter crop on phones), and, through the type attribute, for offering newer formats with a fallback.",
      "Viewport-percentage units (vw, vh) were defined before mobile toolbars appeared and disappeared during scroll. CSS Values Level 4 adds small, large and dynamic variants (svh, lvh, dvh and their width and inline equivalents). dvh tracks the current size but changes during scroll, which can cause layout jumps, so svh is often the safer choice for a hero."
     ]
    },
@@ -1178,7 +1178,7 @@
     {
      "id": "b",
      "label": "A media query at a viewport width of 400 px",
-     "feedback": "The viewport is 1,280 px or more on desktop, so the sidebar card never stacks."
+     "feedback": "On a desktop the viewport is usually far wider than 400 px, so the narrow sidebar card would not stack."
     },
     {
      "id": "c",
@@ -1225,11 +1225,18 @@
    },
    {
     "id": "t218-c2",
-    "kind": "text",
-    "title": "Worked example: the price of polling every 5 seconds",
-    "body": "10,000 open dashboards polling every 5 s send 10,000 ÷ 5 = 2,000 requests per second. If the data changes once a minute, roughly 11 of every 12 responses say nothing new. With SSE the same users hold 10,000 open connections, and the server sends a message only when the data changes.",
+    "kind": "diagram",
+    "title": "Worked example: seven tabs over HTTP/1.1",
+    "body": "Browsers open at most about six connections per host over HTTP/1.1, and each SSE stream holds one open for as long as the page lives.",
     "teaches": [
-     "polling-cost"
+     "options"
+    ],
+    "steps": [
+     "A user opens the same dashboard in seven tabs; each tab opens its own SSE stream",
+     "Six streams take all six connections to that host",
+     "The seventh stream, and every fetch the pages make to that host, waits for a free connection",
+     "Over HTTP/2 all streams share one connection (the server negotiates how many, often 100), so the limit disappears",
+     "Alternatives: one shared stream for all tabs of the site, or serve the stream over HTTP/2"
     ]
    },
    {
@@ -1271,29 +1278,29 @@
     "id": "t218-a1",
     "concept": "options",
     "type": "multiple_choice",
-    "prompt": "A live score page only needs updates pushed from server to browser, as text, and should resume after a dropped connection. Which fits with the least custom code?",
+    "prompt": "An SSE stream drops and the browser reconnects on its own. What does it send so the server can resume?",
     "choices": [
      {
       "id": "a",
-      "label": "Server-sent events"
+      "label": "A Last-Event-ID header with the last id it saw"
      },
      {
       "id": "b",
-      "label": "A WebSocket with a custom resume protocol"
+      "label": "The full list of events it has already received"
      },
      {
       "id": "c",
-      "label": "Short polling every second"
+      "label": "A WebSocket upgrade request for the same URL"
      },
      {
       "id": "d",
-      "label": "Long polling with a resume token"
+      "label": "A new random session token in the query string"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "SSE is one-way text over HTTP with reconnection and Last-Event-ID resume built into the browser client; a WebSocket would need all of that written by hand."
+    "explanation": "The browser remembers the last event id and sends it on reconnect; the server replays what came after it."
    },
    {
     "id": "t218-a2",
@@ -1414,21 +1421,21 @@
     "id": "t218-a6",
     "concept": "polling-cost",
     "type": "estimation",
-    "prompt": "50,000 clients short-poll an endpoint every 10 seconds. How many requests per second does the server receive on average?",
-    "unit": "requests/s",
-    "target": 5000,
-    "assumptions": [
-     "50,000 clients",
-     "one request every 10 s each"
-    ],
-    "formula": "50,000 ÷ 10",
-    "workedAnswer": "50,000 ÷ 10 = 5,000 requests/s",
-    "explanation": "Sanity check: that load stays the same when nothing changes; with SSE or WebSockets the request rate drops to near zero and the cost moves to holding 50,000 idle connections.",
-    "tolerance": 0.02,
+    "prompt": "After a server restart, 50,000 clients reconnect, each after a random delay spread evenly over 0–20 seconds. About how many reconnects per second reach the server?",
+    "unit": "reconnects/s",
+    "target": 2500,
+    "tolerance": 0.05,
     "trapAnswers": [
-     500000,
-     500
-    ]
+     50000,
+     1000
+    ],
+    "assumptions": [
+     "Delays are uniform over 20 s",
+     "Every client reconnects once"
+    ],
+    "formula": "clients ÷ spread in seconds",
+    "workedAnswer": "50,000 ÷ 20 = 2,500 reconnects per second",
+    "explanation": "Design implication: without jitter all 50,000 arrive in the same second; spreading over 20 s cuts the peak 20 times."
    }
   ],
   "flashcards": [
@@ -1569,28 +1576,28 @@
    ]
   },
   "interactive": {
-   "kind": "tradeoff",
-   "title": "Pick the transport",
-   "prompt": "A delivery app shows each customer their rider's position, updated about every 5 seconds. The customer's page never sends anything back while watching.",
+   "kind": "predict",
+   "title": "What happens to the seventh tab?",
+   "prompt": "A user opens the same dashboard in seven tabs. Each tab opens its own server-sent events stream to the site over HTTP/1.1, and the pages also fetch data from the same host.",
    "choices": [
     {
      "id": "a",
-     "label": "Server-sent events",
-     "feedback": "Right: one-way, small text updates, with reconnection and resume built in."
+     "label": "The seventh stream and later fetches wait for a free connection",
+     "feedback": "Right: six long-lived streams use all six connections the browser allows per host over HTTP/1.1."
     },
     {
      "id": "b",
-     "label": "A WebSocket",
-     "feedback": "It works, but nothing flows from the client, so you take on reconnect and resume logic for no gain."
+     "label": "All seven streams share one connection automatically",
+     "feedback": "That is how HTTP/2 behaves, not HTTP/1.1."
     },
     {
      "id": "c",
-     "label": "Short polling every 5 seconds",
-     "feedback": "Workable, but each update costs a full request and arrives up to 5 s late."
+     "label": "The server rejects the seventh stream with 429",
+     "feedback": "The request never reaches the server; it waits in the browser."
     }
    ],
    "correctId": "a",
-   "reveal": "Server-to-client streams of small text messages match SSE exactly. Reach for a WebSocket when the client sends a steady stream of its own messages too."
+   "reveal": "Share one stream across tabs, or serve the site over HTTP/2, where streams share one connection."
   },
   "seeAlso": [
    {
@@ -1664,7 +1671,7 @@
     "id": "t219-c5",
     "kind": "text",
     "title": "Trap: caching by element in a plain map",
-    "body": "A map from element to computed data holds every element strongly, so removed elements can never be collected. A WeakMap holds its keys weakly: when the element is otherwise unreachable, the entry goes with it. Choose the weak version for metadata attached to objects you do not own.",
+    "body": "A map from element to computed data holds every element strongly, so removed elements can never be collected. A weak-keyed map holds its keys weakly: when the element is otherwise unreachable, the entry goes with it. Choose the weak version for metadata attached to objects you do not own.",
     "teaches": [
      "weak-refs"
     ]
@@ -1767,7 +1774,7 @@
      },
      {
       "id": "b",
-      "label": "A WeakMap keyed by element"
+      "label": "A weak-keyed map keyed by element"
      },
      {
       "id": "c",
@@ -1781,7 +1788,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "A WeakMap does not keep its keys alive, so entries disappear with their elements; the plain map and array keep every element forever."
+    "explanation": "A weak-keyed map does not keep its keys alive, so entries disappear with their elements; the plain map and array keep every element forever."
    },
    {
     "id": "t219-a5",
@@ -1790,16 +1797,20 @@
     "prompt": "Order the steps for confirming a suspected leak with heap snapshots.",
     "items": [
      {
-      "id": "s3",
+      "id": "s4",
       "label": "Repeat the suspect action several times"
      },
      {
       "id": "s1",
-      "label": "Load the page and take a baseline snapshot"
+      "label": "Load the page"
      },
      {
-      "id": "s4",
+      "id": "s5",
       "label": "Force garbage collection, take a snapshot and compare"
+     },
+     {
+      "id": "s3",
+      "label": "Take a baseline snapshot"
      },
      {
       "id": "s2",
@@ -1810,23 +1821,16 @@
      "s1",
      "s2",
      "s3",
-     "s4"
+     "s4",
+     "s5"
     ],
-    "explanation": "The warm-up keeps one-time caches out of the comparison, so what grows with repetitions is the leak.",
-    "alternativeOrders": [
-     [
-      "s2",
-      "s1",
-      "s3",
-      "s4"
-     ]
-    ]
+    "explanation": "Warm up before the baseline so one-time caches are not counted as growth, then compare after repeats and a forced collection."
    },
    {
     "id": "t219-a6",
     "concept": "leak-patterns",
     "type": "estimation",
-    "prompt": "Each route change leaks 2.5 MB. A support agent's tab starts at 60 MB and they change route 80 times in a shift. How large is the heap at the end, in MB?",
+    "prompt": "Each route change leaks 2.5 MB. A field agent's tab starts at 60 MB and they change route 80 times in a shift. How large is the heap at the end, in MB?",
     "unit": "MB",
     "target": 260,
     "assumptions": [
@@ -1862,8 +1866,8 @@
    },
    {
     "id": "t219-f4",
-    "front": "Map vs WeakMap for element metadata?",
-    "back": "WeakMap: it does not keep the element alive."
+    "front": "Plain map vs weak-keyed map for element metadata?",
+    "back": "The weak-keyed map: it does not keep the element alive."
    }
   ],
   "sources": [
@@ -1891,7 +1895,7 @@
      "Closures capture the variables of the scope they were created in. A small listener function can therefore keep a large array, a component's whole state or a set of DOM nodes alive for as long as the listener itself is reachable.",
      "Registered listeners, timers, animation-frame callbacks, observers and open sockets are all reachable from roots by design: the browser must be able to call them. Anything they capture stays alive until they are unregistered, cleared, disconnected or closed.",
      "Single-page apps make this worse because the page never reloads. On a traditional site, navigation throws the whole heap away. In an app that swaps views, each view must undo what it set up, or every visit adds another copy of its state.",
-     "Weak references help when you attach data to objects whose lifetime you do not control. WeakMap and WeakSet keys do not keep their objects alive. WeakRef and FinalizationRegistry exist too, but their timing is up to the collector, so they suit caches, not program logic.",
+     "Weak references help when you attach data to objects whose lifetime you do not control. Weak-keyed maps and weak sets do not keep their keys alive. Weak references and finalisation callbacks exist too, but their timing is up to the collector, so they suit caches, not program logic.",
      "Detection is empirical. In the browser's memory tools, compare heap snapshots taken before and after repeating an action, or record allocations over time. Look for object counts that grow with the number of repetitions, then read the retainer chain to find the root that holds them."
     ]
    },
@@ -1901,7 +1905,7 @@
    ],
    "avoidWhen": [
     "Avoid treating a high but stable heap as a leak; caches and pooled objects can be deliberate. Growth per repetition is the signal.",
-    "Avoid WeakRef-based logic that must run at a known time; the collector decides when, and may never collect in a short session."
+    "Avoid weak-reference logic that must run at a known time; the collector decides when, and may never collect in a short session."
    ],
    "tradeoffs": {
     "columns": [
@@ -1918,7 +1922,7 @@
       "Bounded caches with an eviction rule"
      ],
      [
-      "WeakMap keyed by object",
+      "Weak-keyed map keyed by object",
       "Values while the key is alive",
       "The key becomes unreachable",
       "Metadata on elements or objects you do not own"
@@ -1943,7 +1947,7 @@
      "Baseline heap after load: 40 MB",
      "Each route change leaves 3 MB reachable (a view's state plus its detached DOM)",
      "An agent changes route about 25 times an hour for 8 hours",
-     "Budget: 150 MB before low-memory phones and tablets struggle"
+     "Budget: 150 MB before the agent’s low-memory tablet starts discarding tabs"
     ],
     "steps": [
      "Route changes in a day: 25 × 8 = 200.",
@@ -1951,7 +1955,7 @@
      "Heap at end of day: 40 + 600 = 640 MB.",
      "The budget is crossed after (150 − 40) ÷ 3 ≈ 37 route changes, about an hour and a half into the shift."
     ],
-    "result": "A 3 MB leak passes any quick test but breaks the app within the first two hours of real use."
+    "result": "A 3 MB leak passes a quick test but breaks the app within the first two hours of real use."
    },
    "india": {
     "title": "Edge case: detached elements in the memory tools",
@@ -2031,11 +2035,18 @@
    },
    {
     "id": "t220-c2",
-    "kind": "text",
-    "title": "Worked example: sliding a panel 300 px",
-    "body": "Moving a sidebar from left: −300px to left: 0 relays out the page on every frame, and any layout work above the frame budget drops frames. Leaving left alone and animating transform: translateX(−300px) to translateX(0) moves the same pixels with no layout and no repaint once the panel is on its own layer.",
+    "kind": "diagram",
+    "title": "Worked example: promote only while animating",
+    "body": "A grid has 400 cards of 300 × 200 CSS px on a DPR 2 laptop, and any card can lift on hover.",
     "teaches": [
      "property-cost"
+    ],
+    "steps": [
+     "Promoting every card in advance: each layer is up to (600 × 400) device px × 4 B ≈ 0.96 MB, so about 384 MB for 400 cards",
+     "Instead, add will-change: transform to a card only when the pointer enters it",
+     "Animate transform on that one card",
+     "Remove the hint when the animation ends",
+     "At most a few layers exist at once: a few MB instead of hundreds"
     ]
    },
    {
@@ -2065,10 +2076,10 @@
    {
     "id": "t220-c5",
     "kind": "text",
-    "title": "Trap: read, write, read, write in one frame",
-    "body": "Changing a style and then reading a size or position forces the browser to run layout right away to answer. Doing that in a loop over many elements causes layout thrashing: one forced layout per element per frame. Read every measurement first, then make every write.",
+    "title": "Trap: forced layout inside an animation loop",
+    "body": "Reading a size or position right after changing styles forces layout immediately, and doing it per element is layout thrashing (covered in How Browsers Render a Page). In animation code, read every measurement first, then make every write.",
     "teaches": [
-     "thrashing"
+     "property-cost"
     ]
    }
   ],
@@ -2077,29 +2088,29 @@
     "id": "t220-a1",
     "concept": "property-cost",
     "type": "multiple_choice",
-    "prompt": "Which animation can usually run with no layout and no repaint per frame?",
+    "prompt": "A 1,000 × 800 CSS px panel gets its own layer on a DPR 2 laptop. At 4 bytes per pixel, about how much memory can that layer take?",
     "choices": [
      {
       "id": "a",
-      "label": "Animating left from 0 to 200 px"
+      "label": "3.2 MB"
      },
      {
       "id": "b",
-      "label": "Animating transform from translateX(0) to translateX(200px)"
+      "label": "6.4 MB"
      },
      {
       "id": "c",
-      "label": "Animating width from 100 to 300 px"
+      "label": "12.8 MB"
      },
      {
       "id": "d",
-      "label": "Animating box-shadow from small to large"
+      "label": "25.6 MB"
      }
     ],
     "correctChoiceIds": [
-     "b"
+     "c"
     ],
-    "explanation": "transform changes how an existing layer is drawn, not the geometry; left and width rerun layout, and box-shadow repaints."
+    "explanation": "(1,000 × 2) × (800 × 2) × 4 B = 12.8 MB: DPR 2 quadruples the 3.2 MB of a DPR 1 layer."
    },
    {
     "id": "t220-a2",
@@ -2133,29 +2144,29 @@
     "id": "t220-a3",
     "concept": "thrashing",
     "type": "multiple_choice",
-    "prompt": "A loop sets each of 200 elements' heights and then reads that element's new size before moving on. Why is it slow?",
+    "prompt": "A spinner is rotated by a script that sets its transform on every animation frame. The main thread then runs a 300 ms task. What happens to the spinner?",
     "choices": [
      {
       "id": "a",
-      "label": "Each read forces a fresh layout, so layout runs 200 times"
+      "label": "It keeps turning on the compositor thread"
      },
      {
       "id": "b",
-      "label": "Reading sizes moves the elements onto new compositor layers"
+      "label": "It freezes until the task finishes"
      },
      {
       "id": "c",
-      "label": "The browser repaints the screen after each element changes"
+      "label": "It speeds up later to catch up"
      },
      {
       "id": "d",
-      "label": "Style changes are queued and run on the following page load"
+      "label": "It switches to a CSS animation"
      }
     ],
     "correctChoiceIds": [
-     "a"
+     "b"
     ],
-    "explanation": "Writes mark layout dirty and the next read must be answered accurately, so interleaving forces one layout per element; batch the reads, then the writes."
+    "explanation": "Script-driven frames need the main thread; only animations handed to the compositor keep running while it is busy."
    },
    {
     "id": "t220-a4",
@@ -2324,20 +2335,20 @@
     ]
    },
    "numbers": {
-    "title": "The memory bill for promoted layers (illustrative)",
+    "title": "The memory bill for promoted layers (illustrative, upper bound)",
     "assumptions": [
      "A page promotes 12 cards with will-change: transform",
-     "Each card is 600 × 400 CSS px",
+     "Each card is 360 × 240 CSS px",
      "Phone with DPR 3",
-     "4 bytes per pixel"
+     "4 bytes per pixel; browsers may rasterise only tiles near the viewport, so this is an upper bound"
     ],
     "steps": [
-     "Device pixels per card: (600 × 3) × (400 × 3) = 1,800 × 1,200 = 2,160,000.",
-     "Memory per card layer: 2,160,000 × 4 B = 8,640,000 B ≈ 8.6 MB.",
-     "Twelve cards: 12 × 8.6 MB ≈ 104 MB of layer memory.",
-     "Promoting only the card being animated keeps this near 8.6 MB."
+     "Device pixels per card: (360 × 3) × (240 × 3) = 1,080 × 720 = 777,600.",
+     "Memory per card layer: 777,600 × 4 B = 3,110,400 B ≈ 3.1 MB.",
+     "Twelve cards: 12 × 3.1 MB ≈ 37 MB of layer memory before anything moves.",
+     "Promoting only the card being animated keeps it near 3 MB."
     ],
-    "result": "Layers trade memory for cheaper frames; on high-density phones the memory side grows with DPR squared."
+    "result": "Layer memory scales with area × DPR²; promote only what is about to animate."
    },
    "india": {
     "title": "What the performance guides recommend",
@@ -2364,7 +2375,7 @@
   "interactive": {
    "kind": "predict",
    "title": "Which animation stutters?",
-   "prompt": "A page runs a 300 ms search filter on the main thread while two loading spinners rotate. Spinner A animates transform: rotate; spinner B animates its margin to fake rotation. Predict which keeps moving smoothly.",
+   "prompt": "A page runs a 300 ms search filter on the main thread while two loading spinners rotate. Spinner A is a CSS animation of transform: rotate; spinner B is a CSS animation of left and top that moves it around a small circle. Predict which keeps moving smoothly.",
    "choices": [
     {
      "id": "a",

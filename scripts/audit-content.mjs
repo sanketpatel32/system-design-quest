@@ -2,6 +2,7 @@
 import { checkQuiz } from './audit/quiz-quality.mjs'
 import { checkR3 } from './audit/r3.mjs'
 import { checkFundamentals } from './audit/fund.mjs'
+import { checkStems, STEM_DUP_THRESHOLD } from './audit/stems.mjs'
 import { checkGrading, loadGlyphCheck } from './audit/grading.mjs'
 import { checkDepth, checkBossDepth, DEEP_REGIONS } from './audit/depth.mjs'
 import { readFileSync, existsSync } from 'node:fs'
@@ -146,6 +147,12 @@ for (const t of topics) {
 // 5–8 authored questions per topic, concept-aligned with the cards, no silly distractors
 const quiz = checkQuiz(topics)
 errors.push(...checkDepth(topics))
+{
+  const stemErrors = checkStems(topics, join(root, 'scripts/audit/stem-baseline.json'))
+  errors.push(...stemErrors)
+  const base = JSON.parse(readFileSync(join(root, 'scripts/audit/stem-baseline.json'), 'utf8')).pairs.length
+  console.log(`Question stems: no new near-duplicates across topics (overlap >= ${STEM_DUP_THRESHOLD}); ${base} pre-existing pairs baselined`)
+}
 errors.push(...checkBossDepth(topics))
 console.log(`Depth rules enforced for: ${DEEP_REGIONS.join(', ') || 'none yet'}`)
 console.log("Boss study briefs enforced for all boss topics")

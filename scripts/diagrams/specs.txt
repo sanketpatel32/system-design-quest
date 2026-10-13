@@ -872,9 +872,9 @@ Backup vault|same region {store} [copy]> Immutable vault|other account and regio
 Immutable vault|other account and region {store} [scheduled test]> Restore check|measure RTO
 
 # ---------- Frontend additions (215-220) ----------
-@215 Event propagation for one click: the event is captured from the window down to the clicked button, runs on the button, then bubbles back up, where one delegated listener on the table handles clicks for every row.
+@215 Event propagation for one click: the event is captured from the window down through the table and row to the clicked button, runs on the button, then bubbles back up through the row to the table in the same dispatch, where one delegated listener handles clicks for every row.
 Window > Document > Table|delegated listener {client} [capture]> Row > Button|target {client}
-Button|target {client} [bubble]~> Table|delegated listener {client}
+Button|target {client} [bubble, same dispatch]> Row
 Table|delegated listener {client} [find closest button + row]> Handler|edit, delete, share
 
 @216 How a grid shares a 1000 px container with columns 200px 1fr 2fr and 20 px gaps: fixed tracks and gaps come out first, then 760 px is split into 1fr of about 253 px and 2fr of about 507 px.
@@ -887,10 +887,10 @@ srcset|480w, 960w, 1440w > Browser picks {client}
 sizes|slot = 100vw on phones > Browser picks {client}
 Device pixel ratio|DPR 2 or 3 > Browser picks {client} [slot x DPR]> Image file {store}
 
-@218 Real-time options: short polling repeats requests on a timer, server-sent events keep one HTTP response streaming text to the browser, and a WebSocket upgrades with 101 Switching Protocols into a two-way channel.
-Browser {client} [poll every N s]> API {svc}
-Browser {client} [GET text/event-stream]> SSE endpoint {svc} [events, Last-Event-ID on reconnect]~> Browser {client}
-Browser {client} [Upgrade: websocket]> WebSocket server {svc} [101, then frames both ways]~> Browser {client}
+@218 Real-time options: short polling repeats requests on a timer and often gets empty replies; server-sent events keep one HTTP response streaming text to the browser, which reconnects with a Last-Event-ID header; a WebSocket upgrades with 101 Switching Protocols into a two-way channel.
+Browser {client} [poll every N s]> API|replies, often empty {svc}
+Browser {client} [GET text/event-stream; on reconnect: Last-Event-ID]> SSE endpoint|streams events back {svc}
+Browser {client} [GET with Upgrade: websocket]> WebSocket server|101, then frames both ways {svc}
 
 @219 How an old view leaks: a global listener, a running timer and a growing cache are all reachable from a root, and each keeps the closed view's state and detached DOM alive.
 Root|window, globals > Global listener|never removed > Closed view state
@@ -900,5 +900,40 @@ Closed view state > Detached DOM nodes
 
 @220 Animation cost by property: width and left rerun layout, paint and composite; colours repaint and composite; transform and opacity on a layer only recomposite, often off the main thread.
 width, left, margin > Layout > Paint > Composite
-color, box-shadow > Paint
-transform, opacity|own layer > Composite
+color, box-shadow > Repaint|no layout > Then composite
+transform, opacity|own layer > Compositor only|often off the main thread
+
+@235 Shared caching for an API: a CDN keeps public responses for s-maxage and revalidates stale ones with the origin, per-user responses marked private go straight to the origin, and writes use If-Match so a stale version gets 412 Precondition Failed.
+Browser {client} [GET /products]> CDN|shared cache, s-maxage=600 {store} [stale: If-None-Match]> Origin {svc}
+Browser {client} [GET /cart, private]> Origin {svc}
+Editor {client} [PUT with If-Match: v7]> Origin {svc} [version changed]?> 412 Precondition Failed
+
+@236 Keyset pagination: the client sends back an opaque cursor holding the last row's keys, and the API seeks the index on (created_at, id) to read only the next 20 rows.
+Client [GET ?cursor=abc]> API|validate cursor and filters
+API|validate cursor and filters [rows after (t, id), LIMIT 20]> Index on (created_at, id) {store}
+API|validate cursor and filters [20 rows + next cursor]> Client
+
+@237 Webhooks: the sender's dispatcher signs each event with an HMAC and retries with backoff; the receiver verifies the signature and timestamp, skips seen event ids, queues the work and replies 2xx.
+Event store {store} > Dispatcher|sign with HMAC
+Dispatcher|sign with HMAC [POST + signature]> Receiver|verify HMAC and timestamp
+Dispatcher|sign with HMAC [timeout or 5xx]~> Retry with backoff
+Receiver|verify HMAC and timestamp [new event id]> Work queue
+Receiver|verify HMAC and timestamp [2xx]~> Dispatcher|sign with HMAC
+
+@238 Transactional outbox: the service writes the order row and an outbox row in one database transaction; a relay publishes outbox rows to the broker, and consumers skip event ids they have already handled.
+Order service [one transaction]> Orders + outbox {store}
+Relay [read unsent rows]> Orders + outbox {store}
+Relay [publish]> Broker
+Broker ~> Consumer|skip seen event ids
+
+@239 Deadline propagation: the edge sets a 2,000 ms deadline; service A passes 1,700 ms left to B, and B passes 1,200 ms left to C, so no call outlives the user's request.
+Client {client} > Edge|deadline 2,000 ms {svc}
+Edge|deadline 2,000 ms {svc} > Service A|300 ms used
+Service A|300 ms used [1,700 ms left]> Service B|500 ms used
+Service B|500 ms used [1,200 ms left]> Service C
+
+@240 Schema evolution: the writer adds an optional field; old readers skip the unknown tag, new readers use a default when it is missing, and removed field numbers are reserved.
+Writer v2|adds optional field 8 > Message bytes
+Message bytes [unknown tag 8: skip]> Reader v1
+Message bytes > Reader v2|default if field 8 missing
+Schema|field 4 reserved ~> Writer v2|adds optional field 8
