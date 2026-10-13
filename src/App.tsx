@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Route, Routes, useParams, useSearchParams } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { WorldMap } from './components/WorldMap'
 import { BossPage } from './pages/BossPage'
@@ -10,6 +10,8 @@ import { RevisionPage } from './pages/RevisionPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { TopicPage } from './pages/TopicPage'
 import { useGameStore } from './stores/gameStore'
+import { SectionsPage } from './pages/SectionsPage'
+import { isSectionId, rememberSection } from './content/sections'
 
 import { Mascot } from './components/art/Mascot'
 
@@ -23,6 +25,21 @@ function NotFound() {
       <Link to="/" className="btn-cta mt-5">Back to the map</Link>
     </div>
   )
+}
+
+/** /s/:section, one map per section */
+function SectionMap() {
+  const { section } = useParams()
+  useEffect(() => { if (isSectionId(section)) rememberSection(section) }, [section])
+  if (!isSectionId(section)) return <NotFound />
+  return <WorldMap key={section} sectionId={section} />
+}
+
+/** Old links (/?track=fundamentals) still work: they open the first Fundamentals section */
+function Home() {
+  const [params] = useSearchParams()
+  if (params.get('track') === 'fundamentals') return <Navigate to="/s/frontend" replace />
+  return <SectionsPage />
 }
 
 function AppRoutes() {
@@ -44,7 +61,8 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={<WorldMap />} />
+      <Route path="/" element={<Home />} />
+      <Route path="/s/:section" element={<SectionMap />} />
       <Route path="/topic/:slug" element={<TopicPage />} />
       <Route path="/quiz/:slug" element={<QuizPage />} />
       <Route path="/boss/:slug" element={<BossPage />} />

@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react'
 import { PageHero } from '../components/ui/PageHero'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { SECTION_BY_ID, isSectionId, sectionPalette, sectionTopics, type SectionId } from '../content/sections'
+import { SectionPicker } from '../components/map/SectionPicker'
+import { topicLabel } from '../content/numbering'
 import { topicsById } from '../content/catalog'
 
 const PATTERNS: [string, string, string, number][] = [
@@ -41,12 +44,43 @@ function Row({ k, v, approx }: { k: ReactNode; v: ReactNode; approx?: boolean })
   )
 }
 
+/** Non-System-Design sections: one card per topic, built from each lesson's takeaways */
+function SectionSheet({ id }: { id: SectionId }) {
+  const s = SECTION_BY_ID.get(id)!
+  const pal = sectionPalette(id)
+  const topics = sectionTopics(id).filter((t) => t.deep?.takeaways?.length)
+  return (
+    <div className="space-y-5">
+      <PageHero eyebrow="Reference card" title={`${s.name} cheat sheet`} icon="cheat" tone="purple">
+        The key takeaways from every {s.name} lesson on one page. Open a lesson for the reasoning and sources.
+      </PageHero>
+      <SectionPicker current={id} label="Cheat sheet by section" to={(x) => (x === 'system-design' || x === 'all' ? '/cheat-sheet' : `/cheat-sheet?s=${x}`)} />
+      <div className="grid gap-4 md:grid-cols-2" data-testid={`cheat-${id}`}>
+        {topics.map((t) => (
+          <section key={t.id} className="panel min-w-0 p-5" style={{ borderTop: `4px solid ${pal.bright}` }}>
+            <h2 className="font-display text-lg text-chalk mb-2">
+              <Link to={`/topic/${t.slug}`} className="hover:underline"><span style={{ color: pal.deep }}>{topicLabel(t.id)}</span> {t.title}</Link>
+            </h2>
+            <ul className="list-disc space-y-1 pl-5 text-[0.9375rem] text-chalk">
+              {t.deep!.takeaways.map((k) => <li key={k}>{k}</li>)}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function CheatSheetPage() {
+  const [params] = useSearchParams()
+  const sp = params.get('s') ?? undefined
+  if (isSectionId(sp) && sp !== 'system-design') return <SectionSheet id={sp} />
   return (
     <div className="space-y-5">
       <PageHero eyebrow="Reference card" title="Numbers and patterns" icon="cheat" tone="purple">
         Exact values in plain text, interview shortcuts highlighted. Say which one you are using out loud.
       </PageHero>
+      <SectionPicker current="system-design" label="Cheat sheet by section" to={(x) => (x === 'system-design' || x === 'all' ? '/cheat-sheet' : `/cheat-sheet?s=${x}`)} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Sheet title="Time and throughput">

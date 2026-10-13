@@ -9,21 +9,45 @@ async function areas(page: Page) {
   return by
 }
 
-test('track selector: Fundamentals sits beside System Design without changing it', async ({ page }) => {
+const SECTION_OF: Record<string, string> = { 'f1-frontend': 'frontend', 'f2-backend': 'backend', 'f3-networking': 'networking', 'f4-databases': 'databases', 'f5-os': 'os-concurrency', 'f6-security': 'security', 'f7-cloud': 'cloud-devops' }
+
+test('sections: overview rings, a map per section, and System Design unchanged', async ({ page }) => {
   await seed(page)
-  await expect(page.getByTestId('continue-quest')).toContainText('Unit 1')
-  await page.getByTestId('track-fundamentals').click()
-  await expect(page).toHaveURL(/track=fundamentals/)
-  await expect(page.getByRole('heading', { name: 'Fundamentals', level: 1 })).toBeVisible()
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Choose a section', level: 1 })).toBeVisible()
+  await expect(page.getByTestId('ring-system-design')).toHaveAttribute('data-done', '0')
   const by = await areas(page)
   for (const [region, list] of by) {
+    const sec = SECTION_OF[region]!
+    await expect(page.getByTestId(`section-card-${sec}`)).toBeVisible()
+    await page.goto(`/s/${sec}`)
+    await expect(page.getByTestId(`section-tab-${sec}`)).toHaveAttribute('aria-current', 'page')
     await expect(page.getByTestId(`area-${region}`)).toBeVisible()
     await expect(page.getByTestId(`station-${list[0]!.id}`)).toHaveAttribute('data-status', 'available')
     await expect(page.getByTestId(`station-${list[1]!.id}`)).toHaveAttribute('data-status', 'locked')
+    await page.goto('/')
   }
-  await page.getByTestId('track-system-design').click()
+  await page.getByTestId('section-card-system-design').click()
+  await expect(page).toHaveURL(/\/s\/system-design$/)
   await expect(page.getByTestId('unit-1')).toBeVisible()
   await expect(page.getByTestId('boss-sidebar')).toBeVisible()
+})
+
+test('sections: legacy ?track=fundamentals links land on a section, unknown sections 404', async ({ page }) => {
+  await seed(page)
+  await page.goto('/?track=fundamentals')
+  await expect(page).toHaveURL(/\/s\/frontend$/)
+  await page.goto('/s/not-a-section')
+  await expect(page.getByText(/not found|no such/i).first()).toBeVisible()
+})
+
+test('sections: Review and Cheat Sheet filter by section', async ({ page }) => {
+  await seed(page)
+  await page.goto('/revision?s=networking')
+  await expect(page.getByTestId('section-tab-networking')).toHaveAttribute('aria-current', 'page')
+  await page.goto('/cheat-sheet?s=databases')
+  await expect(page.getByTestId('cheat-databases')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Databases cheat sheet' })).toBeVisible()
 })
 
 test('every Fundamentals area: first topic has cards, Go deeper, and a Try it, and its quiz loads', async ({ page }) => {
@@ -48,7 +72,7 @@ test('a locked Fundamentals topic explains which topic opens it', async ({ page 
   await seed(page)
   const by = await areas(page)
   const [, list] = [...by][0]!
-  await page.goto('/?track=fundamentals')
+  await page.goto(`/s/${SECTION_OF[[...by][0]![0]]}`)
   await page.getByTestId(`station-${list[1]!.id}`).click()
   await expect(page.getByRole('dialog', { name: list[1]!.title })).toContainText(`Clear `)
   await expect(page.getByRole('dialog', { name: list[1]!.title })).toContainText(list[0]!.title)

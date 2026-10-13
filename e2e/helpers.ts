@@ -12,7 +12,7 @@ export function correctAnswer(q: Q): unknown {
 
 /** Seed local progress. `answeredTopic1` pre-answers every topic-1 question correctly. */
 export async function seed(page: Page, opts: { answeredTopic1?: boolean; extra?: Record<string, unknown> } = {}) {
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await page.evaluate(
     async ({ answeredTopic1, extra, correctSrc }) => {
       const correct = new Function(`return (${correctSrc})`)() as (q: unknown) => unknown

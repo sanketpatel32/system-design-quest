@@ -31,7 +31,7 @@ const wrong = (n: number, hearts: number, done = 6) =>
   }
 
 test('failure recovery: out of hearts → retry starts fresh with 3 hearts, nothing unlocked', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await seed(page, { extra: await wrong(3, 0, 4)(page) })
   await page.goto('/quiz/the-system-design-interview')
   await expect(page.getByText('Out of hearts')).toBeVisible()
@@ -46,7 +46,7 @@ test('failure recovery: out of hearts → retry starts fresh with 3 hearts, noth
 })
 
 test('failure recovery: failing below 70% shows "Not cleared yet", missed ideas, and a retry', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await seed(page, { extra: await wrong(2, 1)(page) })
   await page.goto('/quiz/the-system-design-interview')
   await expect(page.getByText('Not cleared yet')).toBeVisible()
@@ -54,7 +54,7 @@ test('failure recovery: failing below 70% shows "Not cleared yet", missed ideas,
   await expect(page.getByRole('heading', { name: 'Review these ideas' })).toBeVisible()
   await page.getByRole('button', { name: 'Retry quiz' }).click()
   await expect(page.getByRole('button', { name: /^Question 1/ })).toBeVisible()
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await expect(page.getByTestId('continue-link')).toBeVisible()
 })
 

@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 
 test('map to lesson navigation', async ({ page }) => {
-  await page.goto('/')
-  await expect(page.getByRole('heading', { name: /The network/i })).toBeVisible()
+  await page.goto('/s/system-design')
+  await expect(page.getByRole('heading', { name: 'System Design', level: 1 })).toBeVisible()
   await page.getByTestId('station-1').click()
   await page.getByTestId('start-topic').click()
   await expect(page.getByTestId('topic-title')).toHaveText('The System Design Interview')
@@ -18,7 +18,7 @@ test('wrong answer costs heart and shows feedback', async ({ page }) => {
 })
 
 test('quiz clear awards xp and unlocks next topic', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await page.evaluate(async () => {
     localStorage.removeItem('sdq-progress-v3')
     const res = await fetch('/src/content/generated/topics.json')
@@ -72,12 +72,12 @@ test('quiz clear awards xp and unlocks next topic', async ({ page }) => {
   await page.goto('/quiz/the-system-design-interview')
   // A pass is saved automatically (no claim step)
   await expect(page.getByText(/xp earned/i).first()).toBeVisible()
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await expect(page.getByTestId('station-2')).toHaveAttribute('data-status', 'available')
 })
 
 test('boss canvas submit shows score breakdown', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await page.evaluate(() => {
     localStorage.setItem(
       'sdq-progress-v3',
@@ -126,7 +126,7 @@ test('interview reload preserves timer and notes draft', async ({ page }) => {
 })
 
 test('keyboard help opens with ?', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await page.getByTestId('help-shortcuts-trigger').click()
   await expect(page.getByRole('dialog', { name: /Keyboard shortcuts/i })).toBeVisible()
   await page.keyboard.press('Escape')
@@ -135,7 +135,7 @@ test('keyboard help opens with ?', async ({ page }) => {
 })
 
 test('progress persists after reload', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await page.evaluate(() =>
     localStorage.setItem(
       'sdq-progress-v3',
@@ -160,14 +160,14 @@ test('progress persists after reload', async ({ page }) => {
 
 test('mobile viewport core flow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
   for (const path of ['/', '/quiz/the-system-design-interview', '/revision', '/cheat-sheet', '/topic/the-system-design-interview', '/interview', '/settings', '/boss/url-shortener']) {
     await page.goto(path)
     const width = await page.evaluate(() => document.documentElement.scrollWidth)
     expect(width, `${path} should not scroll sideways`).toBeLessThanOrEqual(390)
   }
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await page.getByTestId('continue-quest').getByRole('link').click()
   await expect(page.getByTestId('topic-title')).toBeVisible()
 })

@@ -15,7 +15,7 @@ test('bug 1: See result never crashes and a pass saves automatically', async ({ 
   await page.getByRole('button', { name: 'See result' }).click()
   await expect(page.getByRole('heading', { name: 'Lesson complete!' })).toBeVisible()
   expect(errors).toEqual([])
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await expect(page.getByTestId('station-2')).toHaveAttribute('data-status', 'available')
 })
 
@@ -43,7 +43,7 @@ test('bug 3: a finished quiz can be retaken for practice', async ({ page }) => {
   await page.getByTestId('practice-again').click()
   await expect(page.getByText(/Question 1 of 6/)).toBeVisible()
   // Progress stays saved
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await expect(page.getByTestId('station-1')).toHaveAttribute('data-status', 'completed')
 })
 

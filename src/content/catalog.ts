@@ -90,6 +90,9 @@ export const regions: RegionMeta[] = [
   { id: 'f2-backend', name: 'Backend', subtitle: 'How servers handle work', theme: 'green', topicIds: range(221, 240), track: 'fundamentals' },
   { id: 'f3-networking', name: 'Networking', subtitle: 'How packets get there', theme: 'violet', topicIds: range(241, 260), track: 'fundamentals' },
   { id: 'f4-databases', name: 'Databases', subtitle: 'How data is stored and queried', theme: 'emerald', topicIds: range(261, 280), track: 'fundamentals' },
+  { id: 'f5-os', name: 'Operating Systems & Concurrency', subtitle: 'How programs share one machine', theme: 'teal', topicIds: range(281, 300), track: 'fundamentals' },
+  { id: 'f6-security', name: 'Security', subtitle: 'How systems are attacked and defended', theme: 'red', topicIds: range(301, 320), track: 'fundamentals' },
+  { id: 'f7-cloud', name: 'Cloud & DevOps', subtitle: 'How software is shipped and run', theme: 'amber', topicIds: range(321, 340), track: 'fundamentals' },
 ]
 
 function range(from: number, to: number) {

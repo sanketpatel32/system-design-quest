@@ -1,6 +1,8 @@
 // Fundamentals track rules: separate ID range, area sizes, language-agnostic wording, authoritative sources,
 // valid links into the System Design track, and the same depth as the core lessons (enforced via DEEP_REGIONS).
-export const FUND_AREAS = ['f1-frontend', 'f2-backend', 'f3-networking', 'f4-databases']
+export const FUND_AREAS = ['f1-frontend', 'f2-backend', 'f3-networking', 'f4-databases', 'f5-os', 'f6-security', 'f7-cloud']
+// The first four areas were sized 12–16 topics; the three later sections 10–14
+const AREA_SIZE = { 'f5-os': [10, 14], 'f6-security': [10, 14], 'f7-cloud': [10, 14] }
 export const FUND_SOURCE_HOSTS = [
   'developer.mozilla.org', 'web.dev', 'developer.chrome.com', 'www.rfc-editor.org', 'datatracker.ietf.org', 'www.w3.org', 'html.spec.whatwg.org',
   'fetch.spec.whatwg.org', 'dom.spec.whatwg.org', 'url.spec.whatwg.org', 'cheatsheetseries.owasp.org', 'owasp.org', 'www.postgresql.org', '12factor.net',
@@ -49,7 +51,7 @@ export function checkFundamentals(topics) {
     if (m) bad(`language- or framework-specific term "${m[0]}" (keep Fundamentals language-agnostic)`)
     if (!/^(Real-world|Official|Public|Illustrative)/i.test(t.deep?.india?.label ?? '') && !/official|public|illustrative/i.test(t.deep?.india?.label ?? '')) bad('real-world example needs an honest label')
   }
-  for (const [area, n] of Object.entries(counts)) if (n < 12 || n > 16) errors.push(`Fundamentals ${area}: ${n} topics (need 12–16)`)
+  for (const [area, n] of Object.entries(counts)) { const [lo, hi] = AREA_SIZE[area] ?? [12, 16]; if (n < lo || n > hi) errors.push(`Fundamentals ${area}: ${n} topics (need ${lo}–${hi})`) }
   const links = fund.reduce((n, t) => n + (t.seeAlso?.length ?? 0), 0)
   info.push(`Fundamentals: ${fund.length} topics (${FUND_AREAS.filter((a) => counts[a]).map((a) => `${a.slice(3)} ${counts[a]}`).join(', ')}), ${links} links into System Design`)
   return { errors, info, count: fund.length }

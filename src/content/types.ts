@@ -14,6 +14,9 @@ export type RegionId =
   | 'f2-backend'
   | 'f3-networking'
   | 'f4-databases'
+  | 'f5-os'
+  | 'f6-security'
+  | 'f7-cloud'
 
 export type TopicKind = 'lesson' | 'boss' | 'tutorial'
 
