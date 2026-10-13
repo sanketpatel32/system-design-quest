@@ -463,3 +463,24 @@ Worker ~> Dead-letter queue {queue}
 Client [ask]> API server [signed URL]> Client
 Client [bytes]> Object storage {store}
 API server > Metadata DB {store}
+
+# ---------- Fundamentals · Networking ----------
+@244 Network address translation: a laptop's private address and port are rewritten by the home router to its public address and a new port, recorded in a NAT table so the server's reply can be mapped back.
+Laptop|192.168.1.20:51000 {client} [request]> Home router|NAT table {svc} > Server|203.0.113.5:443
+Server|203.0.113.5:443 [reply to 198.51.100.7:40001]> Home router|NAT table {svc}
+Home router|NAT table {svc} [rewrite back]> Laptop|192.168.1.20:51000 {client}
+
+@247 The TCP three-way handshake: the client sends SYN, the server answers SYN-ACK, and the client's ACK carries the first request, so the response arrives after two round trips.
+Client [1. SYN]> Server
+Server [2. SYN-ACK]> Client
+Client [3. ACK + request]> Server
+Server [4. response]> Client
+
+@252 Finding the real client behind proxies: the CDN edge appends the client's address to X-Forwarded-For, the load balancer appends the edge's address, and the app skips trusted hops from the right.
+Client|203.0.113.50 > CDN edge|appends 203.0.113.50 > Load balancer|appends 192.0.2.10 > App|skip trusted hops from the right
+
+@254 What happens after you press Enter: the browser parses the URL, resolves the name through DNS, opens TCP and TLS, sends the HTTP request through a CDN to the origin, then parses the HTML.
+Browser|parse URL, check cache [1. look up name]> DNS resolver {svc}
+Browser|parse URL, check cache [2. TCP + TLS]> CDN edge
+CDN edge [3. request on a warm connection]> Origin server
+Origin server [4. HTML]~> Browser|parse URL, check cache

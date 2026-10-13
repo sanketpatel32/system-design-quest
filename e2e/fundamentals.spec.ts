@@ -53,3 +53,17 @@ test('a locked Fundamentals topic explains which topic opens it', async ({ page 
   await expect(page.getByRole('dialog', { name: list[1]!.title })).toContainText(`Clear `)
   await expect(page.getByRole('dialog', { name: list[1]!.title })).toContainText(list[0]!.title)
 })
+
+test('Networking: the subnet slider reports whether a prefix fits 500 hosts', async ({ page }) => {
+  await seed(page, { extra: { unlockedTopicIds: [1, 241, 242, 243] } })
+  await page.goto('/topic/subnets-and-cidr')
+  await page.getByRole('button', { name: 'Go to card 1', exact: true }).waitFor()
+  const n = await page.getByRole('button', { name: /^Go to card/ }).count()
+  await page.getByRole('button', { name: `Go to card ${n}`, exact: true }).click()
+  const box = page.getByTestId('interactive')
+  await box.getByRole('slider').fill('24')
+  await expect(page.getByTestId('interactive-verdict')).toHaveAttribute('data-ok', 'false')
+  await box.getByRole('slider').fill('23')
+  await expect(page.getByTestId('interactive-verdict')).toHaveAttribute('data-ok', 'true')
+  await expect(box).toContainText('510')
+})
