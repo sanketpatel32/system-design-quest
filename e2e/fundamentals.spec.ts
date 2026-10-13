@@ -67,3 +67,15 @@ test('Networking: the subnet slider reports whether a prefix fits 500 hosts', as
   await expect(page.getByTestId('interactive-verdict')).toHaveAttribute('data-ok', 'true')
   await expect(box).toContainText('510')
 })
+
+test('Databases: the pool slider shows requests queueing once queries slow down', async ({ page }) => {
+  await seed(page, { extra: { unlockedTopicIds: [1, 261, 274] } })
+  await page.goto('/topic/connection-pooling')
+  await page.getByRole('button', { name: 'Go to card 1', exact: true }).waitFor()
+  const n = await page.getByRole('button', { name: /^Go to card/ }).count()
+  await page.getByRole('button', { name: `Go to card ${n}`, exact: true }).click()
+  const box = page.getByTestId('interactive')
+  await expect(page.getByTestId('interactive-verdict')).toHaveAttribute('data-ok', 'true')
+  await box.getByRole('slider').fill('60')
+  await expect(page.getByTestId('interactive-verdict')).toHaveAttribute('data-ok', 'false')
+})

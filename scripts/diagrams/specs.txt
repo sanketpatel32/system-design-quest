@@ -484,3 +484,25 @@ Browser|parse URL, check cache [1. look up name]> DNS resolver {svc}
 Browser|parse URL, check cache [2. TCP + TLS]> CDN edge
 CDN edge [3. request on a warm connection]> Origin server
 Origin server [4. HTML]~> Browser|parse URL, check cache
+
+# ---------- Fundamentals · Databases ----------
+@264 A B-tree lookup: the root page points to an inner page for the key's range, which points to a leaf page holding the key and a pointer to the table row.
+Query|WHERE id = 4711 {client} > Root page|keys 1 to 10M {store} > Inner page|keys 4,001 to 8,000 {store} > Leaf page|4711 -> row location {store} > Table row {store}
+
+@269 Write-ahead logging: a commit appends records to the WAL and flushes it before reporting success; changed pages reach the data files later at checkpoints, and recovery replays the WAL.
+Transaction {client} [1. change pages in memory]> Buffer cache {store}
+Transaction {client} [2. append + flush]> WAL on disk {store}
+WAL on disk {store} [3. COMMIT ok]> Transaction {client}
+Buffer cache {store} [4. later, at checkpoints]~> Data files {store}
+WAL on disk {store} [after a crash: replay]~> Data files {store}
+
+@270 Streaming replication: the primary streams its WAL to a synchronous standby that confirms before commit returns, and to an asynchronous replica that may lag and serves read-only queries.
+App {client} [writes]> Primary {store}
+Primary {store} [WAL, confirm before commit]> Sync standby {store}
+Primary {store} [WAL, may lag]~> Async replica {store}
+App {client} [stale-tolerant reads]> Async replica {store}
+
+@274 Connection pooling: app instances borrow connections from their own pools, and the sum of all pools must fit under the database's max_connections.
+App instance 1 {svc} > Pool 1|10 connections {svc} > Database|max_connections 200 {store}
+App instance 2 {svc} > Pool 2|10 connections {svc} > Database|max_connections 200 {store}
+App instance N {svc} > Pool N|10 connections {svc} > Database|max_connections 200 {store}
