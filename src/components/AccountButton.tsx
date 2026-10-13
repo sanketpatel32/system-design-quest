@@ -1,5 +1,6 @@
 import { Show, SignInButton, UserButton } from '@clerk/react'
 import { authEnabled } from '../lib/auth/clerk'
+import { CloudSync, SyncIndicator } from './CloudSync'
 
 /** Header sign-in / account control. Renders nothing when Clerk isn't configured. */
 export function AccountButton() {
@@ -13,7 +14,9 @@ export function AccountButton() {
           </button>
         </SignInButton>
       </Show>
+      <CloudSync />
       <Show when="signed-in">
+        <SyncIndicator />
         <span className="grid h-10 w-10 place-items-center">
           <UserButton appearance={{ elements: { avatarBox: { width: 36, height: 36 } } }} />
         </span>
