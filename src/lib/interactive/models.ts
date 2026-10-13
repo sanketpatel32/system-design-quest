@@ -32,6 +32,8 @@ export type ModelId =
   | 'rollout'
   | 'fr-tracks'
   | 'heap-growth'
+  | 'offset-scan'
+  | 'deadline-chain'
 
 export interface ModelRow {
   label: string
@@ -528,7 +530,43 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
         ],
         verdict: heap <= p.budgetMb!
           ? { ok: true, text: `Within the ${p.budgetMb} MB budget` }
-          : { ok: false, text: `Over the ${p.budgetMb} MB budget: on low-memory phones the tab may be discarded` },
+          : { ok: false, text: `Over the ${p.budgetMb} MB budget: on low-memory devices the tab may be discarded` },
+      }
+    },
+  },
+  // Fundamentals · Backend: OFFSET pagination produces every skipped row before the page it returns
+  'offset-scan': {
+    params: ['pageSize'],
+    run: (x, p) => {
+      const skipped = (x - 1) * p.pageSize!
+      const produced = skipped + p.pageSize!
+      return {
+        rows: [
+          { label: 'Page', value: fmt(x) },
+          { label: 'Rows skipped (OFFSET)', value: fmt(skipped) },
+          { label: 'Rows produced to return one page', value: fmt(produced), strong: true },
+          { label: 'Rows read by a keyset cursor', value: `about ${fmt(p.pageSize!)}` },
+        ],
+        verdict: produced <= 1000
+          ? { ok: true, text: `Shallow page: ${fmt(produced / p.pageSize!)}× a cursor's rows, but a small absolute cost (${fmt(produced)} rows)` }
+          : { ok: false, text: `Offset does ${fmt(produced / p.pageSize!)}× the work of a cursor here` },
+      }
+    },
+  },
+  // Fundamentals · Backend: fixed per-call timeouts on sequential calls add up against one request deadline
+  'deadline-chain': {
+    params: ['calls', 'deadlineMs'],
+    run: (x, p) => {
+      const worst = x * p.calls!
+      return {
+        rows: [
+          { label: 'Timeout per call', value: `${fmt(x)} ms` },
+          { label: `Worst case for ${p.calls} calls in a row`, value: `${fmt(worst)} ms`, strong: true },
+          { label: 'Request deadline', value: `${fmt(p.deadlineMs!)} ms` },
+        ],
+        verdict: worst <= p.deadlineMs!
+          ? { ok: true, text: 'Even if every call times out, the chain ends within the deadline' }
+          : { ok: false, text: `Calls can still be running ${fmt(worst - p.deadlineMs!)} ms after the caller gave up` },
       }
     },
   },

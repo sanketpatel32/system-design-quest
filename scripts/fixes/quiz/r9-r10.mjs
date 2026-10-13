@@ -228,7 +228,7 @@ export default {
       mc('lww-docs', 'What goes wrong with last-write-wins on a whole document?', 'One person’s entire edit disappears', ['The document gets duplicated', 'Both edits merge cleanly', 'The server rejects both edits'],
         'Merge at the operation level instead.'),
       mc('ot', 'Why does classic OT usually have a central server?', 'It orders operations so every client transforms against the same sequence',
-        ['OT needs special hardware', 'It stores users’ passwords', 'OT cannot run in browsers'], 'A single order keeps transforms consistent.'),
+        ['OT needs special hardware to run its transforms', 'It stores users’ passwords', 'OT cannot run inside web browsers'], 'A single order keeps transforms consistent.'),
       ord('ot', 'Order two concurrent edits under OT.', ['A inserts “X” at position 5', 'B deletes position 2', 'Server transforms A’s insert to position 4', 'Both copies converge'], 'Positions are adjusted for concurrent ops.'),
       tr('ot', 'Collaboration engine for an always-online editor with a central server.', ['A central server is always available', 'A proven, mature approach is wanted'],
         [['Operational transformation through the server', 'Server orders operations'], ['Last-write-wins per document', 'Simplest possible']],
