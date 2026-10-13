@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test('record product demo', async ({ page }) => {
   test.setTimeout(240_000)
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await page.waitForTimeout(4500)
   await page.getByTestId('help-shortcuts-trigger').click()
   await page.waitForTimeout(2000)
@@ -26,7 +26,7 @@ test('record product demo', async ({ page }) => {
   await page.getByRole('link', { name: 'Interview' }).click()
   await page.getByRole('button', { name: 'Start mock' }).click()
   await page.waitForTimeout(6000)
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await page.waitForTimeout(2500)
   await page.evaluate(() => {
     localStorage.setItem(
@@ -59,7 +59,7 @@ test('record product demo', async ({ page }) => {
   await page.waitForTimeout(5000)
   await page.getByText(/Score:/i).scrollIntoViewIfNeeded()
   await page.waitForTimeout(10000)
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await page.waitForTimeout(8000)
   await expect(page.getByRole('link', { name: /System Design Quest/ })).toBeVisible()
 })

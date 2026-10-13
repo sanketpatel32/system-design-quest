@@ -5,7 +5,7 @@ const out = process.env.SDQ_SHOTS_DIR ?? 'test-results/screenshots'
 
 test('capture key screens', async ({ page }) => {
   mkdirSync(out, { recursive: true })
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await page.waitForTimeout(800)
   await page.screenshot({ path: `${out}/01-world-map.png`, fullPage: true })
 
@@ -21,7 +21,7 @@ test('capture key screens', async ({ page }) => {
   await page.waitForTimeout(400)
   await page.screenshot({ path: `${out}/03-quiz-feedback.png`, fullPage: true })
 
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await page.evaluate(() => {
     localStorage.setItem(
       'sdq-progress-v3',
@@ -66,7 +66,7 @@ test('capture key screens', async ({ page }) => {
   await page.screenshot({ path: `${out}/07-review.png`, fullPage: true })
 
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/')
+  await page.goto('/s/system-design')
   await page.waitForTimeout(600)
   await page.screenshot({ path: `${out}/08-mobile-map.png`, fullPage: true })
 })

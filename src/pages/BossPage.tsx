@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { topicLabel } from '../content/numbering'
 import { Link, useParams } from 'react-router-dom'
+import { sectionOfTopic, sectionPath } from '../content/sections'
 import { allTopics } from '../content/catalog'
 import { BossCanvas, type CanvasSnapshot } from '../components/BossCanvas'
 import { QuestionRenderer } from '../components/QuestionRenderer'
@@ -199,7 +200,7 @@ export function BossPage() {
         </section>
       )}
 
-      <Link to="/" className="btn-quiet">Back to map</Link>
+      <Link to={topic ? sectionPath(sectionOfTopic(topic.id)) : '/'} className="btn-quiet">Back to map</Link>
     </div>
   )
 }

@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import { PageHero } from '../components/ui/PageHero'
 import { Mascot } from '../components/art/Mascot'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { SECTION_BY_ID, isSectionId, sectionOfTopic, type SectionId } from '../content/sections'
+import { SectionPicker } from '../components/map/SectionPicker'
 import { allTopics, regions, topicsById } from '../content/catalog'
 import { transitLineColor } from '../lib/design/transitTheme'
 import { AGAIN_MINUTES, isDue, scheduleNext, initialSrs } from '../lib/srs/scheduler'
@@ -13,7 +15,11 @@ export function RevisionPage() {
   const topicProgress = useGameStore((s) => s.topicProgress)
   const [reviewed, setReviewed] = useState(0)
   const rateFlashcard = useGameStore((s) => s.rateFlashcard)
+  const [params] = useSearchParams()
+  const sp = params.get('s') ?? undefined
+  const section: SectionId | 'all' = isSectionId(sp) ? sp : 'all'
   const [filter, setFilter] = useState<string>('all')
+  const unitOptions = regions.filter((r) => r.id !== 'boss-arena' && (section === 'all' || SECTION_BY_ID.get(section)?.regionIds.includes(r.id)))
   const [flipped, setFlipped] = useState(false)
   const [last, setLast] = useState<{ front: string; rating: string; dueAt: string } | null>(null)
   /** Cards rated Again this session: they return at the end of the queue (and are due in ~10 minutes anyway) */
@@ -30,11 +36,11 @@ export function RevisionPage() {
       })),
     )
     const key = (c: { topicId: number; flashcard: { id: string } }) => `${c.topicId}:${c.flashcard.id}`
-    const inFilter = cards.filter((c) => filter === 'all' || c.region === filter)
+    const inFilter = cards.filter((c) => (section === 'all' || sectionOfTopic(c.topicId) === section) && (filter === 'all' || c.region === filter))
     const due = inFilter.filter((c) => !relearn.includes(key(c)) && (!c.state || isDue(c.state.dueAt)))
     const again = relearn.map((k) => inFilter.find((c) => key(c) === k)).filter((c): c is (typeof inFilter)[number] => Boolean(c))
     return [...due, ...again]
-  }, [srs, filter, unlocked, topicProgress, relearn])
+  }, [srs, filter, section, unlocked, topicProgress, relearn])
 
   const current = queue[0]
 
@@ -90,12 +96,13 @@ export function RevisionPage() {
         aside={<div className="rounded-2xl bg-white px-4 py-2 text-center"><p className="font-display text-3xl text-[#12749f] tabular-nums">{queue.length}</p><p className="text-xs font-extrabold uppercase tracking-wide text-dim">due now</p></div>}>
         Recall the answer, reveal it, then rate yourself. The rating decides when the card comes back.
       </PageHero>
+      <SectionPicker current={section} allOption="All sections" label="Review by section" to={(id) => (id === 'all' ? '/revision' : `/revision?s=${id}`)} />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <label className="text-sm font-extrabold text-dim">
           Unit
           <select className="field mt-1 block min-w-[240px]" value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="all">All units</option>
-            {regions.filter((r) => r.id !== 'boss-arena').map((r) => (
+            {unitOptions.map((r) => (
               <option key={r.id} value={r.id}>{r.name}</option>
             ))}
           </select>
@@ -114,7 +121,7 @@ export function RevisionPage() {
           <Mascot mood="happy" size={120} className="mx-auto" />
           <p className="font-display text-2xl text-chalk mt-2">Queue empty</p>
           <p className="font-bold text-dim mt-1">Cards from stations you have opened appear here. Rated cards come back on their scheduled day.</p>
-          <Link to="/" className="btn-quiet mt-4">Back to map</Link>
+          <Link to={section === 'all' ? '/' : `/s/${section}`} className="btn-quiet mt-4">Back to map</Link>
         </div>
       ) : (
         <div className="panel p-6 sm:p-8 text-center" style={{ ['--accent' as string]: accent }}>

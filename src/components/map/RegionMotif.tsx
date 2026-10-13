@@ -23,6 +23,9 @@ const PATHS: Record<string, string> = {
   'f1-frontend': 'M3 5h18v14H3zM3 9h18M6 7h.01M9 7h.01M8 13l-2 2 2 2M16 13l2 2-2 2',
   'f2-backend': 'M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01M12 10v4',
   'f3-networking': 'M12 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4M5 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4M19 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4M12 7v5M12 12l-6 5M12 12l6 5',
+  'f5-os': 'M4 5h16v11H4zM8 20h8M12 16v4M7 9h4M7 12h7',
+  'f6-security': 'M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3zM9 12l2 2 4-4',
+  'f7-cloud': 'M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 9.5 4.3 4.3 0 0 0 7 18z',
   'f4-databases': 'M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
   // Architecture Colosseum: tiered arches
   'boss-arena': 'M2 21h20M3 21V9h18v12M3 13h18M6 21v-3a1.5 1.5 0 0 1 3 0v3M10.5 21v-3a1.5 1.5 0 0 1 3 0v3M15 21v-3a1.5 1.5 0 0 1 3 0v3M6 13v-2M10 13v-2M14 13v-2M18 13v-2',

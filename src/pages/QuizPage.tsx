@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { sectionOfTopic, sectionPath } from '../content/sections'
 import { allTopics, orderedTopicsInRegion } from '../content/catalog'
 import { QuestionRenderer } from '../components/QuestionRenderer'
 import { HeartsHud } from '../components/ui/Hud'
@@ -176,7 +177,7 @@ export function QuizPage() {
                 <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
                   {next && <Link to={`/topic/${next.slug}`} className="btn-cta min-w-[220px]">Continue</Link>}
                   <button type="button" className="btn-quiet min-w-[220px]" onClick={retry} data-testid="practice-again">Practice again</button>
-                  <Link to="/" className="btn-quiet min-w-[220px]">Back to map</Link>
+                  <Link to={topic ? sectionPath(sectionOfTopic(topic.id)) : '/'} className="btn-quiet min-w-[220px]">Back to map</Link>
                 </div>
               </div>
             ) : (
@@ -185,7 +186,7 @@ export function QuizPage() {
                 <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
                   {next && <Link to={`/topic/${next.slug}`} className="btn-cta min-w-[220px]">Next: {next.title}</Link>}
                   <button type="button" className="btn-quiet min-w-[220px]" onClick={retry} data-testid="practice-again">Practice again</button>
-                  <Link to="/" className="btn-quiet min-w-[220px]">Back to map</Link>
+                  <Link to={topic ? sectionPath(sectionOfTopic(topic.id)) : '/'} className="btn-quiet min-w-[220px]">Back to map</Link>
                 </div>
               </div>
             )}
