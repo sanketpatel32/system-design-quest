@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Mascot } from '../components/art/Mascot'
 import { PageHero } from '../components/ui/PageHero'
+import { SaveWhere } from '../components/SaveWhere'
 import { useGameStore } from '../stores/gameStore'
 
 type Notice = { tone: 'ok' | 'error'; text: string } | null
@@ -70,9 +71,11 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-5 max-w-2xl">
-      <PageHero eyebrow="Stored only in this browser" title="Settings" icon="settings" tone="slate">
-        Your progress lives in this browser's local storage. Nothing is sent to a server, so keep a backup before clearing site data or switching browsers.
+      <SaveWhere>{(c) => (
+      <PageHero eyebrow={c.eyebrow} title="Settings" icon="settings" tone="slate">
+        {c.text}
       </PageHero>
+      )}</SaveWhere>
 
       {notice && (
         <p className={`feedback ${notice.tone === 'ok' ? 'feedback-ok' : 'feedback-miss'} text-sm`} role={notice.tone === 'ok' ? 'status' : 'alert'}>
