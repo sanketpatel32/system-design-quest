@@ -70,16 +70,16 @@ export function BossPage() {
 
   return (
     <div className="space-y-8 max-w-[960px] mx-auto">
-      <header className="unit-banner flex items-center gap-4 p-5 sm:p-6" style={{ background: '#FFC800', color: '#3D2A00', ['--banner-shadow' as string]: '#E0A800' }}>
+      <header className="unit-banner relative flex items-center gap-4 p-5 sm:p-6" style={{ background: '#FFC800', color: '#3D2A00', ['--banner-shadow' as string]: '#E0A800' }}>
         <div className="hidden sm:grid h-24 w-24 shrink-0 place-items-center rounded-full bg-[#FFE066] shadow-[0_6px_0_#E0A800]">
           <IconCastle size={64} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-extrabold uppercase tracking-wider">Boss fight · {topicLabel(topic.id)}</p>
+          <p className="text-sm font-extrabold uppercase tracking-wider pr-28 sm:pr-0">Boss fight · {topicLabel(topic.id)}</p>
           <h1 className="font-display text-3xl sm:text-4xl mt-1 leading-tight">{topic.title}</h1>
           <p className="font-bold mt-2 max-w-2xl">{topic.boss.estimationScenario}</p>
         </div>
-        <div className="self-start rounded-2xl bg-white px-2 py-1.5">
+        <div className="absolute right-4 top-4 rounded-2xl bg-white px-2 py-1.5 sm:static sm:self-start">
           <HeartsHud hearts={hearts} />
         </div>
       </header>
