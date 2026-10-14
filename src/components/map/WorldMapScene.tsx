@@ -473,7 +473,9 @@ function Onboarding() {
       return false
     }
   })
-  if (!open) return null
+  // Returning players (progress on this device or synced from their account) already know the rules
+  const returning = useGameStore((s) => Object.values(s.topicProgress).some((t) => t?.completed || (t?.attempts ?? 0) > 0) || Object.keys(s.lessonProgress).length > 0)
+  if (!open || returning) return null
   const close = () => {
     try {
       localStorage.setItem(ONBOARD_KEY, '1')
