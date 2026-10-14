@@ -62,7 +62,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <LogoMark size={38} />
             <span className="font-display text-2xl leading-none hidden sm:inline"><span className="text-chalk">design</span><span className="text-[#58cc02]">quest</span></span>
           </Link>
-          <div className="relative flex items-center gap-1">
+          <div className="relative flex min-w-0 items-center gap-0.5 sm:gap-1">
             <button
               type="button"
               className="flex items-center gap-1"
@@ -84,7 +84,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     </span>
                   )}
                 </span>
-                <span className="tabular-nums">{xp} xp</span>
+                <span className="tabular-nums">{xp}<span className="hidden sm:inline"> xp</span></span>
               </span>
               {badges.length > 0 && (
                 <span className="hud-chip text-[#8A5A00] inline-flex" title={`${badges.length} badge${badges.length === 1 ? "" : "s"} earned`}>
@@ -110,7 +110,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             )}
             <button
               type="button"
-              className="hud-chip text-dim px-3"
+              className="hud-chip text-dim px-3 hidden sm:inline-flex"
               data-testid="help-shortcuts-trigger"
               aria-label="Keyboard shortcuts"
               onClick={() => document.dispatchEvent(new CustomEvent('sdq-toggle-help'))}
