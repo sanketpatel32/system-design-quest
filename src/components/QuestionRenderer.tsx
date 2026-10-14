@@ -340,6 +340,12 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
                 />
                 <kbd className="kbd shrink-0">{idx + 1}</kbd>
                 <span className="text-[1rem] font-bold text-chalk">{c.label}</span>
+                {revealNow && (isRight || selected) && (
+                  <span data-testid="choice-verdict" className={`ml-auto shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wide ${isRight ? 'bg-[#58cc02] text-white' : 'bg-[#ea2b2b] text-white'}`}>
+                    <span aria-hidden>{isRight ? '✓' : '✕'}</span>
+                    {isRight ? (selected ? 'Your answer · correct' : 'Correct answer') : 'Your answer'}
+                  </span>
+                )}
               </label>
             )
           })}
