@@ -364,6 +364,24 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
   const btnRef = useRef<HTMLButtonElement>(null)
   const popRef = useRef<HTMLDivElement>(null)
   const pos = usePopoverPosition(open, btnRef, popRef)
+  // The popover lives in a portal at the end of <body>: move focus into it on open, and keep Tab order
+  // in map order (Shift+Tab returns to this node, Tab past the end goes on to the next node).
+  useEffect(() => {
+    if (open && pos.ready) (popRef.current?.querySelector<HTMLElement>('a[href],button') ?? popRef.current)?.focus({ preventScroll: true })
+  }, [open, pos.ready])
+  const onPopKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Tab') return
+    const items = [...(popRef.current?.querySelectorAll<HTMLElement>('a[href],button') ?? [])]
+    const first = items[0], last = items[items.length - 1]
+    const active = document.activeElement
+    if (e.shiftKey && (active === first || active === popRef.current)) {
+      e.preventDefault(); setOpen(false); btnRef.current?.focus()
+    } else if (!e.shiftKey && (active === last || !items.length)) {
+      e.preventDefault(); setOpen(false)
+      const all = [...document.querySelectorAll<HTMLElement>('.path-node')]
+      ;(all[all.indexOf(btnRef.current!) + 1] ?? btnRef.current)?.focus()
+    }
+  }
   const p = regionPalette(topic.region)
   const locked = status === 'locked'
   const fill = locked ? '#E5E0D8' : boss ? '#FFC800' : p.bright
@@ -374,7 +392,9 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
   useEffect(() => {
     if (!open) return
     const close = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !ref.current?.contains(e.target as Node) && !popRef.current?.contains(e.target as Node)) setOpen(false)
+      if (e instanceof KeyboardEvent) {
+        if (e.key === 'Escape') { setOpen(false); btnRef.current?.focus() }
+      } else if (!ref.current?.contains(e.target as Node) && !popRef.current?.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', close)
     document.addEventListener('keydown', close)
@@ -431,6 +451,8 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
           style={{ left: pos.left, top: pos.top, visibility: pos.ready ? 'visible' : 'hidden', opacity: 1, background: locked ? '#5B6472' : boss ? '#8A5A00' : p.deep, boxShadow: `0 5px 0 ${locked ? '#3f4652' : boss ? '#5c3c00' : p.shadow}, 0 12px 28px rgba(0,0,0,0.18)` }}
           role="dialog"
           aria-label={topic.title}
+          tabIndex={-1}
+          onKeyDown={onPopKey}
         >
           <span aria-hidden className={`absolute h-4 w-4 -translate-x-1/2 rotate-45 ${pos.placement === 'below' ? '-top-2' : '-bottom-2'}`} style={{ left: pos.arrow, background: locked ? '#5B6472' : boss ? '#8A5A00' : p.deep }} />
           <p className="font-display text-lg leading-snug">{topic.title}</p>
