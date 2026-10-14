@@ -27,7 +27,8 @@ function Slider({ item, onDone }: { item: InteractiveSlider; onDone?: () => void
         <input
           id={id}
           type="range"
-          className="mt-3 w-full accent-[#58CC02]"
+          className="sdq-range mt-3 w-full"
+          style={{ ['--fill' as string]: `${((x - item.control.min) / (item.control.max - item.control.min || 1)) * 100}%` }}
           min={item.control.min}
           max={item.control.max}
           step={item.control.step}
