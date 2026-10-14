@@ -15,8 +15,8 @@ export function SectionPicker({ current, to = (id) => (id === 'all' ? '/' : sect
     ...SECTIONS.map((s) => ({ id: s.id, name: s.name, colour: sectionPalette(s.id).deep, soft: sectionPalette(s.id).soft })),
   ]
   return (
-    <nav aria-label={label} className="mb-5 -mx-1 overflow-x-auto pb-1" data-testid="section-picker">
-      <ul className="flex gap-2 px-1">
+    <nav aria-label={label} className="section-picker mb-5 -mx-1 overflow-x-auto pb-1 md:overflow-visible" data-testid="section-picker">
+      <ul className="flex gap-2 px-1 md:flex-wrap">
         {items.map((s) => {
           const on = s.id === current
           const wasLast = !on && s.id === recent
