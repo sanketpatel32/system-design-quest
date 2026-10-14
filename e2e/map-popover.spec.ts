@@ -56,3 +56,22 @@ for (const [w, h] of WIDTHS) {
     }
   })
 }
+
+test('map popover keyboard order: focus moves into it, Tab continues to the next node, Escape returns to the node', async ({ page }) => {
+  await seed(page, { extra: { topicProgress: { 1: { completed: true, bestScorePercent: 90, attempts: 1, firstClearXpAwarded: true } }, unlockedTopicIds: [1, 2] } })
+  await page.goto('/s/frontend')
+  const nodes = page.locator('.path-node')
+  await nodes.nth(0).focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByTestId('node-popover')).toBeVisible()
+  await expect(page.getByTestId('node-popover').getByRole('link').first()).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(nodes.nth(0)).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page.getByTestId('node-popover').getByRole('link').first()).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(page.getByTestId('node-popover')).toHaveCount(0)
+  await expect(nodes.nth(1)).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(nodes.nth(0)).toBeFocused()
+})
