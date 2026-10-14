@@ -1,4 +1,4 @@
-import { Show, SignInButton, UserButton, useUser } from '@clerk/react'
+import { ClerkLoading, Show, SignInButton, UserButton, useUser } from '@clerk/react'
 import { authEnabled } from '../lib/auth/clerk'
 import { displayNameFor } from '../lib/auth/displayName'
 import { CloudSync, SyncIndicator } from './CloudSync'
@@ -8,6 +8,9 @@ export function AccountButton() {
   if (!authEnabled) return null
   return (
     <>
+      <ClerkLoading>
+        <span className="account-skeleton" aria-hidden data-testid="account-loading" />
+      </ClerkLoading>
       <Show when="signed-out">
         <SignInButton mode="modal">
           <button type="button" className="btn-cta btn-signin" data-testid="sign-in">
@@ -28,9 +31,9 @@ function SignedInUser() {
   const { user } = useUser()
   const name = displayNameFor(user)
   return (
-    <>
+    <span className="account-chip">
       {name && (
-        <span data-testid="display-name" className="hidden md:inline max-w-[10rem] truncate text-sm font-extrabold" title={name}>
+        <span data-testid="display-name" className="hidden md:inline max-w-[10rem] truncate pl-2 text-sm font-extrabold text-chalk" title={name}>
           {name}
         </span>
       )}
@@ -41,6 +44,6 @@ function SignedInUser() {
           </UserButton.MenuItems>
         </UserButton>
       </span>
-    </>
+    </span>
   )
 }
