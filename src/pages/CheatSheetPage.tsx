@@ -58,7 +58,7 @@ function SectionSheet({ id }: { id: SectionId }) {
         {topics.map((t) => (
           <section key={t.id} className="panel min-w-0 p-5" style={{ borderTop: `4px solid ${pal.bright}` }}>
             <h2 className="font-display text-lg text-chalk mb-2">
-              <Link to={`/topic/${t.slug}`} className="hover:underline"><span style={{ color: pal.deep }}>{topicLabel(t.id)}</span> {t.title}</Link>
+              <Link to={`/topic/${t.slug}`} className="-my-2.5 block py-2.5 hover:underline"><span style={{ color: pal.deep }}>{topicLabel(t.id)}</span> {t.title}</Link>
             </h2>
             <ul className="list-disc space-y-1 pl-5 text-[0.9375rem] text-chalk">
               {t.deep!.takeaways.map((k) => <li key={k}>{k}</li>)}
@@ -149,7 +149,7 @@ export function CheatSheetPage() {
                     <td className="block py-0.5 pr-4 text-dim md:table-cell md:py-2">{w}</td>
                     <td className="block py-0.5 md:table-cell md:py-2">
                       {topic && (
-                        <Link className="font-bold text-[#12749f] underline-offset-2 hover:underline" to={`/topic/${topic.slug}`}>
+                        <Link className="inline-flex min-h-[44px] items-center font-bold text-[#12749f] underline-offset-2 hover:underline md:min-h-0" to={`/topic/${topic.slug}`}>
                           {topic.title}
                         </Link>
                       )}
@@ -162,10 +162,10 @@ export function CheatSheetPage() {
         </Sheet>
 
         <Sheet title="Sources" className="md:col-span-2">
-          <ul className="text-sm space-y-1.5">
+          <ul className="text-sm sm:space-y-1.5">
             {SOURCES.map(([title, url]) => (
               <li key={url}>
-                <a className="text-chalk underline underline-offset-2 hover:text-[#12749f] font-bold" href={url} target="_blank" rel="noreferrer">{title}</a>
+                <a className="inline-flex min-h-[44px] items-center text-chalk underline underline-offset-2 hover:text-[#12749f] font-bold sm:min-h-0" href={url} target="_blank" rel="noreferrer">{title}</a>
               </li>
             ))}
           </ul>
