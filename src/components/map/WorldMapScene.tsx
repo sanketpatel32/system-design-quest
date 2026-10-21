@@ -146,7 +146,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
                 type="button"
                 aria-pressed={view === v}
                 onClick={() => setView(v)}
-                className={`min-h-[40px] rounded-xl px-4 text-sm font-extrabold uppercase tracking-wide ${view === v ? 'bg-[var(--color-sky)] text-[#12749f]' : 'text-dim hover:bg-[#f4f1ec]'}`}
+                className={`min-h-[44px] rounded-xl px-4 text-sm font-extrabold uppercase tracking-wide ${view === v ? 'bg-[var(--color-sky)] text-[#12749f]' : 'text-dim hover:bg-[#f4f1ec]'}`}
               >
                 {v === 'path' ? 'Path' : 'List'}
               </button>
@@ -284,7 +284,7 @@ function UnitBanner({ regionId, index, done, total, title, collapsed, onToggle, 
           <div className="h-full rounded-full bg-white" style={{ width: `${(done / Math.max(1, total)) * 100}%` }} />
         </div>
         {onToggle && (
-          <button type="button" onClick={onToggle} aria-expanded={!collapsed} className="mt-1 rounded-lg bg-white/20 px-2.5 py-1 text-xs font-extrabold uppercase tracking-wide text-white hover:bg-white/30" data-testid={`unit-toggle-${regionId}`}>
+          <button type="button" onClick={onToggle} aria-expanded={!collapsed} className="mt-1 -mb-1 inline-flex min-h-[44px] min-w-[56px] items-center justify-center rounded-xl bg-white/20 px-3 text-xs font-extrabold uppercase tracking-wide text-white hover:bg-white/30" data-testid={`unit-toggle-${regionId}`}>
             {collapsed ? 'Show' : 'Hide'}
           </button>
         )}

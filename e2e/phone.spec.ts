@@ -90,6 +90,18 @@ test('lesson card dots and quiz question dots are 44px tall tap targets', async 
   }
 })
 
+test('map unit toggles, map view switch and lesson section chips are 44px tap targets', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 })
+  await page.goto('/s/system-design?unlockAll=1')
+  await expect(page.getByTestId('jump-current')).toBeVisible()
+  for (const b of await page.locator('[data-testid^="unit-toggle-"]').all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  for (const b of await page.getByRole('group', { name: 'Map view' }).getByRole('button').all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  await page.goto('/topic/where-to-cache?unlockAll=1')
+  const chips = page.locator('.section-chip')
+  await chips.first().scrollIntoViewIfNeeded()
+  for (const b of await chips.all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+})
+
 test('phone header controls are full-size tap targets', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 })
   await page.goto('/s/system-design')
