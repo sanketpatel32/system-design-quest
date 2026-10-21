@@ -102,6 +102,18 @@ test('map unit toggles, map view switch and lesson section chips are 44px tap ta
   for (const b of await chips.all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44)
 })
 
+test('cheat sheet links are 44px tap targets on a phone', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 })
+  for (const s of ['system-design', 'frontend']) {
+    await page.goto(`/cheat-sheet?s=${s}`)
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    const small = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('main a[href]')].filter((a) => a.getBoundingClientRect().height < 44).map((a) => `${a.textContent?.slice(0, 30)} ${Math.round(a.getBoundingClientRect().height)}`),
+    )
+    expect(small, s).toEqual([])
+  }
+})
+
 test('phone header controls are full-size tap targets', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 })
   await page.goto('/s/system-design')
