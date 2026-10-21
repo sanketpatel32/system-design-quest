@@ -577,7 +577,7 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
   },
   // Back-of-envelope capacity for one service: x = daily active users in millions
   'capacity': {
-    params: ['readsPerUser', 'writesPerUser', 'payloadKb', 'peakFactor', 'hotDays', 'cacheGb'],
+    params: ['readsPerUser', 'writesPerUser', 'payloadKb', 'peakFactor', 'hotDays', 'cacheGb', 'readsPerNode', 'writesPerNode', 'diskTbPerNode'],
     run: (x, p) => {
       const dau = x * 1e6
       const readAvg = (dau * p.readsPerUser!) / 86400
@@ -585,17 +585,28 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
       const gbPerDay = (dau * p.writesPerUser! * p.payloadKb!) / 1e6
       const hotGb = gbPerDay * p.hotDays!
       const nodes = Math.max(1, Math.ceil(hotGb / p.cacheGb!))
+      const peakReads = readAvg * p.peakFactor!
+      const peakWrites = writeAvg * p.peakFactor!
+      const tbYear = (gbPerDay * 365) / 1000
+      const need = [
+        { what: 'uncached reads', n: Math.max(1, Math.ceil(peakReads / p.readsPerNode!)) },
+        { what: 'writes', n: Math.max(1, Math.ceil(peakWrites / p.writesPerNode!)) },
+        { what: 'a year of data', n: Math.max(1, Math.ceil(tbYear / p.diskTbPerNode!)) },
+        { what: 'the hot set in cache', n: nodes },
+      ]
+      const top = need.reduce((a, b) => (b.n > a.n ? b : a))
+      const nodeWord = (n: number) => `${n} node${n === 1 ? '' : 's'}`
       return {
         rows: [
-          { label: 'Peak reads', value: `${short(readAvg * p.peakFactor!)}/s`, strong: true },
-          { label: 'Peak writes', value: `${short(writeAvg * p.peakFactor!)}/s` },
+          { label: 'Peak reads', value: `${short(peakReads)}/s · ${nodeWord(need[0]!.n)} uncached`, strong: true },
+          { label: 'Peak writes', value: `${short(peakWrites)}/s · ${nodeWord(need[1]!.n)}` },
           { label: 'New data per day', value: `${fmt(gbPerDay, 1)} GB` },
-          { label: 'New data per year', value: `${fmt((gbPerDay * 365) / 1000, 1)} TB` },
-          { label: `Hot set (last ${p.hotDays} days)`, value: `${fmt(hotGb)} GB`, strong: true },
+          { label: 'New data per year', value: `${fmt(tbYear, 1)} TB · ${nodeWord(need[2]!.n)}` },
+          { label: `Hot set (last ${p.hotDays} days)`, value: `${fmt(hotGb)} GB · ${nodes} cache node${nodes === 1 ? '' : 's'}`, strong: true },
         ],
-        verdict: nodes === 1
-          ? { ok: true, text: `The hot set fits in one cache node with ${p.cacheGb} GB usable` }
-          : { ok: false, text: `The hot set needs about ${nodes} cache nodes of ${p.cacheGb} GB usable (or a shorter hot window)` },
+        verdict: top.n > 10
+          ? { ok: false, text: `${top.what[0]!.toUpperCase()}${top.what.slice(1)} need ${top.n} machines: partition it, or shorten the hot window` }
+          : { ok: true, neutral: true, text: `Most machines go to ${top.what} (${nodeWord(top.n)}); a small cluster covers it` },
       }
     },
   },
@@ -609,16 +620,15 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
       const useful = waitS <= p.timeoutS! ? Math.min(x, p.capacity!) : 0
       return {
         rows: [
-          { label: 'Arrivals', value: `${fmt(x)}/s` },
           { label: `Queue after ${p.seconds} s, no shedding`, value: fmt(queue) },
-          { label: 'Wait for a new request, no shedding', value: `${fmt(waitS, 1)} s`, strong: true },
-          { label: 'Useful answers/s, no shedding', value: `${fmt(useful)}/s` },
+          { label: `Wait for a new request after ${p.seconds} s, no shedding`, value: `${fmt(waitS, 1)} s`, strong: true },
+          { label: `Useful answers/s after ${p.seconds} s, no shedding`, value: `${fmt(useful)}/s` },
           { label: 'Useful answers/s, shedding the excess', value: `${fmt(Math.min(x, p.capacity!))}/s`, strong: true },
         ],
         verdict: extra === 0
           ? { ok: true, text: 'Under capacity: nothing queues, nothing needs shedding' }
           : waitS <= p.timeoutS!
-            ? { ok: true, text: 'The queue is still shorter than the timeout, but it grows every second the overload lasts' }
+            ? { ok: false, text: `The queue grows by ${fmt(extra)} every second; without shedding, waits pass the ${p.timeoutS} s timeout after about ${fmt((p.timeoutS! * p.capacity!) / extra)} s` }
             : { ok: false, text: `Requests wait longer than the ${p.timeoutS} s timeout, so the server works on answers nobody reads` },
       }
     },
@@ -633,7 +643,6 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
       const virt = windowRows * p.nodesPerRow!
       return {
         rows: [
-          { label: 'Rows in the list', value: fmt(x) },
           { label: 'Elements, render every row', value: fmt(all), strong: true },
           { label: `Rows on screen + ${p.overscan} above and below`, value: fmt(windowRows) },
           { label: 'Elements, virtualized', value: fmt(virt), strong: true },
@@ -652,9 +661,9 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
       return {
         rows: [
           { label: 'Forced layouts, read-write-read-write', value: fmt(x) },
-          { label: 'Layout time, interleaved', value: `${fmt(interleaved, 1)} ms`, strong: true },
+          { label: 'Layout time, interleaved', value: `${fmt(interleaved, 2)} ms`, strong: true },
           { label: 'Forced layouts, all reads then all writes', value: '1' },
-          { label: 'Layout time, batched', value: `${fmt(p.layoutMs!, 1)} ms`, strong: true },
+          { label: 'Layout time, batched', value: `${fmt(p.layoutMs!, 2)} ms`, strong: true },
         ],
         verdict: interleaved <= p.frameMs!
           ? { ok: true, text: `Interleaved still fits a ${fmt(p.frameMs!, 1)} ms frame, but the cost grows with every item` }
@@ -669,13 +678,13 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
       const chunks = Math.ceil(x / p.chunkMs!)
       return {
         rows: [
-          { label: 'Task length', value: `${fmt(x)} ms` },
           { label: 'Worst wait for a tap, one task', value: `${fmt(x)} ms`, strong: true },
           { label: `Split into ${p.chunkMs} ms pieces`, value: `${fmt(chunks)} pieces` },
-          { label: 'Worst wait for a tap, split or in a worker', value: `${fmt(Math.min(x, p.chunkMs!))} ms`, strong: true },
+          { label: 'Worst wait for a tap, split', value: `${fmt(Math.min(x, p.chunkMs!))} ms`, strong: true },
+          { label: 'Worst wait for a tap, in a worker', value: 'about 0 ms', strong: true },
         ],
         verdict: x <= p.goodInpMs!
-          ? { ok: true, text: `Even a tap at the start waits at most ${fmt(x)} ms, inside the ${p.goodInpMs} ms "good" INP threshold` }
+          ? { ok: true, text: `Input delay alone stays under the ${p.goodInpMs} ms "good" INP threshold; handler and paint time add to it` }
           : { ok: false, text: `A tap at the start waits ${fmt(x)} ms before any handler runs, past the ${p.goodInpMs} ms "good" INP threshold on its own` },
       }
     },
