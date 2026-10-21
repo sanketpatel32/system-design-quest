@@ -24,15 +24,18 @@ export function useCurrentSection(): SectionId | null {
 
 /** Two-tone wordmark that follows the section: "frontend" + green "quest". Swaps with a short pop (off under reduced motion). */
 function Wordmark({ word, sidebar }: { word: string; sidebar: boolean }) {
-  return (
+  const mark = (
     <span
       key={word}
       data-testid="wordmark"
-      className={`wordmark-swap font-display leading-none tracking-[-0.01em] whitespace-nowrap ${sidebar ? 'text-[1.6rem]' : 'text-[1.2rem] max-[399px]:text-[0.95rem] sm:text-2xl'}`}
+      className={`wordmark-swap font-display leading-none tracking-[-0.01em] whitespace-nowrap ${sidebar ? 'wordmark-fitted' : 'text-[1.2rem] max-[399px]:text-[0.95rem] sm:text-2xl'}`}
+      style={sidebar ? ({ '--wm-chars': word.length + 5 } as React.CSSProperties) : undefined}
     >
       <span className="text-chalk">{word}</span><span className="text-[#58cc02]">quest</span>
     </span>
   )
+  // Sidebar: the word is sized to the space left beside the logo and chevron, so "databasequest" never spills out
+  return sidebar ? <span className="wordmark-box">{mark}</span> : mark
 }
 
 type Pos = { left: number; top: number; width: number; sheet: boolean }
@@ -135,7 +138,7 @@ export function SectionSwitcher({ variant }: { variant: 'sidebar' | 'header' }) 
       <button
         ref={btnRef}
         type="button"
-        className={`switcher-btn ${sidebar ? 'px-3 py-2' : 'min-h-[44px] px-1.5 py-1 max-[399px]:px-1 max-[399px]:gap-1'}`}
+        className={`switcher-btn ${sidebar ? 'switcher-btn-sidebar' : 'min-h-[44px] px-1.5 py-1 max-[399px]:px-1 max-[399px]:gap-1'}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -144,11 +147,11 @@ export function SectionSwitcher({ variant }: { variant: 'sidebar' | 'header' }) 
         onClick={() => setOpen((v) => !v)}
         onKeyDown={onBtnKey}
       >
-        <span className="inline-flex items-center gap-2 max-[399px]:gap-1.5">
-          <LogoMark size={sidebar ? 44 : 34} className={sidebar ? '' : 'max-[399px]:h-[30px] max-[399px]:w-[30px]'} />
+        <span className={sidebar ? 'flex min-w-0 flex-1 items-center gap-2' : 'inline-flex items-center gap-2 max-[399px]:gap-1.5'}>
+          <LogoMark size={sidebar ? 38 : 34} className={sidebar ? '' : 'max-[399px]:h-[30px] max-[399px]:w-[30px]'} />
           <Wordmark word={SECTION_BRAND[current ?? 'system-design'].word} sidebar={sidebar} />
         </span>
-        <svg aria-hidden width="14" height="14" viewBox="0 0 14 14" className={`switcher-chevron ${open ? 'switcher-chevron-open' : ''}`}>
+        <svg aria-hidden width="14" height="14" viewBox="0 0 14 14" className={`switcher-chevron shrink-0 ${open ? 'switcher-chevron-open' : ''}`}>
           <path d="M3 5.2 7 9.2l4-4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
