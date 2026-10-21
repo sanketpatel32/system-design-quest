@@ -135,7 +135,7 @@ export function SectionSwitcher({ variant }: { variant: 'sidebar' | 'header' }) 
       <button
         ref={btnRef}
         type="button"
-        className={`switcher-btn ${sidebar ? 'px-3 py-2' : 'px-1.5 py-1 max-[399px]:px-1 max-[399px]:gap-1'}`}
+        className={`switcher-btn ${sidebar ? 'px-3 py-2' : 'min-h-[44px] px-1.5 py-1 max-[399px]:px-1 max-[399px]:gap-1'}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}

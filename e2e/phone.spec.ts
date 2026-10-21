@@ -61,3 +61,23 @@ test('phone shell respects notches and the dynamic viewport', async ({ page }) =
   const mainBottom = await page.locator('main').evaluate((m) => m.getBoundingClientRect().bottom - parseFloat(getComputedStyle(m).paddingBottom))
   expect(mainBottom).toBeLessThanOrEqual(box!.y)
 })
+
+/** Interactive elements on screen that are smaller than 44px in either direction (the hit area is what counts). */
+async function smallTargets(page: import('@playwright/test').Page, scope = 'body') {
+  return page.evaluate((sel) => {
+    const out: string[] = []
+    for (const el of document.querySelector(sel)!.querySelectorAll<HTMLElement>('a[href], button, select, input:not([type=hidden]), summary, [role=button]')) {
+      const r = el.getBoundingClientRect()
+      if (!r.width || !r.height || getComputedStyle(el).visibility === 'hidden') continue
+      if (el.closest('.react-flow__attribution, .sketch-caption, p, li')) continue // inline text links are exempt
+      if (r.height < 44 || r.width < 24) out.push(`${el.tagName}:${(el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 30)} ${Math.round(r.width)}x${Math.round(r.height)}`)
+    }
+    return out
+  }, scope)
+}
+
+test('phone header controls are full-size tap targets', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 })
+  await page.goto('/s/system-design')
+  expect(await smallTargets(page, '[data-testid=app-header]')).toEqual([])
+})
