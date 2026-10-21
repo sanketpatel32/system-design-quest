@@ -47,3 +47,17 @@ test.describe('phone diagrams', () => {
     await expect(viewer).toBeHidden()
   })
 })
+
+test('phone shell respects notches and the dynamic viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/s/system-design')
+  // viewport-fit=cover turns on env(safe-area-inset-*), which the header, tab bar, quiz bar and feedback sheet pad by
+  await expect(page.locator('meta[name=viewport]')).toHaveAttribute('content', /viewport-fit=cover/)
+  const tabbar = page.locator('nav.tabbar')
+  const box = await tabbar.boundingBox()
+  expect(Math.round(box!.y + box!.height)).toBe(844)
+  // Last bit of page content can scroll clear of the tab bar
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+  const mainBottom = await page.locator('main').evaluate((m) => m.getBoundingClientRect().bottom - parseFloat(getComputedStyle(m).paddingBottom))
+  expect(mainBottom).toBeLessThanOrEqual(box!.y)
+})
