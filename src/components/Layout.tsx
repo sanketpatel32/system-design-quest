@@ -69,7 +69,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="relative flex min-w-0 items-center gap-0.5 sm:gap-1">
             <button
               type="button"
-              className="flex items-center gap-1"
+              className="flex min-h-[44px] items-center gap-1"
               aria-expanded={hudOpen}
               aria-controls="hud-explainer"
               aria-label={`Level ${level}, ${xp} xp, ${streak}-day streak${badges.length ? `, ${badges.length} badges` : ''}. Show details`}
