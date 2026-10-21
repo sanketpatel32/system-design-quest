@@ -30,7 +30,7 @@
     "id": "t341-c2",
     "kind": "text",
     "title": "Worked example: a shop with 50,000 products",
-    "body": "Product pages are public and change a few times a day, which suits static HTML. A full rebuild at 20 ms per page takes 50,000 pages at 20 ms each, 1,000 seconds or about 17 minutes, too slow for every price change. Regenerating each page in the background when it is older than a few minutes keeps pages cached and fresh without rebuilding the site. The cart is personal, so it renders on the client.",
+    "body": "Product pages are public and change a few times a day, which suits static HTML. Rebuilding 50,000 pages at 20 ms each takes 1,000 s, about 17 minutes, too slow for every price change. Instead, regenerate just the affected page when its price changes, and keep a maximum age of a few minutes as a backstop in case a change event is missed. The cart is personal, so it renders on the client.",
     "teaches": [
      "revalidation"
     ]
@@ -108,7 +108,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "Static pages regenerated in the background when stale"
+      "label": "Static pages regenerated when their price changes"
      },
      {
       "id": "b",
@@ -126,7 +126,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Background revalidation serves cached HTML and refreshes it after a set age."
+    "explanation": "Regenerating a page when its data changes keeps it cached and correct; an age limit is the backstop."
    },
    {
     "id": "t341-a3",
@@ -274,7 +274,7 @@
     "title": "Where each strategy does its work",
     "steps": [
      "Static generation renders HTML at build time. Requests are served from files, often on a CDN, so time to first byte is low and servers do little. The cost is the build: content is only as fresh as the last build, and very large sites take long to rebuild.",
-     "Revalidation narrows that gap. A page is served from cache until it is older than a set age; the next request still gets the cached copy while the page regenerates in the background. HTTP has a matching idea in the stale-while-revalidate cache directive. Some platforms also allow regenerating a page on demand when its data changes.",
+     "Revalidation narrows that gap. A page is served from cache until it is older than a set age; the next request still gets the cached copy while the page regenerates in the background. HTTP has a matching idea in the stale-while-revalidate cache directive. Some platforms also allow regenerating a page on demand when its data changes. Age alone gives no freshness bound for rarely visited pages: the first visitor after hours still gets the old copy, so pages whose data must be correct are also regenerated on demand when that data changes.",
      "Server rendering per request builds HTML with fresh, personal data. The server pays for every request, and time to first byte includes the slowest data fetch unless the response is streamed. Streaming sends the shell and ready sections first and appends the rest in the same response as data arrives.",
      "Client rendering sends a small HTML shell and script that fetches data and builds the page in the browser. After the first load, navigation can be quick, but the first view waits for script to download and run, and slower devices feel it most.",
      "Hydration attaches behaviour to server-rendered HTML, which means running the page’s components on the device. Partial or progressive hydration limits that work to the interactive parts, or delays it until they are visible or used, reducing script cost on content-heavy pages."
@@ -301,9 +301,9 @@
       "Build time for large sites"
      ],
      [
-      "Static with revalidation",
-      "Within the revalidation age",
-      "Occasional background renders"
+      "Static, regenerated on change",
+      "Fresh soon after each change",
+      "A change event per update, plus an age backstop"
      ],
      [
       "Server per request",
@@ -327,10 +327,10 @@
     "steps": [
      "Full rebuild: 50,000 pages at 20 ms each is 1,000 s, about 17 minutes.",
      "A price change would wait up to 17 minutes plus deploy time.",
-     "Revalidating a page when it is 5 minutes old renders only pages people visit.",
-     "A page viewed every second is rendered about once per 5 minutes instead of 300 times."
+     "Regenerating a page when its price changes renders only changed pages, within seconds of the change.",
+     "Age-based revalidation alone would let a page nobody visited for 3 hours show a 3-hour-old price to the next shopper."
     ],
-    "result": "Per-page revalidation keeps large catalogues fresh within minutes without full rebuilds or per-request rendering."
+    "result": "Regenerate on change with a short age as a backstop: large catalogues stay correct without full rebuilds or per-request rendering."
    },
    "india": {
     "title": "How the guidance frames it",
@@ -361,22 +361,22 @@
    "choices": [
     {
      "id": "a",
-     "label": "Static pages regenerated when older than 5 minutes",
-     "feedback": "Right: shared content served from cache, fresh within the bound, and only visited pages are rebuilt."
+     "label": "Static pages regenerated when a price changes, with a 5-minute age as a backstop",
+     "feedback": "Right: shared content is served from cache, each page is rebuilt when its price changes, and the age catches a missed update."
     },
     {
      "id": "b",
-     "label": "Render each page on the server for every request",
+     "label": "Render each page on the server for every request, without a cache",
      "feedback": "Fresh, but every view pays server time for content that is the same for everyone."
     },
     {
      "id": "c",
-     "label": "Render on the client from a product API",
+     "label": "Render on the client from a product API once the script has loaded",
      "feedback": "Shoppers and crawlers wait for script before seeing the product; slower phones suffer most."
     }
    ],
    "correctId": "a",
-   "reveal": "The cart and account sections are personal, so they render on the client or per request, while the product content stays static with revalidation. One site, several strategies."
+   "reveal": "Age-based revalidation alone is not enough here: a rarely viewed page keeps its old price until someone visits after it goes stale, and that visitor still sees the old copy. Regenerating on change gives the 10-minute bound. The cart and account sections are personal, so they render on the client or per request. One site, several strategies."
   },
   "seeAlso": [
    {
@@ -420,7 +420,7 @@
     "id": "t342-c2",
     "kind": "text",
     "title": "Worked example: two people rename one card",
-    "body": "Asha and Ben both open card 42 at version 7. Asha renames it; her request says “if version is 7” and succeeds, making version 8. Ben’s rename also says “if version is 7”, so the server answers 412 Precondition Failed. Ben’s screen had already shown his title, so it rolls back to Asha’s title and offers to apply his change again.",
+    "body": "Asha and Ben both open card 42 at version 7. Asha renames it; her request says “if version is 7” and succeeds, making version 8. Ben’s rename also says “if version is 7”, so the server answers 412 Precondition Failed. Ben’s screen had already shown his title, so it rolls back, refetches the card, shows Asha’s title and offers to apply his change again.",
     "teaches": [
      "conflicts",
      "rollback"
@@ -439,7 +439,7 @@
      "Apply the change on screen at once",
      "Send the request with the version it was based on",
      "On success, store the server’s new version",
-     "On failure or conflict, restore the snapshot and explain"
+     "On failure or conflict, restore the confirmed state (refetch on conflict) and explain"
     ]
    },
    {
@@ -582,7 +582,7 @@
     "items": [
      {
       "id": "s3",
-      "label": "Send it with the version"
+      "label": "Send it with the version it was based on"
      },
      {
       "id": "s1",
@@ -594,7 +594,7 @@
      },
      {
       "id": "s2",
-      "label": "Show the change on screen"
+      "label": "Show the change at once, before sending"
      }
     ],
     "correctOrder": [
@@ -603,7 +603,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Snapshot first, so there is something to restore if the server disagrees."
+    "explanation": "Snapshot first so there is something to restore, show the change, then send it with its version."
    },
    {
     "id": "t342-a6",
@@ -1187,7 +1187,7 @@
     "id": "t344-c2",
     "kind": "text",
     "title": "Worked example: the window",
-    "body": "Rows are 48 px tall and the viewport is 800 px, so 17 rows are visible. Adding 5 rows of overscan above and below gives 27 rendered rows, and 27 × 8 = 216 elements instead of 80,000. A tall spacer keeps the scrollbar the size of the full list, and the rows move to wherever the user has scrolled.",
+    "body": "Rows are 48 px tall and the viewport is 800 px, so about 17 rows are visible (18 when scrolled mid-row). Adding 5 rows of overscan above and below gives 27 rendered rows, and 27 × 8 = 216 elements instead of 80,000. A tall spacer keeps the scrollbar the size of the full list, and the rows move to wherever the user has scrolled.",
     "teaches": [
      "windowing"
     ]
@@ -1211,8 +1211,8 @@
    {
     "id": "t344-c4",
     "kind": "text",
-    "title": "Variable heights and lighter options",
-    "body": "If rows differ in height, estimate them, measure each row once it renders, and correct the offsets. For long pages of mostly static content, the content-visibility property can let the browser skip rendering work for sections far off screen without removing them, a lighter step than full virtualization.",
+    "title": "Variable heights, and a lighter option",
+    "body": "If rows differ in height, estimate them, measure each row once it renders, and correct the offsets. For mostly static long pages, content-visibility (see How Browsers Render a Page) skips rendering work off screen while keeping the content findable and accessible, which virtualization does not.",
     "teaches": [
      "variable-heights"
     ]
@@ -1535,6 +1535,10 @@
    {
     "topicId": 220,
     "why": "Transforms that keep scrolling rows on the compositor"
+   },
+   {
+    "topicId": 201,
+    "why": "Rendering cost per element and content-visibility"
    }
   ]
  },
@@ -1560,8 +1564,8 @@
    {
     "id": "t345-c1",
     "kind": "text",
-    "title": "Reading layout after a write forces work",
-    "body": "Browsers delay layout until they need it. If code changes a style and then asks for an element’s size or position, the browser must compute layout right away to answer. Doing that in a loop, write then read for each item, forces a layout per item: layout thrashing.",
+    "title": "Recap: a read after a write forces layout",
+    "body": "How Browsers Render a Page explained forced synchronous layout. The pattern to spot here is the loop: write a style, read a size, repeat. Each pass forces a fresh layout, so the cost grows with the number of items: layout thrashing.",
     "teaches": [
      "forced-layout"
     ]
@@ -2061,7 +2065,7 @@
      },
      {
       "id": "b",
-      "label": "How far visible content moves while the page loads"
+      "label": "How far visible content moves while the page is loading"
      },
      {
       "id": "c",
@@ -2138,21 +2142,22 @@
    },
    {
     "id": "t346-a6",
-    "concept": "yielding",
+    "concept": "inp",
     "type": "estimation",
-    "prompt": "A 400 ms task is split into 50 ms pieces. How many pieces is that?",
-    "unit": "pieces",
-    "target": 8,
+    "prompt": "Good INP is 200 ms. A tap’s handler and the next paint take 80 ms together. If a tap can arrive just as a main-thread chunk starts, what is the longest chunk that still meets 200 ms?",
+    "unit": "ms",
+    "target": 120,
     "assumptions": [
-     "Pieces are equal length"
+     "The tap waits for one whole chunk",
+     "Handler and paint take 80 ms"
     ],
-    "formula": "400 ÷ 50",
-    "workedAnswer": "400 ÷ 50 = 8 pieces",
-    "explanation": "Sanity check: the worst wait for a tap drops from about 400 ms to about 50 ms, while total work is unchanged.",
-    "tolerance": 0,
+    "formula": "200 − 80",
+    "workedAnswer": "200 − 80 = 120 ms per chunk at most",
+    "explanation": "Sanity check: 120 ms is the ceiling, not a target; 50 ms chunks leave margin for slower phones.",
+    "tolerance": 0.05,
     "trapAnswers": [
-     50,
-     400
+     200,
+     280
     ]
    }
   ],
@@ -2181,6 +2186,10 @@
    {
     "title": "MDN: Web Workers API",
     "url": "https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API"
+   },
+   {
+    "title": "web.dev: Optimize long tasks",
+    "url": "https://web.dev/articles/optimize-long-tasks"
    }
   ],
   "deep": {
@@ -2296,6 +2305,10 @@
    {
     "topicId": 211,
     "why": "Loading less script so the main thread is free sooner"
+   },
+   {
+    "topicId": 203,
+    "why": "The event loop and task queues behind long tasks"
    }
   ]
  }

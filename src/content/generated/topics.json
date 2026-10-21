@@ -109250,7 +109250,7 @@
         "id": "t341-c2",
         "kind": "text",
         "title": "Worked example: a shop with 50,000 products",
-        "body": "Product pages are public and change a few times a day, which suits static HTML. A full rebuild at 20 ms per page takes 50,000 pages at 20 ms each, 1,000 seconds or about 17 minutes, too slow for every price change. Regenerating each page in the background when it is older than a few minutes keeps pages cached and fresh without rebuilding the site. The cart is personal, so it renders on the client.",
+        "body": "Product pages are public and change a few times a day, which suits static HTML. Rebuilding 50,000 pages at 20 ms each takes 1,000 s, about 17 minutes, too slow for every price change. Instead, regenerate just the affected page when its price changes, and keep a maximum age of a few minutes as a backstop in case a change event is missed. The cart is personal, so it renders on the client.",
         "teaches": [
           "revalidation"
         ]
@@ -109328,7 +109328,7 @@
         "choices": [
           {
             "id": "a",
-            "label": "Static pages regenerated in the background when stale"
+            "label": "Static pages regenerated when their price changes"
           },
           {
             "id": "b",
@@ -109346,7 +109346,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Background revalidation serves cached HTML and refreshes it after a set age."
+        "explanation": "Regenerating a page when its data changes keeps it cached and correct; an age limit is the backstop."
       },
       {
         "id": "t341-a3",
@@ -109494,7 +109494,7 @@
         "title": "Where each strategy does its work",
         "steps": [
           "Static generation renders HTML at build time. Requests are served from files, often on a CDN, so time to first byte is low and servers do little. The cost is the build: content is only as fresh as the last build, and very large sites take long to rebuild.",
-          "Revalidation narrows that gap. A page is served from cache until it is older than a set age; the next request still gets the cached copy while the page regenerates in the background. HTTP has a matching idea in the stale-while-revalidate cache directive. Some platforms also allow regenerating a page on demand when its data changes.",
+          "Revalidation narrows that gap. A page is served from cache until it is older than a set age; the next request still gets the cached copy while the page regenerates in the background. HTTP has a matching idea in the stale-while-revalidate cache directive. Some platforms also allow regenerating a page on demand when its data changes. Age alone gives no freshness bound for rarely visited pages: the first visitor after hours still gets the old copy, so pages whose data must be correct are also regenerated on demand when that data changes.",
           "Server rendering per request builds HTML with fresh, personal data. The server pays for every request, and time to first byte includes the slowest data fetch unless the response is streamed. Streaming sends the shell and ready sections first and appends the rest in the same response as data arrives.",
           "Client rendering sends a small HTML shell and script that fetches data and builds the page in the browser. After the first load, navigation can be quick, but the first view waits for script to download and run, and slower devices feel it most.",
           "Hydration attaches behaviour to server-rendered HTML, which means running the page’s components on the device. Partial or progressive hydration limits that work to the interactive parts, or delays it until they are visible or used, reducing script cost on content-heavy pages."
@@ -109521,9 +109521,9 @@
             "Build time for large sites"
           ],
           [
-            "Static with revalidation",
-            "Within the revalidation age",
-            "Occasional background renders"
+            "Static, regenerated on change",
+            "Fresh soon after each change",
+            "A change event per update, plus an age backstop"
           ],
           [
             "Server per request",
@@ -109547,10 +109547,10 @@
         "steps": [
           "Full rebuild: 50,000 pages at 20 ms each is 1,000 s, about 17 minutes.",
           "A price change would wait up to 17 minutes plus deploy time.",
-          "Revalidating a page when it is 5 minutes old renders only pages people visit.",
-          "A page viewed every second is rendered about once per 5 minutes instead of 300 times."
+          "Regenerating a page when its price changes renders only changed pages, within seconds of the change.",
+          "Age-based revalidation alone would let a page nobody visited for 3 hours show a 3-hour-old price to the next shopper."
         ],
-        "result": "Per-page revalidation keeps large catalogues fresh within minutes without full rebuilds or per-request rendering."
+        "result": "Regenerate on change with a short age as a backstop: large catalogues stay correct without full rebuilds or per-request rendering."
       },
       "india": {
         "title": "How the guidance frames it",
@@ -109581,22 +109581,22 @@
       "choices": [
         {
           "id": "a",
-          "label": "Static pages regenerated when older than 5 minutes",
-          "feedback": "Right: shared content served from cache, fresh within the bound, and only visited pages are rebuilt."
+          "label": "Static pages regenerated when a price changes, with a 5-minute age as a backstop",
+          "feedback": "Right: shared content is served from cache, each page is rebuilt when its price changes, and the age catches a missed update."
         },
         {
           "id": "b",
-          "label": "Render each page on the server for every request",
+          "label": "Render each page on the server for every request, without a cache",
           "feedback": "Fresh, but every view pays server time for content that is the same for everyone."
         },
         {
           "id": "c",
-          "label": "Render on the client from a product API",
+          "label": "Render on the client from a product API once the script has loaded",
           "feedback": "Shoppers and crawlers wait for script before seeing the product; slower phones suffer most."
         }
       ],
       "correctId": "a",
-      "reveal": "The cart and account sections are personal, so they render on the client or per request, while the product content stays static with revalidation. One site, several strategies."
+      "reveal": "Age-based revalidation alone is not enough here: a rarely viewed page keeps its old price until someone visits after it goes stale, and that visitor still sees the old copy. Regenerating on change gives the 10-minute bound. The cart and account sections are personal, so they render on the client or per request. One site, several strategies."
     },
     "seeAlso": [
       {
@@ -109640,7 +109640,7 @@
         "id": "t342-c2",
         "kind": "text",
         "title": "Worked example: two people rename one card",
-        "body": "Asha and Ben both open card 42 at version 7. Asha renames it; her request says “if version is 7” and succeeds, making version 8. Ben’s rename also says “if version is 7”, so the server answers 412 Precondition Failed. Ben’s screen had already shown his title, so it rolls back to Asha’s title and offers to apply his change again.",
+        "body": "Asha and Ben both open card 42 at version 7. Asha renames it; her request says “if version is 7” and succeeds, making version 8. Ben’s rename also says “if version is 7”, so the server answers 412 Precondition Failed. Ben’s screen had already shown his title, so it rolls back, refetches the card, shows Asha’s title and offers to apply his change again.",
         "teaches": [
           "conflicts",
           "rollback"
@@ -109659,7 +109659,7 @@
           "Apply the change on screen at once",
           "Send the request with the version it was based on",
           "On success, store the server’s new version",
-          "On failure or conflict, restore the snapshot and explain"
+          "On failure or conflict, restore the confirmed state (refetch on conflict) and explain"
         ]
       },
       {
@@ -109802,7 +109802,7 @@
         "items": [
           {
             "id": "s3",
-            "label": "Send it with the version"
+            "label": "Send it with the version it was based on"
           },
           {
             "id": "s1",
@@ -109814,7 +109814,7 @@
           },
           {
             "id": "s2",
-            "label": "Show the change on screen"
+            "label": "Show the change at once, before sending"
           }
         ],
         "correctOrder": [
@@ -109823,7 +109823,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Snapshot first, so there is something to restore if the server disagrees."
+        "explanation": "Snapshot first so there is something to restore, show the change, then send it with its version."
       },
       {
         "id": "t342-a6",
@@ -110407,7 +110407,7 @@
         "id": "t344-c2",
         "kind": "text",
         "title": "Worked example: the window",
-        "body": "Rows are 48 px tall and the viewport is 800 px, so 17 rows are visible. Adding 5 rows of overscan above and below gives 27 rendered rows, and 27 × 8 = 216 elements instead of 80,000. A tall spacer keeps the scrollbar the size of the full list, and the rows move to wherever the user has scrolled.",
+        "body": "Rows are 48 px tall and the viewport is 800 px, so about 17 rows are visible (18 when scrolled mid-row). Adding 5 rows of overscan above and below gives 27 rendered rows, and 27 × 8 = 216 elements instead of 80,000. A tall spacer keeps the scrollbar the size of the full list, and the rows move to wherever the user has scrolled.",
         "teaches": [
           "windowing"
         ]
@@ -110431,8 +110431,8 @@
       {
         "id": "t344-c4",
         "kind": "text",
-        "title": "Variable heights and lighter options",
-        "body": "If rows differ in height, estimate them, measure each row once it renders, and correct the offsets. For long pages of mostly static content, the content-visibility property can let the browser skip rendering work for sections far off screen without removing them, a lighter step than full virtualization.",
+        "title": "Variable heights, and a lighter option",
+        "body": "If rows differ in height, estimate them, measure each row once it renders, and correct the offsets. For mostly static long pages, content-visibility (see How Browsers Render a Page) skips rendering work off screen while keeping the content findable and accessible, which virtualization does not.",
         "teaches": [
           "variable-heights"
         ]
@@ -110755,6 +110755,10 @@
       {
         "topicId": 220,
         "why": "Transforms that keep scrolling rows on the compositor"
+      },
+      {
+        "topicId": 201,
+        "why": "Rendering cost per element and content-visibility"
       }
     ]
   },
@@ -110780,8 +110784,8 @@
       {
         "id": "t345-c1",
         "kind": "text",
-        "title": "Reading layout after a write forces work",
-        "body": "Browsers delay layout until they need it. If code changes a style and then asks for an element’s size or position, the browser must compute layout right away to answer. Doing that in a loop, write then read for each item, forces a layout per item: layout thrashing.",
+        "title": "Recap: a read after a write forces layout",
+        "body": "How Browsers Render a Page explained forced synchronous layout. The pattern to spot here is the loop: write a style, read a size, repeat. Each pass forces a fresh layout, so the cost grows with the number of items: layout thrashing.",
         "teaches": [
           "forced-layout"
         ]
@@ -111281,7 +111285,7 @@
           },
           {
             "id": "b",
-            "label": "How far visible content moves while the page loads"
+            "label": "How far visible content moves while the page is loading"
           },
           {
             "id": "c",
@@ -111358,21 +111362,22 @@
       },
       {
         "id": "t346-a6",
-        "concept": "yielding",
+        "concept": "inp",
         "type": "estimation",
-        "prompt": "A 400 ms task is split into 50 ms pieces. How many pieces is that?",
-        "unit": "pieces",
-        "target": 8,
+        "prompt": "Good INP is 200 ms. A tap’s handler and the next paint take 80 ms together. If a tap can arrive just as a main-thread chunk starts, what is the longest chunk that still meets 200 ms?",
+        "unit": "ms",
+        "target": 120,
         "assumptions": [
-          "Pieces are equal length"
+          "The tap waits for one whole chunk",
+          "Handler and paint take 80 ms"
         ],
-        "formula": "400 ÷ 50",
-        "workedAnswer": "400 ÷ 50 = 8 pieces",
-        "explanation": "Sanity check: the worst wait for a tap drops from about 400 ms to about 50 ms, while total work is unchanged.",
-        "tolerance": 0,
+        "formula": "200 − 80",
+        "workedAnswer": "200 − 80 = 120 ms per chunk at most",
+        "explanation": "Sanity check: 120 ms is the ceiling, not a target; 50 ms chunks leave margin for slower phones.",
+        "tolerance": 0.05,
         "trapAnswers": [
-          50,
-          400
+          200,
+          280
         ]
       }
     ],
@@ -111401,6 +111406,10 @@
       {
         "title": "MDN: Web Workers API",
         "url": "https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API"
+      },
+      {
+        "title": "web.dev: Optimize long tasks",
+        "url": "https://web.dev/articles/optimize-long-tasks"
       }
     ],
     "deep": {
@@ -111516,6 +111525,10 @@
       {
         "topicId": 211,
         "why": "Loading less script so the main thread is free sooner"
+      },
+      {
+        "topicId": 203,
+        "why": "The event loop and task queues behind long tasks"
       }
     ]
   },
@@ -111779,12 +111792,12 @@
     ],
     "sources": [
       {
-        "title": "Google SRE workbook: Managing Load",
-        "url": "https://sre.google/workbook/managing-load/"
+        "title": "Google SRE book: Introduction (Demand Forecasting and Capacity Planning)",
+        "url": "https://sre.google/sre-book/introduction/"
       },
       {
-        "title": "Redis: Memory optimization",
-        "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/memory-optimization/"
+        "title": "Redis: Key eviction",
+        "url": "https://redis.io/docs/latest/develop/reference/eviction/"
       }
     ],
     "deep": {
@@ -111855,9 +111868,9 @@
         "result": "Reads dominate and the hot set fits a small cache cluster, so the first design move is a cache in front of a modest database."
       },
       "india": {
-        "title": "Planning from measured load",
+        "title": "How capacity planning is described",
         "label": "Official documentation",
-        "body": "The Google SRE workbook chapter on managing load describes planning capacity from measured demand, keeping headroom for peaks and failures, and load testing to find what one instance can really serve. It also recommends planning for the loss of capacity during failures, so a cluster sized exactly for the peak with nothing spare is not enough once a node or a zone goes down."
+        "body": "The Google SRE book’s introduction treats demand forecasting and capacity planning as a core SRE responsibility. It lists the steps it considers mandatory: an organic demand forecast that extends beyond the lead time for acquiring capacity, inorganic demand such as launches and marketing pushes, and regular load testing to map raw resources, such as servers and disks, to service capacity. The Redis documentation on key eviction describes LRU and LFU policies that keep the most used keys when memory is full."
       },
       "pitfalls": [
         {
@@ -111872,14 +111885,14 @@
       "takeaways": [
         "Estimate peak reads, peak writes, storage growth and the hot set.",
         "Divide daily volume by 86,400 and apply a peak factor.",
-        "The read:write ratio decides between caching and write scaling.",
+        "The read:write ratio decides between caching and write scaling; check which resource needs the most machines.",
         "Size memory for the hot set, not for all the data."
       ]
     },
     "interactive": {
       "kind": "slider",
       "title": "Size the feed service",
-      "prompt": "Each user reads 40 items and posts 2 a day at 1 KB; the peak is 3x and the last 7 days are hot. Slide daily active users and watch which number grows past one machine first.",
+      "prompt": "Each user reads 40 items and posts 2 a day at 1 KB; the peak is 3x and the last 7 days are hot. Assume one database node serves 10K reads/s or 5K writes/s and holds 10 TB, and one cache node holds 48 GB (illustrative). Slide daily active users and see which resource needs the most machines.",
       "model": "capacity",
       "params": {
         "readsPerUser": 40,
@@ -111887,7 +111900,10 @@
         "payloadKb": 1,
         "peakFactor": 3,
         "hotDays": 7,
-        "cacheGb": 48
+        "cacheGb": 48,
+        "readsPerNode": 10000,
+        "writesPerNode": 5000,
+        "diskTbPerNode": 10
       },
       "control": {
         "label": "Daily active users",
@@ -111897,7 +111913,7 @@
         "initial": 10,
         "unit": "M"
       },
-      "takeaway": "At 10M users the peak is about 14K reads/s and 694 writes/s, and the 140 GB hot set needs three 48 GB cache nodes. Reads dominate at every size, so caching is the first lever; the hot window decides the memory bill."
+      "takeaway": "At 10M users, uncached reads would need 2 database nodes while writes and a year of data fit on one; a 3-node cache holding the 140 GB hot set takes the reads off the database. Writes and storage only become the bottleneck at much larger sizes."
     },
     "seeAlso": [
       {
@@ -111942,7 +111958,7 @@
         "id": "t352-c2",
         "kind": "text",
         "title": "Worked example: one small update",
-        "body": "Changing a 100-byte row in a B-tree rewrites the 8 KB page that holds it, plus a log record: about 8,192 ÷ 100 ≈ 82 bytes written per byte changed, before counting index pages. An LSM-tree appends the new row to its log and memory table at once, but compaction may rewrite it several more times as files are merged level by level.",
+        "body": "Changing a 100-byte row in a B-tree-organised table (a clustered index) rewrites the 8 KB page that holds it, plus a log record: about 8,192 ÷ 100 ≈ 82 bytes written per byte changed, before counting index pages. An LSM-tree appends the new row to its log and memory table at once, but compaction may rewrite it several more times as files are merged level by level.",
         "teaches": [
           "amplification"
         ]
@@ -112080,7 +112096,7 @@
           },
           {
             "id": "b",
-            "label": "A B-tree with a page per row"
+            "label": "A B-tree, since reads are mostly range scans"
           },
           {
             "id": "c",
@@ -112088,13 +112104,13 @@
           },
           {
             "id": "d",
-            "label": "A hash index, for its range scans"
+            "label": "A hash index, for constant-time point writes"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "High-volume appends suit LSM-trees; hash indexes cannot serve range scans."
+        "explanation": "High-volume small appends suit LSM-trees, which still serve recent ranges from sorted files; hash indexes cannot serve range scans."
       },
       {
         "id": "t352-a5",
@@ -112172,6 +112188,10 @@
       {
         "title": "Apache Cassandra: Compaction overview",
         "url": "https://cassandra.apache.org/doc/latest/cassandra/managing/operating/compaction/overview.html"
+      },
+      {
+        "title": "Apache Cassandra: Storage engine",
+        "url": "https://cassandra.apache.org/doc/latest/cassandra/architecture/storage-engine.html"
       }
     ],
     "deep": {
@@ -112183,7 +112203,7 @@
       "mechanism": {
         "title": "How the two engines spend their I/O",
         "steps": [
-          "A B-tree stores rows or keys in fixed-size pages, often 8 KB or 16 KB, arranged as a shallow tree. A lookup reads one page per level, usually three or four, and the top levels stay in memory. An update finds the page, changes it in memory, logs the change, and later writes the whole page back.",
+          "A B-tree stores rows or keys in fixed-size pages, often 8 KB or 16 KB, arranged as a shallow tree. A lookup reads one page per level, usually three or four, and the top levels stay in memory. An update finds the page, changes it in memory, logs the change, and later writes the whole page back. PostgreSQL differs for tables: they are heap files and an update writes a new row version (MVCC) rather than changing the old one, and full-page images in the WAL after each checkpoint add further write amplification.",
           "Writing whole pages for small changes is the B-tree’s write amplification. Random updates across a large table touch different pages, so the disk sees scattered page writes. In exchange, a read finds the single current version of a row in one place.",
           "An LSM-tree turns writes into sequential appends. Each write goes to a log and an in-memory sorted table. When the table fills, it is flushed as an immutable sorted file. Deletes are written as markers called tombstones, because files are never edited in place.",
           "Compaction merges files to discard overwritten rows and tombstones and to bound how many files a read must check. Leveled compaction keeps files in levels of growing size and rewrites data each time it moves down a level, trading extra writes for fewer files per read. Other strategies merge less often, writing less but leaving more files and more space used.",
@@ -112243,7 +112263,7 @@
       "india": {
         "title": "What the documentation says",
         "label": "Official documentation",
-        "body": "The PostgreSQL documentation describes tables and indexes stored as arrays of fixed-size pages, normally 8 kB, with each page holding row pointers and tuples. Apache Cassandra’s documentation describes writes going to a commit log and an in-memory structure, flushed to immutable sorted files, with compaction strategies that trade write amplification against the number of files a read must touch."
+        "body": "The PostgreSQL documentation describes tables and indexes stored as arrays of fixed-size pages, normally 8 kB, with each page holding row pointers and tuples; an update writes a new tuple version rather than overwriting the old one. Apache Cassandra’s documentation describes writes going to a commit log and an in-memory structure, flushed to immutable sorted files, with compaction strategies that trade write amplification against the number of files a read must touch."
       },
       "pitfalls": [
         {
@@ -112337,15 +112357,15 @@
       {
         "id": "t353-c3",
         "kind": "diagram",
-        "title": "Four ways to make the check stick",
+        "title": "Five ways to make the check stick",
         "body": "Each one makes the second request fail or wait instead of double booking.",
         "teaches": [
           "fixes"
         ],
         "steps": [
           "Unique constraint on (flight, seat): the second insert fails",
-          "Lock the seat row first: the second request waits, then sees it taken",
-          "Version check: update only if the version is unchanged, else retry",
+          "Keep one row per seat and lock it first: the second request waits, then sees it taken",
+          "Conditional update: book the seat only where it is still free; zero rows means it is gone",
           "Serializable isolation: the database aborts one transaction",
           "Turn the failure into a clear “seat just taken” reply"
         ]
@@ -112353,8 +112373,8 @@
       {
         "id": "t353-c4",
         "kind": "text",
-        "title": "Pessimistic or optimistic",
-        "body": "Locking the row before checking (pessimistic) makes contenders wait; it suits hot items with frequent conflicts. An optimistic version check lets everyone proceed and rejects the losers at write time; it suits items where conflicts are rare, and it never holds a lock while a user thinks.",
+        "title": "Lock, conditional update or optimistic",
+        "body": "A row lock (pessimistic) makes contenders wait. A single conditional update holds no lock across user think time and needs no retry: the loser learns the seat is gone. Optimistic concurrency reads a version and retries on a mismatch; it suits rare conflicts, not hot seats.",
         "teaches": [
           "fixes"
         ]
@@ -112498,11 +112518,11 @@
           },
           {
             "id": "s4",
-            "label": "Insert the booking and commit"
+            "label": "Mark the seat booked and commit"
           },
           {
             "id": "s2",
-            "label": "Lock the seat row"
+            "label": "Lock the seat’s own row"
           }
         ],
         "correctOrder": [
@@ -112511,7 +112531,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Lock before the check, so the check stays true until commit."
+        "explanation": "Lock the seat row before the check, so the check stays true until commit."
       },
       {
         "id": "t353-a6",
@@ -112573,7 +112593,7 @@
           "Most databases default to read committed or snapshot isolation. A transaction sees committed data, but nothing it reads is locked against other writers. When the decision to insert depends on a read, another transaction can change what that read would return before the insert commits.",
           "If both transactions update the same row, the database notices: one waits or fails. Double booking is harder because the two transactions insert different rows. Snapshot isolation, used for repeatable read in several databases, allows this write skew.",
           "A unique constraint turns the business rule into something the database enforces on every insert: only one row per flight and seat. The second insert fails with a constraint error, which the handler turns into “seat just taken”. For overlapping ranges, such as hotel nights, some databases offer exclusion constraints; otherwise model each night as a row.",
-          "A row lock, taken by reading the seat or room row “for update” before checking, makes the second transaction wait until the first commits, then re-check. An optimistic alternative is a conditional update: set the seat to booked only where it is still free, or only where its version is unchanged, and treat zero rows updated as a lost race.",
+          "Keep one row per seat or room-night so there is something to lock or update. A row lock, taken by reading that row “for update” before checking, makes the second transaction wait until the first commits, then re-check. A conditional update is a separate, lock-free option: one statement sets the seat to booked only where it is still free, and zero rows updated means the seat is gone, with no retry loop. Optimistic concurrency, in contrast, reads a version, writes only if it is unchanged and retries on a mismatch; it suits edits that rarely collide.",
           "Serializable isolation detects that the two transactions could not have run one after the other and aborts one of them. It protects every rule without changing the schema, but the application must retry aborted transactions, and heavy contention increases aborts."
         ]
       },
@@ -112603,8 +112623,13 @@
             "Lock wait time, deadlock care"
           ],
           [
-            "Version or conditional update",
-            "Losers retry or report",
+            "Conditional update",
+            "Loser learns at once",
+            "Rule must fit one row’s state"
+          ],
+          [
+            "Optimistic version and retry",
+            "Losers re-read and retry",
             "Wasted work under heavy contention"
           ],
           [
@@ -112632,7 +112657,7 @@
       "india": {
         "title": "What the PostgreSQL documentation says",
         "label": "Official documentation",
-        "body": "The PostgreSQL documentation on transaction isolation explains that read committed lets each statement see data committed before it began, and that repeatable read in PostgreSQL uses a snapshot. It describes serialization anomalies such as write skew and states that the serializable level detects them and aborts a transaction, which the application must be prepared to retry."
+        "body": "The PostgreSQL documentation on transaction isolation explains that read committed lets each statement see data committed before it began, and that repeatable read in PostgreSQL uses a snapshot. It describes serialization anomalies (write skew is one kind) and states that the serializable level detects them and aborts a transaction, which the application must be prepared to retry."
       },
       "pitfalls": [
         {
@@ -112669,7 +112694,7 @@
         {
           "id": "c",
           "label": "Optimistic versions with automatic retry until success",
-          "feedback": "It prevents duplicates, but with 100 buyers per seat most retries fail again and add load."
+          "feedback": "It prevents duplicates, but each retry re-reads and loses again, adding a round of reads and writes per buyer; a single conditional update settles it in one statement."
         }
       ],
       "correctId": "b",
@@ -112691,12 +112716,12 @@
     "slug": "poison-messages-and-dead-letter-queues",
     "region": "f2-backend",
     "order": 24,
-    "title": "Poison Messages and Dead-Letter Queues",
+    "title": "Operating a Dead-Letter Queue",
     "kind": "lesson",
     "objectives": [
-      "Recognise a poison message that fails on every attempt",
-      "Bound retries and move failing messages to a dead-letter queue",
-      "Operate the dead-letter queue: alert, inspect, fix and redrive"
+      "Decide which failures skip retries and go straight to the dead-letter queue",
+      "Keep enough context and retention to fix and replay parked messages",
+      "Alert on, inspect and redrive a dead-letter queue safely"
     ],
     "difficulty": 2,
     "durationMinutes": 11,
@@ -112707,8 +112732,8 @@
       {
         "id": "t354-c1",
         "kind": "text",
-        "title": "One bad message can stop a queue",
-        "body": "A consumer takes a message, fails on it, and the broker redelivers it. If the failure is in the message itself, such as a malformed field or a reference to a deleted record, every attempt fails the same way. In an ordered queue or partition, the messages behind it wait forever.",
+        "title": "Recap, then the hard part",
+        "body": "Message Queues and Background Jobs introduced poison messages and dead-letter queues. This lesson is about running one: what goes there, what to keep with it, who is alerted, and how to replay safely.",
         "teaches": [
           "poison-message"
         ]
@@ -112742,8 +112767,8 @@
       {
         "id": "t354-c4",
         "kind": "text",
-        "title": "Transient or permanent?",
-        "body": "A timeout to a database is transient and worth retrying. A validation error will fail on every attempt. Classify errors where you can: send permanent failures to the dead-letter queue at once, and give transient ones a few spaced retries so a brief outage does not fill the dead-letter queue.",
+        "title": "Keep enough to act on",
+        "body": "Park each message with its error, attempt count, consumer version and first-failure time. Set the queue’s retention longer than your worst time to fix, or parked messages expire before anyone replays them.",
         "teaches": [
           "retry-limit"
         ]
@@ -112817,31 +112842,31 @@
       },
       {
         "id": "t354-a3",
-        "concept": "dlq",
+        "concept": "retry-limit",
         "type": "multiple_choice",
-        "prompt": "The consumer has tried a message five times and it still fails. Where should it go next?",
+        "prompt": "Which failure should skip retries and go straight to the dead-letter queue?",
         "choices": [
           {
             "id": "a",
-            "label": "Delete it so the queue keeps moving"
+            "label": "A timeout calling the payments service"
           },
           {
             "id": "b",
-            "label": "Put it back at the head of the queue for another try"
+            "label": "A message that fails schema validation"
           },
           {
             "id": "c",
-            "label": "Retry it every second until it works"
+            "label": "A database deadlock that aborted the transaction"
           },
           {
             "id": "d",
-            "label": "Move it with its error to a dead-letter queue"
+            "label": "A 503 from a dependency that is shedding load"
           }
         ],
         "correctChoiceIds": [
-          "d"
+          "b"
         ],
-        "explanation": "Parking keeps the data for inspection and replay without blocking the flow."
+        "explanation": "Invalid content fails the same way every time; the others are transient and worth a few spaced retries."
       },
       {
         "id": "t354-a4",
@@ -113048,7 +113073,7 @@
         {
           "id": "b",
           "label": "The broker skips the bad message after a while",
-          "feedback": "Brokers redeliver until acknowledged; only a configured limit or the consumer moves it aside."
+          "feedback": "Nothing skips it: the consumer keeps re-reading it until a retry limit or the consumer moves it aside."
         },
         {
           "id": "c",
@@ -113136,7 +113161,7 @@
         "id": "t355-c5",
         "kind": "text",
         "title": "Trap: measuring a timeout with wall time",
-        "body": "If a timeout is computed as “now minus start” with the wall clock and the clock steps back 2 seconds, the elapsed time can go negative and the timeout never fires; a step forward fires it early. Durations belong to the monotonic clock.",
+        "body": "If a timeout is computed as “now minus start” with the wall clock and the clock steps back 2 seconds, the elapsed time can go negative and the timeout fires late by the size of the step; a step forward fires it early. Durations belong to the monotonic clock.",
         "teaches": [
           "wall-vs-monotonic"
         ]
@@ -113173,31 +113198,31 @@
       },
       {
         "id": "t355-a2",
-        "concept": "lww",
+        "concept": "wall-vs-monotonic",
         "type": "multiple_choice",
-        "prompt": "Two servers stamp writes with their own clocks and the larger timestamp wins. What can go wrong?",
+        "prompt": "A service records latency as wall-clock end minus start. Mid-request, time sync steps the clock back 2 s. What does that sample show?",
         "choices": [
           {
             "id": "a",
-            "label": "An older write from a fast clock overwrites a newer one"
+            "label": "A latency about 2 s too low, maybe negative"
           },
           {
             "id": "b",
-            "label": "Both writes are kept side by side as two conflicting copies"
+            "label": "The true latency, as steps are rare"
           },
           {
             "id": "c",
-            "label": "The database refuses writes with equal timestamps"
+            "label": "A latency about 2 s too high"
           },
           {
             "id": "d",
-            "label": "Reads return the two writes in random order"
+            "label": "No value, as the system drops that one sample"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Timestamps from skewed clocks do not reflect real order."
+        "explanation": "The end time moved back 2 s, so the difference shrinks by 2 s; a monotonic clock avoids this."
       },
       {
         "id": "t355-a3",
@@ -113290,20 +113315,20 @@
         "id": "t355-a6",
         "concept": "clock-skew",
         "type": "estimation",
-        "prompt": "Server A’s clock is 300 ms ahead of server B’s. With last-write-wins on timestamps, for how many milliseconds after a write on A can a real later write on B still lose?",
+        "prompt": "Server A’s clock is 300 ms fast and server B’s is 100 ms slow. With last-write-wins on timestamps, for how many milliseconds after a write on A can a real later write on B still lose?",
         "unit": "ms",
-        "target": 300,
+        "target": 400,
         "assumptions": [
-          "Both writes target the same key",
+          "A is 300 ms ahead of true time, B is 100 ms behind",
           "Network delays ignored"
         ],
-        "formula": "skew = 300 ms",
-        "workedAnswer": "Any write on B less than 300 ms after a write on A gets a smaller timestamp and loses",
-        "explanation": "Sanity check: the loss window equals the skew, so it grows with worse synchronisation.",
+        "formula": "300 + 100",
+        "workedAnswer": "300 + 100 = 400 ms of skew between A and B",
+        "explanation": "Sanity check: the window is the skew between the two clocks, not either clock’s error alone.",
         "tolerance": 0,
         "trapAnswers": [
-          150,
-          600
+          300,
+          200
         ]
       }
     ],
@@ -113729,7 +113754,7 @@
       "mechanism": {
         "title": "Why queues fail under sustained overload",
         "steps": [
-          "A server has a maximum throughput. When the arrival rate is below it, queues stay short and absorb bursts. When arrivals exceed it for long, the queue grows by the difference every second, and the waiting time for each new request grows with it. Little’s law ties them together: items in the system equal arrival rate times time in the system.",
+          "A server has a maximum throughput. When the arrival rate is below it, queues stay short and absorb bursts. When arrivals exceed it for long, the queue grows by the difference every second, and the waiting time for each new request grows with it. In a growing queue, a new request waits about queue length ÷ service rate. Little’s law, items equal arrival rate times time in the system, holds only once a queue is stable.",
           "Callers have timeouts. Once the queue wait passes the timeout, the server finishes requests whose callers have gone, and it may receive retries for them on top. Throughput of useful answers falls towards zero even though the server is fully busy. This is congestion collapse.",
           "Load shedding caps the work admitted. A server tracks in-flight requests, queue time or CPU, and above a limit rejects new requests quickly with 503 and, where sensible, Retry-After. Rejection must be far cheaper than serving, so it happens before authentication-heavy or database work where possible.",
           "Not all requests are equal. Shedding can drop background, batch or retry traffic first and keep interactive requests. Requests already past their deadline should be dropped when dequeued. Clients must cooperate: limited retries, exponential backoff with jitter, and respect for Retry-After, or shed requests come straight back.",

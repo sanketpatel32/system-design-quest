@@ -137,44 +137,52 @@ describe('fundamentals models', () => {
     expect(MODELS['deadline-chain'].run(500, { calls: 3, deadlineMs: 1000 }).verdict!.ok).toBe(false)
     expect(MODELS['deadline-chain'].run(300, { calls: 3, deadlineMs: 1000 }).verdict!.ok).toBe(true)
   })
-  it('capacity: 10M DAU, 40 reads and 2 writes of 1 KB per user, 3x peak, 7-day hot set', () => {
-    const p = { readsPerUser: 40, writesPerUser: 2, payloadKb: 1, peakFactor: 3, hotDays: 7, cacheGb: 48 }
+  it('capacity: 10M DAU, 40 reads and 2 writes of 1 KB per user, 3x peak, 7-day hot set, per-node limits', () => {
+    const p = { readsPerUser: 40, writesPerUser: 2, payloadKb: 1, peakFactor: 3, hotDays: 7, cacheGb: 48, readsPerNode: 10000, writesPerNode: 5000, diskTbPerNode: 10 }
     const o = MODELS['capacity'].run(10, p)
-    expect(val(o, 0)).toBe('14K/s')
-    expect(val(o, 1)).toBe('694/s')
+    expect(val(o, 0)).toBe('14K/s · 2 nodes uncached')
+    expect(val(o, 1)).toBe('694/s · 1 node')
     expect(val(o, 2)).toBe('20 GB')
-    expect(val(o, 3)).toBe('7.3 TB')
-    expect(val(o, 4)).toBe('140 GB')
-    expect(o.verdict!.text).toContain('3 cache nodes')
-    expect(MODELS['capacity'].run(2, p).verdict!.ok).toBe(true)
+    expect(val(o, 3)).toBe('7.3 TB · 1 node')
+    expect(val(o, 4)).toBe('140 GB · 3 cache nodes')
+    // the recommended design (a small cache cluster) is not marked as a failure
+    expect(o.verdict!.ok).toBe(true)
+    expect(o.verdict!.text).toContain('the hot set in cache (3 nodes)')
+    expect(MODELS['capacity'].run(100, p).verdict!.ok).toBe(false)
   })
-  it('load-shed: 1,500/s into 1,000/s capacity for 60 s queues 30,000 and waits 30 s', () => {
+  it('load-shed: 1,500/s into 1,000/s capacity for 60 s queues 30,000 and waits 30 s; any sustained excess warns', () => {
     const p = { capacity: 1000, timeoutS: 2, seconds: 60 }
     const o = MODELS['load-shed'].run(1500, p)
-    expect(val(o, 1)).toBe('30,000')
-    expect(val(o, 2)).toBe('30 s')
-    expect(val(o, 3)).toBe('0/s')
-    expect(val(o, 4)).toBe('1,000/s')
+    expect(val(o, 0)).toBe('30,000')
+    expect(val(o, 1)).toBe('30 s')
+    expect(val(o, 2)).toBe('0/s')
+    expect(val(o, 3)).toBe('1,000/s')
     expect(o.verdict!.ok).toBe(false)
     expect(MODELS['load-shed'].run(900, p).verdict!.ok).toBe(true)
+    const small = MODELS['load-shed'].run(1010, p)
+    expect(small.verdict!.ok).toBe(false)
+    expect(small.verdict!.text).toContain('after about 200 s')
   })
   it('virtual-list: 10,000 rows x 8 elements = 80,000; virtualized window of 27 rows = 216', () => {
     const o = MODELS['virtual-list'].run(10000, { rowPx: 48, viewportPx: 800, overscan: 5, nodesPerRow: 8, domBudget: 1400 })
-    expect(val(o, 1)).toBe('80,000')
-    expect(val(o, 2)).toBe('27')
-    expect(val(o, 3)).toBe('216')
+    expect(val(o, 0)).toBe('80,000')
+    expect(val(o, 1)).toBe('27')
+    expect(val(o, 2)).toBe('216')
     expect(o.verdict!.ok).toBe(false)
   })
-  it('layout-thrash: 200 interleaved reads and writes at 0.25 ms each = 50 ms, over a 16.7 ms frame', () => {
+  it('layout-thrash: 200 interleaved reads and writes at 0.25 ms each = 50 ms, over a 16.7 ms frame; batched shows 0.25 ms', () => {
     const o = MODELS['layout-thrash'].run(200, { layoutMs: 0.25, frameMs: 16.7 })
     expect(val(o, 1)).toBe('50 ms')
+    expect(val(o, 3)).toBe('0.25 ms')
     expect(o.verdict!.ok).toBe(false)
     expect(MODELS['layout-thrash'].run(40, { layoutMs: 0.25, frameMs: 16.7 }).verdict!.ok).toBe(true)
   })
-  it('long-task: a 400 ms task splits into 8 pieces of 50 ms; a tap waits at most 50 ms', () => {
+  it('long-task: a 400 ms task splits into 8 pieces of 50 ms; in a worker the tap barely waits', () => {
     const o = MODELS['long-task'].run(400, { chunkMs: 50, goodInpMs: 200 })
-    expect(val(o, 2)).toBe('8 pieces')
-    expect(val(o, 3)).toBe('50 ms')
+    expect(val(o, 1)).toBe('8 pieces')
+    expect(val(o, 2)).toBe('50 ms')
+    expect(val(o, 3)).toBe('about 0 ms')
     expect(o.verdict!.ok).toBe(false)
+    expect(MODELS['long-task'].run(150, { chunkMs: 50, goodInpMs: 200 }).verdict!.text).toContain('handler and paint')
   })
 })
