@@ -13,7 +13,7 @@ import { IconBook, IconCastle, IconCheck, IconLock, IconStar } from '../icons/Hu
 import { bosses as arenaTopics, BOSS_N, FUND_N, fundamentalRegions, LESSON_N as STATION_N, learningRegions, playbook, PLAYBOOK_ID, topicLabel } from '../../content/numbering'
 
 import { SECTION_BY_ID, sectionPalette, sectionTopics, type SectionId } from '../../content/sections'
-import { sectionXp } from './SectionPicker'
+import { sectionXp } from '../../lib/progression/sectionXp'
 /** Minutes: ~1 per lesson card, ~1.5 per question */
 export function topicMinutes(id: number) {
   const t = topicsById.get(id)
