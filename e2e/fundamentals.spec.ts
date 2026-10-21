@@ -9,6 +9,11 @@ async function areas(page: Page) {
   return by
 }
 
+async function openSwitcher(page: Page) {
+  await page.locator('[data-testid^="section-switcher-"]:visible').first().click()
+  await expect(page.getByTestId('section-switcher-menu')).toBeVisible()
+}
+
 const SECTION_OF: Record<string, string> = { 'f1-frontend': 'frontend', 'f2-backend': 'backend', 'f3-networking': 'networking', 'f4-databases': 'databases', 'f5-os': 'os-concurrency', 'f6-security': 'security', 'f7-cloud': 'cloud-devops' }
 
 test('sections: overview rings, a map per section, and System Design unchanged', async ({ page }) => {
@@ -16,14 +21,21 @@ test('sections: overview rings, a map per section, and System Design unchanged',
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Choose a section', level: 1 })).toBeVisible()
   await expect(page.getByTestId('ring-system-design')).toHaveAttribute('data-done', '0')
-  // the overview is not any one section's page
-  await expect(page.locator('[data-testid^="section-tab-"][aria-current]')).toHaveCount(0)
+  // the overview has no tab row; the logo switcher marks "All sections" as current, not a section
+  await expect(page.getByTestId('section-picker')).toHaveCount(0)
+  await openSwitcher(page)
+  await expect(page.getByTestId('switcher-item-all')).toHaveAttribute('aria-current', 'page')
+  await expect(page.locator('[data-testid^="switcher-item-"][aria-current]')).toHaveCount(1)
+  await page.keyboard.press('Escape')
   const by = await areas(page)
   for (const [region, list] of by) {
     const sec = SECTION_OF[region]!
     await expect(page.getByTestId(`section-card-${sec}`)).toBeVisible()
     await page.goto(`/s/${sec}`)
-    await expect(page.getByTestId(`section-tab-${sec}`)).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByTestId('section-picker')).toHaveCount(0)
+    await openSwitcher(page)
+    await expect(page.getByTestId(`switcher-item-${sec}`)).toHaveAttribute('aria-current', 'page')
+    await page.keyboard.press('Escape')
     await expect(page.getByTestId(`area-${region}`)).toBeVisible()
     await expect(page.getByTestId(`station-${list[0]!.id}`)).toHaveAttribute('data-status', 'available')
     await expect(page.getByTestId(`station-${list[1]!.id}`)).toHaveAttribute('data-status', 'locked')
