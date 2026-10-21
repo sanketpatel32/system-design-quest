@@ -115,7 +115,7 @@ export function SettingsPage() {
           />
         </div>
         <details className="pt-1">
-          <summary className="cursor-pointer text-sm text-dim">Move between devices by copy and paste instead</summary>
+          <summary className="flex min-h-[44px] cursor-pointer items-center text-sm text-dim">Move between devices by copy and paste instead</summary>
           <div className="mt-3 space-y-2">
             <button type="button" className="btn-quiet" onClick={copy}>Copy backup text</button>
             <label htmlFor="import-json" className="block text-sm text-dim">Paste backup text to restore it</label>
