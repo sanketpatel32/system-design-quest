@@ -159,6 +159,17 @@ test('phone first screens reach the content: lesson goals fold away, the first c
   expect((await page.getByRole('heading', { level: 1 }).boundingBox())!.height).toBeLessThan(120)
 })
 
+test('phone held sideways: header scrolls away and the tab bar is icon-only but still labelled', async ({ page }) => {
+  await page.setViewportSize({ width: 740, height: 360 })
+  await page.goto('/topic/where-to-cache?unlockAll=1')
+  const tabbar = page.locator('nav.tabbar')
+  expect((await tabbar.boundingBox())!.height).toBeLessThanOrEqual(52)
+  await expect(tabbar.getByRole('link', { name: 'Review' })).toBeVisible()
+  for (const t of await tabbar.getByRole('link').all()) expect((await t.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  await page.mouse.wheel(0, 600)
+  await expect.poll(async () => (await page.getByTestId('app-header').boundingBox())!.y).toBeLessThan(-40)
+})
+
 test('phone header controls are full-size tap targets', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 })
   await page.goto('/s/system-design')
