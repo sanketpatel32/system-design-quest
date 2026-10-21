@@ -386,7 +386,13 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
               <input
                 type="number"
                 inputMode="decimal"
+                enterKeyHint="done"
                 min={0}
+                // Phones: once the keyboard is up, bring the field to the middle so neither the keyboard nor the Submit bar hides it
+                onFocus={(e) => {
+                  const el = e.currentTarget
+                  if (window.matchMedia?.('(max-width: 1023px)').matches) window.setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300)
+                }}
                 disabled={submitted}
                 className="field w-full rounded-r-none !min-h-[60px] !text-2xl font-extrabold tabular-nums"
                 value={typeof answer === 'string' ? answer : ''}

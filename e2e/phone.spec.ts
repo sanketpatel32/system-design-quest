@@ -130,6 +130,22 @@ test('text inputs, selects and textareas are at least 16px on a phone (no iOS fo
   }
 })
 
+test('estimate input opens the number keypad and stays clear of the Submit bar when focused', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 })
+  await page.goto('/quiz/back-of-envelope-estimation?unlockAll=1')
+  await page.getByRole('button', { name: /^Question 2/ }).click()
+  const input = page.getByRole('spinbutton')
+  await expect(input).toHaveAttribute('inputmode', 'decimal')
+  await expect(input).toHaveAttribute('enterkeyhint', 'done')
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await input.focus()
+  await expect.poll(async () => {
+    const r = (await input.boundingBox())!
+    const bar = (await page.locator('.quizbar').boundingBox())!
+    return r.y + r.height <= bar.y && r.y >= 0
+  }).toBe(true)
+})
+
 test('phone header controls are full-size tap targets', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 })
   await page.goto('/s/system-design')
