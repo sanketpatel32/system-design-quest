@@ -125,7 +125,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      <main className={`flex-1 w-full max-w-[73.75rem] 2xl:max-w-[80rem] mx-auto px-4 ${inQuiz ? 'pt-3 sm:pt-6 short:pt-1 lg:pt-6' : 'pt-6'} pb-28 lg:pb-10`}>{children}</main>
+      <main className={`flex-1 w-full max-w-[73.75rem] 2xl:max-w-[80rem] mx-auto pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] ${inQuiz ? 'pt-3 sm:pt-6 short:pt-1 lg:pt-6' : 'pt-6'} pb-[calc(7rem+env(safe-area-inset-bottom))] lg:pb-10`}>{children}</main>
       <nav className={`tabbar lg:hidden ${inQuiz ? 'hidden' : ''}`} aria-label="Main">
         {nav.map((item) => (
           <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => `tab ${isActive ? 'tab-active' : ''}`}>
