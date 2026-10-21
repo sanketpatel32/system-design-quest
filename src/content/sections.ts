@@ -54,6 +54,12 @@ export function isSectionId(x: string | undefined): x is SectionId {
   return Boolean(x && SECTION_BY_ID.has(x as SectionId))
 }
 
+/** Review and the Cheat Sheet follow ?s=<section>; without it they show the last section visited */
+export function pageSection(search: string): SectionId {
+  const v = new URLSearchParams(search).get('s') ?? undefined
+  return isSectionId(v) ? v : lastSection()
+}
+
 const LAST = 'sdq-last-section'
 export function rememberSection(id: SectionId) {
   try { localStorage.setItem(LAST, id) } catch { /* private mode */ }

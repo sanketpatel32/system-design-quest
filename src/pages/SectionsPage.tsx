@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { SECTIONS, sectionPalette, sectionPath, sectionTopics, lastSection } from '../content/sections'
 import { useGameStore } from '../stores/gameStore'
-import { sectionXp } from '../components/map/SectionPicker'
+import { sectionXp } from '../lib/progression/sectionXp'
 import { isTopicUnlocked } from '../lib/progression/unlocks'
 import { RegionMotif } from '../components/map/RegionMotif'
 

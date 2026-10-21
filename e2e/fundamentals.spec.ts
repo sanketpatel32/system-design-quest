@@ -55,13 +55,39 @@ test('sections: legacy ?track=fundamentals links land on a section, unknown sect
   await expect(page.getByText(/not found|no such/i).first()).toBeVisible()
 })
 
-test('sections: Review and Cheat Sheet filter by section', async ({ page }) => {
+test('sections: Review and Cheat Sheet follow the logo switcher, with no chip row', async ({ page }) => {
   await seed(page)
+  // Without ?s, both pages follow the last section visited
+  await page.goto('/s/backend')
+  await expect(page.getByTestId('area-f2-backend')).toBeVisible()
+  await page.goto('/revision')
+  await expect(page.getByRole('heading', { name: 'Backend review', level: 1 })).toBeVisible()
+  await expect(page.locator('[data-testid^="section-tab-"]')).toHaveCount(0)
+  await page.goto('/cheat-sheet')
+  await expect(page.getByRole('heading', { name: 'Backend cheat sheet', level: 1 })).toBeVisible()
+  await expect(page.locator('[data-testid^="section-tab-"]')).toHaveCount(0)
+
+  // Switching on Review stays on Review for the new section
   await page.goto('/revision?s=networking')
-  await expect(page.getByTestId('section-tab-networking')).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('heading', { name: 'Networking review', level: 1 })).toBeVisible()
+  await openSwitcher(page)
+  await expect(page.getByTestId('switcher-item-networking')).toHaveAttribute('aria-current', 'page')
+  await page.getByTestId('switcher-item-databases').click()
+  await expect(page).toHaveURL(/\/revision\?s=databases$/)
+  await expect(page.getByRole('heading', { name: 'Databases review', level: 1 })).toBeVisible()
+  await openSwitcher(page)
+  await page.getByTestId('switcher-item-all').click()
+  await expect(page).toHaveURL(/\/revision\?s=all$/)
+  await expect(page.getByRole('heading', { name: 'Review: all sections', level: 1 })).toBeVisible()
+
+  // Switching on the Cheat Sheet stays on the Cheat Sheet
   await page.goto('/cheat-sheet?s=databases')
   await expect(page.getByTestId('cheat-databases')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Databases cheat sheet' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Databases cheat sheet', level: 1 })).toBeVisible()
+  await openSwitcher(page)
+  await page.getByTestId('switcher-item-system-design').click()
+  await expect(page).toHaveURL(/\/cheat-sheet\?s=system-design$/)
+  await expect(page.getByRole('heading', { name: 'System Design cheat sheet', level: 1 })).toBeVisible()
 })
 
 test('every Fundamentals area: first topic has cards, Go deeper, and a Try it, and its quiz loads', async ({ page }) => {

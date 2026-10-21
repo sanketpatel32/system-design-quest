@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { SECTIONS, sectionOfTopic, sectionPalette, sectionPath, sectionTopics, isSectionId, type SectionId } from '../../content/sections'
+import { SECTIONS, sectionOfTopic, sectionPalette, sectionPath, sectionTopics, isSectionId, pageSection, type SectionId } from '../../content/sections'
 import { allTopics } from '../../content/catalog'
 import { useGameStore } from '../../stores/gameStore'
 import { RegionMotif } from '../map/RegionMotif'
@@ -18,7 +18,9 @@ const LANDMARK: Partial<Record<SectionId, string>> = { 'system-design': 'r1-foun
 
 /** Which section the current page belongs to, if any */
 function useCurrentSection(): SectionId | null {
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
+  if (pathname === '/cheat-sheet') return pageSection(search)
+  if (pathname === '/revision') return new URLSearchParams(search).get('s') === 'all' ? null : pageSection(search)
   const m = /^\/(s|topic|quiz|boss)\/([^/]+)/.exec(pathname)
   if (!m) return null
   if (m[1] === 's') return isSectionId(m[2]) ? m[2] : null
@@ -42,7 +44,12 @@ export function SectionSwitcher({ variant }: { variant: 'sidebar' | 'header' }) 
   const current = useCurrentSection()
   const topicProgress = useGameStore((s) => s.topicProgress)
   const navigate = useNavigate()
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
+  // On Review and the Cheat Sheet, switching keeps you on that page for the new section
+  const pageMode = pathname === '/revision' || pathname === '/cheat-sheet' ? pathname : null
+  const hrefFor = (id: SectionId) => (pageMode ? `${pageMode}?s=${id}` : sectionPath(id))
+  const allHref = pageMode === '/revision' ? '/revision?s=all' : '/'
+  const allCurrent = pageMode === '/revision' ? new URLSearchParams(search).get('s') === 'all' : pathname === '/'
 
   const close = useCallback((refocus: boolean) => {
     setOpen(false)
@@ -50,7 +57,7 @@ export function SectionSwitcher({ variant }: { variant: 'sidebar' | 'header' }) 
   }, [])
 
   // Close when the route changes (a section was picked)
-  useEffect(() => { setOpen(false) }, [pathname])
+  useEffect(() => { setOpen(false) }, [pathname, search])
 
   const place = useCallback(() => {
     const b = btnRef.current
@@ -153,7 +160,7 @@ export function SectionSwitcher({ variant }: { variant: 'sidebar' | 'header' }) 
           style={{ left: pos.left, top: pos.top, width: pos.width }}
           onKeyDown={onMenuKey}
         >
-          <p className="px-3 pb-1 pt-1 text-xs font-extrabold uppercase tracking-wide text-dim" aria-hidden>Switch section</p>
+          <p className="px-3 pb-1 pt-1 text-xs font-extrabold uppercase tracking-wide text-dim" aria-hidden>{pageMode === '/revision' ? 'Review a section' : pageMode === '/cheat-sheet' ? 'Cheat sheet for' : 'Switch section'}</p>
           <ul className="flex flex-col gap-1" role="none">
             {SECTIONS.map((s) => {
               const topics = sectionTopics(s.id)
@@ -164,7 +171,7 @@ export function SectionSwitcher({ variant }: { variant: 'sidebar' | 'header' }) 
               return (
                 <li key={s.id} role="none">
                   <Link
-                    to={sectionPath(s.id)}
+                    to={hrefFor(s.id)}
                     role="menuitem"
                     tabIndex={-1}
                     aria-current={on ? 'page' : undefined}
@@ -185,13 +192,13 @@ export function SectionSwitcher({ variant }: { variant: 'sidebar' | 'header' }) 
           </ul>
           <div className="mt-1 border-t-2 border-[var(--color-rail)] pt-1" role="none">
             <Link
-              to="/"
+              to={allHref}
               role="menuitem"
               tabIndex={-1}
-              aria-current={pathname === '/' ? 'page' : undefined}
+              aria-current={allCurrent ? 'page' : undefined}
               data-testid="switcher-item-all"
               className="switcher-item justify-center text-[#1899d6]"
-              onClick={(e) => { e.preventDefault(); setOpen(false); navigate('/') }}
+              onClick={(e) => { e.preventDefault(); setOpen(false); navigate(allHref) }}
             >
               All sections
             </Link>

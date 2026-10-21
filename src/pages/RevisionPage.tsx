@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PageHero } from '../components/ui/PageHero'
 import { Mascot } from '../components/art/Mascot'
 import { Link, useSearchParams } from 'react-router-dom'
-import { SECTION_BY_ID, isSectionId, sectionOfTopic, type SectionId } from '../content/sections'
-import { SectionPicker } from '../components/map/SectionPicker'
+import { SECTION_BY_ID, isSectionId, lastSection, rememberSection, sectionOfTopic, type SectionId } from '../content/sections'
 import { allTopics, regions, topicsById } from '../content/catalog'
 import { transitLineColor } from '../lib/design/transitTheme'
 import { AGAIN_MINUTES, isDue, scheduleNext, initialSrs } from '../lib/srs/scheduler'
@@ -17,8 +16,11 @@ export function RevisionPage() {
   const rateFlashcard = useGameStore((s) => s.rateFlashcard)
   const [params] = useSearchParams()
   const sp = params.get('s') ?? undefined
-  const section: SectionId | 'all' = isSectionId(sp) ? sp : 'all'
+  // The logo switcher picks the section (?s=…); without one, Review follows the last section visited. ?s=all reviews everything.
+  const section: SectionId | 'all' = sp === 'all' ? 'all' : isSectionId(sp) ? sp : lastSection()
   const [filter, setFilter] = useState<string>('all')
+  useEffect(() => { setFilter('all'); if (section !== 'all') rememberSection(section) }, [section])
+  const sectionName = section === 'all' ? 'All sections' : SECTION_BY_ID.get(section)!.name
   const unitOptions = regions.filter((r) => r.id !== 'boss-arena' && (section === 'all' || SECTION_BY_ID.get(section)?.regionIds.includes(r.id)))
   const [flipped, setFlipped] = useState(false)
   const [last, setLast] = useState<{ front: string; rating: string; dueAt: string } | null>(null)
@@ -92,11 +94,10 @@ export function RevisionPage() {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      <PageHero eyebrow="Spaced repetition" title="Review" icon="review" tone="sky"
+      <PageHero eyebrow="Spaced repetition · switch section from the logo" title={section === 'all' ? 'Review: all sections' : `${sectionName} review`} icon="review" tone="sky"
         aside={<div className="rounded-2xl bg-white px-4 py-2 text-center"><p className="font-display text-3xl text-[#12749f] tabular-nums">{queue.length}</p><p className="text-xs font-extrabold uppercase tracking-wide text-dim">due now</p></div>}>
         Recall the answer, reveal it, then rate yourself. The rating decides when the card comes back.
       </PageHero>
-      <SectionPicker current={section} allOption="All sections" label="Review by section" to={(id) => (id === 'all' ? '/revision' : `/revision?s=${id}`)} />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <label className="text-sm font-extrabold text-dim">
           Unit
