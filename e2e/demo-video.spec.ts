@@ -61,5 +61,5 @@ test('record product demo', async ({ page }) => {
   await page.waitForTimeout(10000)
   await page.goto('/s/system-design')
   await page.waitForTimeout(8000)
-  await expect(page.getByRole('link', { name: /System Design Quest/ })).toBeVisible()
+  await expect(page.locator('[data-testid^="section-switcher-"]:visible').first()).toBeVisible()
 })
