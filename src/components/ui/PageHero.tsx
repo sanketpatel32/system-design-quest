@@ -26,14 +26,14 @@ export function PageHero({
 }) {
   const t = TONES[tone]
   return (
-    <header className="unit-banner flex flex-wrap items-center gap-4 p-5 sm:p-6" style={{ background: t.bg, ['--banner-shadow' as string]: t.sh }}>
+    <header className="unit-banner flex flex-wrap items-center gap-3 p-4 sm:gap-4 sm:p-6" style={{ background: t.bg, ['--banner-shadow' as string]: t.sh }}>
       <div className="hidden sm:grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-white shadow-[0_4px_0_rgba(0,0,0,0.2)]">
         <NavIcon name={icon} size={44} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-extrabold uppercase tracking-wider text-white">{eyebrow}</p>
-        <h1 className="font-display text-3xl sm:text-4xl leading-tight text-white">{title}</h1>
-        {children && <div className="mt-1 font-bold text-white">{children}</div>}
+        <p className="text-xs font-extrabold uppercase tracking-wider text-white sm:text-sm">{eyebrow}</p>
+        <h1 className="font-display text-[1.75rem] sm:text-4xl leading-tight text-white">{title}</h1>
+        {children && <div className="mt-1 hidden font-bold text-white sm:block">{children}</div>}
       </div>
       {aside}
     </header>

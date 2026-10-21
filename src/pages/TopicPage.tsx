@@ -67,16 +67,18 @@ export function TopicPage() {
         <header className="unit-banner flex items-center gap-4 p-4 sm:p-5" style={{ background: pal.deep, ['--banner-shadow' as string]: pal.shadow }}>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-extrabold uppercase tracking-wider text-white">{regionName} · {topicLabel(topic.id)}</p>
-            <h1 className="font-display text-3xl sm:text-4xl text-white mt-1 leading-tight" data-testid="topic-title">{topic.title}</h1>
+            <h1 className="font-display text-[1.75rem] sm:text-4xl text-white mt-1 leading-tight" data-testid="topic-title">{topic.title}</h1>
             {topic.objectives.length > 0 && (
-              <ul className="mt-3 space-y-1 font-bold text-white max-w-xl">
-                {topic.objectives.map((o) => (
-                  <li key={o} className="flex gap-2">
-                    <span aria-hidden className="mt-[0.55em] h-2 w-2 shrink-0 rounded-full bg-white" />
-                    {o}
-                  </li>
-                ))}
-              </ul>
+              <>
+                {/* Phones: goals fold away so the first card is on the first screen */}
+                <details className="lesson-goals mt-1 text-white sm:hidden" data-testid="lesson-goals">
+                  <summary className="flex min-h-[44px] cursor-pointer items-center gap-2 text-sm font-extrabold uppercase tracking-wide">
+                    What you'll learn · {topic.objectives.length}
+                  </summary>
+                  <Objectives items={topic.objectives} />
+                </details>
+                <div className="hidden sm:block"><Objectives items={topic.objectives} /></div>
+              </>
             )}
           </div>
         </header>
@@ -168,5 +170,18 @@ function RelatedLink({ t, why, locked }: { t: Topic; why: string; locked: boolea
       )}
       <span className="block text-dim">{why}</span>
     </li>
+  )
+}
+
+function Objectives({ items }: { items: string[] }) {
+  return (
+    <ul className="mt-1 space-y-1 font-bold text-white max-w-xl sm:mt-3">
+      {items.map((o) => (
+        <li key={o} className="flex gap-2">
+          <span aria-hidden className="mt-[0.55em] h-2 w-2 shrink-0 rounded-full bg-white" />
+          {o}
+        </li>
+      ))}
+    </ul>
   )
 }

@@ -146,6 +146,19 @@ test('estimate input opens the number keypad and stays clear of the Submit bar w
   }).toBe(true)
 })
 
+test('phone first screens reach the content: lesson goals fold away, the first card starts on screen', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 })
+  await page.goto('/topic/capacity-planning-for-a-service?unlockAll=1')
+  const goals = page.getByTestId('lesson-goals')
+  await expect(goals).toBeVisible()
+  const card = page.getByText(/^Card 1 of/)
+  expect((await card.boundingBox())!.y).toBeLessThan(740 * 0.5)
+  await goals.locator('summary').click()
+  await expect(goals.locator('li').first()).toBeVisible()
+  await page.goto('/revision?s=system-design')
+  expect((await page.getByRole('heading', { level: 1 }).boundingBox())!.height).toBeLessThan(120)
+})
+
 test('phone header controls are full-size tap targets', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 })
   await page.goto('/s/system-design')
