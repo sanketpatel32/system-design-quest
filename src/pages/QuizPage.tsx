@@ -128,7 +128,7 @@ export function QuizPage() {
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 sm:mb-5 short:mb-1">
         <p className="text-sm font-extrabold uppercase tracking-wide" style={{ color: p.deep }}>{topic.title}</p>
-        <nav aria-label="Questions" className="flex items-center gap-1.5">
+        <nav aria-label="Questions" className="-my-3 flex items-center gap-1">
           {topic.questions.map((x, i) => {
             const state = !(x.id in results) ? 'open' : results[x.id] ? 'right' : 'wrong'
             return (
@@ -138,8 +138,10 @@ export function QuizPage() {
                 onClick={() => { setIndex(i); setPractice(0) }}
                 aria-label={`Question ${i + 1}: ${state === 'open' ? 'not answered' : state === 'right' ? 'correct' : 'wrong'}`}
                 aria-current={!showResult && i === current ? 'step' : undefined}
-                className={`quiz-dot w-6 quiz-dot-${state} ${!showResult && i === current ? 'quiz-dot-current' : ''}`}
-              />
+                className={`quiz-dot-hit ${!showResult && i === current ? 'quiz-dot-current' : ''}`}
+              >
+                <span className={`quiz-dot quiz-dot-${state}`} />
+              </button>
             )
           })}
           {finished && (

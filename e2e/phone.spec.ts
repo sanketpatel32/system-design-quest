@@ -76,6 +76,20 @@ async function smallTargets(page: import('@playwright/test').Page, scope = 'body
   }, scope)
 }
 
+test('lesson card dots and quiz question dots are 44px tall tap targets', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 })
+  await page.goto('/topic/where-to-cache?unlockAll=1')
+  for (const b of await page.getByRole('button', { name: /^Go to card/ }).all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  await page.getByRole('button', { name: 'Go to card 3', exact: true }).click()
+  await expect(page.getByText('Card 3 of')).toBeVisible()
+  await page.goto('/quiz/where-to-cache?unlockAll=1')
+  for (const b of await page.getByRole('button', { name: /^Question \d/ }).all()) {
+    const r = (await b.boundingBox())!
+    expect(r.height).toBeGreaterThanOrEqual(44)
+    expect(r.width).toBeGreaterThanOrEqual(24)
+  }
+})
+
 test('phone header controls are full-size tap targets', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 })
   await page.goto('/s/system-design')

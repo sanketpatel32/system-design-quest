@@ -75,7 +75,8 @@ export function LessonDeck({
             </span>
           )}
         </div>
-        <div className="flex gap-1.5 mb-6">
+        {/* Each dot is a 44px-tall tap target around a slim bar; the negative margin keeps the visual spacing */}
+        <div className="flex gap-1.5 -mt-4 mb-2">
           {cards.map((_, i) => (
             <button
               key={i}
@@ -83,9 +84,10 @@ export function LessonDeck({
               aria-label={`Go to card ${i + 1}`}
               aria-current={i === index ? 'step' : undefined}
               onClick={() => setIndex(i)}
-              className="h-3 flex-1 rounded-full transition-colors duration-200"
-              style={{ background: i <= index ? 'var(--color-hero)' : '#ECE7DF' }}
-            />
+              className="flex h-11 flex-1 items-center"
+            >
+              <span className="block h-3 w-full rounded-full transition-colors duration-200" style={{ background: i <= index ? 'var(--color-hero)' : '#ECE7DF' }} />
+            </button>
           ))}
         </div>
         {hasRealTitle(card) && <h3 className="font-display text-2xl sm:text-3xl text-chalk mb-3">{card.title}</h3>}
