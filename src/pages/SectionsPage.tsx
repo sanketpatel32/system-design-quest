@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { SECTIONS, sectionPalette, sectionPath, sectionTopics, lastSection } from '../content/sections'
 import { useGameStore } from '../stores/gameStore'
-import { SectionPicker, sectionXp } from '../components/map/SectionPicker'
+import { sectionXp } from '../components/map/SectionPicker'
 import { isTopicUnlocked } from '../lib/progression/unlocks'
 import { RegionMotif } from '../components/map/RegionMotif'
 
@@ -48,9 +48,7 @@ export function SectionsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-3xl md:text-4xl text-chalk">Choose a section</h1>
-        <p className="text-dim mt-1">Each section has its own map, progress and review deck. Your progress carries across; you can switch at any time.</p>
       </div>
-      <SectionPicker current="all" recent={last} />
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 min-[1800px]:grid-cols-4" aria-label="Sections">
         {SECTIONS.map((s) => {
           const topics = sectionTopics(s.id)

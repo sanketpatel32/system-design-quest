@@ -13,7 +13,7 @@ import { IconBook, IconCastle, IconCheck, IconLock, IconStar } from '../icons/Hu
 import { bosses as arenaTopics, BOSS_N, FUND_N, fundamentalRegions, LESSON_N as STATION_N, learningRegions, playbook, PLAYBOOK_ID, topicLabel } from '../../content/numbering'
 
 import { SECTION_BY_ID, sectionPalette, sectionTopics, type SectionId } from '../../content/sections'
-import { SectionPicker, sectionXp } from './SectionPicker'
+import { sectionXp } from './SectionPicker'
 /** Minutes: ~1 per lesson card, ~1.5 per question */
 export function topicMinutes(id: number) {
   const t = topicsById.get(id)
@@ -99,7 +99,6 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_20.625rem] 2xl:grid-cols-[minmax(0,1fr)_23rem]">
       <section aria-labelledby="map-title" className="min-w-0">
         <Onboarding />
-        <SectionPicker current={sectionId} />
         {nextTopic && (
           <div
             className="panel mb-6 flex flex-wrap items-center gap-4 p-4 sm:p-5"
