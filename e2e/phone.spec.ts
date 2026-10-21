@@ -114,6 +114,22 @@ test('cheat sheet links are 44px tap targets on a phone', async ({ page }) => {
   }
 })
 
+test('text inputs, selects and textareas are at least 16px on a phone (no iOS focus zoom)', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  for (const path of ['/s/system-design', '/settings', '/boss/url-shortener?unlockAll=1', '/quiz/back-of-envelope-estimation?unlockAll=1']) {
+    await page.goto(path)
+    await page.waitForLoadState('networkidle')
+    await page.evaluate(() => document.querySelectorAll('details').forEach((d) => ((d as HTMLDetailsElement).open = true)))
+    const small = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('input, select, textarea')]
+        .filter((e) => !['checkbox', 'radio', 'range', 'file', 'hidden'].includes((e as HTMLInputElement).type))
+        .filter((e) => parseFloat(getComputedStyle(e).fontSize) < 16)
+        .map((e) => `${e.tagName}#${e.id} ${getComputedStyle(e).fontSize}`),
+    )
+    expect(small, path).toEqual([])
+  }
+})
+
 test('phone header controls are full-size tap targets', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 })
   await page.goto('/s/system-design')
