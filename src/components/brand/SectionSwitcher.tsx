@@ -1,23 +1,16 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { SECTIONS, sectionOfTopic, sectionPalette, sectionPath, sectionTopics, isSectionId, pageSection, type SectionId } from '../../content/sections'
+import { SECTIONS, SECTION_BRAND, questName, sectionOfTopic, sectionPalette, sectionPath, sectionTopics, isSectionId, pageSection, type SectionId } from '../../content/sections'
 import { allTopics } from '../../content/catalog'
 import { useGameStore } from '../../stores/gameStore'
 import { RegionMotif } from '../map/RegionMotif'
-import { Logo, LogoMark } from './Logo'
+import { LogoMark } from './Logo'
 
-/** Friendly names for the switcher; the two flagship tracks read as quests */
-const SWITCHER_NAME: Partial<Record<SectionId, string>> = {
-  'system-design': 'System Design Quest',
-  frontend: 'Frontend Quest',
-  backend: 'Backend Quest',
-  'os-concurrency': 'OS & Concurrency',
-}
 const LANDMARK: Partial<Record<SectionId, string>> = { 'system-design': 'r1-foundations' }
 
 /** Which section the current page belongs to, if any */
-function useCurrentSection(): SectionId | null {
+export function useCurrentSection(): SectionId | null {
   const { pathname, search } = useLocation()
   if (pathname === '/cheat-sheet') return pageSection(search)
   if (pathname === '/revision') return new URLSearchParams(search).get('s') === 'all' ? null : pageSection(search)
@@ -27,6 +20,19 @@ function useCurrentSection(): SectionId | null {
   const slug = decodeURIComponent(m[2]!)
   const t = allTopics.find((x) => x.slug === slug)
   return t ? sectionOfTopic(t.id) : null
+}
+
+/** Two-tone wordmark that follows the section: "frontend" + green "quest". Swaps with a short pop (off under reduced motion). */
+function Wordmark({ word, sidebar }: { word: string; sidebar: boolean }) {
+  return (
+    <span
+      key={word}
+      data-testid="wordmark"
+      className={`wordmark-swap font-display leading-none tracking-[-0.01em] whitespace-nowrap ${sidebar ? 'text-[1.6rem]' : 'text-[1.2rem] max-[399px]:text-[0.95rem] sm:text-2xl'}`}
+    >
+      <span className="text-chalk">{word}</span><span className="text-[#58cc02]">quest</span>
+    </span>
+  )
 }
 
 type Pos = { left: number; top: number; width: number; sheet: boolean }
@@ -69,7 +75,7 @@ export function SectionSwitcher({ variant }: { variant: 'sidebar' | 'header' }) 
       const top = header ? header.getBoundingClientRect().bottom : r.bottom + 6
       setPos({ left: 0, top, width: vw, sheet: true })
     } else {
-      const width = Math.min(340, vw - 16)
+      const width = Math.min(360, vw - 16)
       setPos({ left: Math.max(8, Math.min(r.left, vw - width - 8)), top: r.bottom + 8, width, sheet: false })
     }
   }, [])
@@ -129,21 +135,19 @@ export function SectionSwitcher({ variant }: { variant: 'sidebar' | 'header' }) 
       <button
         ref={btnRef}
         type="button"
-        className={`switcher-btn ${sidebar ? 'px-3 py-2' : 'px-1.5 py-1'}`}
+        className={`switcher-btn ${sidebar ? 'px-3 py-2' : 'px-1.5 py-1 max-[399px]:px-1 max-[399px]:gap-1'}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label="designquest: switch section"
+        aria-label={`${SECTION_BRAND[current ?? 'system-design'].word}quest: switch section`}
         data-testid={`section-switcher-${variant}`}
         onClick={() => setOpen((v) => !v)}
         onKeyDown={onBtnKey}
       >
-        {sidebar ? <Logo size={44} /> : (
-          <span className="inline-flex items-center gap-2">
-            <LogoMark size={38} />
-            <span className="font-display text-2xl leading-none hidden sm:inline"><span className="text-chalk">design</span><span className="text-[#58cc02]">quest</span></span>
-          </span>
-        )}
+        <span className="inline-flex items-center gap-2 max-[399px]:gap-1.5">
+          <LogoMark size={sidebar ? 44 : 34} className={sidebar ? '' : 'max-[399px]:h-[30px] max-[399px]:w-[30px]'} />
+          <Wordmark word={SECTION_BRAND[current ?? 'system-design'].word} sidebar={sidebar} />
+        </span>
         <svg aria-hidden width="14" height="14" viewBox="0 0 14 14" className={`switcher-chevron ${open ? 'switcher-chevron-open' : ''}`}>
           <path d="M3 5.2 7 9.2l4-4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -183,7 +187,7 @@ export function SectionSwitcher({ variant }: { variant: 'sidebar' | 'header' }) 
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: on ? '#fff' : p.soft }} aria-hidden>
                       <RegionMotif regionId={LANDMARK[s.id] ?? s.regionIds[0]!} color={p.deep} size={22} />
                     </span>
-                    <span className="min-w-0 flex-1 truncate">{SWITCHER_NAME[s.id] ?? s.name}</span>
+                    <span className="min-w-0 flex-1 leading-tight" data-testid={`switcher-name-${s.id}`}>{questName(s.id)}</span>
                     <span className="switcher-pct tabular-nums" style={{ color: p.deep, background: on ? '#fff' : p.soft }} aria-label={`${pct}% cleared`}>{pct}%</span>
                   </Link>
                 </li>

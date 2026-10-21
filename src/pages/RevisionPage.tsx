@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { PageHero } from '../components/ui/PageHero'
 import { Mascot } from '../components/art/Mascot'
 import { Link, useSearchParams } from 'react-router-dom'
-import { SECTION_BY_ID, isSectionId, lastSection, rememberSection, sectionOfTopic, type SectionId } from '../content/sections'
+import { SECTION_BY_ID, isSectionId, questName, lastSection, rememberSection, sectionOfTopic, type SectionId } from '../content/sections'
 import { allTopics, regions, topicsById } from '../content/catalog'
 import { transitLineColor } from '../lib/design/transitTheme'
 import { AGAIN_MINUTES, isDue, scheduleNext, initialSrs } from '../lib/srs/scheduler'
@@ -20,7 +20,7 @@ export function RevisionPage() {
   const section: SectionId | 'all' = sp === 'all' ? 'all' : isSectionId(sp) ? sp : lastSection()
   const [filter, setFilter] = useState<string>('all')
   useEffect(() => { setFilter('all'); if (section !== 'all') rememberSection(section) }, [section])
-  const sectionName = section === 'all' ? 'All sections' : SECTION_BY_ID.get(section)!.name
+  const sectionName = section === 'all' ? 'All sections' : questName(section)
   const unitOptions = regions.filter((r) => r.id !== 'boss-arena' && (section === 'all' || SECTION_BY_ID.get(section)?.regionIds.includes(r.id)))
   const [flipped, setFlipped] = useState(false)
   const [last, setLast] = useState<{ front: string; rating: string; dueAt: string } | null>(null)

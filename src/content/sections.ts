@@ -12,6 +12,19 @@ export type Section = {
   regionIds: RegionMeta['id'][]
 }
 
+/** Display name ("Frontend Quest") and the first half of the two-tone wordmark ("frontend" + "quest") */
+export const SECTION_BRAND: Record<SectionId, { questName: string; word: string }> = {
+  'system-design': { questName: 'System Design Quest', word: 'design' },
+  frontend: { questName: 'Frontend Quest', word: 'frontend' },
+  backend: { questName: 'Backend Quest', word: 'backend' },
+  networking: { questName: 'Networking Quest', word: 'network' },
+  databases: { questName: 'Databases Quest', word: 'database' },
+  'os-concurrency': { questName: 'OS & Concurrency Quest', word: 'os' },
+  security: { questName: 'Security Quest', word: 'security' },
+  'cloud-devops': { questName: 'Cloud & DevOps Quest', word: 'cloud' },
+}
+export const questName = (id: SectionId) => SECTION_BRAND[id].questName
+
 /** First-class sections. Topic IDs never move between sections, so saved progress (keyed by topic id) is unaffected. */
 export const ALL_SECTIONS: Section[] = [
   { id: 'system-design', name: 'System Design', blurb: 'Units of core lessons, the Interview Playbook and boss fights that put it all together.', regionIds: regions.filter((r) => r.track !== 'fundamentals').map((r) => r.id) },

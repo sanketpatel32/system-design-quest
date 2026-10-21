@@ -12,7 +12,7 @@ import { IconBook, IconCastle, IconCheck, IconLock, IconStar } from '../icons/Hu
 
 import { bosses as arenaTopics, BOSS_N, FUND_N, fundamentalRegions, LESSON_N as STATION_N, learningRegions, playbook, PLAYBOOK_ID, topicLabel } from '../../content/numbering'
 
-import { SECTION_BY_ID, sectionPalette, sectionTopics, type SectionId } from '../../content/sections'
+import { SECTION_BY_ID, sectionPalette, sectionTopics, type SectionId, questName } from '../../content/sections'
 import { sectionXp } from '../../lib/progression/sectionXp'
 /** Minutes: ~1 per lesson card, ~1.5 per question */
 export function topicMinutes(id: number) {
@@ -134,7 +134,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
         )}
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 id="map-title" className="font-display text-3xl md:text-4xl" style={{ color: sp.deep }}>{section.name}</h1>
+            <h1 id="map-title" className="font-display text-3xl md:text-4xl" style={{ color: sp.deep }}>{questName(section.id)}</h1>
             <p className="text-dim mt-1">
               {fund ? `${doneCount} of ${total} topics cleared · ${xp} XP. ${section.blurb} Language-agnostic; topics open one after another.` : <>{doneCount} of {total} lessons cleared in {learningRegions.length} units · practice track: {playbookDone + bossesDone} of {1 + arenaTopics.length} (Interview Playbook and {arenaTopics.length} bosses, open after Unit 1, alongside the units)</>}
             </p>

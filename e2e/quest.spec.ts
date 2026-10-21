@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test('map to lesson navigation', async ({ page }) => {
   await page.goto('/s/system-design')
-  await expect(page.getByRole('heading', { name: 'System Design', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'System Design Quest', level: 1 })).toBeVisible()
   await page.getByTestId('station-1').click()
   await page.getByTestId('start-topic').click()
   await expect(page.getByTestId('topic-title')).toHaveText('The System Design Interview')
