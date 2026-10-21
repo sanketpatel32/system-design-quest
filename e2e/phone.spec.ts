@@ -135,3 +135,21 @@ test('phone header controls are full-size tap targets', async ({ page }) => {
   await page.goto('/s/system-design')
   expect(await smallTargets(page, '[data-testid=app-header]')).toEqual([])
 })
+
+test.describe('boss canvas on a touch phone', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } })
+  test('empty canvas lets the page scroll, zoom buttons are 44px, minimap hidden', async ({ page }) => {
+    await page.goto('/boss/url-shortener?unlockAll=1')
+    const flow = page.locator('.boss-flow')
+    await flow.scrollIntoViewIfNeeded()
+    await expect(page.getByTestId('canvas-touch-hint')).toBeVisible()
+    expect(await page.locator('.boss-flow .react-flow__pane').evaluate((e) => getComputedStyle(e).touchAction)).toBe('pan-y')
+    await expect(page.locator('.boss-flow .react-flow__minimap')).toBeHidden()
+    for (const b of await page.locator('.react-flow__controls-button').all()) {
+      const r = (await b.boundingBox())!
+      expect(r.height).toBeGreaterThanOrEqual(44)
+      expect(r.width).toBeGreaterThanOrEqual(44)
+    }
+    expect((await flow.boundingBox())!.height).toBeLessThanOrEqual(844 * 0.62 + 1)
+  })
+})

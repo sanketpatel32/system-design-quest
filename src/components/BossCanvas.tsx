@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArchNode, TypeGlyph } from './canvas/ArchNode'
 import { Mascot } from './art/Mascot'
 import {
@@ -16,6 +16,19 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import type { CanvasComponentType } from '../content/types'
+
+/** Touch screens: one finger on the empty canvas scrolls the page (instead of trapping it); pinch zooms, nodes still drag. */
+function useCoarsePointer() {
+  const [coarse, setCoarse] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia?.('(pointer: coarse)')
+    if (!mq) return
+    const on = () => setCoarse(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return coarse
+}
 
 const PALETTE: { type: CanvasComponentType; label: string }[] = [
   { type: 'client', label: 'Client' },
@@ -89,6 +102,7 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
   const suggestedCount = PALETTE.filter((p) => suggestedSet.has(p.type)).length
   const srcRef = useRef<HTMLSelectElement>(null)
   const tgtRef = useRef<HTMLSelectElement>(null)
+  const coarse = useCoarsePointer()
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
 
@@ -192,7 +206,11 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
           </button>
         </div>
       </aside>
-      <div className="boss-flow relative h-[480px] rounded-[20px] border-2 border-[var(--color-rail)] overflow-hidden bg-[#f7f5f0]">
+      <div className="min-w-0 space-y-2">
+      {coarse && (
+        <p className="text-sm font-bold text-dim" data-testid="canvas-touch-hint">Drag components to move them, pinch to zoom; swipe the empty canvas to keep scrolling.</p>
+      )}
+      <div className={`boss-flow relative h-[480px] max-sm:h-[min(420px,62dvh)] rounded-[20px] ${coarse ? 'boss-flow-touch' : ''} border-2 border-[var(--color-rail)] overflow-hidden bg-[#f7f5f0]`}>
         {nodes.length === 0 && (
           <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center p-6 text-center">
             <div className="max-w-xs">
@@ -215,6 +233,8 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           colorMode="light"
+          panOnDrag={!coarse}
+          preventScrolling={!coarse}
           fitView
           fitViewOptions={{ maxZoom: 1.1, padding: 0.3 }}
           defaultEdgeOptions={{ style: { stroke: '#8AA0B8', strokeWidth: 3 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#8AA0B8' } }}
@@ -223,6 +243,7 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
           <MiniMap pannable zoomable nodeColor="#BFD7EA" maskColor="rgba(255,249,240,0.7)" style={{ background: '#FFFFFF' }} />
           <Controls showInteractive={false} />
         </ReactFlow>
+      </div>
       </div>
     </div>
   )
