@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { SECTIONS, sectionPalette, sectionPath, sectionTopics, lastSection } from '../content/sections'
+import { SECTIONS, questName, sectionPalette, sectionPath, sectionTopics, lastSection } from '../content/sections'
 import { useGameStore } from '../stores/gameStore'
 import { sectionXp } from '../lib/progression/sectionXp'
 import { isTopicUnlocked } from '../lib/progression/unlocks'
@@ -61,7 +61,7 @@ export function SectionsPage() {
                 <Banner id={s.id} regionIds={s.regionIds} soft={p.soft} deep={p.deep} bright={p.bright} done={done} total={topics.length} />
                 <div className="flex flex-1 flex-col gap-1 p-5 pt-4">
                   <div className="flex items-baseline justify-between gap-2">
-                    <p className="font-display text-xl leading-tight" style={{ color: p.deep }}>{s.name}</p>
+                    <p className="font-display text-xl leading-tight" style={{ color: p.deep }}>{questName(s.id)}</p>
                     {s.id === last ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[0.7rem] font-extrabold uppercase tracking-wide" style={{ background: p.soft, color: p.deep }}>Last visited</span> : null}
                   </div>
                   <p className="text-sm text-dim">{s.blurb}</p>

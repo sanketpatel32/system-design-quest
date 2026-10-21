@@ -4,7 +4,8 @@ import { useGameStore, useLevel, useStreak } from '../stores/gameStore'
 import { BADGE_LABELS } from '../lib/progression/badges'
 import { IconBadge, IconFlame, IconGem, NavIcon } from './icons/HudIcons'
 import { HelpShortcuts } from './HelpShortcuts'
-import { SectionSwitcher } from './brand/SectionSwitcher'
+import { SectionSwitcher, useCurrentSection } from './brand/SectionSwitcher'
+import { questName } from '../content/sections'
 import { AccountButton } from './AccountButton'
 
 const nav = [
@@ -29,7 +30,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
     if (xp > prevXp.current) setSparkle((k) => k + 1)
     prevXp.current = xp
   }, [xp])
-  const inQuiz = useLocation().pathname.startsWith('/quiz/')
+  const { pathname } = useLocation()
+  const inQuiz = pathname.startsWith('/quiz/')
+  const currentSection = useCurrentSection()
+  // Tab title follows the section: "Frontend Quest", "Review · Backend Quest"; home is System Design Quest
+  useEffect(() => {
+    const quest = questName(currentSection ?? 'system-design')
+    const page = pathname === '/revision' ? 'Review' : pathname === '/cheat-sheet' ? 'Cheat sheet' : null
+    document.title = page ? `${page} · ${quest}` : quest
+  }, [currentSection, pathname])
 
   // The in-app setting applies the same rules as the OS-level prefers-reduced-motion
   useEffect(() => {
@@ -55,7 +64,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </nav>
       </aside>
       <header className="shell-header sticky top-0 z-50">
-        <div className="max-w-[73.75rem] 2xl:max-w-[80rem] mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-3">
+        <div className="max-w-[73.75rem] 2xl:max-w-[80rem] mx-auto px-3 max-[399px]:px-2 sm:px-4 py-2 flex items-center justify-between gap-3 max-[399px]:gap-1.5">
           <div className="flex shrink-0 lg:invisible"><SectionSwitcher variant="header" /></div>
           <div className="relative flex min-w-0 items-center gap-0.5 sm:gap-1">
             <button
@@ -66,7 +75,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               aria-label={`Level ${level}, ${xp} xp, ${streak}-day streak${badges.length ? `, ${badges.length} badges` : ''}. Show details`}
               onClick={() => setHudOpen((v) => !v)}
             >
-              <span className="hud-chip text-[#C25E00]" title={`${streak}-day streak`}>
+              <span className="hud-chip text-[#C25E00] max-[479px]:hidden" title={`${streak}-day streak`}>
                 <IconFlame lit={streak > 0} />
                 <span className="tabular-nums">{streak}</span>
               </span>

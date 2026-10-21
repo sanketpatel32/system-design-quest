@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { PageHero } from '../components/ui/PageHero'
 import { useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { SECTION_BY_ID, pageSection, rememberSection, sectionPalette, sectionTopics, type SectionId } from '../content/sections'
+import { SECTION_BY_ID, questName, pageSection, rememberSection, sectionPalette, sectionTopics, type SectionId } from '../content/sections'
 import { topicLabel } from '../content/numbering'
 import { topicsById } from '../content/catalog'
 
@@ -51,7 +51,7 @@ function SectionSheet({ id }: { id: SectionId }) {
   const topics = sectionTopics(id).filter((t) => t.deep?.takeaways?.length)
   return (
     <div className="space-y-5">
-      <PageHero eyebrow="Reference card" title={`${s.name} cheat sheet`} icon="cheat" tone="purple">
+      <PageHero eyebrow="Reference card" title={`${questName(id)} cheat sheet`} icon="cheat" tone="purple">
         The key takeaways from every {s.name} lesson on one page. Open a lesson for the reasoning and sources.
       </PageHero>
       <div className="grid gap-4 md:grid-cols-2" data-testid={`cheat-${id}`}>
@@ -77,7 +77,7 @@ export function CheatSheetPage() {
   if (id !== 'system-design') return <SectionSheet key={id} id={id} />
   return (
     <div className="space-y-5">
-      <PageHero eyebrow="Reference card · numbers and patterns" title="System Design cheat sheet" icon="cheat" tone="purple">
+      <PageHero eyebrow="Reference card · numbers and patterns" title="System Design Quest cheat sheet" icon="cheat" tone="purple">
         Exact values in plain text, interview shortcuts highlighted. Say which one you are using out loud.
       </PageHero>
 
