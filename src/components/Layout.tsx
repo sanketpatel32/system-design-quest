@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useGameStore, useLevel, useStreak } from '../stores/gameStore'
 import { BADGE_LABELS } from '../lib/progression/badges'
 import { IconBadge, IconFlame, IconGem, NavIcon } from './icons/HudIcons'
 import { HelpShortcuts } from './HelpShortcuts'
-import { Logo, LogoMark } from './brand/Logo'
+import { SectionSwitcher } from './brand/SectionSwitcher'
 import { AccountButton } from './AccountButton'
 
 const nav = [
@@ -39,9 +39,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-full flex flex-col lg:pl-[15.5rem]">
       <aside className="sidebar hidden lg:flex">
-        <Link to="/" className="flex items-center gap-2 px-3 py-2" aria-label="System Design Quest, back to map">
-          <Logo size={44} />
-        </Link>
+        <div className="flex"><SectionSwitcher variant="sidebar" /></div>
         <nav className="mt-4 flex flex-col gap-1.5" aria-label="Main">
           {nav.map((item) => (
             <NavLink
@@ -58,10 +56,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </aside>
       <header className="shell-header sticky top-0 z-50">
         <div className="max-w-[73.75rem] 2xl:max-w-[80rem] mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-3">
-          <Link to="/" className="flex items-center gap-2 shrink-0 lg:invisible" aria-label="System Design Quest, back to map" tabIndex={-1}>
-            <LogoMark size={38} />
-            <span className="font-display text-2xl leading-none hidden sm:inline"><span className="text-chalk">design</span><span className="text-[#58cc02]">quest</span></span>
-          </Link>
+          <div className="flex shrink-0 lg:invisible"><SectionSwitcher variant="header" /></div>
           <div className="relative flex min-w-0 items-center gap-0.5 sm:gap-1">
             <button
               type="button"
