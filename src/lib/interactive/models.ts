@@ -34,6 +34,11 @@ export type ModelId =
   | 'heap-growth'
   | 'offset-scan'
   | 'deadline-chain'
+  | 'capacity'
+  | 'load-shed'
+  | 'virtual-list'
+  | 'layout-thrash'
+  | 'long-task'
 
 export interface ModelRow {
   label: string
@@ -567,6 +572,111 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
         verdict: worst <= p.deadlineMs!
           ? { ok: true, text: 'Even if every call times out, the chain ends within the deadline' }
           : { ok: false, text: `Calls can still be running ${fmt(worst - p.deadlineMs!)} ms after the caller gave up` },
+      }
+    },
+  },
+  // Back-of-envelope capacity for one service: x = daily active users in millions
+  'capacity': {
+    params: ['readsPerUser', 'writesPerUser', 'payloadKb', 'peakFactor', 'hotDays', 'cacheGb'],
+    run: (x, p) => {
+      const dau = x * 1e6
+      const readAvg = (dau * p.readsPerUser!) / 86400
+      const writeAvg = (dau * p.writesPerUser!) / 86400
+      const gbPerDay = (dau * p.writesPerUser! * p.payloadKb!) / 1e6
+      const hotGb = gbPerDay * p.hotDays!
+      const nodes = Math.max(1, Math.ceil(hotGb / p.cacheGb!))
+      return {
+        rows: [
+          { label: 'Peak reads', value: `${short(readAvg * p.peakFactor!)}/s`, strong: true },
+          { label: 'Peak writes', value: `${short(writeAvg * p.peakFactor!)}/s` },
+          { label: 'New data per day', value: `${fmt(gbPerDay, 1)} GB` },
+          { label: 'New data per year', value: `${fmt((gbPerDay * 365) / 1000, 1)} TB` },
+          { label: `Hot set (last ${p.hotDays} days)`, value: `${fmt(hotGb)} GB`, strong: true },
+        ],
+        verdict: nodes === 1
+          ? { ok: true, text: `The hot set fits in one cache node with ${p.cacheGb} GB usable` }
+          : { ok: false, text: `The hot set needs about ${nodes} cache nodes of ${p.cacheGb} GB usable (or a shorter hot window)` },
+      }
+    },
+  },
+  // Overload with and without shedding: x = arrivals per second against a fixed capacity
+  'load-shed': {
+    params: ['capacity', 'timeoutS', 'seconds'],
+    run: (x, p) => {
+      const extra = Math.max(0, x - p.capacity!)
+      const queue = extra * p.seconds!
+      const waitS = queue / p.capacity!
+      const useful = waitS <= p.timeoutS! ? Math.min(x, p.capacity!) : 0
+      return {
+        rows: [
+          { label: 'Arrivals', value: `${fmt(x)}/s` },
+          { label: `Queue after ${p.seconds} s, no shedding`, value: fmt(queue) },
+          { label: 'Wait for a new request, no shedding', value: `${fmt(waitS, 1)} s`, strong: true },
+          { label: 'Useful answers/s, no shedding', value: `${fmt(useful)}/s` },
+          { label: 'Useful answers/s, shedding the excess', value: `${fmt(Math.min(x, p.capacity!))}/s`, strong: true },
+        ],
+        verdict: extra === 0
+          ? { ok: true, text: 'Under capacity: nothing queues, nothing needs shedding' }
+          : waitS <= p.timeoutS!
+            ? { ok: true, text: 'The queue is still shorter than the timeout, but it grows every second the overload lasts' }
+            : { ok: false, text: `Requests wait longer than the ${p.timeoutS} s timeout, so the server works on answers nobody reads` },
+      }
+    },
+  },
+  // List virtualization: x = rows in the list
+  'virtual-list': {
+    params: ['rowPx', 'viewportPx', 'overscan', 'nodesPerRow', 'domBudget'],
+    run: (x, p) => {
+      const visible = Math.ceil(p.viewportPx! / p.rowPx!)
+      const windowRows = Math.min(x, visible + 2 * p.overscan!)
+      const all = x * p.nodesPerRow!
+      const virt = windowRows * p.nodesPerRow!
+      return {
+        rows: [
+          { label: 'Rows in the list', value: fmt(x) },
+          { label: 'Elements, render every row', value: fmt(all), strong: true },
+          { label: `Rows on screen + ${p.overscan} above and below`, value: fmt(windowRows) },
+          { label: 'Elements, virtualized', value: fmt(virt), strong: true },
+        ],
+        verdict: all <= p.domBudget!
+          ? { ok: true, text: `Rendering every row stays within about ${fmt(p.domBudget!)} elements` }
+          : { ok: false, text: `Rendering every row creates ${fmt(all)} elements, past the ${fmt(p.domBudget!)} that Lighthouse flags as excessive; virtualizing keeps ${fmt(virt)}` },
+      }
+    },
+  },
+  // Layout thrashing: x = items updated in one loop
+  'layout-thrash': {
+    params: ['layoutMs', 'frameMs'],
+    run: (x, p) => {
+      const interleaved = x * p.layoutMs!
+      return {
+        rows: [
+          { label: 'Forced layouts, read-write-read-write', value: fmt(x) },
+          { label: 'Layout time, interleaved', value: `${fmt(interleaved, 1)} ms`, strong: true },
+          { label: 'Forced layouts, all reads then all writes', value: '1' },
+          { label: 'Layout time, batched', value: `${fmt(p.layoutMs!, 1)} ms`, strong: true },
+        ],
+        verdict: interleaved <= p.frameMs!
+          ? { ok: true, text: `Interleaved still fits a ${fmt(p.frameMs!, 1)} ms frame, but the cost grows with every item` }
+          : { ok: false, text: `Interleaving blows the ${fmt(p.frameMs!, 1)} ms frame budget; batching reads before writes needs one layout` },
+      }
+    },
+  },
+  // Long tasks and input delay: x = length of one main-thread task in ms
+  'long-task': {
+    params: ['chunkMs', 'goodInpMs'],
+    run: (x, p) => {
+      const chunks = Math.ceil(x / p.chunkMs!)
+      return {
+        rows: [
+          { label: 'Task length', value: `${fmt(x)} ms` },
+          { label: 'Worst wait for a tap, one task', value: `${fmt(x)} ms`, strong: true },
+          { label: `Split into ${p.chunkMs} ms pieces`, value: `${fmt(chunks)} pieces` },
+          { label: 'Worst wait for a tap, split or in a worker', value: `${fmt(Math.min(x, p.chunkMs!))} ms`, strong: true },
+        ],
+        verdict: x <= p.goodInpMs!
+          ? { ok: true, text: `Even a tap at the start waits at most ${fmt(x)} ms, inside the ${p.goodInpMs} ms "good" INP threshold` }
+          : { ok: false, text: `A tap at the start waits ${fmt(x)} ms before any handler runs, past the ${p.goodInpMs} ms "good" INP threshold on its own` },
       }
     },
   },

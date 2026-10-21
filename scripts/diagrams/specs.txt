@@ -937,3 +937,75 @@ Writer v2|adds optional field 8 > Message bytes
 Message bytes [unknown tag 8: skip]> Reader v1
 Message bytes > Reader v2|default if field 8 missing
 Schema|field 4 reserved ~> Writer v2|adds optional field 8
+
+@341 Choosing rendering per page: shared, rarely changing pages are built as static HTML on a CDN, product pages revalidate in the background, and personal pages render per request or on the client.
+Build step {concept} > Static HTML|CDN {store} > Browser {client}
+Static HTML|CDN [stale after 5 min]> Regenerate|in background {svc}
+Server render|per request, personal {svc} > Browser
+Browser [interactive parts only]> Hydrate widgets {concept}
+
+@342 An optimistic edit: the client shows the change at once and sends it with the version it read; the server applies it if the version matches or answers 412, and the client rolls back.
+User action {client} > Show change now {client} > Save|If-Match version 7 {client} > Server {svc}
+Server [still version 7]> 200|new version 8 {svc}
+Server [already version 8]?> 412|roll back, explain {client}
+
+@343 Coordinating tabs of one origin: a tab writes to shared storage and broadcasts the change; one leader tab holds a lock and keeps the single live connection, relaying updates to the others.
+Tab A {client} > IndexedDB|shared storage {store}
+Tab A [id + version]> Broadcast channel {queue} > Tab B {client}
+Leader tab|holds lock {client} > Live connection {svc}
+Leader tab|holds lock ~> Broadcast channel
+
+@344 A virtual list: the scroll offset picks a window of visible rows plus overscan, only those rows are rendered inside a spacer as tall as the full list, so the element count stays fixed.
+Scroll offset {client} > Visible range|first and last row {concept} > Window rows|plus overscan {client}
+Spacer|full list height {concept} > Scrollbar size {client}
+10,000 rows {store} [about 27 rendered]> Window rows|plus overscan
+
+@345 Layout thrashing versus batching: interleaved style writes and geometry reads force a layout per item, while all reads followed by all writes need one layout per frame; reserved space prevents layout shift.
+Write, read, repeat {client} [layout per item]> Long frame {concept}
+Read all {client} > Compute {concept} > Write all {client} > One layout {concept}
+Reserved space {concept} ~> No layout shift {concept}
+
+@346 Keeping input responsive: a long main-thread task makes a tap wait; splitting it into short yielding pieces or moving the computation to a web worker lets the tap run quickly.
+Tap {client} > Main thread queue {queue}
+Long task|400 ms {concept} ?> Main thread queue
+Short pieces|yield between {concept} > Main thread queue
+Main thread queue [heavy work]> Web worker {svc}
+Web worker [result message]> Main thread queue
+
+@351 A capacity estimate for one service: daily users times actions give daily volume, divided by 86,400 and multiplied by a peak factor for rates, plus storage growth and a hot set sized for the cache.
+Users x actions {concept} > Per day {concept} > Per second|times peak factor {concept}
+Per day > Storage growth|writes x bytes {store}
+Storage growth|writes x bytes > Hot set|cache size {store}
+Per second|times peak factor > Compare|with one node {svc}
+
+@352 B-tree versus LSM-tree storage: a B-tree updates fixed pages in place, while an LSM-tree buffers writes in a memtable, flushes sorted files and merges them by compaction.
+Write {client} > B-tree page|update in place {store}
+Write > WAL + memtable {store} > Sorted file|SSTable {store} > Compaction {svc}
+Read {client} > Memtable, then files|bloom filters {store}
+
+@353 Preventing double booking: two requests race for the same seat, and an atomic conditional update or unique constraint lets only one of them succeed while the other is told the seat is gone.
+User A {client} > Book seat {svc}
+User B {client} > Book seat
+Book seat [update where seat is free]> Database {store}
+Database [1 row updated]> Confirm A {client}
+Database [0 rows]?> Seat taken|tell B {client}
+
+@354 Poison messages and dead-letter queues: a consumer retries a failing message with backoff up to a limit, then parks it in a dead-letter queue that alerts and can redrive it after a fix.
+Queue {queue} > Consumer {svc}
+Consumer [retry with backoff]~> Queue
+Consumer [attempt limit reached]?> Dead-letter queue {queue}
+Dead-letter queue > Alert|inspect and fix {ext}
+Dead-letter queue [redrive after fix]~> Queue
+
+@355 Clocks and ordering: a fast clock on one server gives an older write a larger timestamp so last-write-wins keeps it, while versions from one authority keep updates in the true order.
+Server A|clock 300 ms fast {svc} [stamp .300]> Store {store}
+Server B {svc} [stamp .200, later]> Store
+Store [last write wins]?> Newer write lost {concept}
+Version check|if version is 7 {concept} > Store
+
+@356 Load shedding and backpressure: a server admits work up to its limit and rejects the excess early with 503 and Retry-After, and bounded queues push pressure back to producers.
+Clients {client} > Admission check|in-flight limit {svc}
+Admission check|in-flight limit [under limit]> Workers {svc}
+Admission check|in-flight limit [over limit]?> 503|Retry-After {client}
+Producer stage {svc} > Bounded queue {queue} > Workers
+Bounded queue [full, slow down]~> Producer stage
