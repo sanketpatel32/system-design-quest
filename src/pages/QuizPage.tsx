@@ -109,7 +109,7 @@ export function QuizPage() {
 
   return (
     <div className="mx-auto max-w-3xl pb-24">
-      <header className="mb-6 flex items-center gap-3 sm:gap-4">
+      <header className="mb-3 flex items-center gap-3 sm:mb-6 sm:gap-4 short:mb-1">
         <Link to={`/topic/${topic.slug}`} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-dim hover:bg-[#f4f1ec]" aria-label="Leave quiz, back to the lesson">
           <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" /></svg>
         </Link>
@@ -126,7 +126,7 @@ export function QuizPage() {
         <HeartsHud hearts={attempt.hearts} />
       </header>
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 sm:mb-5 short:mb-1">
         <p className="text-sm font-extrabold uppercase tracking-wide" style={{ color: p.deep }}>{topic.title}</p>
         <nav aria-label="Questions" className="flex items-center gap-1.5">
           {topic.questions.map((x, i) => {
@@ -223,7 +223,7 @@ export function QuizPage() {
       ) : (
         <>
           {answeredCount === 0 && !alreadyCleared && !lessonViewed && !skipLessonHint && (
-            <div className="panel mb-5 flex flex-wrap items-center gap-3 p-3 text-sm" data-testid="lesson-first">
+            <div className="panel mb-5 flex flex-wrap items-center gap-3 p-3 text-sm short:mb-2 short:py-1.5" data-testid="lesson-first">
               <span className="flex-1 font-bold text-chalk">New to this topic? The short lesson comes first and makes this quiz much easier.</span>
               <Link to={`/topic/${topic.slug}`} className="btn-cta !min-h-[40px]">Read the lesson</Link>
               <button type="button" className="text-sm font-extrabold uppercase text-dim" onClick={() => setSkipLessonHint(true)}>Skip</button>

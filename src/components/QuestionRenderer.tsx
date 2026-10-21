@@ -309,14 +309,14 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
   })
 
   return (
-    <div className={sheet ? 'space-y-5' : `panel-slab p-4 sm:p-5 space-y-4 ${hotkeys && !submitted ? 'question-active' : ''}`}>
+    <div className={sheet ? 'space-y-5 short:space-y-3' : `panel-slab p-4 sm:p-5 space-y-4 ${hotkeys && !submitted ? 'question-active' : ''}`}>
       {number !== undefined && (
         <p className="text-sm font-extrabold uppercase tracking-wide text-[#12749f] tabular-nums">
           Question {number}
           {total ? ` of ${total}` : ''} · {TYPE_LABEL[question.type]}
         </p>
       )}
-      <p className={`font-display text-chalk leading-snug ${sheet ? 'text-2xl' : 'text-lg'}`}>{question.prompt}</p>
+      <p className={`font-display text-chalk leading-snug ${sheet ? 'text-2xl short:text-lg' : 'text-lg'}`}>{question.prompt}</p>
       {question.type === 'multiple_choice' && (
         <div className="space-y-2">
           {shownChoices.map((c, idx) => {
@@ -501,7 +501,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
       )}
       {!submitted && sheet && (
         <div className="quizbar">
-          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-4 short:py-2">
             <span className="text-sm font-bold text-dim">{pending ?? 'Ready when you are.'}</span>
             <button type="button" onClick={submit} className="btn-cta min-w-[160px]" disabled={pending !== null}>
               Submit
