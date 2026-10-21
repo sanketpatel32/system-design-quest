@@ -22,3 +22,28 @@ test.describe('phone layout', () => {
     await expect(page.getByTestId('app-header')).toBeVisible()
   })
 })
+
+test.describe('phone diagrams', () => {
+  test.use({ hasTouch: true, viewport: { width: 360, height: 740 } })
+  test('wide diagrams fit the card on a phone and open full screen with pan and close', async ({ page }) => {
+    await page.goto('/topic/capacity-planning-for-a-service?unlockAll=1')
+    const fig = page.getByTestId('sketch-figure').first()
+    await fig.scrollIntoViewIfNeeded()
+    const frame = fig.locator('.sketch-frame')
+    // No sideways scrolling inside the card: the diagram fits its frame
+    expect(await frame.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1)
+    await fig.getByTestId('diagram-zoom').click()
+    const viewer = page.getByTestId('diagram-viewer')
+    await expect(viewer).toBeVisible()
+    // Opens at actual size so a wide diagram pans sideways; Fit screen shows the whole thing
+    const body = page.getByTestId('diagram-viewer-body')
+    await expect.poll(() => body.evaluate((e) => e.scrollHeight > e.clientHeight || e.scrollWidth > e.clientWidth)).toBe(true)
+    await page.getByRole('button', { name: 'Fit screen' }).click()
+    await expect.poll(() => body.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1)
+    await page.keyboard.press('Escape')
+    await expect(viewer).toBeHidden()
+    await page.getByTestId('diagram-zoom').first().click()
+    await page.getByRole('button', { name: 'Close the diagram' }).click()
+    await expect(viewer).toBeHidden()
+  })
+})
