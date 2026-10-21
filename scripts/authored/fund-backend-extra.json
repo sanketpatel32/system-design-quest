@@ -1,0 +1,2318 @@
+[
+ {
+  "id": 351,
+  "slug": "capacity-planning-for-a-service",
+  "region": "f2-backend",
+  "order": 21,
+  "title": "Capacity Planning for One Service",
+  "kind": "lesson",
+  "objectives": [
+   "Turn daily users and per-user actions into peak read and write rates",
+   "Estimate storage growth and the RAM needed for a hot set",
+   "Decide which number drives the design: reads, writes, storage or memory"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 12,
+  "prereqIds": [
+   221
+  ],
+  "cards": [
+   {
+    "id": "t351-c1",
+    "kind": "text",
+    "title": "Four numbers decide most designs",
+    "body": "Before choosing a database or a cache, estimate four things for the service: peak reads per second, peak writes per second, how fast stored data grows, and how much of it is hot enough to keep in memory. Each one points at a different bottleneck, and the largest one shapes the design.",
+    "teaches": [
+     "capacity-inputs"
+    ]
+   },
+   {
+    "id": "t351-c2",
+    "kind": "text",
+    "title": "Worked example: a feed service at 10M daily users",
+    "body": "Each user reads 40 items and posts 2 a day, 1 KB per post. Reads: 10M × 40 = 400M a day, about 4,600 per second on average and about 14K at a 3x peak. Writes: 10M × 2 = 20M a day, about 230 per second and about 700 at peak. Storage grows 20 GB a day, about 7.3 TB a year. If the last 7 days are hot, that is 140 GB of hot data.",
+    "teaches": [
+     "read-write-ratio",
+     "hot-set"
+    ]
+   },
+   {
+    "id": "t351-c3",
+    "kind": "diagram",
+    "title": "From users to resources",
+    "body": "Every estimate is a chain of multiplications with stated assumptions.",
+    "teaches": [
+     "capacity-inputs"
+    ],
+    "steps": [
+     "Daily active users × actions per user = actions per day",
+     "Actions per day ÷ 86,400 = average per second; × peak factor = peak",
+     "Writes per day × bytes per write = storage growth per day",
+     "Growth per day × hot days = memory for the hot set",
+     "Compare each result with what one node can handle"
+    ]
+   },
+   {
+    "id": "t351-c4",
+    "kind": "text",
+    "title": "The read:write ratio picks the tools",
+    "body": "A 20:1 read-heavy service benefits from caches and read replicas. A write-heavy service, such as event ingestion, needs cheap appends, partitioning and batching instead; a cache does little for data that is written once and rarely read again.",
+    "teaches": [
+     "read-write-ratio"
+    ]
+   },
+   {
+    "id": "t351-c5",
+    "kind": "text",
+    "title": "Trap: sizing memory for all the data",
+    "body": "Holding every byte ever written in RAM is rarely needed. Most requests touch recent or popular data. Size the cache for the hot set, measure the hit rate, and let older data live on disk.",
+    "teaches": [
+     "hot-set"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t351-a1",
+    "concept": "read-write-ratio",
+    "type": "multiple_choice",
+    "prompt": "A service gets 50 reads for every write. Which change usually helps its peak load the most?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A cache in front of the reads"
+     },
+     {
+      "id": "b",
+      "label": "Faster disks for the write path"
+     },
+     {
+      "id": "c",
+      "label": "Larger write batches from clients"
+     },
+     {
+      "id": "d",
+      "label": "More partitions for the write log"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "With reads dominating, serving them from memory removes most of the load."
+   },
+   {
+    "id": "t351-a2",
+    "concept": "capacity-inputs",
+    "type": "multiple_choice",
+    "prompt": "Why multiply the daily average by a peak factor?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Daily averages already include the busiest hour"
+     },
+     {
+      "id": "b",
+      "label": "Traffic bunches into busy hours, and capacity must cover them"
+     },
+     {
+      "id": "c",
+      "label": "It converts the daily request count into bytes needed for storage"
+     },
+     {
+      "id": "d",
+      "label": "It accounts for the size of each response"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Users are not spread evenly over 24 hours; the evening peak can be several times the average."
+   },
+   {
+    "id": "t351-a3",
+    "concept": "hot-set",
+    "type": "multiple_choice",
+    "prompt": "A service stores 7 TB but 90% of reads hit posts from the last week (140 GB). What should the cache be sized for?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "All 7 TB, so no read misses"
+     },
+     {
+      "id": "b",
+      "label": "The 140 GB hot set, then measure the hit rate"
+     },
+     {
+      "id": "c",
+      "label": "A fixed 1 GB, since caches should stay very small"
+     },
+     {
+      "id": "d",
+      "label": "Half of the total data, as a safe middle"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Size for the working set; the long tail of old data can stay on disk."
+   },
+   {
+    "id": "t351-a4",
+    "concept": "read-write-ratio",
+    "type": "multiple_choice",
+    "prompt": "An ingestion service writes 50K events per second and they are read once, by a nightly job. What matters most?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A large read cache in front of the event store"
+     },
+     {
+      "id": "b",
+      "label": "Read replicas in more regions for the nightly job"
+     },
+     {
+      "id": "c",
+      "label": "Cheap appends, batching and partitioned storage"
+     },
+     {
+      "id": "d",
+      "label": "Keeping all events in RAM until the job runs"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Write-once, read-rarely data is limited by write throughput and storage, not reads."
+   },
+   {
+    "id": "t351-a5",
+    "concept": "capacity-inputs",
+    "type": "drag_order",
+    "prompt": "Order the steps of a capacity estimate.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "Apply a peak factor"
+     },
+     {
+      "id": "s5",
+      "label": "Compare with per-node limits"
+     },
+     {
+      "id": "s1",
+      "label": "State users and actions per user"
+     },
+     {
+      "id": "s4",
+      "label": "Compute storage growth and the hot set"
+     },
+     {
+      "id": "s2",
+      "label": "Compute daily volume, then per second"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Inputs, volume, peak, data size, then the comparison that decides the design."
+   },
+   {
+    "id": "t351-a6",
+    "concept": "capacity-inputs",
+    "type": "estimation",
+    "prompt": "A feed has 10M people reading 40 posts apiece each day. Spread across the day, how many reads per second is that?",
+    "unit": "reads/s",
+    "target": 4630,
+    "assumptions": [
+     "Reads are spread over 86,400 seconds"
+    ],
+    "formula": "10M × 40 ÷ 86,400",
+    "workedAnswer": "400M ÷ 86,400 ≈ 4,630 reads/s",
+    "explanation": "Sanity check: at a 3x peak that is about 14K reads/s, a load a cache handles easily but a single database would feel.",
+    "tolerance": 0.15,
+    "trapAnswers": [
+     400000,
+     46300
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t351-f1",
+    "front": "Four capacity numbers?",
+    "back": "Peak reads/s, peak writes/s, storage growth, hot-set memory."
+   },
+   {
+    "id": "t351-f2",
+    "front": "Per-second from per-day?",
+    "back": "Divide by 86,400 (about 10^5), then apply a peak factor."
+   },
+   {
+    "id": "t351-f3",
+    "front": "Hot set?",
+    "back": "The recent or popular data most requests touch; size caches for it, not for all data."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Google SRE workbook: Managing Load",
+    "url": "https://sre.google/workbook/managing-load/"
+   },
+   {
+    "title": "Redis: Memory optimization",
+    "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/memory-optimization/"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "capacity-inputs",
+    "read-write-ratio",
+    "hot-set"
+   ],
+   "mechanism": {
+    "title": "How a capacity estimate is built",
+    "steps": [
+     "Start from stated inputs: daily active users, actions per user per day split into reads and writes, the size of each stored item, and how long data is kept. Write them down, because every later number inherits their error, and an interviewer or reviewer can only check what is stated.",
+     "Convert daily volume to a rate. A day has 86,400 seconds, about 10^5, so 400M reads a day is about 4,600 per second on average. Traffic is uneven, so multiply by a peak factor taken from real traffic graphs; 2 to 5 times the average is common for consumer services with an evening peak.",
+     "Storage growth is writes per day times bytes per write, plus overhead for indexes and replicas. 20M writes of 1 KB is 20 GB a day before replication; with three replicas the disk footprint is 60 GB a day. Over a year that adds up to tens of terabytes, which decides whether one machine or a partitioned store is needed.",
+     "Memory follows the access pattern, not the total size. If most reads hit the last week of data, the hot set is a week of writes. Caching it gives a high hit rate; caching more gives diminishing returns. Measure the hit rate after launch and adjust, because popularity curves differ by product.",
+     "Finally compare each number with what one node can do, using measured benchmarks for the chosen software and hardware. The largest ratio between demand and single-node capacity is the bottleneck, and the design should address that one first: caching for reads, partitioning for writes or storage, more memory for the hot set."
+    ]
+   },
+   "useWhen": [
+    "Choosing between a single database and a partitioned store.",
+    "Sizing caches, replicas and disks before a launch."
+   ],
+   "avoidWhen": [
+    "Avoid precise-looking numbers from guessed inputs; keep one or two significant figures.",
+    "Avoid planning from averages alone; size for the peak."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Number",
+     "Drives",
+     "Typical response"
+    ],
+    "rows": [
+     [
+      "Peak reads/s",
+      "Read capacity",
+      "Caches, read replicas, CDN"
+     ],
+     [
+      "Peak writes/s",
+      "Write capacity",
+      "Batching, partitioning, append-only logs"
+     ],
+     [
+      "Storage growth",
+      "Disk and cost",
+      "Retention limits, tiering, partitioning"
+     ],
+     [
+      "Hot set",
+      "Memory",
+      "Cache size and eviction policy"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "The feed service in numbers",
+    "assumptions": [
+     "10M daily users, 40 reads and 2 writes each per day",
+     "1 KB per post, 3x peak, the last 7 days are hot"
+    ],
+    "steps": [
+     "Reads: 10M × 40 = 400M a day; 400M ÷ 86,400 ≈ 4,630 per second; about 14K at peak.",
+     "Writes: 10M × 2 = 20M a day; about 230 per second; about 700 at peak.",
+     "Storage: 20M writes of 1 KB each is 20 GB a day; about 7.3 TB a year before replication.",
+     "Hot set: 20 GB × 7 = 140 GB, about three cache nodes with 48 GB usable each."
+    ],
+    "result": "Reads dominate and the hot set fits a small cache cluster, so the first design move is a cache in front of a modest database."
+   },
+   "india": {
+    "title": "Planning from measured load",
+    "label": "Official documentation",
+    "body": "The Google SRE workbook chapter on managing load describes planning capacity from measured demand, keeping headroom for peaks and failures, and load testing to find what one instance can really serve. It also recommends planning for the loss of capacity during failures, so a cluster sized exactly for the peak with nothing spare is not enough once a node or a zone goes down."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We have 10 TB, so we need 10 TB of cache.”",
+     "say": "“I’d size the cache for the hot set, about a week of writes here, and check the hit rate.”"
+    },
+    {
+     "trap": "“Average QPS is 4,600, so one server is fine.”",
+     "say": "“The peak is about three times that, and I’d keep headroom for losing a node.”"
+    }
+   ],
+   "takeaways": [
+    "Estimate peak reads, peak writes, storage growth and the hot set.",
+    "Divide daily volume by 86,400 and apply a peak factor.",
+    "The read:write ratio decides between caching and write scaling.",
+    "Size memory for the hot set, not for all the data."
+   ]
+  },
+  "interactive": {
+   "kind": "slider",
+   "title": "Size the feed service",
+   "prompt": "Each user reads 40 items and posts 2 a day at 1 KB; the peak is 3x and the last 7 days are hot. Slide daily active users and watch which number grows past one machine first.",
+   "model": "capacity",
+   "params": {
+    "readsPerUser": 40,
+    "writesPerUser": 2,
+    "payloadKb": 1,
+    "peakFactor": 3,
+    "hotDays": 7,
+    "cacheGb": 48
+   },
+   "control": {
+    "label": "Daily active users",
+    "min": 1,
+    "max": 100,
+    "step": 1,
+    "initial": 10,
+    "unit": "M"
+   },
+   "takeaway": "At 10M users the peak is about 14K reads/s and 694 writes/s, and the 140 GB hot set needs three 48 GB cache nodes. Reads dominate at every size, so caching is the first lever; the hot window decides the memory bill."
+  },
+  "seeAlso": [
+   {
+    "topicId": 2,
+    "why": "The general estimation habits behind these numbers"
+   },
+   {
+    "topicId": 15,
+    "why": "Where a cache sits once reads dominate"
+   }
+  ]
+ },
+ {
+  "id": 352,
+  "slug": "storage-engines-btree-vs-lsm",
+  "region": "f2-backend",
+  "order": 22,
+  "title": "Storage Engines: B-trees vs LSM-trees",
+  "kind": "lesson",
+  "objectives": [
+   "Explain how a B-tree updates pages in place and an LSM-tree appends and compacts",
+   "Compare write, read and space amplification",
+   "Pick an engine for a write-heavy or a read-heavy workload"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 13,
+  "prereqIds": [
+   221
+  ],
+  "cards": [
+   {
+    "id": "t352-c1",
+    "kind": "text",
+    "title": "Two ways to keep data sorted on disk",
+    "body": "A B-tree keeps sorted data in fixed-size pages and changes a page where it lives. An LSM-tree (log-structured merge-tree) buffers writes in memory, flushes them as new sorted files, and merges those files in the background. Both answer the same queries; they pay for them at different times.",
+    "teaches": [
+     "btree",
+     "lsm"
+    ]
+   },
+   {
+    "id": "t352-c2",
+    "kind": "text",
+    "title": "Worked example: one small update",
+    "body": "Changing a 100-byte row in a B-tree rewrites the 8 KB page that holds it, plus a log record: about 8,192 ÷ 100 ≈ 82 bytes written per byte changed, before counting index pages. An LSM-tree appends the new row to its log and memory table at once, but compaction may rewrite it several more times as files are merged level by level.",
+    "teaches": [
+     "amplification"
+    ]
+   },
+   {
+    "id": "t352-c3",
+    "kind": "diagram",
+    "title": "The LSM write path",
+    "body": "Writes are sequential; the cost moves to background merging and to reads.",
+    "teaches": [
+     "lsm"
+    ],
+    "steps": [
+     "Append the write to a log for durability",
+     "Insert it into a sorted in-memory table",
+     "Flush the full table to disk as an immutable sorted file",
+     "Compaction merges files and drops overwritten or deleted rows",
+     "Reads check memory, then files from newest to oldest, skipping files by filter"
+    ]
+   },
+   {
+    "id": "t352-c4",
+    "kind": "text",
+    "title": "Three kinds of amplification",
+    "body": "Write amplification is bytes written to disk per byte the application wrote. Read amplification is how many places a lookup must check. Space amplification is disk used per byte of live data. B-trees usually read less and write more per update; LSM-trees write in large sequential batches, but a read may consult several files and old versions take space until compaction.",
+    "teaches": [
+     "amplification"
+    ]
+   },
+   {
+    "id": "t352-c5",
+    "kind": "text",
+    "title": "Trap: “LSM is always faster for writes”",
+    "body": "LSM ingestion is cheap at first, but compaction must keep up. If writes outpace merging, files pile up, reads slow down and the engine eventually throttles writers. Measure sustained throughput, not the first minutes of a benchmark.",
+    "teaches": [
+     "lsm",
+     "amplification"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t352-a1",
+    "concept": "btree",
+    "type": "multiple_choice",
+    "prompt": "What does a B-tree do when one row in a page changes?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Appends the row to a new sorted file and merges it in later compaction"
+     },
+     {
+      "id": "b",
+      "label": "Rewrites the page that holds the row, after logging the change"
+     },
+     {
+      "id": "c",
+      "label": "Stores only the changed bytes and nothing else"
+     },
+     {
+      "id": "d",
+      "label": "Rebuilds the whole index from the table"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "B-trees update pages in place; the write-ahead log makes that safe."
+   },
+   {
+    "id": "t352-a2",
+    "concept": "lsm",
+    "type": "multiple_choice",
+    "prompt": "Why can an LSM-tree read touch several files?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A key may exist in memory and in several sorted files"
+     },
+     {
+      "id": "b",
+      "label": "Each sorted file stores a single column of the table rows"
+     },
+     {
+      "id": "c",
+      "label": "Files are stored out of key order"
+     },
+     {
+      "id": "d",
+      "label": "The engine keeps two copies of each row on disk"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Newer versions sit in newer files; a lookup checks newest first and filters skip files without the key."
+   },
+   {
+    "id": "t352-a3",
+    "concept": "amplification",
+    "type": "multiple_choice",
+    "prompt": "An engine writes 30 GB to disk while the application writes 1 GB. What is that?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Read amplification of 30"
+     },
+     {
+      "id": "b",
+      "label": "Space amplification of 30"
+     },
+     {
+      "id": "c",
+      "label": "Write amplification of 30"
+     },
+     {
+      "id": "d",
+      "label": "A replication factor of 30"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Bytes written to disk per byte written by the application."
+   },
+   {
+    "id": "t352-a4",
+    "concept": "lsm",
+    "type": "multiple_choice",
+    "prompt": "A time-series service ingests many small writes and mostly reads recent ranges. Which engine fits well?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "An LSM-tree, for cheap sequential ingestion"
+     },
+     {
+      "id": "b",
+      "label": "A B-tree with a page per row"
+     },
+     {
+      "id": "c",
+      "label": "Either one, as engines barely differ on write cost"
+     },
+     {
+      "id": "d",
+      "label": "A hash index, for its range scans"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "High-volume appends suit LSM-trees; hash indexes cannot serve range scans."
+   },
+   {
+    "id": "t352-a5",
+    "concept": "lsm",
+    "type": "drag_order",
+    "prompt": "Order the life of a write in an LSM-tree.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "Flush the table to a sorted file"
+     },
+     {
+      "id": "s1",
+      "label": "Append to the log"
+     },
+     {
+      "id": "s4",
+      "label": "Merge files during compaction"
+     },
+     {
+      "id": "s2",
+      "label": "Insert into the memory table"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Durable first, then in memory, then on disk, then merged."
+   },
+   {
+    "id": "t352-a6",
+    "concept": "amplification",
+    "type": "estimation",
+    "prompt": "A 100-byte row changes in an 8 KB (8,192-byte) page that is written back whole. Roughly what is the write amplification?",
+    "unit": "x",
+    "target": 82,
+    "assumptions": [
+     "Only the data page is counted, not the log or index pages"
+    ],
+    "formula": "8,192 ÷ 100",
+    "workedAnswer": "8,192 ÷ 100 ≈ 82",
+    "explanation": "Sanity check: small random updates are where B-trees pay most; the log and index pages add more on top.",
+    "tolerance": 0.1,
+    "trapAnswers": [
+     100,
+     8
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t352-f1",
+    "front": "B-tree update?",
+    "back": "Rewrite the page in place, after logging the change."
+   },
+   {
+    "id": "t352-f2",
+    "front": "LSM write?",
+    "back": "Log, memory table, flush to sorted file, merge later by compaction."
+   },
+   {
+    "id": "t352-f3",
+    "front": "Three amplifications?",
+    "back": "Write: disk bytes per app byte. Read: places checked. Space: disk per live byte."
+   }
+  ],
+  "sources": [
+   {
+    "title": "PostgreSQL: Database page layout",
+    "url": "https://www.postgresql.org/docs/current/storage-page-layout.html"
+   },
+   {
+    "title": "Apache Cassandra: Compaction overview",
+    "url": "https://cassandra.apache.org/doc/latest/cassandra/managing/operating/compaction/overview.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "btree",
+    "lsm",
+    "amplification"
+   ],
+   "mechanism": {
+    "title": "How the two engines spend their I/O",
+    "steps": [
+     "A B-tree stores rows or keys in fixed-size pages, often 8 KB or 16 KB, arranged as a shallow tree. A lookup reads one page per level, usually three or four, and the top levels stay in memory. An update finds the page, changes it in memory, logs the change, and later writes the whole page back.",
+     "Writing whole pages for small changes is the B-tree’s write amplification. Random updates across a large table touch different pages, so the disk sees scattered page writes. In exchange, a read finds the single current version of a row in one place.",
+     "An LSM-tree turns writes into sequential appends. Each write goes to a log and an in-memory sorted table. When the table fills, it is flushed as an immutable sorted file. Deletes are written as markers called tombstones, because files are never edited in place.",
+     "Compaction merges files to discard overwritten rows and tombstones and to bound how many files a read must check. Leveled compaction keeps files in levels of growing size and rewrites data each time it moves down a level, trading extra writes for fewer files per read. Other strategies merge less often, writing less but leaving more files and more space used.",
+     "Reads in an LSM-tree check the memory table and then files from newest to oldest. Per-file filters, such as Bloom filters, answer “definitely not here” for most files, so a point lookup usually reads one or two. Range scans must merge sorted runs from several files, which costs more than a B-tree range scan."
+    ]
+   },
+   "useWhen": [
+    "LSM-trees for write-heavy ingestion such as logs, metrics and events.",
+    "B-trees for read-heavy, update-in-place workloads with many range queries."
+   ],
+   "avoidWhen": [
+    "Avoid judging an LSM engine on a short benchmark before compaction starts.",
+    "Avoid B-trees for huge append-only streams where random page writes dominate."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Engine",
+     "Writes",
+     "Reads",
+     "Space"
+    ],
+    "rows": [
+     [
+      "B-tree",
+      "Page rewrite per update",
+      "One place per key",
+      "Some free space in pages"
+     ],
+     [
+      "LSM, leveled",
+      "Rewritten at each level",
+      "Few files per lookup",
+      "Low, after compaction"
+     ],
+     [
+      "LSM, tiered",
+      "Fewer rewrites",
+      "More files per lookup",
+      "Higher until merges run"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Small updates in an 8 KB page",
+    "assumptions": [
+     "100-byte rows, 8,192-byte pages",
+     "1,000 updates per second spread over a large table"
+    ],
+    "steps": [
+     "Each update dirties one page: 8,192 ÷ 100 ≈ 82 bytes written per byte changed.",
+     "At 1,000 updates per second that is up to 1,000 × 8 KB ≈ 8 MB/s of page writes, before the log.",
+     "If many updates hit the same hot pages between writes to disk, they share one page write, so the real figure is often lower.",
+     "An LSM-tree writes the same 100 KB/s sequentially, then rewrites it during compaction a number of times that depends on its levels."
+    ],
+    "result": "Neither engine avoids amplification; they choose where to pay it. Measure with the real access pattern."
+   },
+   "india": {
+    "title": "What the documentation says",
+    "label": "Official documentation",
+    "body": "The PostgreSQL documentation describes tables and indexes stored as arrays of fixed-size pages, normally 8 kB, with each page holding row pointers and tuples. Apache Cassandra’s documentation describes writes going to a commit log and an in-memory structure, flushed to immutable sorted files, with compaction strategies that trade write amplification against the number of files a read must touch."
+   },
+   "pitfalls": [
+    {
+     "trap": "“LSM-trees are faster, full stop.”",
+     "say": "“They make writes sequential; I’d check compaction can keep up and what range reads cost.”"
+    },
+    {
+     "trap": "“A B-tree update writes only the changed row.”",
+     "say": "“It rewrites the page, so small random updates have high write amplification.”"
+    }
+   ],
+   "takeaways": [
+    "B-trees update pages in place; LSM-trees append and compact.",
+    "Every engine pays write, read or space amplification somewhere.",
+    "Compaction must keep pace with ingestion.",
+    "Choose by workload: write-heavy streams vs read-heavy updates and ranges."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Which engine for the metrics store?",
+   "prompt": "A service ingests 200K small metric points per second and dashboards read the last hour by time range. Which storage engine suits it better, and why?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "An LSM-tree: sequential appends absorb the write rate",
+     "feedback": "Right: ingestion dominates, and recent data stays in few, recent files."
+    },
+    {
+     "id": "b",
+     "label": "A B-tree: one page per lookup keeps the reads fast",
+     "feedback": "Reads are cheap either way here; scattered page rewrites at 200K writes/s are the real risk."
+    },
+    {
+     "id": "c",
+     "label": "A hash index: constant-time writes and reads",
+     "feedback": "Hash indexes cannot serve the time-range reads the dashboards need."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "With a write rate this high, turning writes into sequential appends matters most. The cost moves to compaction, so plan disk bandwidth for it and keep an eye on the number of files per read."
+  },
+  "seeAlso": [
+   {
+    "topicId": 23,
+    "why": "B-tree and LSM indexes in system design terms"
+   },
+   {
+    "topicId": 264,
+    "why": "How B-tree and hash indexes serve lookups"
+   }
+  ]
+ },
+ {
+  "id": 353,
+  "slug": "preventing-double-booking",
+  "region": "f2-backend",
+  "order": 23,
+  "title": "Preventing Double Booking",
+  "kind": "lesson",
+  "objectives": [
+   "Spot the check-then-insert race behind double bookings",
+   "Compare constraints, row locks, optimistic versions and serializable isolation",
+   "Choose a fix that holds under concurrent requests"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 13,
+  "prereqIds": [
+   238
+  ],
+  "cards": [
+   {
+    "id": "t353-c1",
+    "kind": "text",
+    "title": "The race in check-then-insert",
+    "body": "A booking handler reads “is seat 12A free?”, sees yes, and inserts a booking. Two requests can both read “free” before either inserts, and both succeed. Each request is correct on its own; together they break the rule that a seat has one booking.",
+    "teaches": [
+     "check-then-act"
+    ]
+   },
+   {
+    "id": "t353-c2",
+    "kind": "text",
+    "title": "Worked example: two requests, 5 ms apart",
+    "body": "At 10:00:00.000 request A checks seat 12A and finds it free. At 10:00:00.005 request B checks and also finds it free, because A has not committed yet. A inserts and commits at .010, B at .015. Under the default read-committed isolation in many databases, nothing stops B; the flight now has two passengers in 12A.",
+    "teaches": [
+     "check-then-act",
+     "isolation"
+    ]
+   },
+   {
+    "id": "t353-c3",
+    "kind": "diagram",
+    "title": "Four ways to make the check stick",
+    "body": "Each one makes the second request fail or wait instead of double booking.",
+    "teaches": [
+     "fixes"
+    ],
+    "steps": [
+     "Unique constraint on (flight, seat): the second insert fails",
+     "Lock the seat row first: the second request waits, then sees it taken",
+     "Version check: update only if the version is unchanged, else retry",
+     "Serializable isolation: the database aborts one transaction",
+     "Turn the failure into a clear “seat just taken” reply"
+    ]
+   },
+   {
+    "id": "t353-c4",
+    "kind": "text",
+    "title": "Pessimistic or optimistic",
+    "body": "Locking the row before checking (pessimistic) makes contenders wait; it suits hot items with frequent conflicts. An optimistic version check lets everyone proceed and rejects the losers at write time; it suits items where conflicts are rare, and it never holds a lock while a user thinks.",
+    "teaches": [
+     "fixes"
+    ]
+   },
+   {
+    "id": "t353-c5",
+    "kind": "text",
+    "title": "Trap: checking in the application only",
+    "body": "A check in application code, even inside a transaction, does not stop a concurrent insert under read committed or snapshot isolation. The guarantee must come from the database: a constraint, a lock, a conditional update, or serializable isolation.",
+    "teaches": [
+     "isolation"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t353-a1",
+    "concept": "check-then-act",
+    "type": "multiple_choice",
+    "prompt": "Two requests both read “seat free” and both insert. What is this?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A deadlock between the two transactions"
+     },
+     {
+      "id": "b",
+      "label": "A check-then-act race"
+     },
+     {
+      "id": "c",
+      "label": "A dirty read of uncommitted data"
+     },
+     {
+      "id": "d",
+      "label": "A lost connection during commit"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "The decision was based on a read that another transaction made stale."
+   },
+   {
+    "id": "t353-a2",
+    "concept": "fixes",
+    "type": "multiple_choice",
+    "prompt": "Which fix makes the second insert fail even if the code forgets to check?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Logging every booking attempt"
+     },
+     {
+      "id": "b",
+      "label": "A cache of the free seats kept in app memory"
+     },
+     {
+      "id": "c",
+      "label": "Retrying the insert on timeout"
+     },
+     {
+      "id": "d",
+      "label": "A unique constraint on flight and seat"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Constraints are enforced by the database for every writer."
+   },
+   {
+    "id": "t353-a3",
+    "concept": "isolation",
+    "type": "multiple_choice",
+    "prompt": "Under snapshot isolation, two transactions insert different rows after each checked the same rule. What can happen?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Both commit and the rule is broken"
+     },
+     {
+      "id": "b",
+      "label": "The second always waits for the first"
+     },
+     {
+      "id": "c",
+      "label": "Both are aborted by the database"
+     },
+     {
+      "id": "d",
+      "label": "The second reads the first one’s insert"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "This is write skew: no row was written twice, so snapshot isolation sees no conflict."
+   },
+   {
+    "id": "t353-a4",
+    "concept": "fixes",
+    "type": "multiple_choice",
+    "prompt": "Concert tickets: thousands of buyers hit the same few seats in seconds. Which approach fits best?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Optimistic versions, since conflicts are rare"
+     },
+     {
+      "id": "b",
+      "label": "A read-only replica for the seat check"
+     },
+     {
+      "id": "c",
+      "label": "Locking or a conditional update on the seat row"
+     },
+     {
+      "id": "d",
+      "label": "Checking seat availability twice in the booking code"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "With frequent conflicts, optimistic retries waste work; a lock or atomic conditional update settles each seat once."
+   },
+   {
+    "id": "t353-a5",
+    "concept": "fixes",
+    "type": "drag_order",
+    "prompt": "Order a pessimistic booking transaction.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "Check that it is free"
+     },
+     {
+      "id": "s1",
+      "label": "Begin the transaction"
+     },
+     {
+      "id": "s4",
+      "label": "Insert the booking and commit"
+     },
+     {
+      "id": "s2",
+      "label": "Lock the seat row"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Lock before the check, so the check stays true until commit."
+   },
+   {
+    "id": "t353-a6",
+    "concept": "check-then-act",
+    "type": "estimation",
+    "prompt": "A hotel has 50 rooms and 49 are booked. Three requests check at the same moment, all see a free room, and all insert with no constraint. How many bookings exist afterwards?",
+    "unit": "bookings",
+    "target": 52,
+    "assumptions": [
+     "No locks or constraints",
+     "Every insert succeeds"
+    ],
+    "formula": "49 + 3",
+    "workedAnswer": "49 + 3 = 52 bookings for 50 rooms",
+    "explanation": "Sanity check: the overbooking equals the number of racing requests minus the rooms that were really free.",
+    "tolerance": 0,
+    "trapAnswers": [
+     50,
+     51
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t353-f1",
+    "front": "Why does check-then-insert double book?",
+    "back": "Two requests can read “free” before either commits."
+   },
+   {
+    "id": "t353-f2",
+    "front": "Write skew?",
+    "back": "Two transactions read the same rule, write different rows, and both commit."
+   },
+   {
+    "id": "t353-f3",
+    "front": "Four fixes?",
+    "back": "Unique constraint, row lock, version check, serializable isolation."
+   }
+  ],
+  "sources": [
+   {
+    "title": "PostgreSQL: Transaction isolation",
+    "url": "https://www.postgresql.org/docs/current/transaction-iso.html"
+   },
+   {
+    "title": "PostgreSQL: Explicit locking",
+    "url": "https://www.postgresql.org/docs/current/explicit-locking.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "check-then-act",
+    "isolation",
+    "fixes"
+   ],
+   "mechanism": {
+    "title": "Why the read does not protect the write",
+    "steps": [
+     "Most databases default to read committed or snapshot isolation. A transaction sees committed data, but nothing it reads is locked against other writers. When the decision to insert depends on a read, another transaction can change what that read would return before the insert commits.",
+     "If both transactions update the same row, the database notices: one waits or fails. Double booking is harder because the two transactions insert different rows. Snapshot isolation, used for repeatable read in several databases, allows this write skew.",
+     "A unique constraint turns the business rule into something the database enforces on every insert: only one row per flight and seat. The second insert fails with a constraint error, which the handler turns into “seat just taken”. For overlapping ranges, such as hotel nights, some databases offer exclusion constraints; otherwise model each night as a row.",
+     "A row lock, taken by reading the seat or room row “for update” before checking, makes the second transaction wait until the first commits, then re-check. An optimistic alternative is a conditional update: set the seat to booked only where it is still free, or only where its version is unchanged, and treat zero rows updated as a lost race.",
+     "Serializable isolation detects that the two transactions could not have run one after the other and aborts one of them. It protects every rule without changing the schema, but the application must retry aborted transactions, and heavy contention increases aborts."
+    ]
+   },
+   "useWhen": [
+    "Bookings, inventory, unique usernames and any “at most N” rule.",
+    "Flows where a read decides whether a write is allowed."
+   ],
+   "avoidWhen": [
+    "Avoid relying on an application-level check alone.",
+    "Avoid holding locks while waiting for a user or a remote call."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Fix",
+     "Contention behaviour",
+     "Cost"
+    ],
+    "rows": [
+     [
+      "Unique constraint",
+      "Second insert fails fast",
+      "Needs a rule that fits a key"
+     ],
+     [
+      "Row lock",
+      "Contenders wait in turn",
+      "Lock wait time, deadlock care"
+     ],
+     [
+      "Version or conditional update",
+      "Losers retry or report",
+      "Wasted work under heavy contention"
+     ],
+     [
+      "Serializable isolation",
+      "Database aborts one",
+      "Retry logic, more aborts"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "How many bookings slip through",
+    "assumptions": [
+     "50 rooms, 49 already booked",
+     "3 requests check at the same moment",
+     "No constraint or lock"
+    ],
+    "steps": [
+     "All 3 see one free room.",
+     "All 3 insert: 49 + 3 = 52 bookings.",
+     "With a unique constraint per room and night, 1 insert succeeds and 2 fail.",
+     "With a row lock, the 2 later requests wait, re-check and see no free room."
+    ],
+    "result": "The overbooking equals the racing requests minus the free rooms; any of the four fixes brings it to zero."
+   },
+   "india": {
+    "title": "What the PostgreSQL documentation says",
+    "label": "Official documentation",
+    "body": "The PostgreSQL documentation on transaction isolation explains that read committed lets each statement see data committed before it began, and that repeatable read in PostgreSQL uses a snapshot. It describes serialization anomalies such as write skew and states that the serializable level detects them and aborts a transaction, which the application must be prepared to retry."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We check availability inside a transaction, so it is safe.”",
+     "say": "“The read is not locked; I’d add a unique constraint or lock the row.”"
+    },
+    {
+     "trap": "“Optimistic locking is always better.”",
+     "say": "“For a few hot seats with many buyers, I’d lock or use an atomic conditional update.”"
+    }
+   ],
+   "takeaways": [
+    "Check-then-insert races under default isolation.",
+    "Make the database enforce the rule: constraint, lock, conditional update or serializable.",
+    "Lock for hot items; use versions when conflicts are rare.",
+    "Turn the conflict into a clear reply and retry where it makes sense."
+   ]
+  },
+  "interactive": {
+   "kind": "tradeoff",
+   "title": "Stop the double booking",
+   "prompt": "A cinema app checks “seat free?” then inserts a booking. During a premiere, 2,000 people click the same 20 seats in the first second. Which change prevents double bookings and handles the rush best?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Retry the insert if it times out",
+     "feedback": "Retries do nothing about two requests that both saw the seat as free."
+    },
+    {
+     "id": "b",
+     "label": "Atomic conditional update: book the seat only where it is still free",
+     "feedback": "Right: each seat is taken once, and every loser learns at once that it is gone."
+    },
+    {
+     "id": "c",
+     "label": "Optimistic versions with automatic retry until success",
+     "feedback": "It prevents duplicates, but with 100 buyers per seat most retries fail again and add load."
+    }
+   ],
+   "correctId": "b",
+   "reveal": "The fix must live in the database. Under heavy contention, an atomic conditional update or a short row lock settles each seat once; a unique constraint is the safety net that catches any code path that forgets."
+  },
+  "seeAlso": [
+   {
+    "topicId": 267,
+    "why": "The isolation anomalies behind write skew"
+   },
+   {
+    "topicId": 72,
+    "why": "Optimistic and pessimistic locking compared"
+   }
+  ]
+ },
+ {
+  "id": 354,
+  "slug": "poison-messages-and-dead-letter-queues",
+  "region": "f2-backend",
+  "order": 24,
+  "title": "Poison Messages and Dead-Letter Queues",
+  "kind": "lesson",
+  "objectives": [
+   "Recognise a poison message that fails on every attempt",
+   "Bound retries and move failing messages to a dead-letter queue",
+   "Operate the dead-letter queue: alert, inspect, fix and redrive"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 11,
+  "prereqIds": [
+   227
+  ],
+  "cards": [
+   {
+    "id": "t354-c1",
+    "kind": "text",
+    "title": "One bad message can stop a queue",
+    "body": "A consumer takes a message, fails on it, and the broker redelivers it. If the failure is in the message itself, such as a malformed field or a reference to a deleted record, every attempt fails the same way. In an ordered queue or partition, the messages behind it wait forever.",
+    "teaches": [
+     "poison-message"
+    ]
+   },
+   {
+    "id": "t354-c2",
+    "kind": "text",
+    "title": "Worked example: five tries, then park it",
+    "body": "A consumer retries a failing message with backoff of 1, 2, 4 and 8 seconds between five attempts, a total wait of 1 + 2 + 4 + 8 = 15 seconds. After the fifth failure it moves the message to a dead-letter queue and carries on with the next one. An alert fires, an engineer finds a missing field, fixes the producer, and replays the parked message.",
+    "teaches": [
+     "retry-limit",
+     "dlq"
+    ]
+   },
+   {
+    "id": "t354-c3",
+    "kind": "diagram",
+    "title": "Where failing messages go",
+    "body": "Transient failures are retried; persistent ones are parked, not dropped.",
+    "teaches": [
+     "dlq"
+    ],
+    "steps": [
+     "Consumer receives the message and tries to process it",
+     "On failure, retry with backoff while the attempt count is under the limit",
+     "At the limit, move the message to the dead-letter queue with the error",
+     "Alert on dead-letter queue depth",
+     "After a fix, redrive the messages back to the main queue"
+    ]
+   },
+   {
+    "id": "t354-c4",
+    "kind": "text",
+    "title": "Transient or permanent?",
+    "body": "A timeout to a database is transient and worth retrying. A validation error will fail on every attempt. Classify errors where you can: send permanent failures to the dead-letter queue at once, and give transient ones a few spaced retries so a brief outage does not fill the dead-letter queue.",
+    "teaches": [
+     "retry-limit"
+    ]
+   },
+   {
+    "id": "t354-c5",
+    "kind": "text",
+    "title": "Trap: a dead-letter queue nobody watches",
+    "body": "Parking messages hides the failure from the main flow. Without an alert on its depth and a way to replay, the dead-letter queue becomes a place where orders and payments silently disappear. Treat a growing dead-letter queue as an incident.",
+    "teaches": [
+     "dlq"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t354-a1",
+    "concept": "poison-message",
+    "type": "multiple_choice",
+    "prompt": "A message fails with “missing field: customer_id” on every attempt. What is it?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A transient failure that more retries will clear"
+     },
+     {
+      "id": "b",
+      "label": "A poison message that will never succeed as is"
+     },
+     {
+      "id": "c",
+      "label": "A duplicate that the consumer already handled"
+     },
+     {
+      "id": "d",
+      "label": "A message that arrived out of order"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "The failure is in the content, so retrying cannot change the outcome."
+   },
+   {
+    "id": "t354-a2",
+    "concept": "retry-limit",
+    "type": "multiple_choice",
+    "prompt": "Why cap the number of delivery attempts?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "So one failing message cannot block the queue or burn capacity"
+     },
+     {
+      "id": "b",
+      "label": "Because brokers delete any message after three failed deliveries"
+     },
+     {
+      "id": "c",
+      "label": "To turn at-least-once delivery into exactly-once"
+     },
+     {
+      "id": "d",
+      "label": "To keep the consumer’s memory use constant"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Unbounded retries turn one bad message into an outage for everything behind it."
+   },
+   {
+    "id": "t354-a3",
+    "concept": "dlq",
+    "type": "multiple_choice",
+    "prompt": "The consumer has tried a message five times and it still fails. Where should it go next?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Delete it so the queue keeps moving"
+     },
+     {
+      "id": "b",
+      "label": "Put it back at the head of the queue for another try"
+     },
+     {
+      "id": "c",
+      "label": "Retry it every second until it works"
+     },
+     {
+      "id": "d",
+      "label": "Move it with its error to a dead-letter queue"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Parking keeps the data for inspection and replay without blocking the flow."
+   },
+   {
+    "id": "t354-a4",
+    "concept": "dlq",
+    "type": "multiple_choice",
+    "prompt": "After a producer bug is fixed, 3,000 orders sit in the dead-letter queue. What is the safe next step?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Delete them, since they are old"
+     },
+     {
+      "id": "b",
+      "label": "Redrive them to the main queue with idempotent consumers"
+     },
+     {
+      "id": "c",
+      "label": "Apply them by hand with SQL updates in the orders database"
+     },
+     {
+      "id": "d",
+      "label": "Leave them as a record of the incident"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Replaying through the normal path is safe when consumers ignore duplicates."
+   },
+   {
+    "id": "t354-a5",
+    "concept": "dlq",
+    "type": "drag_order",
+    "prompt": "Order the handling of a message that keeps failing.",
+    "items": [
+     {
+      "id": "s2",
+      "label": "Move it to the dead-letter queue with the error"
+     },
+     {
+      "id": "s4",
+      "label": "Fix the cause and redrive"
+     },
+     {
+      "id": "s1",
+      "label": "Retry with backoff up to the limit"
+     },
+     {
+      "id": "s3",
+      "label": "Alert on the dead-letter queue depth"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Bound the retries, park it, make it visible, then replay after the fix."
+   },
+   {
+    "id": "t354-a6",
+    "concept": "retry-limit",
+    "type": "estimation",
+    "prompt": "A consumer waits 1, 2, 4 and 8 seconds between five attempts. How many seconds pass between the first attempt and the move to the dead-letter queue, ignoring processing time?",
+    "unit": "s",
+    "target": 15,
+    "assumptions": [
+     "Waits double each time",
+     "Processing time is negligible"
+    ],
+    "formula": "1 + 2 + 4 + 8",
+    "workedAnswer": "1 + 2 + 4 + 8 = 15 s",
+    "explanation": "Sanity check: the backoff should be long enough to outlast a short outage of a dependency, or transient failures land in the dead-letter queue too.",
+    "tolerance": 0,
+    "trapAnswers": [
+     16,
+     31
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t354-f1",
+    "front": "Poison message?",
+    "back": "A message that fails on every attempt because of its content."
+   },
+   {
+    "id": "t354-f2",
+    "front": "Dead-letter queue?",
+    "back": "Where messages go after the retry limit, with the error, for inspection and replay."
+   },
+   {
+    "id": "t354-f3",
+    "front": "Redrive safely?",
+    "back": "Fix the cause, replay through the normal path, keep consumers idempotent."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Amazon SQS: Dead-letter queues",
+    "url": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html"
+   },
+   {
+    "title": "Google Cloud Pub/Sub: Dead-letter topics",
+    "url": "https://cloud.google.com/pubsub/docs/handling-failures"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "poison-message",
+    "retry-limit",
+    "dlq"
+   ],
+   "mechanism": {
+    "title": "How retries, limits and dead-letter queues fit together",
+    "steps": [
+     "Message brokers deliver at least once. If a consumer fails or crashes before acknowledging, the broker delivers the message again. That is what makes queues reliable for transient failures, and it is also why a message that can never succeed keeps coming back.",
+     "In a strictly ordered stream, such as a partition consumed in order, the consumer cannot skip a message without giving up ordering. A poison message at the head stops the partition. In an unordered queue, it is redelivered among the others and keeps using consumer time on every attempt.",
+     "A retry limit counts deliveries per message. Many brokers track a receive count and move the message to a configured dead-letter queue when it passes the maximum. Consumers can also classify errors: validation failures go straight to the dead-letter queue, while timeouts get retries with exponential backoff and jitter.",
+     "The dead-letter queue keeps the original message and, ideally, the error, the attempt count and the consumer version. Operators alert on its depth or age, inspect a sample, fix the producer or the consumer, and then redrive: move the messages back to the source queue to be processed normally.",
+     "Redrive delivers messages again, possibly long after they were first sent. Consumers must be idempotent, and handlers should check that the action still makes sense, for example that an order has not been cancelled since. For ordered streams, a parked message can leave later messages for the same entity applied before it, so some systems park the whole entity’s messages together."
+    ]
+   },
+   "useWhen": [
+    "Any queue or stream consumer whose input can be malformed or refer to missing data.",
+    "Pipelines where losing a message is worse than delaying it."
+   ],
+   "avoidWhen": [
+    "Avoid infinite redelivery with no limit.",
+    "Avoid a dead-letter queue with no alert, owner or replay path."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Choice",
+     "Benefit",
+     "Risk"
+    ],
+    "rows": [
+     [
+      "Low retry limit",
+      "Poison messages leave fast",
+      "Short outages fill the dead-letter queue"
+     ],
+     [
+      "High retry limit",
+      "Rides out longer outages",
+      "A poison message blocks or burns capacity longer"
+     ],
+     [
+      "Classify errors first",
+      "Permanent failures skip retries",
+      "Misclassified errors are parked or retried wrongly"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "How long a message takes to reach the dead-letter queue",
+    "assumptions": [
+     "5 attempts",
+     "Backoff doubles from 1 s",
+     "Processing time ignored"
+    ],
+    "steps": [
+     "Waits between attempts: 1, 2, 4 and 8 s.",
+     "Total: 1 + 2 + 4 + 8 = 15 s from first attempt to parking.",
+     "A dependency outage of 10 s is ridden out; one of 60 s is not.",
+     "Adding jitter spreads the retries of many messages so they do not arrive together."
+    ],
+    "result": "The retry schedule decides which outages are absorbed; anything longer belongs in the dead-letter queue, with an alert."
+   },
+   "india": {
+    "title": "How managed queues describe it",
+    "label": "Official documentation",
+    "body": "The Amazon SQS developer guide describes a redrive policy that moves a message to a dead-letter queue after it has been received a configured maximum number of times, and a redrive feature to move messages back after the cause is fixed. Google Cloud Pub/Sub documents dead-letter topics that receive messages after a maximum number of delivery attempts."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We retry until it works.”",
+     "say": "“I’d cap attempts, park failures with the error, and alert on the dead-letter queue.”"
+    },
+    {
+     "trap": "“Messages in the dead-letter queue are lost anyway.”",
+     "say": "“They are parked for replay; after the fix I’d redrive them through idempotent consumers.”"
+    }
+   ],
+   "takeaways": [
+    "At-least-once delivery redelivers failures, including poison messages.",
+    "Bound retries with backoff; park the rest in a dead-letter queue.",
+    "Alert on dead-letter depth and own the replay.",
+    "Redrive only into idempotent consumers."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "The stuck partition",
+   "prompt": "An ordered consumer of a payments stream hits a message whose amount field is text, not a number. It retries forever. What happens to the other payments in that partition?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "They wait behind it until the message is removed",
+     "feedback": "Right: in-order consumption cannot pass the head, so the whole partition stalls."
+    },
+    {
+     "id": "b",
+     "label": "The broker skips the bad message after a while",
+     "feedback": "Brokers redeliver until acknowledged; only a configured limit or the consumer moves it aside."
+    },
+    {
+     "id": "c",
+     "label": "Other consumers pick them up in parallel",
+     "feedback": "A partition is consumed in order by one consumer at a time in a group; others do not jump ahead."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Bound the attempts and move the message to a dead-letter queue with its error, then alert. Because this is a payments stream, decide whether later payments for the same account should wait with it to keep their order."
+  },
+  "seeAlso": [
+   {
+    "topicId": 36,
+    "why": "Queues, acknowledgements and redelivery"
+   },
+   {
+    "topicId": 227,
+    "why": "Background jobs and how workers retry them"
+   }
+  ]
+ },
+ {
+  "id": 355,
+  "slug": "clocks-time-and-ordering-in-services",
+  "region": "f2-backend",
+  "order": 25,
+  "title": "Clocks, Time and Ordering in Services",
+  "kind": "lesson",
+  "objectives": [
+   "Tell wall-clock time from monotonic time and use each correctly",
+   "Explain how clock skew breaks last-write-wins and ordering by timestamp",
+   "Order events with versions or sequence numbers instead"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 12,
+  "prereqIds": [
+   221
+  ],
+  "cards": [
+   {
+    "id": "t355-c1",
+    "kind": "text",
+    "title": "Two clocks on every machine",
+    "body": "A wall clock tells the date and time and can be adjusted: time synchronisation may step it forward or back. A monotonic clock only ever moves forward and is meant for measuring durations. Use the monotonic clock for timeouts and latency, and wall time only to record when something happened.",
+    "teaches": [
+     "wall-vs-monotonic"
+    ]
+   },
+   {
+    "id": "t355-c2",
+    "kind": "text",
+    "title": "Worked example: a 300 ms skew loses a write",
+    "body": "Server A’s clock runs 300 ms fast. A user saves a profile through A at a true time of 10:00:00.000, stamped 10:00:00.300. They save again 200 ms later through B, stamped 10:00:00.200. Last-write-wins keeps the larger timestamp, so the older save from A wins and the newer one is silently lost.",
+    "teaches": [
+     "clock-skew",
+     "lww"
+    ]
+   },
+   {
+    "id": "t355-c3",
+    "kind": "diagram",
+    "title": "Ordering without trusting clocks",
+    "body": "Give the order a single source or carry it in the data.",
+    "teaches": [
+     "ordering"
+    ],
+    "steps": [
+     "Let one writer per item assign increasing version numbers",
+     "Or let the database assign a sequence at commit",
+     "Send the version with each update; reject stale ones",
+     "Use logical clocks when many writers must agree on causality",
+     "Keep wall time for display and logs only"
+    ]
+   },
+   {
+    "id": "t355-c4",
+    "kind": "text",
+    "title": "Skew is normal, not an error",
+    "body": "Synchronised clocks on servers in one data centre often agree within a few milliseconds, but drift, pauses and misconfiguration can push skew much higher, and phones can be off by minutes. Any design that compares timestamps from different machines must state how much skew it tolerates.",
+    "teaches": [
+     "clock-skew"
+    ]
+   },
+   {
+    "id": "t355-c5",
+    "kind": "text",
+    "title": "Trap: measuring a timeout with wall time",
+    "body": "If a timeout is computed as “now minus start” with the wall clock and the clock steps back 2 seconds, the elapsed time can go negative and the timeout never fires; a step forward fires it early. Durations belong to the monotonic clock.",
+    "teaches": [
+     "wall-vs-monotonic"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t355-a1",
+    "concept": "wall-vs-monotonic",
+    "type": "multiple_choice",
+    "prompt": "Which clock should measure how long a request took?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The wall clock, since it shows the real time"
+     },
+     {
+      "id": "b",
+      "label": "The client’s clock, sent in the request"
+     },
+     {
+      "id": "c",
+      "label": "The database server’s wall clock"
+     },
+     {
+      "id": "d",
+      "label": "The monotonic clock, which never steps back"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Durations need a clock that cannot jump when time is corrected."
+   },
+   {
+    "id": "t355-a2",
+    "concept": "lww",
+    "type": "multiple_choice",
+    "prompt": "Two servers stamp writes with their own clocks and the larger timestamp wins. What can go wrong?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "An older write from a fast clock overwrites a newer one"
+     },
+     {
+      "id": "b",
+      "label": "Both writes are kept side by side as two conflicting copies"
+     },
+     {
+      "id": "c",
+      "label": "The database refuses writes with equal timestamps"
+     },
+     {
+      "id": "d",
+      "label": "Reads return the two writes in random order"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Timestamps from skewed clocks do not reflect real order."
+   },
+   {
+    "id": "t355-a3",
+    "concept": "ordering",
+    "type": "multiple_choice",
+    "prompt": "How can a service apply updates to one document in the right order?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Sort updates by the client device’s timestamp"
+     },
+     {
+      "id": "b",
+      "label": "Use a version number assigned by one writer or the database"
+     },
+     {
+      "id": "c",
+      "label": "Apply whichever update arrives last over the network"
+     },
+     {
+      "id": "d",
+      "label": "Round each timestamp to the nearest second so skew is hidden"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "A single source of versions gives an order that does not depend on clocks."
+   },
+   {
+    "id": "t355-a4",
+    "concept": "clock-skew",
+    "type": "multiple_choice",
+    "prompt": "A lease holder thinks its 10 s lease has 1 s left; the lock service’s clock says it expired. What is the safe design?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Trust the holder, since it took the lease"
+     },
+     {
+      "id": "b",
+      "label": "Extend each lease to 60 s so it cannot expire mid-write"
+     },
+     {
+      "id": "c",
+      "label": "Use a fencing token the storage checks on every write"
+     },
+     {
+      "id": "d",
+      "label": "Synchronise clocks before each write"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Fencing tokens let the storage reject writes from a holder whose lease has passed, whatever its clock says."
+   },
+   {
+    "id": "t355-a5",
+    "concept": "ordering",
+    "type": "drag_order",
+    "prompt": "Order a versioned update that cannot apply out of order.",
+    "items": [
+     {
+      "id": "s4",
+      "label": "On a mismatch, re-read and retry or report"
+     },
+     {
+      "id": "s2",
+      "label": "Change it locally"
+     },
+     {
+      "id": "s1",
+      "label": "Read the document and its version"
+     },
+     {
+      "id": "s3",
+      "label": "Write only if the version is unchanged"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "The version, not a timestamp, decides whether the write is still based on the latest state."
+   },
+   {
+    "id": "t355-a6",
+    "concept": "clock-skew",
+    "type": "estimation",
+    "prompt": "Server A’s clock is 300 ms ahead of server B’s. With last-write-wins on timestamps, for how many milliseconds after a write on A can a real later write on B still lose?",
+    "unit": "ms",
+    "target": 300,
+    "assumptions": [
+     "Both writes target the same key",
+     "Network delays ignored"
+    ],
+    "formula": "skew = 300 ms",
+    "workedAnswer": "Any write on B less than 300 ms after a write on A gets a smaller timestamp and loses",
+    "explanation": "Sanity check: the loss window equals the skew, so it grows with worse synchronisation.",
+    "tolerance": 0,
+    "trapAnswers": [
+     150,
+     600
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t355-f1",
+    "front": "Wall vs monotonic clock?",
+    "back": "Wall: date and time, can step. Monotonic: only forward, for durations."
+   },
+   {
+    "id": "t355-f2",
+    "front": "Why does LWW lose writes?",
+    "back": "With skew, an older write can carry a larger timestamp."
+   },
+   {
+    "id": "t355-f3",
+    "front": "Order without clocks?",
+    "back": "Versions from one writer or the database, or logical clocks."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Linux man-pages: clock_gettime(2)",
+    "url": "https://man7.org/linux/man-pages/man2/clock_gettime.2.html"
+   },
+   {
+    "title": "RFC 5905: Network Time Protocol Version 4",
+    "url": "https://www.rfc-editor.org/rfc/rfc5905"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "wall-vs-monotonic",
+    "clock-skew",
+    "lww",
+    "ordering"
+   ],
+   "mechanism": {
+    "title": "Why timestamps from different machines do not order events",
+    "steps": [
+     "Every machine keeps time with a local oscillator that drifts. Time synchronisation, such as NTP, measures the offset to reference servers and corrects it, either by slewing the clock gradually or by stepping it when the offset is large. Between corrections, clocks on different machines disagree by some amount: the skew.",
+     "Operating systems expose at least two clocks. The real-time clock follows the synchronised wall time and can jump. The monotonic clock counts from an arbitrary start, never goes backwards and is not stepped by time corrections. Timeouts, rate limits and latency measurements should use the monotonic clock.",
+     "Last-write-wins resolves conflicting writes by keeping the one with the largest timestamp. When timestamps come from different machines, the order they give is only as good as the skew. A write can lose to one that really happened earlier, and nothing reports the loss.",
+     "To order updates to one item, let a single authority assign the order: the item’s owner service, a primary database that assigns a sequence or commit order, or a version column checked on every write. Clients send the version they read; a stale version is rejected instead of overwriting newer data.",
+     "When many writers must agree on what caused what, logical clocks help. A Lamport clock gives an order consistent with causality; vector clocks can also detect concurrent writes so they can be merged or shown to a user. Some databases combine bounded clock uncertainty with waiting out that bound, which needs carefully engineered time sources."
+    ]
+   },
+   "useWhen": [
+    "Any service that times work, expires leases or resolves concurrent writes.",
+    "Logs and traces that must line up across machines, with skew in mind."
+   ],
+   "avoidWhen": [
+    "Avoid last-write-wins on wall-clock timestamps from different machines for data that matters.",
+    "Avoid wall time for timeouts and elapsed-time checks."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Ordering method",
+     "Needs",
+     "Weakness"
+    ],
+    "rows": [
+     [
+      "Wall-clock timestamps",
+      "Synchronised clocks",
+      "Skew reorders and loses writes"
+     ],
+     [
+      "Version per item",
+      "One authority per item",
+      "Contention on hot items"
+     ],
+     [
+      "Logical clocks",
+      "Metadata on every message",
+      "No link to real time"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "How skew turns into lost writes",
+    "assumptions": [
+     "Server A runs 300 ms fast",
+     "A user saves through A, then 200 ms later through B",
+     "Last-write-wins on timestamps"
+    ],
+    "steps": [
+     "A’s write: true 10:00:00.000, stamped 10:00:00.300.",
+     "B’s write: true 10:00:00.200, stamped 10:00:00.200.",
+     "LWW keeps A’s write because 0.300 > 0.200, so the user’s newer change is lost.",
+     "Any write on B within 300 ms after a write on A loses the same way."
+    ],
+    "result": "The loss window equals the skew. Versions remove it; better synchronisation only shrinks it."
+   },
+   "india": {
+    "title": "What the specifications say",
+    "label": "Official documentation",
+    "body": "The Linux manual page for the clock functions describes a realtime clock that can be set and can jump, and a monotonic clock that cannot be set and is not affected by discontinuous jumps in system time, though it can be slewed. RFC 5905 specifies NTP version 4, which estimates the offset to time servers and disciplines the local clock, with accuracy depending on network conditions."
+   },
+   "pitfalls": [
+    {
+     "trap": "“Our servers use NTP, so timestamps order events.”",
+     "say": "“Skew is small but not zero; I’d order with versions and keep timestamps for display.”"
+    },
+    {
+     "trap": "“Elapsed time is now minus start.”",
+     "say": "“With the monotonic clock, so a time correction cannot break the timeout.”"
+    }
+   ],
+   "takeaways": [
+    "Use the monotonic clock for durations and timeouts.",
+    "Clocks on different machines disagree; state the skew you tolerate.",
+    "Last-write-wins on wall time can drop newer writes.",
+    "Order updates with versions, sequences or logical clocks."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Which save survives?",
+   "prompt": "Server A’s clock is 300 ms fast. A user saves a draft through A, then 200 ms later saves a newer version through B. The store keeps the write with the larger timestamp. Which version is stored?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "The newer save through B",
+     "feedback": "B’s timestamp is 10:00:00.200, smaller than A’s 10:00:00.300, so it loses."
+    },
+    {
+     "id": "b",
+     "label": "The older save through A",
+     "feedback": "Right: A’s fast clock gives its older write the larger timestamp."
+    },
+    {
+     "id": "c",
+     "label": "Both, as conflicting versions",
+     "feedback": "Last-write-wins keeps one value; it does not report conflicts."
+    }
+   ],
+   "correctId": "b",
+   "reveal": "Last-write-wins picks the larger timestamp, not the later event. With a version number checked on each save, B’s save would be based on A’s version and both would apply in order."
+  },
+  "seeAlso": [
+   {
+    "topicId": 47,
+    "why": "Lamport and vector clocks for causal order"
+   },
+   {
+    "topicId": 224,
+    "why": "Idempotent endpoints that handle repeated writes"
+   }
+  ]
+ },
+ {
+  "id": 356,
+  "slug": "load-shedding-and-backpressure",
+  "region": "f2-backend",
+  "order": 26,
+  "title": "Load Shedding and Backpressure",
+  "kind": "lesson",
+  "objectives": [
+   "Explain why a queue in front of an overloaded server makes every request late",
+   "Shed excess load early with a clear retryable reply",
+   "Use bounded queues and backpressure so producers slow down"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 12,
+  "prereqIds": [
+   239
+  ],
+  "cards": [
+   {
+    "id": "t356-c1",
+    "kind": "text",
+    "title": "More work than capacity has only three outcomes",
+    "body": "When requests arrive faster than a server can finish them, the excess must go somewhere: it waits in a queue, it is rejected, or the sender slows down. Waiting looks kind, but past a point every request waits longer than its caller will, and the server spends all its effort on answers nobody reads.",
+    "teaches": [
+     "overload"
+    ]
+   },
+   {
+    "id": "t356-c2",
+    "kind": "text",
+    "title": "Worked example: 1,500 requests per second into 1,000",
+    "body": "A server finishes 1,000 requests per second and 1,500 arrive. Without limits, the queue grows by 500 every second: after 60 seconds it holds 30,000 requests, and a new one waits 30 seconds. With a 2-second client timeout, almost everything served is already abandoned. Rejecting the extra 500 per second keeps 1,000 good answers per second flowing.",
+    "teaches": [
+     "overload",
+     "shedding"
+    ]
+   },
+   {
+    "id": "t356-c3",
+    "kind": "diagram",
+    "title": "Shedding at the front door",
+    "body": "Reject early and cheaply, before work is spent.",
+    "teaches": [
+     "shedding"
+    ],
+    "steps": [
+     "Measure in-flight requests or queue time",
+     "Above the limit, reject with 503 and a Retry-After hint",
+     "Prefer to drop low-priority work first",
+     "Bound every queue; drop requests already past their deadline",
+     "Clients back off with jitter instead of retrying at once"
+    ]
+   },
+   {
+    "id": "t356-c4",
+    "kind": "text",
+    "title": "Backpressure between stages",
+    "body": "Inside a pipeline, a full buffer should slow the stage before it rather than grow without limit. A bounded queue that blocks or refuses new items passes the pressure upstream until it reaches something that can wait, shed or scale, instead of exhausting memory in the middle.",
+    "teaches": [
+     "backpressure"
+    ]
+   },
+   {
+    "id": "t356-c5",
+    "kind": "text",
+    "title": "Trap: an unbounded queue “so nothing is lost”",
+    "body": "An unbounded queue turns a short overload into minutes of latency and can exhaust memory. Requests are not saved; they are delayed past usefulness. Bound the queue and decide explicitly what is rejected.",
+    "teaches": [
+     "overload",
+     "backpressure"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t356-a1",
+    "concept": "overload",
+    "type": "multiple_choice",
+    "prompt": "Arrivals exceed capacity by 20% for ten minutes and the queue is unbounded. What happens to latency?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "It rises by about 20% and stays there"
+     },
+     {
+      "id": "b",
+      "label": "It stays flat because the queue absorbs the excess"
+     },
+     {
+      "id": "c",
+      "label": "It keeps growing for as long as the overload lasts"
+     },
+     {
+      "id": "d",
+      "label": "It falls once the server warms its caches"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "The backlog grows every second the excess lasts, and every new request waits behind it."
+   },
+   {
+    "id": "t356-a2",
+    "concept": "shedding",
+    "type": "multiple_choice",
+    "prompt": "What reply suits a request shed because the server is overloaded?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "400 Bad Request, as the client sent too many requests"
+     },
+     {
+      "id": "b",
+      "label": "503 Service Unavailable with a Retry-After hint"
+     },
+     {
+      "id": "c",
+      "label": "200 OK with an empty body"
+     },
+     {
+      "id": "d",
+      "label": "404 Not Found until load falls"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "503 says the failure is temporary and Retry-After tells well-behaved clients when to come back."
+   },
+   {
+    "id": "t356-a3",
+    "concept": "shedding",
+    "type": "multiple_choice",
+    "prompt": "Why reject at the front door rather than after partial processing?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A late rejection gives the client a more detailed error message"
+     },
+     {
+      "id": "b",
+      "label": "Partial work is usually cached for later"
+     },
+     {
+      "id": "c",
+      "label": "Clients ignore early rejections"
+     },
+     {
+      "id": "d",
+      "label": "An early rejection is cheap; a late one wastes capacity"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Shedding is only useful if dropping a request is much cheaper than serving it."
+   },
+   {
+    "id": "t356-a4",
+    "concept": "backpressure",
+    "type": "multiple_choice",
+    "prompt": "A parser stage feeds a slower database writer through a buffer. What prevents memory from running out?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A bounded buffer that makes the parser wait when full"
+     },
+     {
+      "id": "b",
+      "label": "A larger in-memory buffer sized for the busiest day of the year"
+     },
+     {
+      "id": "c",
+      "label": "Writing to the database from more threads"
+     },
+     {
+      "id": "d",
+      "label": "Compressing items in the buffer"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Bounding the buffer pushes the slowdown upstream instead of piling items in memory."
+   },
+   {
+    "id": "t356-a5",
+    "concept": "shedding",
+    "type": "drag_order",
+    "prompt": "Order what a server does with a request during overload.",
+    "items": [
+     {
+      "id": "s2",
+      "label": "Reject cheaply with 503 and Retry-After if over"
+     },
+     {
+      "id": "s4",
+      "label": "Process it if there is still time"
+     },
+     {
+      "id": "s1",
+      "label": "Check in-flight count against the limit"
+     },
+     {
+      "id": "s3",
+      "label": "Otherwise check the request’s deadline"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Decide cheaply first, then avoid work whose caller has already given up."
+   },
+   {
+    "id": "t356-a6",
+    "concept": "overload",
+    "type": "estimation",
+    "prompt": "1,500 requests per second arrive at a server that finishes 1,000 per second. With an unbounded queue, how many requests are waiting after 60 seconds?",
+    "unit": "requests",
+    "target": 30000,
+    "assumptions": [
+     "Arrival and service rates are steady",
+     "The queue starts empty"
+    ],
+    "formula": "(1,500 − 1,000) × 60",
+    "workedAnswer": "500 × 60 = 30,000 requests",
+    "explanation": "Sanity check: at 1,000 per second that backlog takes 30 s to clear, far past a 2 s timeout.",
+    "tolerance": 0.05,
+    "trapAnswers": [
+     90000,
+     500
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t356-f1",
+    "front": "Overload outcomes?",
+    "back": "Queue, reject, or slow the sender; queues alone make everyone late."
+   },
+   {
+    "id": "t356-f2",
+    "front": "Good shed reply?",
+    "back": "503 with Retry-After, returned before work is spent."
+   },
+   {
+    "id": "t356-f3",
+    "front": "Backpressure?",
+    "back": "A full bounded buffer slows the stage before it."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Google SRE book: Handling Overload",
+    "url": "https://sre.google/sre-book/handling-overload/"
+   },
+   {
+    "title": "RFC 9110: HTTP Semantics (503 and Retry-After)",
+    "url": "https://www.rfc-editor.org/rfc/rfc9110"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "overload",
+    "shedding",
+    "backpressure"
+   ],
+   "mechanism": {
+    "title": "Why queues fail under sustained overload",
+    "steps": [
+     "A server has a maximum throughput. When the arrival rate is below it, queues stay short and absorb bursts. When arrivals exceed it for long, the queue grows by the difference every second, and the waiting time for each new request grows with it. Little’s law ties them together: items in the system equal arrival rate times time in the system.",
+     "Callers have timeouts. Once the queue wait passes the timeout, the server finishes requests whose callers have gone, and it may receive retries for them on top. Throughput of useful answers falls towards zero even though the server is fully busy. This is congestion collapse.",
+     "Load shedding caps the work admitted. A server tracks in-flight requests, queue time or CPU, and above a limit rejects new requests quickly with 503 and, where sensible, Retry-After. Rejection must be far cheaper than serving, so it happens before authentication-heavy or database work where possible.",
+     "Not all requests are equal. Shedding can drop background, batch or retry traffic first and keep interactive requests. Requests already past their deadline should be dropped when dequeued. Clients must cooperate: limited retries, exponential backoff with jitter, and respect for Retry-After, or shed requests come straight back.",
+     "Backpressure is the same idea inside a system. A bounded queue between stages blocks or refuses when full, so a slow consumer slows its producer rather than letting memory grow. Pressure moves upstream until it reaches a point that can wait, shed or scale, such as the edge of the system or an autoscaler."
+    ]
+   },
+   "useWhen": [
+    "Any service that can receive more traffic than it can serve, which is every public service.",
+    "Pipelines whose stages run at different speeds."
+   ],
+   "avoidWhen": [
+    "Avoid unbounded queues and thread pools in request paths.",
+    "Avoid client retries without backoff, jitter and a limit."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Response to overload",
+     "Effect on latency",
+     "Effect on useful work"
+    ],
+    "rows": [
+     [
+      "Unbounded queue",
+      "Grows without limit",
+      "Falls towards zero after timeouts"
+     ],
+     [
+      "Shed excess at the front",
+      "Stays low for admitted work",
+      "Stays near capacity"
+     ],
+     [
+      "Backpressure to the source",
+      "Moves waiting upstream",
+      "Preserved if the source can wait"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "The cost of queueing an overload",
+    "assumptions": [
+     "Capacity 1,000 requests/s; arrivals 1,500/s for 60 s",
+     "Clients time out after 2 s"
+    ],
+    "steps": [
+     "Excess: 1,500 − 1,000 = 500 per second.",
+     "Queue after 60 s: 500 × 60 = 30,000 requests.",
+     "A new request waits 30,000 ÷ 1,000 = 30 s, fifteen times the timeout.",
+     "Shedding 500/s instead keeps waits near zero and 1,000 useful answers per second."
+    ],
+    "result": "Shedding a third of the traffic keeps two thirds succeeding; queueing all of it lets nearly all of it fail."
+   },
+   "india": {
+    "title": "What the Google SRE book recommends",
+    "label": "Official documentation",
+    "body": "The Google SRE book’s chapter on handling overload describes servers protecting themselves by rejecting requests they cannot serve in time, client-side throttling that stops sending requests likely to be rejected, request criticality so the least important traffic is dropped first, and retry budgets that keep retries from multiplying load during an overload."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We queue everything so no request is lost.”",
+     "say": "“Past the timeout the queue only delays failures; I’d bound it and shed early with 503.”"
+    },
+    {
+     "trap": "“Clients should retry immediately on 503.”",
+     "say": "“With backoff, jitter and Retry-After, or the retries become the overload.”"
+    }
+   ],
+   "takeaways": [
+    "Sustained overload grows queues and latency without limit.",
+    "Shed early and cheaply with 503 and Retry-After.",
+    "Drop low-priority and expired work first.",
+    "Bound queues so backpressure reaches the source."
+   ]
+  },
+  "interactive": {
+   "kind": "slider",
+   "title": "Queue it or shed it?",
+   "prompt": "A server finishes 1,000 requests per second and clients time out after 2 s. Slide the arrival rate and compare a server that queues everything with one that sheds the excess, after 60 seconds.",
+   "model": "load-shed",
+   "params": {
+    "capacity": 1000,
+    "timeoutS": 2,
+    "seconds": 60
+   },
+   "control": {
+    "label": "Arrivals",
+    "min": 500,
+    "max": 2000,
+    "step": 10,
+    "initial": 1500,
+    "unit": "/s"
+   },
+   "takeaway": "Even 3% over capacity, at 1,030 per second, builds a 1.8 s wait in a minute; at 1,500 the wait is 30 s and nothing useful comes out. Shedding the excess keeps up to 1,000 good answers per second however high arrivals go."
+  },
+  "seeAlso": [
+   {
+    "topicId": 53,
+    "why": "Timeouts, retries and circuit breakers that pair with shedding"
+   },
+   {
+    "topicId": 233,
+    "why": "Rate limiting, which caps load per client"
+   }
+  ]
+ }
+]
