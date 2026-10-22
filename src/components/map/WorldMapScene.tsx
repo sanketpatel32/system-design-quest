@@ -98,7 +98,6 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_20.625rem] 2xl:grid-cols-[minmax(0,1fr)_23rem]">
       <section aria-labelledby="map-title" className="min-w-0">
-        <Onboarding />
         {nextTopic && (
           <div
             className="panel mb-6 flex flex-wrap items-center gap-4 p-4 sm:p-5"
@@ -110,7 +109,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
               <p className="text-sm font-extrabold" style={{ color: regionPalette(nextTopic.region).deep }}>
                 {resume || lessonStarted ? 'Continue' : 'Up next'} · {unitWord(nextTopic)}
               </p>
-              <p className="font-display text-xl text-chalk truncate">{nextTopic.title}</p>
+              <p className="font-display text-xl text-chalk line-clamp-2">{nextTopic.title}</p>
               <p className="text-sm text-dim" data-testid="continue-detail">
                 {resume
                   ? `Quiz in progress · question ${nextQuestion + 1} of ${nextTopic.questions.length} is next`
@@ -132,6 +131,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
             </Link>
           </div>
         )}
+        <Onboarding />
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 id="map-title" className="font-display text-[1.75rem] sm:text-3xl md:text-4xl" style={{ color: sp.deep }}>{questName(section.id)}</h1>

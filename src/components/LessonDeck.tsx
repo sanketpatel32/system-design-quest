@@ -126,13 +126,13 @@ export function LessonDeck({
           </div>
         )}
         <div className="flex gap-3 mt-6 border-t-2 border-[var(--color-rail)] pt-5">
-          <button type="button" onClick={prev} disabled={index === 0} className="btn-quiet">
+          <button type="button" onClick={prev} disabled={index === 0} className="btn-quiet whitespace-nowrap max-[359px]:px-3">
             Prev
           </button>
           {index === cards.length - 1 && finalAction ? (
             finalAction
           ) : (
-            <button type="button" onClick={next} disabled={index === cards.length - 1} className="btn-cta flex-1 sm:flex-none sm:min-w-[200px]">
+            <button type="button" onClick={next} disabled={index === cards.length - 1} className="btn-cta flex-1 whitespace-nowrap max-[359px]:px-3 sm:flex-none sm:min-w-[200px]">
               Next card
             </button>
           )}
