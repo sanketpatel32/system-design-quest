@@ -15,7 +15,7 @@ export function BossDeepView({ brief, accent, topicId }: { brief: BossDeep; acce
         <summary>Requirements</summary>
         <div className="deep-body grid gap-4 sm:grid-cols-3">
           <div>
-            <p className="deep-label text-[#2f7d00]">Functional</p>
+            <p className="deep-label text-hero-deep">Functional</p>
             <ul className="deep-list deep-list-yes">{r.functional.map((s) => <li key={s}>{s}</li>)}</ul>
           </div>
           <div>
@@ -23,7 +23,7 @@ export function BossDeepView({ brief, accent, topicId }: { brief: BossDeep; acce
             <ul className="deep-list">{r.nonFunctional.map((s) => <li key={s}>{s}</li>)}</ul>
           </div>
           <div>
-            <p className="deep-label text-[#c0392b]">Out of scope</p>
+            <p className="deep-label text-wrong-text">Out of scope</p>
             <ul className="deep-list deep-list-no">{r.outOfScope.map((s) => <li key={s}>{s}</li>)}</ul>
           </div>
         </div>

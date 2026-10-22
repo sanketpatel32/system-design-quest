@@ -84,12 +84,12 @@ function BottleneckDiagram({
   const W = 20 + cols.size * NW + (cols.size - 1) * GX
   const H = 20 + maxRows * NH + (maxRows - 1) * GY
   return (
-    <div className="rounded-[20px] border-2 border-[var(--color-rail)] bg-[#fbfaf7] p-4 overflow-x-auto">
+    <div className="rounded-[20px] border-2 border-[var(--color-rail)] bg-paper-2 p-4 overflow-x-auto">
       <p className="text-sm font-bold text-dim mb-3">Requests flow left to right. Tap the component that saturates first.</p>
       <svg viewBox={`0 0 ${W} ${H + 6}`} className="w-full max-w-full" style={{ minWidth: Math.min(W, 560), maxHeight: 320 }} role="group" aria-label="Request path diagram">
         <defs>
           <marker id={`arrow-${question.id}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-            <path d="M0 0L10 5L0 10z" fill="#9AA3AF" />
+            <path d="M0 0L10 5L0 10z" fill="var(--color-order-arrow)" />
           </marker>
         </defs>
         {question.diagramEdges.map((e) => {
@@ -103,7 +103,7 @@ function BottleneckDiagram({
               y1={a.y + NH / 2}
               x2={b.x - 2}
               y2={b.y + NH / 2}
-              stroke="#9AA3AF"
+              stroke="var(--color-order-arrow)"
               strokeWidth={3}
               markerEnd={`url(#arrow-${question.id})`}
             />
@@ -114,7 +114,7 @@ function BottleneckDiagram({
           const sel = picked.includes(n.id)
           const right = reveal && question.correctNodeIds.includes(n.id)
           const wrong = reveal && sel && !right
-          const stroke = right ? '#58CC02' : wrong ? '#FF4B4B' : sel ? '#1CB0F6' : '#E6E0D6'
+          const stroke = right ? 'var(--color-hero)' : wrong ? 'var(--color-heart)' : sel ? 'var(--color-gem)' : 'var(--color-rail)'
           return (
             <g
               key={n.id}
@@ -132,11 +132,11 @@ function BottleneckDiagram({
                 }
               }}
             >
-              <rect className="station-focus" x={p.x - 5} y={p.y - 5} width={NW + 10} height={NH + 14} rx={20} fill="none" stroke="#1CB0F6" strokeWidth={3} />
-              <rect x={p.x} y={p.y + 4} width={NW} height={NH} rx={16} fill={stroke === '#E6E0D6' ? '#E6E0D6' : stroke} />
-              <rect x={p.x} y={p.y} width={NW} height={NH} rx={16} fill={right ? '#D7FFB8' : wrong ? '#FFDFE0' : sel ? '#DDF4FE' : '#FFFFFF'} stroke={stroke} strokeWidth={2.5} />
+              <rect className="station-focus" x={p.x - 5} y={p.y - 5} width={NW + 10} height={NH + 14} rx={20} fill="none" stroke="var(--color-gem)" strokeWidth={3} />
+              <rect x={p.x} y={p.y + 4} width={NW} height={NH} rx={16} fill={stroke === 'var(--color-rail)' ? 'var(--color-rail)' : stroke} />
+              <rect x={p.x} y={p.y} width={NW} height={NH} rx={16} fill={right ? 'var(--color-right-soft)' : wrong ? 'var(--color-wrong-soft)' : sel ? 'var(--color-sky)' : 'var(--color-card)'} stroke={stroke} strokeWidth={2.5} />
               {wrapLabel(n.label).map((line, li, all) => (
-                <text key={li} x={p.x + NW / 2} y={p.y + NH / 2 + 5 + (li - (all.length - 1) / 2) * 23} textAnchor="middle" fontSize={20} fontWeight={800} fill="#29303D" className="font-display">
+                <text key={li} x={p.x + NW / 2} y={p.y + NH / 2 + 5 + (li - (all.length - 1) / 2) * 23} textAnchor="middle" fontSize={20} fontWeight={800} fill="var(--color-chalk)" className="font-display">
                   {line}
                 </text>
               ))}
@@ -248,7 +248,7 @@ function OrderList({
 function FeedbackMark({ ok }: { ok: boolean }) {
   return (
     <svg width="28" height="28" viewBox="0 0 20 20" aria-hidden className="shrink-0">
-      <circle cx="10" cy="10" r="10" fill="#fff" />
+      <circle cx="10" cy="10" r="10" fill="var(--color-card)" />
       {ok ? (
         <path d="M6 10.5l2.6 2.6L14 7.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
       ) : (
@@ -311,7 +311,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
   return (
     <div className={sheet ? 'space-y-5 short:space-y-3' : `panel-slab p-4 sm:p-5 space-y-4 ${hotkeys && !submitted ? 'question-active' : ''}`}>
       {number !== undefined && (
-        <p className="text-sm font-extrabold uppercase tracking-wide text-[#12749f] tabular-nums">
+        <p className="text-sm font-extrabold text-teal tabular-nums">
           Question {number}
           {total ? ` of ${total}` : ''} · {TYPE_LABEL[question.type]}
         </p>
@@ -341,7 +341,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
                 <kbd className="kbd shrink-0">{idx + 1}</kbd>
                 <span className="text-[1rem] font-bold text-chalk">{c.label}</span>
                 {revealNow && (isRight || selected) && (
-                  <span data-testid="choice-verdict" className={`ml-auto shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wide ${isRight ? 'bg-[#58cc02] text-white' : 'bg-[#ea2b2b] text-white'}`}>
+                  <span data-testid="choice-verdict" className={`ml-auto shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-extrabold ${isRight ? 'bg-hero text-white' : 'bg-wrong-bright text-white'}`}>
                     <span aria-hidden>{isRight ? '✓' : '✕'}</span>
                     {isRight ? (selected ? 'Your answer · correct' : 'Correct answer') : 'Your answer'}
                   </span>
@@ -369,7 +369,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
         />
       )}
       {question.type === 'drag_order' && shown && !shown.correct && (
-        <div className="rounded-2xl border border-[#79d634] bg-[#effbe5] p-3">
+        <div className="rounded-2xl border border-right-edge bg-right-wash p-3">
           <p className="text-sm font-semibold text-[var(--color-clear)] mb-1.5">{question.alternativeOrders?.length ? 'One correct sequence' : 'Correct sequence'}</p>
           <ol className="list-decimal pl-5 text-sm text-chalk space-y-0.5">
             {question.correctOrder.map((id) => (
@@ -381,7 +381,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
       {question.type === 'estimation' && (
         <div className="space-y-3">
           <label className="block">
-            <span className="text-sm font-extrabold uppercase tracking-wide text-dim">Your estimate</span>
+            <span className="text-sm font-extrabold text-dim">Your estimate</span>
             <span className="mt-2 flex max-w-md items-stretch">
               <input
                 type="number"
@@ -400,7 +400,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
                 placeholder={`Your answer in ${question.unit}`}
                 aria-label={`Your estimate in ${question.unit}`}
               />
-              <span className="grid place-items-center rounded-r-2xl border-2 border-l-0 border-[var(--color-rail)] bg-[var(--color-sky)] px-4 font-extrabold text-[#12749f]">
+              <span className="grid place-items-center rounded-r-2xl border-2 border-l-0 border-[var(--color-rail)] bg-[var(--color-sky)] px-4 font-extrabold text-teal">
                 {question.unit}
               </span>
             </span>
@@ -423,14 +423,14 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
       {question.type === 'tradeoff' && (
         <div className="space-y-3">
           <div>
-            <p className="text-sm font-extrabold uppercase tracking-wide text-dim mb-2">Constraints</p>
+            <p className="text-sm font-extrabold text-dim mb-2">Constraints</p>
             <ul className="flex flex-wrap gap-2">
               {question.constraints.map((c) => (
-                <li key={c} className="rounded-full bg-[#FFF1DB] px-3 py-1 text-sm font-extrabold text-[#8A4B00]">{c}</li>
+                <li key={c} className="rounded-full bg-flame-wash px-3 py-1 text-sm font-extrabold text-flame-ink-2">{c}</li>
               ))}
             </ul>
           </div>
-          <p className="text-sm font-extrabold uppercase tracking-wide text-dim pt-1">Choose an approach</p>
+          <p className="text-sm font-extrabold text-dim pt-1">Choose an approach</p>
           {question.approaches.map((a) => (
             <label key={a.id} className={`choice-row flex gap-3 items-center p-3.5 ${submitted ? '' : 'cursor-pointer'} ${(answer as { approachId?: string })?.approachId === a.id ? 'choice-row-selected' : ''}`}>
               <input
@@ -454,7 +454,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
           ))}
           {hasStructuredTradeoff(question) ? (
             <div className="space-y-2.5 pt-3">
-              <p className="text-sm font-extrabold uppercase tracking-wide text-dim">Why? Pick every reason that applies</p>
+              <p className="text-sm font-extrabold text-dim">Why? Pick every reason that applies</p>
               {question.rationaleOptions.map((opt) => {
                 const ids = (answer as { rationaleIds?: string[] })?.rationaleIds ?? []
                 const checked = ids.includes(opt.id)

@@ -37,9 +37,9 @@ function Sheet({ title, children, className = '' }: { title: string; children: R
 
 function Row({ k, v, approx }: { k: ReactNode; v: ReactNode; approx?: boolean }) {
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b-2 border-[#F1EDE6] py-2 last:border-0 text-[0.9375rem]">
+    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b-2 border-paper-3 py-2 last:border-0 text-[0.9375rem]">
       <dt className="min-w-0 text-dim font-bold">{k}</dt>
-      <dd className={`ml-auto tabular-nums text-right ${approx ? 'text-[#8350C7] font-extrabold' : 'text-chalk font-semibold'}`}>{v}</dd>
+      <dd className={`ml-auto tabular-nums text-right ${approx ? 'text-lilac-ink font-extrabold' : 'text-chalk font-semibold'}`}>{v}</dd>
     </div>
   )
 }
@@ -51,7 +51,7 @@ function SectionSheet({ id }: { id: SectionId }) {
   const topics = sectionTopics(id).filter((t) => t.deep?.takeaways?.length)
   return (
     <div className="space-y-5">
-      <PageHero eyebrow="Reference card" title={`${questName(id)} cheat sheet`} icon="cheat" tone="purple">
+      <PageHero meta="Reference card" title={`${questName(id)} cheat sheet`} icon="cheat" tone="purple">
         The key takeaways from every {s.name} lesson on one page. Open a lesson for the reasoning and sources.
       </PageHero>
       <div className="grid gap-4 md:grid-cols-2" data-testid={`cheat-${id}`}>
@@ -77,7 +77,7 @@ export function CheatSheetPage() {
   if (id !== 'system-design') return <SectionSheet key={id} id={id} />
   return (
     <div className="space-y-5">
-      <PageHero eyebrow="Reference card · numbers and patterns" title="System Design Quest cheat sheet" icon="cheat" tone="purple">
+      <PageHero meta="Reference card · numbers and patterns" title="System Design Quest cheat sheet" icon="cheat" tone="purple">
         Exact values in plain text, interview shortcuts highlighted. Say which one you are using out loud.
       </PageHero>
 
@@ -143,13 +143,13 @@ export function CheatSheetPage() {
               {PATTERNS.map(([p, u, w, id]) => {
                 const topic = topicsById.get(id)
                 return (
-                  <tr key={p} className="block border-b-2 border-[#F1EDE6] py-2 last:border-0 md:table-row md:py-0">
+                  <tr key={p} className="block border-b-2 border-paper-3 py-2 last:border-0 md:table-row md:py-0">
                     <th scope="row" className="block py-0.5 pr-4 font-display md:table-cell md:py-2">{p}</th>
                     <td className="block py-0.5 pr-4 font-bold text-chalk md:table-cell md:py-2">{u}</td>
                     <td className="block py-0.5 pr-4 text-dim md:table-cell md:py-2">{w}</td>
                     <td className="block py-0.5 md:table-cell md:py-2">
                       {topic && (
-                        <Link className="inline-flex min-h-[44px] items-center font-bold text-[#12749f] underline-offset-2 hover:underline md:min-h-0" to={`/topic/${topic.slug}`}>
+                        <Link className="inline-flex min-h-[44px] items-center font-bold text-teal underline-offset-2 hover:underline md:min-h-0" to={`/topic/${topic.slug}`}>
                           {topic.title}
                         </Link>
                       )}
@@ -165,7 +165,7 @@ export function CheatSheetPage() {
           <ul className="text-sm sm:space-y-1.5">
             {SOURCES.map(([title, url]) => (
               <li key={url}>
-                <a className="inline-flex min-h-[44px] items-center text-chalk underline underline-offset-2 hover:text-[#12749f] font-bold sm:min-h-0" href={url} target="_blank" rel="noreferrer">{title}</a>
+                <a className="inline-flex min-h-[44px] items-center text-chalk underline underline-offset-2 hover:text-teal font-bold sm:min-h-0" href={url} target="_blank" rel="noreferrer">{title}</a>
               </li>
             ))}
           </ul>

@@ -19,12 +19,12 @@ export const typeLabels: Record<CanvasComponentType, string> = {
 
 /** Pastel family per component role (see DESIGN.md "Boss canvas") */
 const FAMILY = {
-  edge: { bg: '#DDF4FE', bd: '#84D8FF', ink: '#12749F' },
-  traffic: { bg: '#F0E6FC', bd: '#CDB0F5', ink: '#7A45C0' },
-  compute: { bg: '#E3F9D3', bd: '#A5E075', ink: '#2F7D00' },
-  cache: { bg: '#DDF6F6', bd: '#8FDCDC', ink: '#1B7A7A' },
-  data: { bg: '#FFF1DB', bd: '#FFC97A', ink: '#A35F00' },
-  queue: { bg: '#FCE2F1', bd: '#F2A6D2', ink: '#B0347F' },
+  edge: { bg: 'var(--color-sky)', bd: 'var(--color-sky-edge)', ink: 'var(--color-teal)' },
+  traffic: { bg: 'var(--color-lilac-soft)', bd: 'var(--color-lilac-edge)', ink: 'var(--color-lilac-deep)' },
+  compute: { bg: 'var(--color-right-wash-2)', bd: 'var(--color-right-edge-2)', ink: 'var(--color-hero-deep)' },
+  cache: { bg: 'var(--color-cache-soft)', bd: 'var(--color-cache-edge)', ink: 'var(--color-cache-ink)' },
+  data: { bg: 'var(--color-flame-wash)', bd: 'var(--color-data-edge)', ink: 'var(--color-flame-deep)' },
+  queue: { bg: 'var(--color-queue-soft)', bd: 'var(--color-queue-edge)', ink: 'var(--color-queue-ink)' },
 } as const
 
 const TYPE_FAMILY: Record<CanvasComponentType, keyof typeof FAMILY> = {
@@ -52,7 +52,7 @@ export function TypeGlyph({ type, size = 22 }: { type: CanvasComponentType; size
   const g: Record<string, React.ReactNode> = {
     edge: <><rect x="4" y="4" width="16" height="12" rx="3" fill={c} /><rect x="9" y="17" width="6" height="3" rx="1.5" fill={c} /></>,
     traffic: <><circle cx="6" cy="12" r="3.2" fill={c} /><path d="M9 12h3M12 12l6-6M12 12l6 6M12 12h7" stroke={c} strokeWidth="2.4" strokeLinecap="round" /></>,
-    compute: <><rect x="4" y="5" width="16" height="6" rx="2.5" fill={c} /><rect x="4" y="13" width="16" height="6" rx="2.5" fill={c} opacity="0.7" /><circle cx="16.5" cy="8" r="1.3" fill="#fff" /></>,
+    compute: <><rect x="4" y="5" width="16" height="6" rx="2.5" fill={c} /><rect x="4" y="13" width="16" height="6" rx="2.5" fill={c} opacity="0.7" /><circle cx="16.5" cy="8" r="1.3" fill="var(--color-card)" /></>,
     cache: <path d="M13 2 5 13h6l-1 9 8-11h-6z" fill={c} />,
     data: <><ellipse cx="12" cy="6" rx="7" ry="3" fill={c} /><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6c0 1.7-3.1 3-7 3S5 7.7 5 6z" fill={c} opacity="0.7" /></>,
     queue: <><rect x="3" y="8" width="5" height="8" rx="2" fill={c} /><rect x="9.5" y="8" width="5" height="8" rx="2" fill={c} opacity="0.8" /><rect x="16" y="8" width="5" height="8" rx="2" fill={c} opacity="0.6" /></>,

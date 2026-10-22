@@ -210,7 +210,7 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
       {coarse && (
         <p className="text-sm font-bold text-dim" data-testid="canvas-touch-hint">Drag components to move them, pinch to zoom; swipe the empty canvas to keep scrolling.</p>
       )}
-      <div className={`boss-flow relative h-[480px] max-sm:h-[min(420px,62dvh)] rounded-[20px] ${coarse ? 'boss-flow-touch' : ''} border-2 border-[var(--color-rail)] overflow-hidden bg-[#f7f5f0]`}>
+      <div className={`boss-flow relative h-[480px] max-sm:h-[min(420px,62dvh)] rounded-[20px] ${coarse ? 'boss-flow-touch' : ''} border-2 border-[var(--color-rail)] overflow-hidden bg-paper-2`}>
         {nodes.length === 0 && (
           <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center p-6 text-center">
             <div className="max-w-xs">
@@ -237,10 +237,10 @@ export function BossCanvas({ initial, onChange, suggested }: Props) {
           preventScrolling={!coarse}
           fitView
           fitViewOptions={{ maxZoom: 1.1, padding: 0.3 }}
-          defaultEdgeOptions={{ style: { stroke: '#8AA0B8', strokeWidth: 3 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#8AA0B8' } }}
+          defaultEdgeOptions={{ style: { stroke: 'var(--color-slate-soft)', strokeWidth: 3 }, markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--color-slate-soft)' } }}
         >
-          <Background color="#DED7CA" gap={24} size={2} />
-          <MiniMap pannable zoomable nodeColor="#BFD7EA" maskColor="rgba(255,249,240,0.7)" style={{ background: '#FFFFFF' }} />
+          <Background color="var(--color-canvas-dot)" gap={24} size={2} />
+          <MiniMap pannable zoomable nodeColor="var(--color-minimap-node)" maskColor="var(--color-minimap-mask)" style={{ background: 'var(--color-card)' }} />
           <Controls showInteractive={false} />
         </ReactFlow>
       </div>

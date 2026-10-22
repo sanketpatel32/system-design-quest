@@ -19,7 +19,7 @@ function Slider({ item, onDone }: { item: InteractiveSlider; onDone?: () => void
       <div className="rounded-2xl border-2 border-[var(--color-rail)] bg-white p-4">
         <label htmlFor={id} className="flex items-baseline justify-between gap-3 font-extrabold text-chalk">
           <span>{item.control.label}</span>
-          <span className="tabular-nums text-[#12749f]" data-testid="interactive-value">
+          <span className="tabular-nums text-teal" data-testid="interactive-value">
             {shown}
             {item.control.unit ? ` ${item.control.unit}` : ''}
           </span>
@@ -55,7 +55,7 @@ function Slider({ item, onDone }: { item: InteractiveSlider; onDone?: () => void
         </dl>
         {out.verdict && (
           <p
-            className={`mt-3 rounded-xl px-3 py-2 text-sm font-extrabold ${out.verdict.neutral ? 'bg-[#e6f4fb] text-[#12749f]' : out.verdict.ok ? 'bg-[#e9f8dc] text-[#2f7d00]' : 'bg-[#ffe9e9] text-[#b42318]'}`}
+            className={`mt-3 rounded-xl px-3 py-2 text-sm font-extrabold ${out.verdict.neutral ? 'bg-sky-wash text-teal' : out.verdict.ok ? 'bg-right-wash text-hero-deep' : 'bg-wrong-wash text-wrong-text'}`}
             data-testid="interactive-verdict"
             data-ok={out.verdict.ok}
           >
@@ -65,7 +65,7 @@ function Slider({ item, onDone }: { item: InteractiveSlider; onDone?: () => void
         )}
       </div>
       {moved ? (
-        <p className="rounded-2xl bg-[#f3f9ec] p-4 font-semibold text-chalk" data-testid="interactive-takeaway">
+        <p className="rounded-2xl bg-right-wash p-4 font-semibold text-chalk" data-testid="interactive-takeaway">
           <span className="font-extrabold">Takeaway. </span>
           {item.takeaway}
         </p>
@@ -86,10 +86,10 @@ function Predict({ item, onDone }: { item: InteractivePredict; onDone?: () => vo
     <div className="space-y-4" data-testid="interactive" data-kind={item.kind}>
       <p className="text-chalk font-semibold text-[1.0625rem] leading-relaxed">{item.prompt}</p>
       {item.setup && item.setup.length > 0 && (
-        <ul className="space-y-1 rounded-2xl bg-[#f7f4ef] p-3 text-[0.9375rem] font-bold text-chalk">
+        <ul className="space-y-1 rounded-2xl bg-paper-2 p-3 text-[0.9375rem] font-bold text-chalk">
           {item.setup.map((s) => (
             <li key={s} className="flex gap-2">
-              <span aria-hidden className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-[#8C8476]" />
+              <span aria-hidden className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-dim-warm" />
               {s}
             </li>
           ))}
@@ -109,7 +109,7 @@ function Predict({ item, onDone }: { item: InteractivePredict; onDone?: () => vo
               }}
               data-testid={`interactive-choice-${c.id}`}
               className={`rounded-2xl border-2 px-4 py-3 text-left font-bold transition-colors ${
-                state === 'right' ? 'border-[#58CC02] bg-[#e9f8dc] text-[#2f7d00]' : state === 'wrong' ? 'border-[#FF4B4B] bg-[#ffe9e9] text-[#b42318]' : 'border-[var(--color-rail)] bg-white text-chalk hover:bg-[#f7f4ef]'
+                state === 'right' ? 'border-hero bg-right-wash text-hero-deep' : state === 'wrong' ? 'border-heart bg-wrong-wash text-wrong-text' : 'border-[var(--color-rail)] bg-white text-chalk hover:bg-paper-2'
               } disabled:cursor-default`}
             >
               {c.label}
@@ -119,12 +119,12 @@ function Predict({ item, onDone }: { item: InteractivePredict; onDone?: () => vo
       </div>
       {choice && (
         <div className="space-y-2" aria-live="polite" data-testid="interactive-feedback">
-          <p className={`font-extrabold ${right ? 'text-[#2f7d00]' : 'text-[#b42318]'}`}>{right ? 'Yes. ' : 'Not quite. '}{choice.feedback}</p>
-          <p className="rounded-2xl bg-[#f3f9ec] p-4 font-semibold text-chalk">
+          <p className={`font-extrabold ${right ? 'text-hero-deep' : 'text-wrong-text'}`}>{right ? 'Yes. ' : 'Not quite. '}{choice.feedback}</p>
+          <p className="rounded-2xl bg-right-wash p-4 font-semibold text-chalk">
             <span className="font-extrabold">Why. </span>
             {item.reveal}
           </p>
-          <button type="button" className="text-sm font-extrabold uppercase tracking-wide text-[#12749f]" onClick={() => setPicked(null)}>
+          <button type="button" className="text-sm font-extrabold text-teal" onClick={() => setPicked(null)}>
             Try again
           </button>
         </div>

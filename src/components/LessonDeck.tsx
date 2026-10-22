@@ -66,11 +66,11 @@ export function LessonDeck({
     <div className="panel" style={{ ['--accent' as string]: accent }}>
       <div className="p-5 sm:p-7">
         <div className="flex justify-between items-center gap-4 mb-3">
-          <span className="text-sm font-extrabold uppercase tracking-wide text-dim tabular-nums" aria-live="polite">
+          <span className="text-sm font-extrabold text-dim tabular-nums" aria-live="polite">
             Card {index + 1} of {cards.length}
           </span>
           {card.accent && (
-            <span className="text-xs font-extrabold uppercase tracking-wide rounded-full px-3 py-1" style={{ color: accent, border: `2px solid ${accent}` }}>
+            <span className="text-xs font-extrabold rounded-full px-3 py-1" style={{ color: accent, border: `2px solid ${accent}` }}>
               {card.accent}
             </span>
           )}
@@ -86,7 +86,7 @@ export function LessonDeck({
               onClick={() => setIndex(i)}
               className="flex h-11 flex-1 items-center"
             >
-              <span className="block h-3 w-full rounded-full transition-colors duration-200" style={{ background: i <= index ? 'var(--color-hero)' : '#ECE7DF' }} />
+              <span className="block h-3 w-full rounded-full transition-colors duration-200" style={{ background: i <= index ? 'var(--color-hero)' : 'var(--color-paper-3)' }} />
             </button>
           ))}
         </div>
@@ -107,13 +107,13 @@ export function LessonDeck({
           </ol>
         )}
         {card.note && (
-          <p className="mt-4 rounded-2xl bg-[#f3f9ec] p-4 leading-relaxed text-chalk font-semibold" data-testid="card-note">
+          <p className="mt-4 rounded-2xl bg-right-wash p-4 leading-relaxed text-chalk font-semibold" data-testid="card-note">
             <span className="font-extrabold">Result. </span>
             {card.note}
           </p>
         )}
         {card.diagram && (
-          <div className="mt-4 rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 overflow-x-auto" dangerouslySetInnerHTML={{ __html: lightDiagram(card.diagram) }} />
+          <div className="mt-4 rounded-2xl border border-[var(--color-rail)] bg-paper-2 p-3 overflow-x-auto" dangerouslySetInnerHTML={{ __html: lightDiagram(card.diagram) }} />
         )}
         {card.kind === 'animation' && (
           <div className="mt-4 h-1 bg-[var(--color-rail)] rounded-full overflow-hidden" aria-hidden>

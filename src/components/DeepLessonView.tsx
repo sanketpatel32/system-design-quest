@@ -31,11 +31,11 @@ export function DeepLessonView({ deep, accent, topicId, numbersInCards = false }
         <summary>When to use it, and when not to</summary>
         <div className="deep-body grid gap-4 sm:grid-cols-2">
           <div>
-            <p className="deep-label text-[#2f7d00]">Use it when</p>
+            <p className="deep-label text-hero-deep">Use it when</p>
             <ul className="deep-list deep-list-yes">{deep.useWhen.map((s) => <li key={s}>{s}</li>)}</ul>
           </div>
           <div>
-            <p className="deep-label text-[#c0392b]">Avoid it when</p>
+            <p className="deep-label text-wrong-text">Avoid it when</p>
             <ul className="deep-list deep-list-no">{deep.avoidWhen.map((s) => <li key={s}>{s}</li>)}</ul>
           </div>
         </div>
@@ -87,8 +87,8 @@ export function DeepLessonView({ deep, accent, topicId, numbersInCards = false }
         <div className="deep-body space-y-3">
           {deep.pitfalls.map((p) => (
             <div key={p.trap} className="deep-pitfall">
-              <p><span className="deep-label text-[#c0392b]">Trap</span> {p.trap}</p>
-              <p className="mt-1"><span className="deep-label text-[#2f7d00]">Say instead</span> {p.say}</p>
+              <p><span className="deep-label text-wrong-text">Trap</span> {p.trap}</p>
+              <p className="mt-1"><span className="deep-label text-hero-deep">Say instead</span> {p.say}</p>
             </div>
           ))}
         </div>

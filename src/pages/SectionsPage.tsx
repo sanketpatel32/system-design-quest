@@ -9,9 +9,9 @@ function Ring({ done, total, colour, id }: { done: number; total: number; colour
   const r = 30, c = 2 * Math.PI * r, f = total ? done / total : 0
   return (
     <svg width="60" height="60" className="shrink-0" viewBox="0 0 76 76" role="img" aria-label={`${done} of ${total} cleared`} data-testid={`ring-${id}`} data-done={done} data-total={total}>
-      <circle cx="38" cy="38" r={r} fill="none" stroke="#EEE9E1" strokeWidth="9" />
+      <circle cx="38" cy="38" r={r} fill="none" stroke="var(--color-paper-3)" strokeWidth="9" />
       <circle cx="38" cy="38" r={r} fill="none" stroke={colour} strokeWidth="9" strokeLinecap="round" strokeDasharray={`${c * f} ${c}`} transform="rotate(-90 38 38)" />
-      <text x="38" y="43" textAnchor="middle" fontSize="15" fontWeight="800" fill="#29303D">{Math.round(f * 100)}%</text>
+      <text x="38" y="43" textAnchor="middle" fontSize="15" fontWeight="800" fill="var(--color-chalk)">{Math.round(f * 100)}%</text>
     </svg>
   )
 }
@@ -32,7 +32,7 @@ function Banner({ id, regionIds, soft, deep, bright, done, total }: { id: string
       <svg className="ml-auto" width="112" height="44" viewBox="0 0 112 44">
         <path d="M8 34 C 28 6, 44 6, 56 22 S 86 40, 104 10" fill="none" stroke={bright} strokeOpacity="0.45" strokeWidth="3" strokeDasharray="2 6" strokeLinecap="round" />
         {[[8, 34], [32, 14], [56, 22], [80, 32], [104, 10]].slice(0, dots).map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r={i < lit ? 7 : 6} fill={i < lit ? bright : '#fff'} stroke={i < lit ? deep : bright} strokeWidth="2.5" />
+          <circle key={i} cx={x} cy={y} r={i < lit ? 7 : 6} fill={i < lit ? bright : 'var(--color-card)'} stroke={i < lit ? deep : bright} strokeWidth="2.5" />
         ))}
       </svg>
     </div>
@@ -62,7 +62,7 @@ export function SectionsPage() {
                 <div className="flex flex-1 flex-col gap-1 p-5 pt-4">
                   <div className="flex items-baseline justify-between gap-2">
                     <p className="font-display text-xl leading-tight" style={{ color: p.deep }}>{questName(s.id)}</p>
-                    {s.id === last ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[0.7rem] font-extrabold uppercase tracking-wide" style={{ background: p.soft, color: p.deep }}>Last visited</span> : null}
+                    {s.id === last ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[0.7rem] font-extrabold" style={{ background: p.soft, color: p.deep }}>Last visited</span> : null}
                   </div>
                   <p className="text-sm text-dim">{s.blurb}</p>
                   <div className="mt-auto flex items-center gap-3 pt-3">

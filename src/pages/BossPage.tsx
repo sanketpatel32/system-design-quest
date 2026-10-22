@@ -70,13 +70,13 @@ export function BossPage() {
 
   return (
     <div className="space-y-8 max-w-[960px] mx-auto">
-      <header className="unit-banner relative flex items-center gap-4 p-5 sm:p-6" style={{ background: '#FFC800', color: '#3D2A00', ['--banner-shadow' as string]: '#E0A800' }}>
-        <div className="hidden sm:grid h-24 w-24 shrink-0 place-items-center rounded-full bg-[#FFE066] shadow-[0_6px_0_#E0A800]">
+      <header className="unit-banner boss-banner relative flex items-center gap-4 p-5 sm:p-6" style={{ background: 'var(--color-gold)', color: 'var(--color-gold-ink)', ['--banner-shadow' as string]: 'var(--color-gold-edge)' }}>
+        <div className="hidden sm:grid h-24 w-24 shrink-0 place-items-center rounded-full bg-gold-soft shadow-[0_6px_0_var(--color-gold-edge)]">
           <IconCastle size={64} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-extrabold uppercase tracking-wider pr-28 sm:pr-0">Boss fight · {topicLabel(topic.id)}</p>
-          <h1 className="font-display text-3xl sm:text-4xl mt-1 leading-tight">{topic.title}</h1>
+          <h1 className="font-display text-3xl sm:text-4xl leading-tight pr-28 sm:pr-0">{topic.title}</h1>
+          <p className="mt-1 text-sm font-extrabold">Boss fight · {topicLabel(topic.id)}</p>
           <p className="font-bold mt-2 max-w-2xl">{topic.boss.estimationScenario}</p>
         </div>
         <div className="absolute right-4 top-4 rounded-2xl bg-white px-2 py-1.5 sm:static sm:self-start">
@@ -133,17 +133,17 @@ export function BossPage() {
           <div className="flex flex-wrap items-center gap-4">
             <Mascot mood={grade.passed ? 'happy' : 'sad'} size={96} />
             <div>
-              <p className={`text-sm font-extrabold uppercase tracking-wide ${grade.passed ? 'text-[var(--color-clear)]' : 'text-[var(--color-fault)]'}`}>
-                {grade.passed ? 'Boss cleared · 70 needed to pass' : 'Not cleared yet · 70 needed to pass'}
-              </p>
               <h2 id="boss-score" className="font-display text-4xl text-chalk mt-1">
                 Score: <span className="tabular-nums">{grade.total}</span>
                 <span className="text-dim text-xl font-semibold">/100</span>
               </h2>
+              <p className={`text-sm font-extrabold ${grade.passed ? 'text-[var(--color-clear)]' : 'text-[var(--color-fault)]'}`}>
+                {grade.passed ? 'Boss cleared · 70 needed to pass' : 'Not cleared yet · 70 needed to pass'}
+              </p>
             </div>
           </div>
           <div className="score-track" aria-hidden>
-            <div className="score-fill" style={{ width: `${grade.total}%`, background: grade.passed ? 'var(--color-hero)' : '#FF9600' }} />
+            <div className="score-fill" style={{ ['--fill' as string]: `${grade.total}%`, background: grade.passed ? 'var(--color-hero)' : 'var(--color-flame)' }} />
             <div className="score-pass" />
           </div>
           <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-3">
@@ -158,7 +158,7 @@ export function BossPage() {
                     </dd>
                   </div>
                   <div className="score-track score-track-thin mt-1" aria-hidden>
-                    <div className="score-fill" style={{ width: `${(v / max) * 100}%`, background: v === max ? 'var(--color-clear)' : 'var(--color-dim)' }} />
+                    <div className="score-fill" style={{ ['--fill' as string]: `${(v / max) * 100}%`, background: v === max ? 'var(--color-clear)' : 'var(--color-dim)' }} />
                   </div>
                 </div>
               )
@@ -185,7 +185,7 @@ export function BossPage() {
                 <span className="text-chalk font-semibold">Estimate: </span>
                 {topic.boss.workedEstimate}
               </p>
-              <pre className="whitespace-pre-wrap rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 text-[0.8125rem] text-chalk">{topic.boss.exampleApi}</pre>
+              <pre className="whitespace-pre-wrap rounded-2xl border border-[var(--color-rail)] bg-paper-2 p-3 text-[0.8125rem] text-chalk">{topic.boss.exampleApi}</pre>
               <p>
                 <span className="text-chalk font-semibold">Trade-offs: </span>
                 {topic.boss.tradeoffAnalysis}

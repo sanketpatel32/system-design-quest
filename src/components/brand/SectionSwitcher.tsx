@@ -31,7 +31,7 @@ function Wordmark({ word, sidebar }: { word: string; sidebar: boolean }) {
       className={`wordmark-swap font-display leading-none tracking-[-0.01em] whitespace-nowrap ${sidebar ? 'wordmark-fitted' : 'text-[1.2rem] max-[399px]:text-[0.95rem] sm:text-2xl'}`}
       style={sidebar ? ({ '--wm-chars': word.length + 5 } as React.CSSProperties) : undefined}
     >
-      <span className="text-chalk">{word}</span><span className="text-[#58cc02]">quest</span>
+      <span className="text-chalk">{word}</span><span className="text-wordmark">quest</span>
     </span>
   )
   // Sidebar: the word is sized to the space left beside the logo and chevron, so "databasequest" never spills out
@@ -167,7 +167,7 @@ export function SectionSwitcher({ variant }: { variant: 'sidebar' | 'header' }) 
           style={{ left: pos.left, top: pos.top, width: pos.width }}
           onKeyDown={onMenuKey}
         >
-          <p className="px-3 pb-1 pt-1 text-xs font-extrabold uppercase tracking-wide text-dim" aria-hidden>{pageMode === '/revision' ? 'Review a section' : pageMode === '/cheat-sheet' ? 'Cheat sheet for' : 'Switch section'}</p>
+          <p className="px-3 pb-1 pt-1 text-xs font-extrabold text-dim" aria-hidden>{pageMode === '/revision' ? 'Review a section' : pageMode === '/cheat-sheet' ? 'Cheat sheet for' : 'Switch section'}</p>
           <ul className="flex flex-col gap-1" role="none">
             {SECTIONS.map((s) => {
               const topics = sectionTopics(s.id)
@@ -187,11 +187,11 @@ export function SectionSwitcher({ variant }: { variant: 'sidebar' | 'header' }) 
                     style={on ? { background: p.soft, borderColor: p.bright, color: p.deep } : undefined}
                     onClick={() => setOpen(false)}
                   >
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: on ? '#fff' : p.soft }} aria-hidden>
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: on ? 'var(--color-card)' : p.soft }} aria-hidden>
                       <RegionMotif regionId={LANDMARK[s.id] ?? s.regionIds[0]!} color={p.deep} size={22} />
                     </span>
                     <span className="min-w-0 flex-1 leading-tight" data-testid={`switcher-name-${s.id}`}>{questName(s.id)}</span>
-                    <span className="switcher-pct tabular-nums" style={{ color: p.deep, background: on ? '#fff' : p.soft }} aria-label={`${pct}% cleared`}>{pct}%</span>
+                    <span className="switcher-pct tabular-nums" style={{ color: p.deep, background: on ? 'var(--color-card)' : p.soft }} aria-label={`${pct}% cleared`}>{pct}%</span>
                   </Link>
                 </li>
               )
@@ -204,7 +204,7 @@ export function SectionSwitcher({ variant }: { variant: 'sidebar' | 'header' }) 
               tabIndex={-1}
               aria-current={allCurrent ? 'page' : undefined}
               data-testid="switcher-item-all"
-              className="switcher-item justify-center text-[#1899d6]"
+              className="switcher-item justify-center text-gem-deep"
               onClick={(e) => { e.preventDefault(); setOpen(false); navigate(allHref) }}
             >
               All sections

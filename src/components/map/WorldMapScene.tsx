@@ -90,7 +90,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
   const nextQuestion = nextTopic ? nextTopic.questions.findIndex((x) => !(x.id in (quizAttempts[`topic-${nextTopic.id}`]?.results ?? {}))) : -1
   const total = trackIds.length
   const doneCount = trackIds.filter((id) => completed.has(id)).length
-  const unitWord = (t: Topic) => (fund ? `Fundamentals · ${topicLabel(t.id)}` : `Unit ${learningRegions.findIndex((r) => r.id === t.region) + 1}`)
+  const unitWord = (t: Topic) => (fund ? `Fundamentals, ${topicLabel(t.id)}` : `Unit ${learningRegions.findIndex((r) => r.id === t.region) + 1}`)
   const bossesDone = arenaTopics.filter((t) => completed.has(t.id)).length
   const playbookDone = completed.has(PLAYBOOK_ID) ? 1 : 0
   const arenaOpen = isTopicUnlocked(PLAYBOOK_ID, unlocked) || completed.has(PLAYBOOK_ID)
@@ -107,7 +107,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
           >
             <Mascot mood="idle" size={64} className="shrink-0 hidden sm:block" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-extrabold uppercase tracking-wide" style={{ color: regionPalette(nextTopic.region).deep }}>
+              <p className="text-sm font-extrabold" style={{ color: regionPalette(nextTopic.region).deep }}>
                 {resume || lessonStarted ? 'Continue' : 'Up next'} · {unitWord(nextTopic)}
               </p>
               <p className="font-display text-xl text-chalk truncate">{nextTopic.title}</p>
@@ -146,7 +146,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
                 type="button"
                 aria-pressed={view === v}
                 onClick={() => setView(v)}
-                className={`min-h-[44px] rounded-xl px-4 text-sm font-extrabold uppercase tracking-wide ${view === v ? 'bg-[var(--color-sky)] text-[#12749f]' : 'text-dim hover:bg-[#f4f1ec]'}`}
+                className={`min-h-[44px] rounded-xl px-4 text-sm font-extrabold ${view === v ? 'bg-[var(--color-sky)] text-teal' : 'text-dim hover:bg-paper-3'}`}
               >
                 {v === 'path' ? 'Path' : 'List'}
               </button>
@@ -188,10 +188,10 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
               <div key={r.id} className="space-y-6">
                 <Unit index={i} regionId={r.id} statusMap={statusMap} completed={completed} nextId={nextId} />
                 {i === 0 && (
-                  <a href="#arena" onClick={(e) => { e.preventDefault(); showBossList() }} className="flex items-center gap-3 rounded-2xl border-2 border-dashed border-[#E0A800] bg-[#FFFBEA] px-4 py-3 text-sm font-bold text-[#6b4700]" data-testid="practice-track-signpost">
+                  <a href="#arena" onClick={(e) => { e.preventDefault(); showBossList() }} className="flex items-center gap-3 rounded-2xl border-2 border-dashed border-gold-edge bg-gold-wash-2 px-4 py-3 text-sm font-bold text-gold-ink-2" data-testid="practice-track-signpost">
                     <IconCastle size={28} />
                     <span className="flex-1">{arenaOpen ? 'Practice track open: the Interview Playbook and boss fights run alongside Units 2–10.' : 'After Unit 1, a boss-fight practice track opens alongside the remaining units.'}</span>
-                    <span className="font-extrabold uppercase tracking-wide">Go</span>
+                    <span className="font-extrabold">Go</span>
                   </a>
                 )}
               </div>
@@ -214,7 +214,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
             </div>
           </div>
           <div className="progress-track mt-4" aria-hidden>
-            <div className="progress-fill" style={{ width: `${Math.max(4, (doneCount / total) * 100)}%` }} />
+            <div className="progress-fill" style={{ ['--fill' as string]: `${Math.max(4, (doneCount / total) * 100)}%` }} />
           </div>
         </section>
         {!fund && <section className={`panel ${arenaOpen ? 'p-5' : 'p-4'}`} aria-labelledby="arena-title" data-testid="boss-sidebar">
@@ -234,7 +234,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
               return (
                 <li key={t.id}>
                   {bst !== 'locked' ? (
-                    <Link to={`/topic/${t.slug}`} className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-sm font-bold hover:bg-[#f4f1ec]" data-testid={`boss-row-${t.id}`}>
+                    <Link to={`/topic/${t.slug}`} className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-sm font-bold hover:bg-paper-3" data-testid={`boss-row-${t.id}`}>
                       <BossPip status={bst} />
                       <span className="text-dim tabular-nums w-6">{bi + 1}</span>
                       <span className="truncate">{t.title}</span>
@@ -251,7 +251,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
               )
             })}
           </ol>}
-          <button type="button" className="mt-2 text-sm font-extrabold uppercase tracking-wide text-[#12749f]" onClick={showBossList} data-testid="see-all-bosses">
+          <button type="button" className="mt-2 text-sm font-extrabold text-teal" onClick={showBossList} data-testid="see-all-bosses">
             {arenaOpen ? `See all ${arenaTopics.length} bosses` : `Preview the ${arenaTopics.length} bosses`}
           </button>
         </section>}
@@ -261,8 +261,8 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
 }
 
 function BossPip({ status }: { status: Status }) {
-  const bg = status === 'completed' ? '#FFC800' : status === 'locked' ? '#E6E0D6' : '#fff'
-  return <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-full border-[3px]" style={{ background: bg, borderColor: status === 'locked' ? '#E6E0D6' : '#E0A800' }} />
+  const bg = status === 'completed' ? 'var(--color-gold)' : status === 'locked' ? 'var(--color-rail)' : 'var(--color-card)'
+  return <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-full border-[3px]" style={{ background: bg, borderColor: status === 'locked' ? 'var(--color-rail)' : 'var(--color-gold-edge)' }} />
 }
 
 function UnitBanner({ regionId, index, done, total, title, collapsed, onToggle, note, kicker }: { regionId: string; index: number | null; done: number; total: number; title: string; collapsed?: boolean; onToggle?: () => void; note?: string; kicker?: string }) {
@@ -271,11 +271,11 @@ function UnitBanner({ regionId, index, done, total, title, collapsed, onToggle, 
   return (
     <div className={`unit-banner flex items-center gap-3 px-4 py-3 sm:px-5 ${gold ? 'banner-gold' : ''}`} style={{ background: gold ? p.bright : p.deep, ['--banner-shadow' as string]: p.shadow }}>
       <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/20">
-        <RegionMotif regionId={regionId} color={gold ? '#3d2a00' : '#fff'} size={26} />
+        <RegionMotif regionId={regionId} color={gold ? 'var(--color-gold-ink)' : 'var(--color-card)'} size={26} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-extrabold uppercase tracking-wider text-white">{kicker ?? (index === null ? 'Practice track · opens after Unit 1' : `Unit ${index + 1}`)}</p>
         <h2 className="font-display text-xl leading-tight text-white">{title}</h2>
+        <p className="text-xs font-extrabold text-white">{kicker ?? (index === null ? 'Practice track · opens after Unit 1' : `Unit ${index + 1}`)}</p>
         {note && <p className="text-sm font-bold text-white">{note}</p>}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
@@ -284,7 +284,7 @@ function UnitBanner({ regionId, index, done, total, title, collapsed, onToggle, 
           <div className="h-full rounded-full bg-white" style={{ width: `${(done / Math.max(1, total)) * 100}%` }} />
         </div>
         {onToggle && (
-          <button type="button" onClick={onToggle} aria-expanded={!collapsed} className="mt-1 -mb-1 inline-flex min-h-[44px] min-w-[56px] items-center justify-center rounded-xl bg-white/20 px-3 text-xs font-extrabold uppercase tracking-wide text-white hover:bg-white/30" data-testid={`unit-toggle-${regionId}`}>
+          <button type="button" onClick={onToggle} aria-expanded={!collapsed} className="mt-1 -mb-1 inline-flex min-h-[44px] min-w-[56px] items-center justify-center rounded-xl bg-white/20 px-3 text-xs font-extrabold text-white hover:bg-white/30" data-testid={`unit-toggle-${regionId}`}>
             {collapsed ? 'Show' : 'Hide'}
           </button>
         )}
@@ -383,8 +383,8 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
   }
   const p = regionPalette(topic.region)
   const locked = status === 'locked'
-  const fill = locked ? '#E5E0D8' : boss ? '#FFC800' : p.bright
-  const shadow = locked ? '#CFC7BA' : boss ? '#E0A800' : p.shadow
+  const fill = locked ? 'var(--color-rail)' : boss ? 'var(--color-gold)' : p.bright
+  const shadow = locked ? 'var(--color-rail-deep)' : boss ? 'var(--color-gold-edge)' : p.shadow
   const n = STATION_N.get(topic.id)
   const nodeLabel = boss ? `Boss ${BOSS_N.get(topic.id)}` : n ? `Lesson ${n}` : topicLabel(topic.id)
 
@@ -447,16 +447,16 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
           data-testid="node-popover"
           data-placement={pos.placement}
           className="fixed z-50 w-[min(290px,86vw)] rounded-2xl p-4 text-white"
-          style={{ left: pos.left, top: pos.top, visibility: pos.ready ? 'visible' : 'hidden', opacity: 1, background: locked ? '#5B6472' : boss ? '#8A5A00' : p.deep, boxShadow: `0 5px 0 ${locked ? '#3f4652' : boss ? '#5c3c00' : p.shadow}, 0 12px 28px rgba(0,0,0,0.18)` }}
+          style={{ left: pos.left, top: pos.top, visibility: pos.ready ? 'visible' : 'hidden', opacity: 1, background: locked ? 'var(--color-dim)' : boss ? 'var(--color-gold-deep)' : p.deep, boxShadow: `0 5px 0 ${locked ? 'var(--color-dim-shadow)' : boss ? 'var(--color-gold-shadow)' : p.shadow}, 0 12px 28px var(--color-shade-pop)` }}
           role="dialog"
           aria-label={topic.title}
           tabIndex={-1}
           onKeyDown={onPopKey}
         >
-          <span aria-hidden className={`absolute h-4 w-4 -translate-x-1/2 rotate-45 ${pos.placement === 'below' ? '-top-2' : '-bottom-2'}`} style={{ left: pos.arrow, background: locked ? '#5B6472' : boss ? '#8A5A00' : p.deep }} />
+          <span aria-hidden className={`absolute h-4 w-4 -translate-x-1/2 rotate-45 ${pos.placement === 'below' ? '-top-2' : '-bottom-2'}`} style={{ left: pos.arrow, background: locked ? 'var(--color-dim)' : boss ? 'var(--color-gold-deep)' : p.deep }} />
           <p className="font-display text-lg leading-snug">{topic.title}</p>
           <p className="text-sm font-bold text-white">
-            {nodeLabel} · {STATUS_WORD[status]} · about {topicMinutes(topic.id)} min
+            {nodeLabel}, {STATUS_WORD[status].toLowerCase()}<br />About {topicMinutes(topic.id)} min
           </p>
           {locked ? (
             <p className="mt-2 text-sm font-bold">{getUnlockHint(topic.id, completed)}</p>
@@ -466,12 +466,12 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
                 to={`/topic/${topic.slug}`}
                 data-testid={boss ? undefined : 'start-topic'}
                 className="btn-quiet btn-block"
-                style={{ color: locked ? undefined : boss ? '#8A5A00' : p.deep, ['--b-sh' as string]: 'rgba(0,0,0,0.25)', ['--b-bd' as string]: '#fff' }}
+                style={{ color: locked ? undefined : boss ? 'var(--color-gold-deep)' : p.deep, ['--b-sh' as string]: 'var(--color-shade-press)', ['--b-bd' as string]: 'var(--color-card)' }}
               >
                 {status === 'completed' ? 'Review lesson' : status === 'in_progress' ? 'Continue lesson' : boss ? 'Read the brief' : 'Start lesson'}
               </Link>
               {boss && (
-                <Link to={`/boss/${topic.slug}`} className="btn-quiet btn-block" style={{ color: '#8A5A00', ['--b-sh' as string]: 'rgba(0,0,0,0.25)' }}>
+                <Link to={`/boss/${topic.slug}`} className="btn-quiet btn-block" style={{ color: 'var(--color-gold-deep)', ['--b-sh' as string]: 'var(--color-shade-press)' }}>
                   Fight the boss
                 </Link>
               )}
@@ -512,12 +512,12 @@ function Onboarding() {
       </MascotSays>
       <ul className="mt-3 grid gap-3 text-[0.9375rem] sm:grid-cols-2">
         {[
-          ['Lessons', 'Each node is a short lesson, then a quiz. Pass to open the next one.', '#58CC02'],
-          ['Hearts', 'You get 3 per quiz. A wrong answer costs one; blank answers never do.', '#FF4B4B'],
-          ['Review', 'Cleared topics come back as flashcards on a schedule, so they stick.', '#1CB0F6'],
-          ['Bosses', `A practice track that runs alongside the units: it opens after Unit 1 and you can switch between bosses and lessons at any time. ${arenaTopics.length} full design problems, each scored stage by stage (requirements, estimates, design on a canvas, deep dive).`, '#FFC800'],
+          ['Lessons', 'Each node is a short lesson, then a quiz. Pass to open the next one.', 'var(--color-hero)'],
+          ['Hearts', 'You get 3 per quiz. A wrong answer costs one; blank answers never do.', 'var(--color-heart)'],
+          ['Review', 'Cleared topics come back as flashcards on a schedule, so they stick.', 'var(--color-gem)'],
+          ['Bosses', `A practice track that runs alongside the units: it opens after Unit 1 and you can switch between bosses and lessons at any time. ${arenaTopics.length} full design problems, each scored stage by stage (requirements, estimates, design on a canvas, deep dive).`, 'var(--color-gold)'],
         ].map(([h, b, c]) => (
-          <li key={h} className="flex gap-3 rounded-2xl bg-[#f7f4ef] p-3">
+          <li key={h} className="flex gap-3 rounded-2xl bg-paper-2 p-3">
             <span aria-hidden className="mt-1 h-4 w-4 shrink-0 rounded-full" style={{ background: c }} />
             <span><span className="font-extrabold text-chalk">{h}.</span> <span className="text-dim">{b}</span></span>
           </li>
@@ -544,8 +544,8 @@ function Curriculum({ statusMap, needle, fund, areas }: { statusMap: Map<number,
             <div key={r.id} className="panel min-w-0 overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-3 text-white" style={{ background: p.deep }}>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-extrabold uppercase tracking-wider text-white">{r.id === 'boss-arena' ? 'Practice track' : fund ? r.subtitle : `Unit ${i + 1}`}</p>
                   <h3 className="font-display text-lg leading-tight">{r.id === 'boss-arena' ? 'Boss fights' : r.name}</h3>
+                  <p className="text-xs font-extrabold text-white">{r.id === 'boss-arena' ? 'Practice track' : fund ? r.subtitle : `Unit ${i + 1}`}</p>
                 </div>
                 <span className="text-sm font-extrabold tabular-nums">{done}/{all.length}</span>
               </div>
@@ -554,8 +554,8 @@ function Curriculum({ statusMap, needle, fund, areas }: { statusMap: Map<number,
                   const st = statusMap.get(t.id) ?? 'locked'
                   const body = (
                     <>
-                      <span aria-hidden className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold" style={{ background: st === 'locked' ? '#EEE9E1' : p.soft, color: st === 'locked' ? '#5B6472' : p.deep }}>
-                        {STATION_N.get(t.id) ?? FUND_N.get(t.id) ?? (BOSS_N.has(t.id) ? `B${BOSS_N.get(t.id)}` : '★')}
+                      <span aria-hidden className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold" style={{ background: st === 'locked' ? 'var(--color-paper-3)' : p.soft, color: st === 'locked' ? 'var(--color-dim)' : p.deep }}>
+                        {STATION_N.get(t.id) ?? FUND_N.get(t.id) ?? (BOSS_N.has(t.id) ? `B${BOSS_N.get(t.id)}` : <IconStar size={14} color="currentColor" />)}
                       </span>
                       <span className={`flex-1 truncate ${st === 'locked' ? 'text-dim' : 'text-chalk'}`}>{t.title}</span>
                       <span className={`status-chip status-${st}`}>{STATUS_WORD[st]}</span>
@@ -566,7 +566,7 @@ function Curriculum({ statusMap, needle, fund, areas }: { statusMap: Map<number,
                       {st === 'locked' ? (
                         <div className="flex items-center gap-2 px-2 py-1.5 text-sm font-bold">{body}</div>
                       ) : (
-                        <Link to={`/topic/${t.slug}`} className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm font-bold hover:bg-[#f4f1ec]">
+                        <Link to={`/topic/${t.slug}`} className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm font-bold hover:bg-paper-3">
                           {body}
                         </Link>
                       )}

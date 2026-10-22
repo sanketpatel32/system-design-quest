@@ -26,7 +26,7 @@ export function HelpShortcuts() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#29303d]/45"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-chalk/45"
       role="dialog"
       aria-modal="true"
       aria-labelledby="help-title"
@@ -43,10 +43,10 @@ export function HelpShortcuts() {
           </button>
         </div>
         <ul className="font-bold text-chalk space-y-3">
-          <li><kbd className="kbd">?</kbd> — toggle this help</li>
-          <li><kbd className="kbd">1</kbd>–<kbd className="kbd">4</kbd> — select MCQ option (quiz)</li>
-          <li><kbd className="kbd">Enter</kbd> — submit current question</li>
-          <li><kbd className="kbd">←</kbd> / <kbd className="kbd">→</kbd> — previous / next lesson card</li>
+          <li><kbd className="kbd">?</kbd> Toggle this help</li>
+          <li><kbd className="kbd">1</kbd> to <kbd className="kbd">4</kbd> Select an MCQ option (quiz)</li>
+          <li><kbd className="kbd">Enter</kbd> Submit the current question</li>
+          <li><kbd className="kbd">←</kbd> and <kbd className="kbd">→</kbd> Previous or next lesson card</li>
         </ul>
         <p className="text-sm text-dim">Shortcuts pause while focus is in a text field.</p>
       </div>

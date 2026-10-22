@@ -3,21 +3,21 @@ import { NavIcon } from '../icons/HudIcons'
 
 /** Friendly page header: a coloured banner with the page's icon. Colours pass AA with white text. */
 const TONES = {
-  sky: { bg: '#12749F', sh: '#0B4F6D' },
-  purple: { bg: '#8350C7', sh: '#5E3594' },
-  orange: { bg: '#C2410C', sh: '#9A3412' },
-  slate: { bg: '#4B5563', sh: '#30363F' },
+  sky: { bg: 'var(--color-teal)', sh: 'var(--color-teal-shadow)' },
+  purple: { bg: 'var(--color-lilac-ink)', sh: 'var(--color-lilac-shadow)' },
+  orange: { bg: 'var(--color-banner-orange)', sh: 'var(--color-banner-orange-shadow)' },
+  slate: { bg: 'var(--color-banner-slate)', sh: 'var(--color-banner-slate-shadow)' },
 } as const
 
 export function PageHero({
-  eyebrow,
+  meta,
   title,
   icon,
   tone,
   children,
   aside,
 }: {
-  eyebrow: string
+  meta: string
   title: string
   icon: 'map' | 'review' | 'cheat' | 'interview' | 'settings'
   tone: keyof typeof TONES
@@ -27,12 +27,12 @@ export function PageHero({
   const t = TONES[tone]
   return (
     <header className="unit-banner flex flex-wrap items-center gap-3 p-4 sm:gap-4 sm:p-6" style={{ background: t.bg, ['--banner-shadow' as string]: t.sh }}>
-      <div className="hidden sm:grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-white shadow-[0_4px_0_rgba(0,0,0,0.2)]">
+      <div className="hidden sm:grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-card shadow-[0_4px_0_var(--color-shade-tile)]">
         <NavIcon name={icon} size={44} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-extrabold uppercase tracking-wider text-white sm:text-sm">{eyebrow}</p>
         <h1 className="font-display text-[1.75rem] sm:text-4xl leading-tight text-white">{title}</h1>
+        <p className="mt-1 text-sm font-extrabold text-white">{meta}</p>
         {children && <div className="mt-1 hidden font-bold text-white sm:block">{children}</div>}
       </div>
       {aside}

@@ -72,7 +72,7 @@ export function SettingsPage() {
   return (
     <div className="space-y-5 max-w-2xl">
       <SaveWhere>{(c) => (
-      <PageHero eyebrow={c.eyebrow} title="Settings" icon="settings" tone="slate">
+      <PageHero meta={c.eyebrow} title="Settings" icon="settings" tone="slate">
         {c.text}
       </PageHero>
       )}</SaveWhere>
@@ -132,9 +132,9 @@ export function SettingsPage() {
         </details>
       </section>
 
-      <section className="panel p-5 space-y-2 border-[#ffb2b2]" aria-labelledby="danger">
+      <section className="panel p-5 space-y-2 border-wrong-edge-soft" aria-labelledby="danger">
         <h2 id="danger" className="font-display text-lg font-bold text-[var(--color-fault)]">Danger zone</h2>
-        <p className="text-sm text-dim">Clears XP, badges, unlocks, review history and drafts. This cannot be undone.</p>
+        <p className="text-sm text-dim">Clears XP, badges, opened lessons, review history and drafts. This cannot be undone.</p>
         <button type="button" className="btn-danger" onClick={() => dialogRef.current?.showModal()}>
           Reset all progress
         </button>
