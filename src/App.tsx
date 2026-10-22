@@ -19,8 +19,8 @@ function NotFound() {
   return (
     <div className="mx-auto max-w-lg py-10 text-center">
       <Mascot mood="sad" size={140} className="mx-auto" />
-      <p className="mt-2 text-sm font-extrabold uppercase tracking-wide text-[var(--color-fault)]">Page not found</p>
       <h1 className="font-display text-4xl text-chalk mt-1">This page is not on the map</h1>
+      <p className="mt-2 text-sm font-extrabold text-[var(--color-fault)]">Page not found</p>
       <p className="font-bold text-dim mt-2">The link may be old or mistyped. Every topic is reachable from the map.</p>
       <Link to="/" className="btn-cta mt-5">Back to the map</Link>
     </div>

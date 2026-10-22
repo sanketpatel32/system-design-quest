@@ -75,11 +75,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
               aria-label={`Level ${level}, ${xp} xp, ${streak}-day streak${badges.length ? `, ${badges.length} badges` : ''}. Show details`}
               onClick={() => setHudOpen((v) => !v)}
             >
-              <span className="hud-chip text-[#C25E00] max-[479px]:hidden" title={`${streak}-day streak`}>
+              <span className="hud-chip text-flame-ink max-[479px]:hidden" title={`${streak}-day streak`}>
                 <IconFlame lit={streak > 0} />
                 <span className="tabular-nums">{streak}</span>
               </span>
-              <span className="hud-chip text-[#12749f]" title={`Level ${level} · ${xp % 500} of 500 xp to the next level`}>
+              <span className="hud-chip text-teal" title={`Level ${level} · ${xp % 500} of 500 xp to the next level`}>
                 <span className="relative inline-flex">
                   <IconGem />
                   {sparkle > 0 && (
@@ -91,7 +91,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <span className="tabular-nums">{xp}<span className="hidden sm:inline"> xp</span></span>
               </span>
               {badges.length > 0 && (
-                <span className="hud-chip text-[#8A5A00] inline-flex" title={`${badges.length} badge${badges.length === 1 ? "" : "s"} earned`}>
+                <span className="hud-chip text-gold-deep inline-flex" title={`${badges.length} badge${badges.length === 1 ? "" : "s"} earned`}>
                   <IconBadge />
                   <span className="tabular-nums">{badges.length}</span>
                 </span>
@@ -102,7 +102,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <div>
                   <div className="flex justify-between font-extrabold"><span>Level {level}</span><span className="text-dim tabular-nums">{xp % 500}/500</span></div>
                   <div className="xp-track mt-1.5">
-                    <div className="xp-fill" style={{ width: `${((xp % 500) / 500) * 100}%` }} role="progressbar" aria-label="XP to next level" aria-valuenow={xp % 500} aria-valuemin={0} aria-valuemax={500} />
+                    <div className="xp-fill" style={{ ['--fill' as string]: `${((xp % 500) / 500) * 100}%` }} role="progressbar" aria-label="XP to next level" aria-valuenow={xp % 500} aria-valuemin={0} aria-valuemax={500} />
                   </div>
                 </div>
                 <p className="text-dim">XP comes from clearing quizzes and boss fights. Every 500 XP is a level.</p>

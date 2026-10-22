@@ -32,7 +32,7 @@ export function Logo({ size = 40, wordmark = true, className = '' }: { size?: nu
       {wordmark && (
         <span className="font-display leading-none tracking-[-0.01em]" style={{ fontSize: size * 0.62 }}>
           <span className="text-chalk">design</span>
-          <span className="text-[#58cc02]">quest</span>
+          <span className="text-wordmark">quest</span>
         </span>
       )}
     </span>

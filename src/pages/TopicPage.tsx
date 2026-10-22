@@ -39,9 +39,9 @@ export function TopicPage() {
   if (status === 'locked') {
     return (
       <div className="mx-auto mt-6 max-w-lg space-y-3 panel p-6 text-center">
-        <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-[#E5E0D8] shadow-[0_6px_0_#CFC7BA]"><IconLock size={40} color="#8C8476" /></div>
-        <p className="text-sm font-extrabold uppercase tracking-wide text-dim">Locked · {topicLabel(topic.id)}</p>
+        <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-rail shadow-[0_6px_0_var(--color-rail-deep)]"><IconLock size={40} color="var(--color-dim-warm)" /></div>
         <h1 className="font-display text-3xl text-chalk">{topic.title}</h1>
+        <p className="text-sm font-extrabold text-dim">Locked · {topicLabel(topic.id)}</p>
         <p className="font-bold text-chalk">{getUnlockHint(topic.id, completed)}</p>
         <Link to={sectionPath(sectionOfTopic(topic.id))} className="btn-cta">Back to the map</Link>
       </div>
@@ -66,13 +66,13 @@ export function TopicPage() {
       <div className="space-y-5 min-w-0">
         <header className="unit-banner flex items-center gap-4 p-4 sm:p-5" style={{ background: pal.deep, ['--banner-shadow' as string]: pal.shadow }}>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-extrabold uppercase tracking-wider text-white">{regionName} · {topicLabel(topic.id)}</p>
             <h1 className="font-display text-[1.75rem] sm:text-4xl text-white mt-1 leading-tight" data-testid="topic-title">{topic.title}</h1>
+            <p className="text-sm font-extrabold text-white">{regionName} · {topicLabel(topic.id)}</p>
             {topic.objectives.length > 0 && (
               <>
                 {/* Phones: goals fold away so the first card is on the first screen */}
                 <details className="lesson-goals mt-1 text-white sm:hidden" data-testid="lesson-goals">
-                  <summary className="flex min-h-[44px] cursor-pointer items-center gap-2 text-sm font-extrabold uppercase tracking-wide">
+                  <summary className="flex min-h-[44px] cursor-pointer items-center gap-2 text-sm font-extrabold">
                     What you'll learn · {topic.objectives.length}
                   </summary>
                   <Objectives items={topic.objectives} />
@@ -113,7 +113,7 @@ export function TopicPage() {
             <ul className="space-y-1">
               {prereqLinks.map((p) => (
                 <li key={p!.id}>
-                  <Link className="font-bold text-[#12749f] hover:underline" to={`/topic/${p!.slug}`}>{p!.title}</Link>
+                  <Link className="font-bold text-teal hover:underline" to={`/topic/${p!.slug}`}>{p!.title}</Link>
                 </li>
               ))}
             </ul>
@@ -145,7 +145,7 @@ export function TopicPage() {
           <ul className="space-y-2 text-sm font-bold">
             {topic.sources.map((s) => (
               <li key={s.url}>
-                <a className="text-[#12749f] hover:text-[var(--color-teal)] underline-offset-2 hover:underline" href={s.url} target="_blank" rel="noreferrer">
+                <a className="text-teal hover:text-[var(--color-teal)] underline-offset-2 hover:underline" href={s.url} target="_blank" rel="noreferrer">
                   {s.title}
                 </a>
               </li>
@@ -161,11 +161,11 @@ export function TopicPage() {
 function RelatedLink({ t, why, locked }: { t: Topic; why: string; locked: boolean }) {
   return (
     <li data-testid={`related-${t.id}`} data-locked={locked ? 'true' : 'false'}>
-      <span className="block text-xs font-extrabold uppercase tracking-wide text-dim">{SECTION_BY_ID.get(sectionOfTopic(t.id))?.name}</span>
-      <Link className="font-bold text-[#12749f] hover:underline" to={`/topic/${t.slug}`}>{t.title}</Link>
+      <span className="block text-xs font-extrabold text-dim">{SECTION_BY_ID.get(sectionOfTopic(t.id))?.name}</span>
+      <Link className="font-bold text-teal hover:underline" to={`/topic/${t.slug}`}>{t.title}</Link>
       {locked && (
-        <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-[#E5E0D8] px-1.5 py-0.5 align-middle text-xs font-bold text-[#5B6472]">
-          <IconLock size={12} color="#5B6472" /> Locked
+        <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-rail px-1.5 py-0.5 align-middle text-xs font-bold text-dim">
+          <IconLock size={12} color="var(--color-dim)" /> Locked
         </span>
       )}
       <span className="block text-dim">{why}</span>

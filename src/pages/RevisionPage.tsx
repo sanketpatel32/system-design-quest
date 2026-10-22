@@ -94,8 +94,8 @@ export function RevisionPage() {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      <PageHero eyebrow="Spaced repetition · switch section from the logo" title={section === 'all' ? 'Review: all sections' : `${sectionName} review`} icon="review" tone="sky"
-        aside={<div className="rounded-2xl bg-white px-4 py-2 text-center"><p className="font-display text-3xl text-[#12749f] tabular-nums">{queue.length}</p><p className="text-xs font-extrabold uppercase tracking-wide text-dim">due now</p></div>}>
+      <PageHero meta="Spaced repetition · switch section from the logo" title={section === 'all' ? 'Review: all sections' : `${sectionName} review`} icon="review" tone="sky"
+        aside={<div className="rounded-2xl bg-white px-4 py-2 text-center"><p className="font-display text-3xl text-teal tabular-nums">{queue.length}</p><p className="text-xs font-extrabold text-dim">due now</p></div>}>
         Recall the answer, reveal it, then rate yourself. The rating decides when the card comes back.
       </PageHero>
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -111,7 +111,7 @@ export function RevisionPage() {
         {reviewed > 0 && <p className="text-sm font-extrabold text-[var(--color-hero-deep)] tabular-nums">{reviewed} reviewed this session</p>}
       </div>
       {last && (
-        <p className="rounded-2xl bg-[#d7ffb8] px-4 py-2 text-sm font-bold text-[#235c00]" role="status">
+        <p className="rounded-2xl bg-right-soft px-4 py-2 text-sm font-bold text-right-ink" role="status">
           {last.rating === 'again'
             ? `“${last.front}” comes back at the end of this session (due again in ${AGAIN_MINUTES} minutes).`
             : `Next due ${new Date(last.dueAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} for the card you rated ${last.rating}.`}
@@ -126,7 +126,7 @@ export function RevisionPage() {
         </div>
       ) : (
         <div className="panel p-6 sm:p-8 text-center" style={{ ['--accent' as string]: accent }}>
-          <p className="text-sm font-extrabold uppercase tracking-wide" style={{ color: accent }}>
+          <p className="text-sm font-extrabold" style={{ color: accent }}>
             {topicsById.get(current.topicId)?.title}
           </p>
           <p className="font-display text-3xl text-chalk mt-4 leading-snug">{current.flashcard.front}</p>
@@ -143,7 +143,7 @@ export function RevisionPage() {
               <button key={r} type="button" onClick={() => rate(r)} className={`rate-btn rate-${r}`}>
                 <span className="font-display text-lg">{label}</span>
                 <span className="block text-sm text-dim">{hint}</span>
-                <span className="block text-xs font-extrabold uppercase tracking-wide text-chalk mt-1">Next: {intervalFor(r)}</span>
+                <span className="block text-xs font-extrabold text-chalk mt-1">Next: {intervalFor(r)}</span>
               </button>
             ))}
           </div>

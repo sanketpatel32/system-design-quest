@@ -110,7 +110,7 @@ export function QuizPage() {
   return (
     <div className="mx-auto max-w-3xl pb-24">
       <header className="mb-3 flex items-center gap-3 sm:mb-6 sm:gap-4 short:mb-1">
-        <Link to={`/topic/${topic.slug}`} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-dim hover:bg-[#f4f1ec]" aria-label="Leave quiz, back to the lesson">
+        <Link to={`/topic/${topic.slug}`} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-dim hover:bg-paper-3" aria-label="Leave quiz, back to the lesson">
           <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" /></svg>
         </Link>
         <div
@@ -121,13 +121,13 @@ export function QuizPage() {
           aria-valuemax={total}
           aria-valuenow={answeredCount}
         >
-          <div className="progress-fill" style={{ width: `${Math.max(answeredCount ? 6 : 0, (answeredCount / total) * 100)}%` }} />
+          <div className="progress-fill" style={{ ['--fill' as string]: `${Math.max(answeredCount ? 6 : 0, (answeredCount / total) * 100)}%` }} />
         </div>
         <HeartsHud hearts={attempt.hearts} />
       </header>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 sm:mb-5 short:mb-1">
-        <p className="text-sm font-extrabold uppercase tracking-wide" style={{ color: p.deep }}>{topic.title}</p>
+        <p className="text-sm font-extrabold" style={{ color: p.deep }}>{topic.title}</p>
         <nav aria-label="Questions" className="-my-3 flex items-center gap-1">
           {topic.questions.map((x, i) => {
             const state = !(x.id in results) ? 'open' : results[x.id] ? 'right' : 'wrong'
@@ -145,7 +145,7 @@ export function QuizPage() {
             )
           })}
           {finished && (
-            <button type="button" className="ml-2 text-sm font-extrabold uppercase text-[#12749f]" onClick={() => setIndex(total)}>
+            <button type="button" className="ml-2 text-sm font-extrabold text-teal" onClick={() => setIndex(total)}>
               Result
             </button>
           )}
@@ -161,9 +161,9 @@ export function QuizPage() {
             </h1>
             <p className="mt-1 text-lg font-bold text-dim">{correctCount}/{total} correct</p>
             <div className="mx-auto mt-6 grid max-w-md grid-cols-3 gap-3">
-              <StatTile label="Total XP" color="#FFC800" deep="#8A5A00" value={claim ? `+${claim.xpGained}` : 'Saved'} icon={<IconGem size={28} />} />
-              <StatTile label="Accuracy" color="#58CC02" deep="#2F7D00" value={`${Math.round((correctCount / total) * 100)}%`} icon={<Target />} />
-              <StatTile label="Streak" color="#FF9600" deep="#A35F00" value={`${streak}`} icon={<IconFlame size={28} />} />
+              <StatTile label="Total XP" color="var(--color-gold)" deep="var(--color-gold-deep)" value={claim ? `+${claim.xpGained}` : 'Saved'} icon={<IconGem size={28} />} />
+              <StatTile label="Accuracy" color="var(--color-hero)" deep="var(--color-hero-deep)" value={`${Math.round((correctCount / total) * 100)}%`} icon={<Target />} />
+              <StatTile label="Streak" color="var(--color-flame)" deep="var(--color-flame-deep)" value={`${streak}`} icon={<IconFlame size={28} />} />
             </div>
             {claim ? (
               <div className="mt-6 space-y-3">
@@ -172,7 +172,7 @@ export function QuizPage() {
                   {next ? `${next.title} is now open.` : 'Unit complete!'}
                 </p>
                 {claim.newBadges.length > 0 && (
-                  <p className="inline-flex items-center gap-2 rounded-2xl bg-[#FFF6CC] px-4 py-2 font-extrabold text-[#8A5A00]">
+                  <p className="inline-flex items-center gap-2 rounded-2xl bg-gold-wash px-4 py-2 font-extrabold text-gold-deep">
                     <IconBadge /> New badge: {claim.newBadges.map((b) => BADGE_LABELS[b as keyof typeof BADGE_LABELS] ?? b).join(', ')}
                   </p>
                 )}
@@ -197,10 +197,10 @@ export function QuizPage() {
           <section className="space-y-5" aria-labelledby="quiz-result" role="status">
             <div className="flex flex-col items-center text-center">
               <Mascot mood="sad" size={130} />
-              <p className="mt-2 text-sm font-extrabold uppercase tracking-wide text-[var(--color-fault)]">{heartsOut ? 'Out of hearts' : 'Not cleared yet'}</p>
               <h1 id="quiz-result" className="font-display text-3xl text-chalk">
                 {correctCount}/{total} correct, you need {need}
               </h1>
+              <p className="mt-2 text-sm font-extrabold text-[var(--color-fault)]">{heartsOut ? 'Out of hearts' : 'Not cleared yet'}</p>
               <p className="font-bold text-dim mt-1">Every miss is a clue. Have a look, then try again.</p>
             </div>
             {missed.length > 0 && (
@@ -228,7 +228,7 @@ export function QuizPage() {
             <div className="panel mb-5 flex flex-wrap items-center gap-3 p-3 text-sm short:mb-2 short:py-1.5" data-testid="lesson-first">
               <span className="flex-1 font-bold text-chalk">New to this topic? The short lesson comes first and makes this quiz much easier.</span>
               <Link to={`/topic/${topic.slug}`} className="btn-cta !min-h-[40px]">Read the lesson</Link>
-              <button type="button" className="text-sm font-extrabold uppercase text-dim" onClick={() => setSkipLessonHint(true)}>Skip</button>
+              <button type="button" className="text-sm font-extrabold text-dim" onClick={() => setSkipLessonHint(true)}>Skip</button>
             </div>
           )}
           <QuestionRenderer
@@ -251,7 +251,7 @@ export function QuizPage() {
               continueLabel: current < total - 1 && !heartsOut ? 'Continue' : 'See result',
               extra:
                 answered && !results[q.id] && practice === 0 ? (
-                  <button type="button" className="text-sm font-extrabold uppercase tracking-wide underline-offset-2 hover:underline" onClick={() => setPractice((x) => x + 1)}>
+                  <button type="button" className="text-sm font-extrabold underline-offset-2 hover:underline" onClick={() => setPractice((x) => x + 1)}>
                     Try again for practice
                   </button>
                 ) : practice > 0 ? (
@@ -261,7 +261,7 @@ export function QuizPage() {
           />
           {q.type === 'multiple_choice' && !answered && (
           <p className="mt-8 hidden text-sm text-dim sm:block" data-testid="shortcut-hint">
-            Shortcuts: <kbd className="kbd">1</kbd>–<kbd className="kbd">4</kbd> pick an option, <kbd className="kbd">Enter</kbd> submits.
+            Shortcuts: <kbd className="kbd">1</kbd> to <kbd className="kbd">4</kbd> pick an option, <kbd className="kbd">Enter</kbd> submits.
           </p>
           )}
         </>
@@ -273,7 +273,7 @@ export function QuizPage() {
 function StatTile({ label, value, color, deep, icon }: { label: string; value: string; color: string; deep: string; icon: React.ReactNode }) {
   return (
     <div className="anim-pop overflow-hidden rounded-2xl border-2" style={{ borderColor: color, background: color }}>
-      <p className="py-1 text-xs font-extrabold uppercase tracking-wider text-[#29303D]">{label}</p>
+      <p className="py-1 text-xs font-extrabold text-chalk">{label}</p>
       <p className="flex items-center justify-center gap-1.5 rounded-t-xl bg-white py-3 font-display text-2xl" style={{ color: deep }}>
         {icon}
         {value}
@@ -285,9 +285,9 @@ function StatTile({ label, value, color, deep, icon }: { label: string; value: s
 function Target() {
   return (
     <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden>
-      <circle cx="12" cy="12" r="10" fill="#58CC02" />
-      <circle cx="12" cy="12" r="6.5" fill="#fff" />
-      <circle cx="12" cy="12" r="3.2" fill="#58CC02" />
+      <circle cx="12" cy="12" r="10" fill="var(--color-hero)" />
+      <circle cx="12" cy="12" r="6.5" fill="var(--color-card)" />
+      <circle cx="12" cy="12" r="3.2" fill="var(--color-hero)" />
     </svg>
   )
 }

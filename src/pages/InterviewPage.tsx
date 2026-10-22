@@ -144,7 +144,7 @@ export function InterviewPage() {
 
   return (
     <div className="space-y-5">
-      <PageHero eyebrow="Mock interview · 45 minutes" title="Interview mode" icon="interview" tone="orange">
+      <PageHero meta="Mock interview · 45 minutes" title="Interview mode" icon="interview" tone="orange">
         One scenario, six timed stages, no hints. The reference answer appears only after you finish.
       </PageHero>
 
@@ -212,7 +212,7 @@ export function InterviewPage() {
             <ol className="flex gap-1" aria-label="Stages">
               {STAGES.map((s, i) => (
                 <li key={s.label} className="flex-1" style={{ flexGrow: INTERVIEW_STAGE_MINUTES[i] }} aria-current={i === stageIndex ? 'step' : undefined}>
-                  <div className="h-3 rounded-full" style={{ background: i < stageIndex ? 'var(--color-hero)' : i === stageIndex ? '#1CB0F6' : '#ECE7DF' }} />
+                  <div className="h-3 rounded-full" style={{ background: i < stageIndex ? 'var(--color-hero)' : i === stageIndex ? 'var(--color-gem)' : 'var(--color-paper-3)' }} />
                   <p className={`mt-1 text-[0.6875rem] truncate ${i === stageIndex ? 'text-chalk' : 'text-dim'}`}>{s.label}</p>
                 </li>
               ))}
@@ -258,8 +258,8 @@ export function InterviewPage() {
             <div className="flex items-center gap-4">
               <Mascot mood="happy" size={84} className="anim-pop shrink-0" />
               <div>
-                <p className="text-sm font-extrabold uppercase tracking-wide text-[var(--color-clear)]">Mock finished</p>
                 <h2 id="mock-summary" className="font-display text-3xl text-chalk mt-1">{boss.title}: your answers</h2>
+                <p className="text-sm font-extrabold text-[var(--color-clear)]">Mock finished</p>
                 <p className="font-bold text-dim">Rate each part honestly, then compare with the reference.</p>
               </div>
             </div>
@@ -317,7 +317,7 @@ export function InterviewPage() {
               )}
               <div>
                 <h3 className="font-extrabold">API sketch</h3>
-                <pre className="mt-1 whitespace-pre-wrap rounded-2xl border border-[var(--color-rail)] bg-[#f7f5f0] p-3 text-[0.8125rem] text-chalk">{boss.boss?.exampleApi}</pre>
+                <pre className="mt-1 whitespace-pre-wrap rounded-2xl border border-[var(--color-rail)] bg-paper-2 p-3 text-[0.8125rem] text-chalk">{boss.boss?.exampleApi}</pre>
               </div>
               {boss.bossDeep && (
                 <div>

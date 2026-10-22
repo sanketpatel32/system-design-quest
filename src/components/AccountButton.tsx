@@ -2,6 +2,7 @@ import { ClerkLoading, Show, SignInButton, UserButton, useUser } from '@clerk/re
 import { authEnabled } from '../lib/auth/clerk'
 import { displayNameFor } from '../lib/auth/displayName'
 import { CloudSync, SyncIndicator } from './CloudSync'
+import { IconGem } from './icons/HudIcons'
 
 /** Header sign-in / account control. Renders nothing when Clerk isn't configured. */
 export function AccountButton() {
@@ -40,7 +41,7 @@ function SignedInUser() {
       <span className="grid h-10 w-10 place-items-center">
         <UserButton appearance={{ elements: { avatarBox: { width: 36, height: 36 } } }}>
           <UserButton.MenuItems>
-            <UserButton.Action label={`Playing as ${name || 'you'}`} labelIcon={<span aria-hidden>🎮</span>} onClick={() => {}} />
+            <UserButton.Action label={`Playing as ${name || 'you'}`} labelIcon={<IconGem size={16} />} onClick={() => {}} />
           </UserButton.MenuItems>
         </UserButton>
       </span>
