@@ -5,7 +5,7 @@ DesignQuest should feel like a friendly learning game: a warm light page, satura
 ## Colour
 - **Page** `#FFF9F0` (soft warm white). **Cards** `#FFFFFF` with a 2px `#E6E0D6` outline and a 4px solid "floor" shadow in the same colour.
 - **Text** `#29303D`; secondary `#5B6472` (5.7:1 on the page).
-- **Hero green** for every primary action: button fill `#2F7D00` (white text 5.4:1), floor `#1F5600`. Bright `#58CC02` is used only for fills that carry no text (progress bars, the mascot, correct-answer accents).
+- **Hero green** for every primary action: button fill `#2F7D00` (white text 5.4:1), floor `#1F5600`. Bright `#58CC02` is used only for fills that carry no text (progress bars, the mascot, correct-answer accents). The "quest" half of the wordmark uses `--color-wordmark` `#378500` (4.6:1 on the paper).
 - **Feedback.** Correct uses `#D7FFB8` with `#235C00` text. Wrong uses `#FFDFE0` with `#8E1F26` text. Hearts are `#FF4B4B`, gems `#1CB0F6`, the streak flame `#FF9600`, gold/boss `#FFC800`.
 - **One cheerful colour per region** (`src/lib/design/transitTheme.ts`):
   - `bright` is for path nodes and illustrations.
@@ -16,7 +16,9 @@ DesignQuest should feel like a friendly learning game: a warm light page, satura
 
 ## Type
 - **Nunito** (600–900) everywhere, loaded through `@fontsource/nunito`. Headings and buttons use weight 900. Body text is 600 at 16–18px.
-- Buttons, chips and eyebrows are uppercase with letter-spacing of 0.04–0.05em.
+- Full-size buttons are uppercase at 16px with 0.03em letter-spacing. Small buttons (`.btn-sm`), chips, nav links, tab labels and status labels are sentence case and untracked: tracked caps under 16px read as generated chrome (Hallmark gate 67).
+- **Headings lead.** A page or banner opens on its heading; the fact line that used to sit above it (section, lesson number, duration) now sits under it in sentence case. No middle-dot strings with more than one dot.
+- **Colour lives in tokens.** Every colour is a `--color-*` token in the `@theme` block of `src/index.css`; components use the token utility (`bg-card`) or `var(--color-*)`, never a hex literal. The SVG artwork (logo mark, Byte, region art) keeps its drawn colours.
 
 ## Shape and controls
 - **Corners.** 16px on buttons and tiles, 20px on cards and banners, and pills for chips.
@@ -26,7 +28,7 @@ DesignQuest should feel like a friendly learning game: a warm light page, satura
 - **Answer tiles** (`.choice-row`):
   - The whole tile is the hit target (a transparent radio covers it), at least 56px tall, with a numbered key chip.
   - Selected is sky blue, correct is green, wrong is red. Each state has a matching floor.
-- **Focus.** A 3px `#1CB0F6` ring on everything, including tiles (`:has(input:focus-visible)`) and path nodes.
+- **Focus.** A 3px `--color-focus` (`#0B78B8`, 3:1 or better on the paper) ring on everything, including tiles (`:has(input:focus-visible)`) and path nodes. On a coloured banner the ring turns white, and dark ink on gold.
 
 ## Map
 - **A vertical winding path** of 72px round nodes, offset in a sine-like pattern (`WIND`).
@@ -90,12 +92,13 @@ DesignQuest should feel like a friendly learning game: a warm light page, satura
 - A light dotted grid, thick grey edges, and the same glyphs in the palette.
 
 ## Motion
-- **Springy, and used only where it carries meaning:**
+- **Ease-out by default, spring by exception.** UI state changes (pop-in, sheets, popovers, chevrons, progress fills) use `--ease-out-expo`. The overshoot `--ease-spring` is kept for the primary action (`.btn-cta`) and Byte's moods only.
+- **Where motion carries meaning:**
   - Pop-in for results and popovers.
   - Bob for the Start bubble and the loading Byte.
   - Wiggle for sad Byte.
   - The sheet slides up.
-  - Progress bars fill with a spring.
+  - Progress bars fill by animating `clip-path` (never `width`).
   - Buttons press down.
 - **Reduced motion.** `prefers-reduced-motion` and the in-app "Reduce motion" switch both cut animations to ~0ms, and confetti is skipped.
 
