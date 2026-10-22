@@ -226,9 +226,9 @@ export function QuizPage() {
         <>
           {answeredCount === 0 && !alreadyCleared && !lessonViewed && !skipLessonHint && (
             <div className="panel mb-5 flex flex-wrap items-center gap-3 p-3 text-sm short:mb-2 short:py-1.5" data-testid="lesson-first">
-              <span className="flex-1 font-bold text-chalk">New to this topic? The short lesson comes first and makes this quiz much easier.</span>
+              <span className="min-w-0 flex-[1_1_16rem] font-bold text-chalk">New to this topic? The short lesson comes first and makes this quiz much easier.</span>
               <Link to={`/topic/${topic.slug}`} className="btn-cta !min-h-[40px]">Read the lesson</Link>
-              <button type="button" className="text-sm font-extrabold text-dim" onClick={() => setSkipLessonHint(true)}>Skip</button>
+              <button type="button" className="min-h-[44px] px-2 text-sm font-extrabold text-dim hover:text-chalk" onClick={() => setSkipLessonHint(true)}>Skip</button>
             </div>
           )}
           <QuestionRenderer
