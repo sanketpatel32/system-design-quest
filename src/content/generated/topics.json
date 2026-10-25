@@ -119382,5 +119382,1746 @@
         "why": "Versioning decisions decide how many old APIs stay exposed"
       }
     ]
+  },
+  {
+    "id": 664,
+    "slug": "parser-and-deserialisation-attacks",
+    "region": "f6-security",
+    "order": 24,
+    "title": "Parser Attacks: Unsafe Deserialisation, XXE and Decompression Bombs",
+    "kind": "lesson",
+    "objectives": [
+      "Explain why native object deserialisation of untrusted data can run code",
+      "Configure parsers so documents cannot fetch files or expand without bound",
+      "Process uploaded archives with hard limits on size, count and ratio"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 15,
+    "prereqIds": [
+      308
+    ],
+    "cards": [
+      {
+        "id": "t664-c1",
+        "kind": "text",
+        "title": "Deserialising can mean running code",
+        "body": "Many languages have a native format that rebuilds whole objects, including their types, and runs constructors or hooks while doing it. If the bytes come from an attacker, they choose which types get built. Chains of harmless-looking classes, called gadget chains, can end in file writes or command execution (CWE-502). Use data-only formats such as JSON or Protocol Buffers, and map them into explicit schemas. If a native format cannot be avoided, allowlist the permitted types and sign the payload with an HMAC so only your servers can produce it.",
+        "teaches": [
+          "unsafe-deserialisation"
+        ]
+      },
+      {
+        "id": "t664-c2",
+        "kind": "text",
+        "title": "XXE: the document fetches files for the attacker",
+        "body": "XML allows a document to define entities, and an external entity points at a URI. A request containing <!ENTITY x SYSTEM \"file:///etc/passwd\"> and a reference to &x; makes a permissive parser read the file into the document, which may be echoed back. Pointing the URI at an internal address turns the parser into an SSRF tool. Nested entities can also expand a tiny document into gigabytes. The fix is parser configuration: disable DTDs, or at least external entities and entity expansion. Defaults differ between libraries and versions, so set them explicitly.",
+        "teaches": [
+          "xxe",
+          "parser-limits"
+        ]
+      },
+      {
+        "id": "t664-c3",
+        "kind": "diagram",
+        "title": "Worked example: importing uploaded archives safely",
+        "body": "Customers upload zip files of documents for bulk import.",
+        "teaches": [
+          "decompression-bomb",
+          "parser-limits"
+        ],
+        "steps": [
+          "Reject uploads above the size limit before reading them",
+          "Hand the job to a sandboxed worker with time and memory limits",
+          "Decompress as a stream, aborting past a total-bytes cap, a file-count cap or a 100:1 ratio",
+          "Reject entries with absolute paths or .. segments, so nothing is written outside the target folder",
+          "Parse each file with a data-only parser that has depth and size limits",
+          "Map the parsed values into an explicit schema and drop everything else"
+        ]
+      },
+      {
+        "id": "t664-c4",
+        "kind": "text",
+        "title": "Misconception: validating after parsing is enough",
+        "body": "With these attacks the damage happens during parsing: code runs while objects are rebuilt, entities fetch files while the document loads, and memory fills while an archive expands. Schema validation afterwards is still useful, but it comes too late to stop them. Protection has to be in how the parser is configured and limited before it sees a byte.",
+        "teaches": [
+          "parser-limits"
+        ]
+      },
+      {
+        "id": "t664-c5",
+        "kind": "text",
+        "title": "Trap: trusting data because it came from your own system",
+        "body": "A serialised object read back from a cookie, a cache, a queue or a file store feels internal. But users can edit cookies, and anyone who gains write access to the cache or queue can plant a payload that your service will execute. Treat data that crosses a trust boundary as untrusted, even when your own code wrote it originally.",
+        "teaches": [
+          "unsafe-deserialisation"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t664-a1",
+        "concept": "unsafe-deserialisation",
+        "type": "multiple_choice",
+        "prompt": "A service stores session state as a natively serialised object in a cookie. What is the main risk?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The cookie may exceed browser size limits"
+          },
+          {
+            "id": "b",
+            "label": "A forged cookie can make the server build objects of its choosing"
+          },
+          {
+            "id": "c",
+            "label": "Cookies with binary data are often rejected by older browsers and proxies"
+          },
+          {
+            "id": "d",
+            "label": "Users can read their own session state"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "The attacker controls which types get built, and gadget chains can turn that into code execution. Size limits and encoding problems cause bugs, not takeovers. Reading one’s own state is a privacy issue that signing or encryption solves, but neither fixes native deserialisation of forged data."
+      },
+      {
+        "id": "t664-a2",
+        "concept": "xxe",
+        "type": "multiple_choice",
+        "prompt": "Which change best prevents XXE in an XML API?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Escape angle brackets in the XML before parsing it"
+          },
+          {
+            "id": "b",
+            "label": "Disable DTDs and external entities in the parser"
+          },
+          {
+            "id": "c",
+            "label": "Validate the parsed document against a schema"
+          },
+          {
+            "id": "d",
+            "label": "Accept XML only over HTTPS connections"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "XXE happens inside the parser, so the parser must refuse entities. Escaping brackets breaks valid XML. Schema validation runs after the entity was already resolved. HTTPS protects the transfer, not the server from what it receives."
+      },
+      {
+        "id": "t664-a3",
+        "concept": "decompression-bomb",
+        "type": "multiple_choice",
+        "prompt": "A 40 KB upload expands to 40 GB when unzipped. Which control stops it?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Reject uploads larger than 10 MB before unzipping"
+          },
+          {
+            "id": "b",
+            "label": "Scan the archive with antivirus software first"
+          },
+          {
+            "id": "c",
+            "label": "Unzip into a temporary folder and delete it afterwards"
+          },
+          {
+            "id": "d",
+            "label": "Stream decompression with a cap on total output bytes"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "The danger is the expanded size, so the cap must apply to output while decompressing. A 40 KB file passes an upload limit easily. Antivirus looks for known malware, not ratios. A temporary folder still fills the disk before the clean-up runs."
+      },
+      {
+        "id": "t664-a4",
+        "concept": "decompression-bomb",
+        "type": "estimation",
+        "prompt": "An import pipeline allows a 100:1 compression ratio and a hard cap of 1 GB of output. For a 5 MB upload, how many MB can it write before aborting?",
+        "unit": "MB",
+        "target": 500,
+        "assumptions": [
+          "5 MB upload",
+          "Ratio limit 100:1",
+          "Absolute cap 1 GB, which is 1,000 MB"
+        ],
+        "formula": "min(upload × ratio, absolute cap)",
+        "workedAnswer": "5 MB at up to 100:1 allows 500 MB, below the 1,000 MB cap, so the ratio limit stops it first.",
+        "explanation": "Design implication: the ratio limit protects against small bombs, the absolute cap against large ones. You need both, and both must be checked while streaming.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          1000,
+          5
+        ]
+      },
+      {
+        "id": "t664-a5",
+        "concept": "parser-limits",
+        "type": "drag_order",
+        "prompt": "Order the stages of a safe import of an uploaded archive.",
+        "items": [
+          {
+            "id": "s4",
+            "label": "Parse each file with a data-only parser that has limits"
+          },
+          {
+            "id": "s2",
+            "label": "Start a sandboxed worker with time and memory limits"
+          },
+          {
+            "id": "s5",
+            "label": "Map parsed values into an explicit schema"
+          },
+          {
+            "id": "s1",
+            "label": "Check the upload size against a limit"
+          },
+          {
+            "id": "s3",
+            "label": "Decompress as a stream with byte, file-count and ratio caps"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Cheap checks first, then isolation, then bounded decompression and parsing. The schema step at the end keeps only the fields the import expects."
+      },
+      {
+        "id": "t664-a6",
+        "concept": "unsafe-deserialisation",
+        "type": "tradeoff",
+        "prompt": "A legacy service exchanges natively serialised objects with partners over a message queue.",
+        "constraints": [
+          "Migration will take two quarters",
+          "Partners run their own code",
+          "The queue is reachable from partner networks"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "Move to a data-only format with a schema; meanwhile allowlist types and sign messages",
+            "description": "Migrate and contain"
+          },
+          {
+            "id": "p2",
+            "label": "Keep the native format and add TLS to the queue",
+            "description": "Add TLS"
+          },
+          {
+            "id": "p3",
+            "label": "Keep the format and filter out known gadget classes",
+            "description": "Block gadgets"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "A data-only format cannot build arbitrary types"
+          },
+          {
+            "id": "r2",
+            "label": "Type allowlists and signatures cut risk while the migration runs"
+          },
+          {
+            "id": "r3",
+            "label": "TLS stops a compromised partner from sending crafted objects"
+          },
+          {
+            "id": "r4",
+            "label": "Blocking known gadget classes covers chains found in future"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "TLS protects the channel, but a compromised partner sends its payload through that channel.",
+          "r4": "New gadget chains are found regularly, so a denylist is out of date as soon as one appears."
+        },
+        "explanation": "Remove the dangerous capability, and contain it with allowlists and signatures until the migration is done."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t664-f1",
+        "front": "Why native deserialisation is dangerous",
+        "back": "The input picks which types are built, and gadget chains can run code."
+      },
+      {
+        "id": "t664-f2",
+        "front": "XXE fix",
+        "back": "Disable DTDs, or external entities and entity expansion, in the parser configuration."
+      },
+      {
+        "id": "t664-f3",
+        "front": "Decompression limits",
+        "back": "Cap total bytes, file count and ratio while streaming."
+      }
+    ],
+    "sources": [
+      {
+        "title": "OWASP Deserialization Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html"
+      },
+      {
+        "title": "OWASP XML External Entity Prevention Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html"
+      },
+      {
+        "title": "CWE-502: Deserialization of Untrusted Data",
+        "url": "https://cwe.mitre.org/data/definitions/502.html"
+      },
+      {
+        "title": "CWE-409: Improper Handling of Highly Compressed Data",
+        "url": "https://cwe.mitre.org/data/definitions/409.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "unsafe-deserialisation",
+        "xxe",
+        "decompression-bomb",
+        "parser-limits"
+      ],
+      "mechanism": {
+        "title": "How to make parsing safe",
+        "steps": [
+          "Inventory parsers: list every place the system turns bytes into structures, including request bodies, uploaded files, cookies, cache entries, queue messages, configuration files and documents from partners. Each one is an entry point.",
+          "Prefer data-only formats: choose formats that describe values, not types, and map them into explicit schemas. Remove native object deserialisation wherever untrusted data can reach it, and sign anything that must round-trip through a client.",
+          "Configure parsers defensively: turn off DTDs and external entities in XML parsers, turn off type information in formats that support it, and set limits on nesting depth, string length, element count and total size.",
+          "Bound decompression: stream archives and compressed bodies with caps on output bytes, file count and compression ratio, and refuse paths that would write outside the target folder.",
+          "Isolate risky work: run file conversion and parsing of complex formats in sandboxed workers with time, memory and network limits, so a parser bug cannot reach the main service or internal addresses.",
+          "Test the parsers: fuzz them with malformed input, include known attack documents in regression tests, and track parser library versions closely, because many published flaws are in parsers."
+        ]
+      },
+      "useWhen": [
+        "Services that accept files, documents or serialised data from users or partners",
+        "Systems that read cookies, caches or queues that other parties could write to"
+      ],
+      "avoidWhen": [
+        "Rolling your own parser for a complex format",
+        "Relying on a library’s defaults without checking them for each version"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Threat",
+          "Happens during",
+          "Control"
+        ],
+        "rows": [
+          [
+            "Unsafe deserialisation",
+            "Rebuilding objects",
+            "Data-only formats; type allowlists; signatures"
+          ],
+          [
+            "XXE and entity expansion",
+            "Resolving entities",
+            "Disable DTDs and external entities"
+          ],
+          [
+            "Decompression bombs",
+            "Expanding archives",
+            "Byte, count and ratio caps while streaming"
+          ],
+          [
+            "Path traversal from archives",
+            "Writing extracted files",
+            "Reject absolute and .. paths"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How big can a tiny XML document get?",
+        "assumptions": [
+          "Nine nested entity levels in a document under 1 KB",
+          "Level 1 holds 10 copies of a 3-byte string",
+          "Each further level repeats the one below 10 times"
+        ],
+        "steps": [
+          "Level 1: 10 copies of the 3-byte string, 30 bytes",
+          "Each level multiplies the copies by 10",
+          "After 9 levels: a billion copies, about 3 billion bytes or 3 GB",
+          "One more level would need about 30 GB"
+        ],
+        "result": "A document under 1 KB can demand about 3 GB of memory unless entity expansion is capped or DTDs are off."
+      },
+      "india": {
+        "title": "CWE and OWASP on unsafe parsing",
+        "label": "Official documentation",
+        "body": "MITRE’s CWE-502, Deserialization of Untrusted Data, describes products that deserialise untrusted data without sufficiently verifying that the result will be valid. The OWASP Deserialization Cheat Sheet advises that the safest architecture is not to accept serialised objects from untrusted sources at all, or to accept only primitive data types. The OWASP Top 10:2025 maps XML external entity processing (CWE-611) into Security Misconfiguration, reflecting that the fix is mostly parser configuration."
+      },
+      "pitfalls": [
+        {
+          "trap": "Validating the document after the parser has already resolved entities",
+          "say": "Configure the parser to refuse DTDs and external entities before it reads anything."
+        },
+        {
+          "trap": "Keeping native serialised objects in cookies because the data is “ours”",
+          "say": "Users can edit cookies, so store an opaque session id or a signed, data-only token instead."
+        },
+        {
+          "trap": "Checking only the upload size of archives",
+          "say": "Cap the expanded size, the file count and the ratio while decompressing."
+        }
+      ],
+      "takeaways": [
+        "Native deserialisation of untrusted data can run code",
+        "XXE is fixed in parser configuration",
+        "Limit decompression by output, count and ratio",
+        "Treat data that crosses a trust boundary as untrusted"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What does the response contain?",
+      "prompt": "An XML API with a permissive parser receives a document that defines an external entity pointing at file:///etc/hostname and uses it in a field the API echoes back.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The contents of the server’s hostname file",
+          "feedback": "Right: the parser resolved the entity and the API returned it."
+        },
+        {
+          "id": "b",
+          "label": "An error, since file paths are not valid entity values",
+          "feedback": "File URIs are exactly what external entities accept."
+        },
+        {
+          "id": "c",
+          "label": "The literal text of the entity reference",
+          "feedback": "That only happens when entity expansion is off."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Turn off DTDs and external entities in every XML parser, and check the settings for each library version."
+    },
+    "seeAlso": [
+      {
+        "topicId": 234,
+        "why": "Parser attacks are a cousin of injection: data treated as instructions"
+      },
+      {
+        "topicId": 232,
+        "why": "Uploads are the usual way archives and documents reach a parser"
+      },
+      {
+        "topicId": 308,
+        "why": "XXE can make the parser fetch internal URLs, which is SSRF"
+      }
+    ]
+  },
+  {
+    "id": 665,
+    "slug": "password-reset-and-account-recovery",
+    "region": "f6-security",
+    "order": 25,
+    "title": "Password Reset and Account Recovery",
+    "kind": "lesson",
+    "objectives": [
+      "Design reset tokens that cannot be guessed, reused or leaked",
+      "Keep recovery from revealing which accounts exist",
+      "Stop recovery from becoming a way around MFA"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 14,
+    "prereqIds": [
+      303,
+      310
+    ],
+    "cards": [
+      {
+        "id": "t665-c1",
+        "kind": "text",
+        "title": "Recovery is a second front door",
+        "body": "An account is only as strong as its weakest way back in. If a strong password and a security key can be bypassed by a reset email, a text message to a number that can be hijacked through a SIM swap, or a persuasive call to the support desk, attackers will use that path instead. Design recovery with the same care as login, and log and alert on it in the same way.",
+        "teaches": [
+          "recovery-channel-strength"
+        ]
+      },
+      {
+        "id": "t665-c2",
+        "kind": "text",
+        "title": "What makes a good reset token",
+        "body": "Generate at least 128 bits from a cryptographically secure random generator. Store only a hash of it, with the account and an expiry of 15 to 60 minutes. Accept it once, then delete it. Send it only to a channel registered before the request, never to an address supplied in the request. Keep the reset page free of third-party scripts and set a strict Referrer-Policy, because the token sits in the URL.",
+        "teaches": [
+          "reset-tokens"
+        ]
+      },
+      {
+        "id": "t665-c3",
+        "kind": "diagram",
+        "title": "Worked example: a reset flow that resists takeover",
+        "body": "A user has forgotten their password and has an authenticator app enrolled.",
+        "teaches": [
+          "reset-tokens",
+          "recovery-enumeration",
+          "session-invalidation"
+        ],
+        "steps": [
+          "The form replies “If an account exists, we have sent a link” in similar time either way",
+          "For a real account, store a hash of a random token with a 30-minute expiry and email the link",
+          "The link page checks the token, then asks for the authenticator code, because MFA is enrolled",
+          "The new password is checked against breached-password lists",
+          "On success: delete the token, end all other sessions and notify the user on every registered channel"
+        ]
+      },
+      {
+        "id": "t665-c4",
+        "kind": "text",
+        "title": "Misconception: security questions add security",
+        "body": "Answers to “mother’s maiden name” or “first school” are often public, guessable from social media, or shared with family. They are also hard to change once leaked. NIST SP 800-63B tells verifiers not to prompt users for secrets based on this kind of personal information. Use recovery codes issued at enrolment, a second registered factor, or a verified identity check instead.",
+        "teaches": [
+          "recovery-channel-strength"
+        ]
+      },
+      {
+        "id": "t665-c5",
+        "kind": "text",
+        "title": "Trap: a reset that skips MFA",
+        "body": "A reset link proves control of the email inbox, nothing more. If the account has MFA, the reset must still demand a second factor or a recovery code, otherwise anyone who phishes the inbox owns the account. When users have lost every factor, support-desk recovery needs strong evidence, a waiting period and notifications to the old channels, so the real owner has time to object.",
+        "teaches": [
+          "recovery-channel-strength",
+          "session-invalidation"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t665-a1",
+        "concept": "reset-tokens",
+        "type": "multiple_choice",
+        "prompt": "Which reset token design is best?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The user id and a timestamp, encrypted with a server key"
+          },
+          {
+            "id": "b",
+            "label": "A 6-digit code sent by text message and valid for 24 hours"
+          },
+          {
+            "id": "c",
+            "label": "Random 128 bits, single use, 30-minute expiry, stored hashed"
+          },
+          {
+            "id": "d",
+            "label": "A hash of the email address and the current date"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Randomness makes it unguessable, single use and a short expiry limit replay, and hashing protects tokens if the database leaks. An encrypted id and time can be replayed until it expires and is not single use. Six digits for a whole day is guessable without strict attempt limits. A hash of known values can be computed by anyone."
+      },
+      {
+        "id": "t665-a2",
+        "concept": "recovery-enumeration",
+        "type": "multiple_choice",
+        "prompt": "What should the reset form reply when the email address is not registered?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "An error saying that no account uses that email"
+          },
+          {
+            "id": "b",
+            "label": "A suggestion to sign up with that email instead"
+          },
+          {
+            "id": "c",
+            "label": "The same message it shows for registered emails"
+          },
+          {
+            "id": "d",
+            "label": "A CAPTCHA, followed by the account status"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "An identical reply, in similar time, stops attackers from building lists of valid accounts. An explicit error and a sign-up suggestion both reveal that the account does not exist. A CAPTCHA slows enumeration but still reveals the status afterwards."
+      },
+      {
+        "id": "t665-a3",
+        "concept": "session-invalidation",
+        "type": "multiple_choice",
+        "prompt": "After a successful password reset, what should happen to the account’s existing sessions?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Keep them, so the user stays signed in on other devices"
+          },
+          {
+            "id": "b",
+            "label": "End the other sessions and notify the user"
+          },
+          {
+            "id": "c",
+            "label": "End only sessions older than 30 days"
+          },
+          {
+            "id": "d",
+            "label": "End them only if the user ticks a box"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "A reset often follows a takeover, and the attacker may still hold a session, so it must end. Keeping sessions, ending only old ones or leaving it to a box the user may not tick all leave a live attacker signed in."
+      },
+      {
+        "id": "t665-a4",
+        "concept": "reset-tokens",
+        "type": "estimation",
+        "prompt": "A 6-digit reset code is valid for 15 minutes, and the server does not limit attempts. An attacker makes 100 guesses per second. What is their chance, in percent, of guessing it?",
+        "unit": "percent",
+        "target": 9,
+        "assumptions": [
+          "1,000,000 possible codes",
+          "15 minutes, which is 900 seconds",
+          "100 guesses per second"
+        ],
+        "formula": "guesses / possible codes",
+        "workedAnswer": "100 × 900 = 90,000 guesses; 90,000 / 1,000,000 = 9%.",
+        "explanation": "Design implication: short codes need attempt limits, such as 5 tries before the code is cancelled. A 128-bit link token needs no such limit to stay safe.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          0.01,
+          90
+        ]
+      },
+      {
+        "id": "t665-a5",
+        "concept": "reset-tokens",
+        "type": "drag_order",
+        "prompt": "Order the steps of a safe password reset.",
+        "items": [
+          {
+            "id": "s2",
+            "label": "Store a hash of a random token with an expiry"
+          },
+          {
+            "id": "s5",
+            "label": "Set the new password, then end sessions and notify the user"
+          },
+          {
+            "id": "s1",
+            "label": "Show the same reply whether or not the account exists"
+          },
+          {
+            "id": "s4",
+            "label": "Check the token, then ask for a second factor if enrolled"
+          },
+          {
+            "id": "s3",
+            "label": "Send the link to the registered email address"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "The reply comes first and reveals nothing. The token exists only as a hash, the link goes to a registered channel, MFA still applies, and the account is cleaned up after the change."
+      },
+      {
+        "id": "t665-a6",
+        "concept": "recovery-channel-strength",
+        "type": "tradeoff",
+        "prompt": "Users who have lost both their phone and their recovery codes call support to get back into their accounts.",
+        "constraints": [
+          "Accounts hold stored payment methods",
+          "Attackers have tried social engineering before",
+          "Real users are often stressed and in a hurry"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "Strong identity evidence, a waiting period and alerts to old channels",
+            "description": "Verify and wait"
+          },
+          {
+            "id": "p2",
+            "label": "Ask for date of birth and postcode, then reset at once",
+            "description": "Known facts"
+          },
+          {
+            "id": "p3",
+            "label": "Refuse recovery; the account is lost",
+            "description": "No recovery"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "A delay with alerts lets the real owner stop a takeover"
+          },
+          {
+            "id": "r2",
+            "label": "Strong evidence resists social engineering better than facts"
+          },
+          {
+            "id": "r3",
+            "label": "Date of birth and postcode prove who someone is"
+          },
+          {
+            "id": "r4",
+            "label": "Refusing recovery costs the business nothing"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "Both are often public or leaked, so they prove very little.",
+          "r4": "Locked-out customers churn, complain and flood support."
+        },
+        "explanation": "Recovery without factors is the riskiest path, so slow it down and make it loud, rather than fast and quiet."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t665-f1",
+        "front": "Reset token checklist",
+        "back": "Random 128 bits, hashed at rest, single use, short expiry, registered channel only."
+      },
+      {
+        "id": "t665-f2",
+        "front": "Enumeration-safe reply",
+        "back": "“If an account exists, we have sent a link”, in similar time either way."
+      },
+      {
+        "id": "t665-f3",
+        "front": "After a reset",
+        "back": "End other sessions, keep MFA, and notify the user on all channels."
+      }
+    ],
+    "sources": [
+      {
+        "title": "OWASP Forgot Password Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html"
+      },
+      {
+        "title": "NIST SP 800-63B: Authentication and Lifecycle Management",
+        "url": "https://pages.nist.gov/800-63-4/sp800-63b.html"
+      },
+      {
+        "title": "CWE-640: Weak Password Recovery Mechanism for Forgotten Password",
+        "url": "https://cwe.mitre.org/data/definitions/640.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "reset-tokens",
+        "recovery-enumeration",
+        "recovery-channel-strength",
+        "session-invalidation"
+      ],
+      "mechanism": {
+        "title": "How a recovery system fits together",
+        "steps": [
+          "Offer strong recovery options at enrolment: one-time recovery codes, a second registered factor such as another security key, and verified contact channels. Recovery planned in advance is far safer than recovery improvised on a support call.",
+          "Request without revealing: accept the request, reply with the same message and in similar time whether or not the account exists, and rate-limit requests per account and per source so the form cannot be used to flood someone’s inbox.",
+          "Issue a strong token: generate 128 random bits, store only a hash with the account and a short expiry, and send the link to the channel registered before the request. A new request cancels any earlier token.",
+          "Verify at use: check the token in constant time, accept it once, and if MFA is enrolled require the second factor or a recovery code before allowing a change.",
+          "Finish cleanly: set the new password after checking it against breached lists, delete the token, end all other sessions and refresh tokens, and notify the user on every registered channel.",
+          "Handle the hard cases slowly: when users have lost all factors, require strong identity evidence, add a waiting period, alert the old channels and log the case for review."
+        ]
+      },
+      "useWhen": [
+        "Any system with self-service password or factor recovery",
+        "Support teams that can reset accounts on request"
+      ],
+      "avoidWhen": [
+        "Security questions as a recovery factor",
+        "Sending reset links to an address supplied in the request"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Recovery path",
+          "Strength",
+          "Weakness"
+        ],
+        "rows": [
+          [
+            "Recovery codes",
+            "Strong and offline",
+            "Users lose them or never save them"
+          ],
+          [
+            "Second registered factor",
+            "Phishing-resistant if it is a security key",
+            "Needs users to enrol two factors"
+          ],
+          [
+            "Email link",
+            "Familiar and cheap",
+            "Only as strong as the inbox"
+          ],
+          [
+            "Support desk with identity check",
+            "Works when all else is lost",
+            "Target for social engineering; slow"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How much do attempt limits matter for short codes?",
+        "assumptions": [
+          "6-digit codes, 1,000,000 possibilities",
+          "5 attempts allowed per code",
+          "At most 10 codes requested per account per day"
+        ],
+        "steps": [
+          "Guesses per day: 5 × 10 = 50",
+          "Chance per day: 50 / 1,000,000 = 0.005%",
+          "Over a year: 50 × 365 = 18,250 guesses, about 1.8% of the space",
+          "Without limits, 100 guesses a second covers the whole space in under 3 hours"
+        ],
+        "result": "With attempt and request limits a 6-digit code holds up for a year in this illustrative case; without them it falls within hours."
+      },
+      "india": {
+        "title": "OWASP and CWE on password recovery",
+        "label": "Official documentation",
+        "body": "The OWASP Forgot Password Cheat Sheet recommends returning a consistent message for existing and non-existent accounts, keeping response times uniform, generating tokens with a cryptographically secure random generator, making them single use with an expiry, and not making any change to the account until a valid token is presented, so that attackers cannot lock users out. MITRE’s CWE-640 describes weak recovery mechanisms that let attackers change or recover passwords without proper verification."
+      },
+      "pitfalls": [
+        {
+          "trap": "Telling users that no account exists for an email",
+          "say": "Use one reply for both cases, so the form cannot be used to enumerate accounts."
+        },
+        {
+          "trap": "Letting a reset link bypass MFA",
+          "say": "Ask for the second factor or a recovery code after the link, because the email alone is not enough."
+        },
+        {
+          "trap": "Leaving old sessions alive after a reset",
+          "say": "End all other sessions and refresh tokens, and tell the user on all channels."
+        }
+      ],
+      "takeaways": [
+        "Recovery is a second front door; make it as strong as login",
+        "Tokens: random, hashed, single use, short-lived",
+        "Reply identically whether or not the account exists",
+        "Keep MFA in the reset and end other sessions after it"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Who else can see the reset token?",
+      "prompt": "The reset page loads a third-party analytics script, and the token is in the page URL.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The script can read the full URL, token included",
+          "feedback": "Right: page scripts can read the location, and may send it home."
+        },
+        {
+          "id": "b",
+          "label": "Nobody, since TLS encrypts the URL",
+          "feedback": "TLS protects the network hop, not code running inside the page."
+        },
+        {
+          "id": "c",
+          "label": "Only the analytics provider’s domain name leaks",
+          "feedback": "Scripts on the page see the whole URL, not just a domain."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Keep reset pages free of third-party scripts, set a strict Referrer-Policy, and expire tokens quickly and after one use."
+    },
+    "seeAlso": [
+      {
+        "topicId": 303,
+        "why": "New passwords set during a reset still need safe storage and breach checks"
+      },
+      {
+        "topicId": 310,
+        "why": "Recovery must not undo the protection that MFA provides"
+      },
+      {
+        "topicId": 573,
+        "why": "Recovery forms face the same enumeration and stuffing attacks as login"
+      }
+    ]
+  },
+  {
+    "id": 666,
+    "slug": "least-privilege-and-iam-policies",
+    "region": "f6-security",
+    "order": 26,
+    "title": "Least Privilege and IAM Policy Design",
+    "kind": "lesson",
+    "objectives": [
+      "Scope a policy to the actions, resources and conditions a job needs",
+      "Replace standing admin access with time-limited elevation",
+      "Use last-used data to shrink permissions safely"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 14,
+    "prereqIds": [
+      306
+    ],
+    "cards": [
+      {
+        "id": "t666-c1",
+        "kind": "text",
+        "title": "Least privilege, in one sentence",
+        "body": "Each identity, whether a person, a service or a pipeline, gets only the actions, on only the resources, for only the time it needs. The test is the blast radius: if this credential were stolen right now, what could the thief do? A key that can read one bucket prefix is an incident. A key with admin rights over the account is a disaster.",
+        "teaches": [
+          "least-privilege"
+        ]
+      },
+      {
+        "id": "t666-c2",
+        "kind": "text",
+        "title": "The anatomy of a policy",
+        "body": "Cloud and platform policies share a shape: a principal (who), actions (what), resources (on what) and conditions (when and how), such as source network, MFA present or resource tags. In most cloud IAM systems an explicit deny overrides any allow. Wildcards are the usual mistake: “storage:*” on “*” grants deletion of every bucket. Name actions and resources explicitly, and add conditions where the platform supports them.",
+        "teaches": [
+          "policy-scoping"
+        ]
+      },
+      {
+        "id": "t666-c3",
+        "kind": "diagram",
+        "title": "Worked example: shrinking a service role",
+        "body": "A reporting service runs with full storage access on all buckets.",
+        "teaches": [
+          "policy-scoping",
+          "privilege-review"
+        ],
+        "steps": [
+          "Pull last-used data for the role over 90 days: it read and wrote objects under one prefix of one bucket",
+          "Write a policy allowing only object read and write on that prefix",
+          "Deploy it to staging and run the full job, watching for access-denied errors",
+          "Roll it out to production with an alert on access-denied errors",
+          "Remove the old broad policy and set a review date"
+        ]
+      },
+      {
+        "id": "t666-c4",
+        "kind": "text",
+        "title": "Misconception: our engineers are trusted, so admin is fine",
+        "body": "Trust is not the issue. Laptops are stolen, sessions are phished, tokens leak into logs and people make mistakes, such as running a delete against production instead of staging. Give engineers read access by default and time-limited elevation for changes, with approval, an expiry and logging. Keep a break-glass account for emergencies, locked away and alarmed.",
+        "teaches": [
+          "standing-access"
+        ]
+      },
+      {
+        "id": "t666-c5",
+        "kind": "text",
+        "title": "Trap: permissions only ever grow",
+        "body": "Access is granted quickly for a project and rarely removed. People change teams and keep old rights, services keep permissions for features that were deleted, and unused keys linger. Give grants an expiry, review access on a schedule, and remove permissions that last-used data shows have not been touched in months.",
+        "teaches": [
+          "privilege-review"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t666-a1",
+        "concept": "policy-scoping",
+        "type": "multiple_choice",
+        "prompt": "A nightly job reads files from one prefix in one bucket. Which policy fits least privilege?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Read and write on that bucket, to allow for future changes"
+          },
+          {
+            "id": "b",
+            "label": "Read on that prefix only, for the job’s own role"
+          },
+          {
+            "id": "c",
+            "label": "Read on all buckets in the account"
+          },
+          {
+            "id": "d",
+            "label": "Full storage access, limited to working hours"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "The job needs one action on one prefix, so that is all it gets. Future needs can be granted when they arrive. Reading all buckets exposes data the job never uses. A time window does not shrink what a stolen credential can do during that window."
+      },
+      {
+        "id": "t666-a2",
+        "concept": "standing-access",
+        "type": "multiple_choice",
+        "prompt": "Engineers need admin rights on the production database a few times a month. Which model is best?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Permanent admin rights for the on-call team only"
+          },
+          {
+            "id": "b",
+            "label": "One shared admin account whose password rotates monthly"
+          },
+          {
+            "id": "c",
+            "label": "Just-in-time elevation with approval, expiry and logging"
+          },
+          {
+            "id": "d",
+            "label": "Admin rights for whoever is on call that week"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Elevation on demand means a stolen credential is usually not admin, and each use is approved and recorded. Permanent and weekly rights both stand open between uses. A shared account cannot show who did what, and monthly rotation leaves weeks of exposure after a leak."
+      },
+      {
+        "id": "t666-a3",
+        "concept": "privilege-review",
+        "type": "multiple_choice",
+        "prompt": "Which data best shows which permissions a role can safely lose?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Last-used records for each permission over a long window"
+          },
+          {
+            "id": "b",
+            "label": "The permissions listed in the original design document"
+          },
+          {
+            "id": "c",
+            "label": "A survey asking teams which permissions they need"
+          },
+          {
+            "id": "d",
+            "label": "How many permissions it has compared with similar roles"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Usage data shows what the role actually does, and a long window catches monthly and quarterly jobs. Design documents go stale. Teams tend to ask to keep everything. Comparing counts says nothing about which permissions matter."
+      },
+      {
+        "id": "t666-a4",
+        "concept": "privilege-review",
+        "type": "estimation",
+        "prompt": "An organisation has 300 service roles, and a review finds 40% grant wildcard actions on all resources. If the team tightens 15 roles a week, how many weeks will it take?",
+        "unit": "weeks",
+        "target": 8,
+        "assumptions": [
+          "300 roles",
+          "40% have wildcard grants",
+          "15 roles tightened per week"
+        ],
+        "formula": "roles × share / roles per week",
+        "workedAnswer": "300 × 0.4 = 120 roles; 120 / 15 = 8 weeks.",
+        "explanation": "Sanity check: start with the roles whose credentials are most exposed, such as pipeline and internet-facing service roles, so the riskiest half is done in the first month.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          20,
+          1800
+        ]
+      },
+      {
+        "id": "t666-a5",
+        "concept": "privilege-review",
+        "type": "drag_order",
+        "prompt": "Order the steps for tightening an over-privileged role.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Test it in staging and watch for denied calls"
+          },
+          {
+            "id": "s5",
+            "label": "Remove the old broad policy and set a review date"
+          },
+          {
+            "id": "s1",
+            "label": "Collect last-used data for the role over a long window"
+          },
+          {
+            "id": "s4",
+            "label": "Roll it out with an alert on access-denied errors"
+          },
+          {
+            "id": "s2",
+            "label": "Write a policy with only the used actions and resources"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Evidence first, then a narrow policy, then a test, then a watched rollout. The broad policy goes only once the narrow one has proved itself."
+      },
+      {
+        "id": "t666-a6",
+        "concept": "policy-scoping",
+        "type": "multiple_choice",
+        "prompt": "One policy allows storage reads on all buckets, and another explicitly denies reads on the payroll bucket. In most cloud IAM systems, what happens when the role reads payroll?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The read is allowed, because an allow exists"
+          },
+          {
+            "id": "b",
+            "label": "The more specific rule wins, whichever it is"
+          },
+          {
+            "id": "c",
+            "label": "The read is denied, because explicit deny wins"
+          },
+          {
+            "id": "d",
+            "label": "The read is allowed unless MFA is missing"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Explicit deny overrides allow, which makes deny rules a reliable guardrail. A single allow is not enough when a deny matches. Specificity does not decide the outcome in these systems. MFA only matters if a condition asks for it."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t666-f1",
+        "front": "Least privilege test",
+        "back": "If this credential were stolen now, what could the thief do?"
+      },
+      {
+        "id": "t666-f2",
+        "front": "Policy parts",
+        "back": "Principal, actions, resources and conditions; explicit deny wins."
+      },
+      {
+        "id": "t666-f3",
+        "front": "Standing vs just-in-time access",
+        "back": "Elevate on demand with approval, expiry and logging instead of permanent admin."
+      }
+    ],
+    "sources": [
+      {
+        "title": "AWS: Security best practices in IAM",
+        "url": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html"
+      },
+      {
+        "title": "Google Cloud: Use IAM securely",
+        "url": "https://cloud.google.com/iam/docs/using-iam-securely"
+      },
+      {
+        "title": "NIST SP 800-53 Rev. 5: Security and Privacy Controls",
+        "url": "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "least-privilege",
+        "policy-scoping",
+        "standing-access",
+        "privilege-review"
+      ],
+      "mechanism": {
+        "title": "How to run least privilege as a practice",
+        "steps": [
+          "Separate identities: give each service, pipeline and person its own identity rather than sharing keys, so that permissions can be scoped and every action can be traced to one owner.",
+          "Prefer short-lived credentials: use workload identity and federation so services and pipelines receive temporary credentials, rather than long-lived keys that sit in configuration and leak.",
+          "Start narrow: grant the specific actions and resources a job needs, using predefined roles where they fit and custom policies where they are too broad, with conditions such as network, MFA or tags.",
+          "Elevate on demand: give people read access by default and time-limited elevation for changes, with approval for sensitive systems, and keep a monitored break-glass account for emergencies.",
+          "Add guardrails: use organisation-level deny policies to block the most dangerous actions everywhere, such as disabling audit logs or making storage public, whatever individual roles allow.",
+          "Review continuously: use last-used data and policy analysis tools to find unused and overly broad permissions, give grants expiry dates, and remove access when people change teams or leave."
+        ]
+      },
+      "useWhen": [
+        "Cloud accounts, clusters, databases and CI systems",
+        "Any credential that could leak, which means all of them"
+      ],
+      "avoidWhen": [
+        "Tightening production permissions without testing, which causes outages",
+        "Building one policy per person instead of roles that can be reviewed"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Approach",
+          "Reduces",
+          "Costs"
+        ],
+        "rows": [
+          [
+            "Narrow policies per service",
+            "Blast radius of a stolen key",
+            "Effort to write and maintain"
+          ],
+          [
+            "Just-in-time elevation",
+            "Hours of standing admin",
+            "Friction for urgent fixes"
+          ],
+          [
+            "Organisation-level deny guardrails",
+            "Worst-case actions everywhere",
+            "Occasional legitimate requests need exceptions"
+          ],
+          [
+            "Last-used reviews",
+            "Permission creep",
+            "Needs long enough data windows"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How much standing admin access does just-in-time remove?",
+        "assumptions": [
+          "20 engineers",
+          "Standing admin today, around the clock",
+          "With elevation: 3 sessions a month each, 2 hours per session"
+        ],
+        "steps": [
+          "Standing: 24 × 365 = 8,760 hours a year, and 20 × 8,760 = 175,200 admin-hours",
+          "Just-in-time: 3 × 2 = 6 hours a month each, 6 × 12 = 72 a year, and 20 × 72 = 1,440 admin-hours",
+          "Reduction: 1,440 / 175,200 ≈ 0.8% of the original exposure",
+          "Each remaining hour is approved and logged"
+        ],
+        "result": "Just-in-time elevation removes about 99% of admin-hours in this illustrative team."
+      },
+      "india": {
+        "title": "Cloud provider guidance on least privilege",
+        "label": "Official documentation",
+        "body": "AWS’s IAM best practices recommend applying least-privilege permissions, using temporary credentials for workloads, requiring MFA, and regularly reviewing and removing unused users, roles, permissions and credentials, using last-accessed information and policy generation from access activity. Google Cloud’s guidance recommends predefined or custom roles over the broad basic roles. NIST SP 800-53 Rev. 5 makes least privilege a control in its own right, AC-6, covering both people and processes acting on their behalf. It also asks organisations to review privileges periodically and to restrict privileged accounts to the people who need them, which is exactly what just-in-time elevation and last-used reviews put into practice."
+      },
+      "pitfalls": [
+        {
+          "trap": "Granting wildcard actions to get a service working quickly",
+          "say": "List the actions the service uses, and tighten with last-used data after a few weeks."
+        },
+        {
+          "trap": "Giving all engineers standing production admin",
+          "say": "Default to read access and elevate on demand with approval, expiry and logging."
+        },
+        {
+          "trap": "Removing permissions in production without a test",
+          "say": "Test in staging, roll out with an access-denied alert, then remove the old policy."
+        }
+      ],
+      "takeaways": [
+        "Scope actions, resources, conditions and time",
+        "Use short-lived credentials and separate identities",
+        "Replace standing admin with just-in-time elevation",
+        "Review with last-used data and add deny guardrails"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What can the attacker do?",
+      "prompt": "A CI pipeline’s cloud key has admin rights on the account and is printed into a public build log.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Anything the account allows, including deleting backups",
+          "feedback": "Right: the blast radius is the whole account."
+        },
+        {
+          "id": "b",
+          "label": "Only touch the pipeline’s own resources",
+          "feedback": "The key is admin; the pipeline’s scope is irrelevant."
+        },
+        {
+          "id": "c",
+          "label": "Nothing, since the key is meant only for CI",
+          "feedback": "Keys work for whoever holds them."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Give pipelines short-lived, narrowly scoped credentials, and block the most dangerous actions with organisation-level deny rules."
+    },
+    "seeAlso": [
+      {
+        "topicId": 306,
+        "why": "Least privilege is the design side of preventing broken access control"
+      },
+      {
+        "topicId": 307,
+        "why": "Secrets management decides how long a leaked credential stays useful"
+      },
+      {
+        "topicId": 571,
+        "why": "Workload identity replaces long-lived service keys"
+      }
+    ]
+  },
+  {
+    "id": 667,
+    "slug": "business-logic-abuse-and-races",
+    "region": "f6-security",
+    "order": 27,
+    "title": "Business Logic Abuse and Race Conditions",
+    "kind": "lesson",
+    "objectives": [
+      "Spot requests that are valid but lead to outcomes the business never allowed",
+      "Make check-then-act operations atomic so one use cannot become many",
+      "Enforce workflows and prices on the server"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 15,
+    "prereqIds": [
+      306
+    ],
+    "cards": [
+      {
+        "id": "t667-c1",
+        "kind": "text",
+        "title": "The request is valid; the outcome is not",
+        "body": "Logic flaws use features as designed, in an order or combination nobody planned for: a negative quantity that lowers the total, two discounts that stack, a refund larger than the payment, a currency switch after the price is fixed, or a confirm call made without paying. Scanners rarely find them because no single request looks malformed. Write down the invariants the business relies on, such as “the amount charged equals the server’s price minus approved discounts”, and check them on the server.",
+        "teaches": [
+          "business-logic-flaws"
+        ]
+      },
+      {
+        "id": "t667-c2",
+        "kind": "text",
+        "title": "Race conditions turn one into many",
+        "body": "A single-use gift card is checked with one query and marked used with another. Send 20 redeem requests at the same moment and several may pass the check before any marks it used. This is a time-of-check to time-of-use flaw (CWE-367). The fix is to make check and update one atomic step: a conditional update such as “mark used where id = X and used = false” that reports how many rows changed, a unique constraint, or a row lock inside the transaction.",
+        "teaches": [
+          "toctou"
+        ]
+      },
+      {
+        "id": "t667-c3",
+        "kind": "diagram",
+        "title": "Worked example: redeeming a gift card safely",
+        "body": "A gift card worth 500 must be redeemable exactly once, even under parallel requests.",
+        "teaches": [
+          "toctou",
+          "invariant-checks"
+        ],
+        "steps": [
+          "Check that the caller may use this card",
+          "Begin a transaction",
+          "Run a conditional update that marks the card used only if it is still unused",
+          "If one row changed, add the credit in the same transaction; if none did, return “already used”",
+          "Commit, and store the result under the request’s idempotency key so retries get the same answer"
+        ]
+      },
+      {
+        "id": "t667-c4",
+        "kind": "text",
+        "title": "Misconception: the app enforces the workflow",
+        "body": "The checkout screens go cart, address, payment, confirm, but the server sees only separate requests and anyone can call them in any order. Keep the state of each order on the server and allow only valid transitions, such as “pending payment” to “paid” only after the payment provider confirms it to the server directly. A client saying “payment succeeded” is a claim, not a fact.",
+        "teaches": [
+          "workflow-bypass"
+        ]
+      },
+      {
+        "id": "t667-c5",
+        "kind": "text",
+        "title": "Trap: trusting prices and totals from the client",
+        "body": "If a client sends item prices or a total, an attacker can edit them. Clients should send only item ids, quantities and codes. The server looks up prices, applies discounts according to its own rules, checks that quantities are positive and within limits, and computes the total itself. The same applies to discount percentages, shipping fees and loyalty points.",
+        "teaches": [
+          "invariant-checks"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t667-a1",
+        "concept": "toctou",
+        "type": "multiple_choice",
+        "prompt": "A single-use voucher is checked with a SELECT, then marked used with a separate UPDATE. An attacker sends 20 requests at once. What happens?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Several requests may pass the check before any marks it used"
+          },
+          {
+            "id": "b",
+            "label": "The database queues them, so only the first one succeeds"
+          },
+          {
+            "id": "c",
+            "label": "The web server rejects parallel requests from one user"
+          },
+          {
+            "id": "d",
+            "label": "Only the last request succeeds, overwriting the others"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Each request reads “unused” before the others write, so several redeem it. The database runs the two statements separately and does not know they belong together. Web servers happily handle parallel requests. Each redemption is a separate credit, so nothing is overwritten."
+      },
+      {
+        "id": "t667-a2",
+        "concept": "toctou",
+        "type": "multiple_choice",
+        "prompt": "Which change makes the voucher single-use under concurrency?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A check in the app that the voucher still looks unused"
+          },
+          {
+            "id": "b",
+            "label": "A one-second pause between the check and the update"
+          },
+          {
+            "id": "c",
+            "label": "A conditional update that marks it used only if unused"
+          },
+          {
+            "id": "d",
+            "label": "Disabling the redeem button after one click"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "The database applies the condition and the write as one step and reports whether a row changed, so only one request can win. A second app check has the same race. A pause widens the window. A disabled button stops double clicks, not scripts."
+      },
+      {
+        "id": "t667-a3",
+        "concept": "workflow-bypass",
+        "type": "multiple_choice",
+        "prompt": "An order becomes “paid” when the client calls /orders/{id}/confirm after leaving the payment page. What is the flaw?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The endpoint should use PUT rather than POST"
+          },
+          {
+            "id": "b",
+            "label": "The server trusts the client to say payment happened"
+          },
+          {
+            "id": "c",
+            "label": "Order ids in the path can be guessed"
+          },
+          {
+            "id": "d",
+            "label": "The confirm call is missing a CSRF token"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Anyone can call confirm without paying. The server must learn of payment from the provider, through a verified callback or a server-side check. The HTTP method does not matter here. Guessable ids and CSRF are real issues, but fixing them still lets a user confirm their own unpaid order."
+      },
+      {
+        "id": "t667-a4",
+        "concept": "toctou",
+        "type": "estimation",
+        "prompt": "The gap between check and update is 50 ms. An attacker times requests to arrive 5 ms apart. About how many redemptions can pass inside one gap?",
+        "unit": "redemptions",
+        "target": 10,
+        "assumptions": [
+          "50 ms between check and update",
+          "Requests arrive 5 ms apart",
+          "Each request that checks inside the gap succeeds"
+        ],
+        "formula": "gap / spacing",
+        "workedAnswer": "50 / 5 = 10 requests check inside the gap, so about 10 redemptions.",
+        "explanation": "Design implication: shrinking the gap only lowers the count; at any gap above zero, a well-timed burst wins more than once. Only an atomic check-and-update brings it to one.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          1,
+          250
+        ]
+      },
+      {
+        "id": "t667-a5",
+        "concept": "invariant-checks",
+        "type": "tradeoff",
+        "prompt": "A mobile app sends each cart line with its price, plus the order total, to the checkout API.",
+        "constraints": [
+          "Prices change during sales",
+          "Discount rules are complex",
+          "Old app versions stay in use for months"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "Client sends item ids and quantities; server computes the rest",
+            "description": "Server computes"
+          },
+          {
+            "id": "p2",
+            "label": "Server checks that the total equals the sum of client prices",
+            "description": "Check the sum"
+          },
+          {
+            "id": "p3",
+            "label": "Sign the cart with a key inside the app",
+            "description": "Signed cart"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "Prices and discounts come from data the client cannot edit"
+          },
+          {
+            "id": "r2",
+            "label": "Quantity checks sit next to the price calculation"
+          },
+          {
+            "id": "r3",
+            "label": "Checking the client’s sum catches edited prices"
+          },
+          {
+            "id": "r4",
+            "label": "A key inside the app keeps the cart tamper-proof"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "An attacker edits the prices and the total together, so the sum still matches.",
+          "r4": "Anyone can extract a key shipped inside an app and sign whatever they like."
+        },
+        "explanation": "Treat the client as a source of intentions, not facts: it says what it wants, and the server decides what it costs."
+      },
+      {
+        "id": "t667-a6",
+        "concept": "toctou",
+        "type": "drag_order",
+        "prompt": "Order the steps of a race-safe voucher redemption.",
+        "items": [
+          {
+            "id": "s4",
+            "label": "If one row changed, apply the credit in the same transaction"
+          },
+          {
+            "id": "s1",
+            "label": "Authenticate and check the caller may use the voucher"
+          },
+          {
+            "id": "s5",
+            "label": "Commit, and store the result under the idempotency key"
+          },
+          {
+            "id": "s3",
+            "label": "Mark it used only if still unused, and check how many rows changed"
+          },
+          {
+            "id": "s2",
+            "label": "Begin a transaction"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Authorisation first, then one transaction in which the conditional update decides the winner and the credit follows. Storing the result makes retries safe."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t667-f1",
+        "front": "TOCTOU",
+        "back": "A check and the action it guards run separately, so parallel requests slip between them."
+      },
+      {
+        "id": "t667-f2",
+        "front": "Atomic fix",
+        "back": "A conditional update, a unique constraint or a row lock in one transaction."
+      },
+      {
+        "id": "t667-f3",
+        "front": "Client inputs at checkout",
+        "back": "Ids, quantities and codes only; the server computes prices and totals."
+      }
+    ],
+    "sources": [
+      {
+        "title": "OWASP: Business logic vulnerability",
+        "url": "https://owasp.org/www-community/vulnerabilities/Business_logic_vulnerability"
+      },
+      {
+        "title": "OWASP WSTG: Business Logic Testing",
+        "url": "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/10-Business_Logic_Testing/README"
+      },
+      {
+        "title": "CWE-367: Time-of-check Time-of-use (TOCTOU) Race Condition",
+        "url": "https://cwe.mitre.org/data/definitions/367.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "business-logic-flaws",
+        "toctou",
+        "workflow-bypass",
+        "invariant-checks"
+      ],
+      "mechanism": {
+        "title": "How to defend business logic",
+        "steps": [
+          "Write down the invariants: for each money, stock or reward flow, list what must stay true, such as “a voucher credits once”, “refunds never exceed payments” and “stock never goes below zero”. These become the checks and the tests.",
+          "Compute on the server: take only intentions from clients, such as ids, quantities and codes, and derive prices, discounts, fees and totals from server data under server rules, validating ranges such as positive quantities and per-order limits.",
+          "Model workflows as state machines: store each order’s state on the server, allow only listed transitions, and move to states like “paid” only on evidence the server obtains itself, such as a verified callback from the payment provider.",
+          "Make check-and-act atomic: express single-use and limited-use rules as conditional updates, unique constraints or locks inside one transaction, and treat “zero rows changed” as the loser of the race.",
+          "Make retries safe: attach idempotency keys to operations with side effects, so a retried request returns the stored result instead of acting twice.",
+          "Test like an attacker: send requests out of order, in parallel bursts and with edited values, and monitor business metrics such as refunds per order and voucher redemptions per code."
+        ]
+      },
+      "useWhen": [
+        "Payments, refunds, vouchers, rewards, stock and limits of any kind",
+        "Multi-step flows where steps happen in separate requests"
+      ],
+      "avoidWhen": [
+        "Relying on client-side checks or button states for limits",
+        "Fixing races with delays or retries, which only change the odds"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Defence",
+          "Stops",
+          "Watch for"
+        ],
+        "rows": [
+          [
+            "Server-side pricing",
+            "Edited prices, totals and discounts",
+            "Rules duplicated in client and server drifting apart"
+          ],
+          [
+            "State machine for workflows",
+            "Skipped or reordered steps",
+            "Transitions added later without review"
+          ],
+          [
+            "Atomic conditional updates",
+            "Races on single-use resources",
+            "Checks done outside the transaction"
+          ],
+          [
+            "Idempotency keys",
+            "Double actions on retry",
+            "Keys that expire before retries end"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "What does a voucher race cost?",
+        "assumptions": [
+          "10,000 vouchers worth 500 each",
+          "Attackers race 1% of them",
+          "Each raced voucher redeems 10 times instead of once"
+        ],
+        "steps": [
+          "Raced vouchers: 10,000 × 0.01 = 100",
+          "Extra redemptions: 100 × 9 = 900",
+          "Loss: 900 × 500 = 450,000",
+          "That is 9% on top of the face value of the whole campaign, 5,000,000"
+        ],
+        "result": "A race on 1% of vouchers costs an illustrative 450,000, about 9% of the campaign’s face value."
+      },
+      "india": {
+        "title": "OWASP on testing business logic",
+        "label": "Official documentation",
+        "body": "The OWASP Web Security Testing Guide has a whole section on business logic testing. It includes tests for forged requests, integrity checks, process timing, limits on how many times a function can be used, and circumvention of workflows. MITRE’s CWE-367 describes time-of-check to time-of-use races, where a resource is checked and then used after its state may have changed, which is the pattern behind most double-redemption bugs. Both sources stress that these flaws are specific to each application, so they need tests written from its own rules."
+      },
+      "pitfalls": [
+        {
+          "trap": "Accepting prices or totals from the client",
+          "say": "Take ids and quantities and compute prices, discounts and totals on the server."
+        },
+        {
+          "trap": "Checking a voucher, then marking it used in a separate query",
+          "say": "Use one conditional update and check how many rows changed."
+        },
+        {
+          "trap": "Marking orders paid when the client says so",
+          "say": "Wait for the payment provider to confirm to the server directly."
+        }
+      ],
+      "takeaways": [
+        "Valid requests can produce invalid outcomes; check invariants",
+        "Make check-and-act one atomic step",
+        "Keep workflow state and transitions on the server",
+        "Clients send intentions; the server computes the facts"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What does the order cost?",
+      "prompt": "A cart accepts a quantity of -3 for an item priced 1,000, next to 1 item priced 3,500. The server multiplies and adds without checks.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "It totals 500, a discount nobody approved",
+          "feedback": "Right: 3,500 − 3,000 = 500."
+        },
+        {
+          "id": "b",
+          "label": "The server rejects it, since prices cannot be negative",
+          "feedback": "The price is positive; the quantity is the problem, and nothing checks it."
+        },
+        {
+          "id": "c",
+          "label": "The payment provider ignores the negative line",
+          "feedback": "The provider sees only the final amount."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Validate quantities on the server and check invariants such as “no line can lower the total”."
+    },
+    "seeAlso": [
+      {
+        "topicId": 353,
+        "why": "Double booking is the same race, solved with constraints and locks"
+      },
+      {
+        "topicId": 224,
+        "why": "Idempotency keys make retried side effects safe"
+      },
+      {
+        "topicId": 663,
+        "why": "APIs expose business flows to the same abuse"
+      }
+    ]
   }
 ]
