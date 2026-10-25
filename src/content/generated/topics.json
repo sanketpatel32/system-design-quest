@@ -100522,11 +100522,11 @@
           },
           {
             "id": "b",
-            "label": "Only in the database schema"
+            "label": "At the CDN, with a cache rule per route"
           },
           {
             "id": "c",
-            "label": "Only in the mobile app"
+            "label": "In the web form, with the rules documented"
           },
           {
             "id": "d",
@@ -100536,7 +100536,7 @@
         "correctChoiceIds": [
           "d"
         ],
-        "explanation": "Clients are outside the trust boundary and can be bypassed; the server is the first trusted point."
+        "explanation": "Clients and their forms are outside the trust boundary and can be bypassed by calling the API directly. A CDN caches responses; it does not validate input. The server boundary is the first point you control."
       },
       {
         "id": "t301-a2",
@@ -100633,11 +100633,11 @@
         "choices": [
           {
             "id": "a",
-            "label": "The public home page"
+            "label": "The external payment provider"
           },
           {
             "id": "b",
-            "label": "The main login page"
+            "label": "The login and sign-up flows"
           },
           {
             "id": "c",
@@ -100651,7 +100651,7 @@
         "correctChoiceIds": [
           "d"
         ],
-        "explanation": "Operational and side paths are easy to forget and attractive to attackers."
+        "explanation": "Operational side paths such as admin tools and batch jobs are easy to forget and attractive to attackers. The main user flows, the primary database and third-party providers are what people draw first."
       },
       {
         "id": "t301-a6",
@@ -100963,17 +100963,17 @@
           },
           {
             "id": "c",
-            "label": "Compressing each message"
+            "label": "Encrypting each message with AES-CTR"
           },
           {
             "id": "d",
-            "label": "Base64-encoding each message"
+            "label": "A CRC-32 checksum on each message"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "A plain hash can be recomputed by an attacker; a MAC needs the key."
+        "explanation": "A plain hash or a CRC can be recomputed by an attacker after editing the message; a MAC needs the key. Unauthenticated CTR encryption hides content but is malleable, so flipped bits go undetected."
       },
       {
         "id": "t302-a2",
@@ -100991,17 +100991,17 @@
           },
           {
             "id": "c",
-            "label": "They expire after one second"
+            "label": "Their keys must change for every record"
           },
           {
             "id": "d",
-            "label": "Browsers forbid symmetric keys"
+            "label": "They cannot provide forward secrecy"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Asymmetric crypto establishes a symmetric session key for bulk encryption."
+        "explanation": "Asymmetric operations are far slower, so the handshake uses them to agree a symmetric session key for bulk data. Ephemeral key exchange is what provides forward secrecy, and session keys do not change per record."
       },
       {
         "id": "t302-a3",
@@ -101051,13 +101051,13 @@
           },
           {
             "id": "d",
-            "label": "The download was fast"
+            "label": "The publisher’s server was not hacked"
           }
         ],
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "Signatures prove origin and integrity, not quality."
+        "explanation": "A signature proves these bytes came unchanged from the key holder. It says nothing about quality or encryption, and a hacked download server is the case it protects against, not something it rules out."
       },
       {
         "id": "t302-a5",
@@ -101258,7 +101258,7 @@
         ],
         "steps": [
           "The chance of a repeated random nonce grows with the square of the message count (birthday bound).",
-          "At 2³² (about 4.3 billion) messages the collision chance stays around 2^-32, the bound NIST accepts.",
+          "At 2³² (about 4.3 billion) messages the collision chance is about n² / 2⁹⁷ = 2⁶⁴ / 2⁹⁷ = 2^-33, inside the 2^-32 bound NIST sets.",
           "A service encrypting 1,000 messages a second reaches 2³² in 4.3 billion ÷ 1,000 ≈ 4.3 million seconds, about 50 days.",
           "So rotate the key well before 50 days at that rate, or use a library that tracks usage."
         ],
@@ -101413,13 +101413,13 @@
           },
           {
             "id": "d",
-            "label": "MD5 applied 2 times"
+            "label": "HMAC-SHA-256 with a secret pepper"
           }
         ],
         "correctChoiceIds": [
           "b"
         ],
-        "explanation": "Password hashes must be slow and tunable; Argon2id is OWASP’s first choice."
+        "explanation": "Password hashes must be slow and tunable; Argon2id is OWASP’s first choice. SHA-256 and HMAC are fast, so guesses stay cheap even with a salt or pepper, and AES is reversible by anyone with the key."
       },
       {
         "id": "t303-a2",
@@ -101437,17 +101437,17 @@
           },
           {
             "id": "c",
-            "label": "Identical but in reverse"
+            "label": "Identical until one of them logs in again"
           },
           {
             "id": "d",
-            "label": "Empty until first login"
+            "label": "Identical, but encrypted with different keys"
           }
         ],
         "correctChoiceIds": [
           "b"
         ],
-        "explanation": "Salts make identical passwords produce different hashes."
+        "explanation": "A unique salt per user makes identical passwords produce different hashes, so one cracked hash reveals nothing about the other. Hashes do not change on login, and password hashes are not encrypted."
       },
       {
         "id": "t303-a3",
@@ -101633,7 +101633,7 @@
           "bcrypt uses a cost parameter where each +1 doubles the work; OWASP recommends at least 10. It reads at most 72 bytes of input, so very long passphrases are silently truncated unless you handle that. PBKDF2 is the choice when FIPS validation is required; OWASP suggests 600,000 iterations with HMAC-SHA-256.",
           "A pepper is a secret added to every hash and kept outside the database, for example in a secrets manager. If only the database leaks, the attacker also needs the pepper. It complements salting; it does not replace it.",
           "Parameters age as hardware improves. Store them with each hash; when a user logs in with outdated settings, rehash with current ones. For accounts that never log in, wrap the old hash in a new function.",
-          "Policy matters as much as hashing. NIST SP 800-63B advises checking new passwords against lists of breached and common passwords, allowing long passphrases, and not forcing periodic changes or composition rules, which push users to predictable patterns."
+          "Policy matters as much as hashing. NIST SP 800-63B advises checking new passwords against lists of breached and common passwords, allowing long passphrases, and not forcing periodic changes or composition rules, which push users to predictable patterns. The 2025 revision, SP 800-63B-4, makes this firmer: passwords used alone must be at least 15 characters (at least 8 when they are only one factor of MFA), and verifiers shall not impose composition rules or periodic changes, though they must force a change on evidence of compromise."
         ]
       },
       "useWhen": [
@@ -101885,11 +101885,11 @@
           },
           {
             "id": "b",
-            "label": "The signature changes on logout"
+            "label": "Logout removes it from the server’s session table"
           },
           {
             "id": "c",
-            "label": "JWTs expire after 5 minutes"
+            "label": "Revoking the refresh token kills it at once"
           },
           {
             "id": "d",
@@ -101899,7 +101899,7 @@
         "correctChoiceIds": [
           "d"
         ],
-        "explanation": "Self-contained tokens need short lifetimes or a revocation check."
+        "explanation": "A self-contained token is checked by signature and expiry, not looked up, so there is no server session to remove and revoking the refresh token does not stop it. Use short lifetimes or a revocation check."
       },
       {
         "id": "t304-a4",
@@ -102327,11 +102327,11 @@
           },
           {
             "id": "b",
-            "label": "To choose the scopes"
+            "label": "To prove the client’s identity to the token endpoint"
           },
           {
             "id": "c",
-            "label": "To set the token lifetime"
+            "label": "To stop the code being redeemed twice"
           },
           {
             "id": "d",
@@ -102341,7 +102341,7 @@
         "correctChoiceIds": [
           "d"
         ],
-        "explanation": "state defends against cross-site request forgery on the redirect."
+        "explanation": "state ties the redirect to a request this browser started, defending against cross-site request forgery on the callback. Client authentication and PKCE prove who redeems the code, and the authorisation server enforces single use."
       },
       {
         "id": "t305-a4",
@@ -102645,7 +102645,7 @@
         "id": "t306-c1",
         "kind": "text",
         "title": "The most common serious flaw",
-        "body": "OWASP ranked broken access control first in its 2021 Top 10: it found some form of it in 94% of the applications tested. The pattern is simple: the app checks that you are logged in, but not that this record, action or tenant belongs to you.",
+        "body": "OWASP ranked broken access control first in its 2021 Top 10, where 94% of the applications were tested for some form of it, and kept it first in the 2025 edition. The pattern is simple: the app checks that you are logged in, but not that this record, action or tenant belongs to you.",
         "teaches": [
           "access-control"
         ]
@@ -102731,11 +102731,11 @@
         "choices": [
           {
             "id": "a",
-            "label": "In the browser’s local storage"
+            "label": "In the admin page’s frontend route guard"
           },
           {
             "id": "b",
-            "label": "In the CSS for the admin page"
+            "label": "In the client app’s role check before the call"
           },
           {
             "id": "c",
@@ -102743,13 +102743,13 @@
           },
           {
             "id": "d",
-            "label": "Only by hiding the button"
+            "label": "By hiding the delete button from non-admins"
           }
         ],
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "Clients can call endpoints directly."
+        "explanation": "Route guards, client-side role checks and hidden buttons all run on the client, which an attacker controls; anyone can call the endpoint directly. Only the server handler sees every request."
       },
       {
         "id": "t306-a3",
@@ -102932,6 +102932,10 @@
       {
         "title": "CWE-639: Authorization Bypass Through User-Controlled Key",
         "url": "https://cwe.mitre.org/data/definitions/639.html"
+      },
+      {
+        "title": "OWASP Top 10:2025: A01 Broken Access Control",
+        "url": "https://owasp.org/Top10/2025/A01_2025-Broken_Access_Control/"
       }
     ],
     "deep": {
@@ -103140,7 +103144,7 @@
         "choices": [
           {
             "id": "a",
-            "label": "Delete the commit"
+            "label": "Rewrite the Git history to remove it"
           },
           {
             "id": "b",
@@ -103152,13 +103156,13 @@
           },
           {
             "id": "d",
-            "label": "Email the team about it"
+            "label": "Rotate it at the next scheduled rotation"
           }
         ],
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "Assume it was copied within minutes; only revocation stops its use."
+        "explanation": "Assume it was copied within minutes, because scanners watch public repositories. Only revocation stops its use. History rewrites come afterwards, and waiting for scheduled rotation leaves it live."
       },
       {
         "id": "t307-a2",
@@ -103180,13 +103184,13 @@
           },
           {
             "id": "d",
-            "label": "In the README for operators"
+            "label": "In an environment file on each server"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Runtime delivery keeps it out of code and images and allows rotation."
+        "explanation": "A secrets manager keeps it out of code and images, adds access control and audit, and allows rotation. Repositories, image layers and files on each server are copied, backed up and hard to rotate."
       },
       {
         "id": "t307-a3",
@@ -103200,11 +103204,11 @@
           },
           {
             "id": "b",
-            "label": "They are faster to type"
+            "label": "They remove the need for a secrets manager"
           },
           {
             "id": "c",
-            "label": "They need no permissions"
+            "label": "They can be shared between workloads safely"
           },
           {
             "id": "d",
@@ -103214,17 +103218,17 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Short lifetimes bound the damage of a leak."
+        "explanation": "Short lifetimes bound the damage of a leak. They are usually issued by a secrets manager or identity service, and each workload should get its own so access can be scoped and traced."
       },
       {
         "id": "t307-a4",
         "concept": "secret-handling",
         "type": "multiple_choice",
-        "prompt": "A Docker image build copies a .env file with keys, then deletes it in a later step. Is the secret gone?",
+        "prompt": "A container image build copies a .env file with keys, then deletes it in a later step. Is the secret gone?",
         "choices": [
           {
             "id": "a",
-            "label": "No, but only on Windows"
+            "label": "No, but only the build machine still has it"
           },
           {
             "id": "b",
@@ -103242,7 +103246,7 @@
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "Image layers are additive; earlier layers keep the file."
+        "explanation": "Image layers are additive: anyone who pulls the image can extract the earlier layer, private or not. Use build-time secret mounts that never enter a layer."
       },
       {
         "id": "t307-a5",
@@ -103671,17 +103675,17 @@
           },
           {
             "id": "c",
-            "label": "It requires a user password"
+            "label": "It only answers requests made over HTTPS"
           },
           {
             "id": "d",
-            "label": "It moves to a public address"
+            "label": "It encrypts the credentials it returns"
           }
         ],
         "correctChoiceIds": [
           "b"
         ],
-        "explanation": "Simple GET-only SSRF cannot perform the PUT to get the token."
+        "explanation": "IMDSv2 requires a session token fetched with a PUT and a custom header, which a simple GET-only SSRF cannot send. It still answers over plain HTTP on the link-local address and returns credentials unencrypted to callers that complete the flow."
       },
       {
         "id": "t308-a5",
@@ -103808,6 +103812,10 @@
       {
         "title": "CWE-918: Server-Side Request Forgery",
         "url": "https://cwe.mitre.org/data/definitions/918.html"
+      },
+      {
+        "title": "OWASP Top 10:2025: A01 Broken Access Control (now includes SSRF)",
+        "url": "https://owasp.org/Top10/2025/A01_2025-Broken_Access_Control/"
       }
     ],
     "deep": {
@@ -103880,7 +103888,7 @@
       "india": {
         "title": "A firewall that fetched credentials",
         "label": "Publicly reported",
-        "body": "Publicly reported in Capital One’s 2019 disclosure and the related US court filings: an attacker exploited a misconfigured web application firewall to make requests from inside Capital One’s cloud environment, obtained credentials for a role with broad storage access, and copied data on about 100 million people in the US and about 6 million in Canada. It became a standard example of SSRF reaching an instance metadata service, and one reason cloud providers pushed hardened metadata access."
+        "body": "Publicly reported in Capital One’s 2019 disclosure and the related US court filings: an attacker exploited a misconfigured web application firewall to make requests from inside Capital One’s cloud environment, obtained credentials for a role with broad storage access, and copied data on about 100 million people in the US and about 6 million in Canada. It became a standard example of SSRF reaching an instance metadata service, and one reason cloud providers pushed hardened metadata access. In the OWASP Top 10:2025, SSRF no longer has its own entry; it is folded into A01 Broken Access Control."
       },
       "pitfalls": [
         {
@@ -104018,11 +104026,11 @@
         "choices": [
           {
             "id": "a",
-            "label": "SQL injection"
+            "label": "A hijacked maintainer account"
           },
           {
             "id": "b",
-            "label": "Cross-site scripting"
+            "label": "A malicious install script"
           },
           {
             "id": "c",
@@ -104036,7 +104044,7 @@
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "The resolver preferred the public registry’s higher version."
+        "explanation": "The resolver preferred the public registry’s higher version of an internal name. Typosquatting relies on a mistyped name, a hijacked maintainer publishes under the real package, and an install script attack needs no name clash."
       },
       {
         "id": "t309-a2",
@@ -104106,7 +104114,7 @@
           },
           {
             "id": "b",
-            "label": "Slow deployments"
+            "label": "A compromised CI runner signing its own build"
           },
           {
             "id": "c",
@@ -104120,7 +104128,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Provenance ties artefacts to a trusted build, not to good code."
+        "explanation": "Provenance ties an artefact to your trusted build. It cannot detect a compromised builder that signs its own output, bugs in the commit, or vulnerable dependencies; those need hardened builders, review and scanning."
       },
       {
         "id": "t309-a5",
@@ -104514,7 +104522,7 @@
         "choices": [
           {
             "id": "a",
-            "label": "To make codes longer"
+            "label": "To let a code be reused once"
           },
           {
             "id": "b",
@@ -104522,17 +104530,17 @@
           },
           {
             "id": "c",
-            "label": "To skip the password"
+            "label": "To resist phishing of the code"
           },
           {
             "id": "d",
-            "label": "To let users share codes"
+            "label": "To lower the chance of guessing"
           }
         ],
         "correctChoiceIds": [
           "b"
         ],
-        "explanation": "Small clock differences would otherwise reject valid codes."
+        "explanation": "Phone clocks drift and users take time to type, so a one-step window accepts valid codes. It slightly widens the guessing window, does nothing against phishing, and servers should still reject a reused code."
       },
       {
         "id": "t310-a4",
@@ -104554,13 +104562,13 @@
           },
           {
             "id": "d",
-            "label": "Phones cannot store secrets"
+            "label": "Codes can be guessed in a few tries"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Attackers convince carriers to move the number to their SIM."
+        "explanation": "Attackers persuade carriers to move the number to their SIM, then receive the codes. Six-digit codes with rate limits are not practically guessable, and SMS needs no internet connection."
       },
       {
         "id": "t310-a5",
@@ -104706,7 +104714,7 @@
           "WebAuthn (behind passkeys and security keys) creates a key pair per site. Registration stores the public key on the server. At sign-in the server sends a challenge; the browser includes the site’s origin in what the authenticator signs, and refuses to use a credential for any origin other than the one it was created for.",
           "Because the origin is enforced by the browser, a look-alike domain cannot request a signature for the real site. A phishing proxy receives a signature for its own origin, which the real server rejects. This is what “phishing-resistant” means in NIST’s guidance.",
           "Passkeys are WebAuthn credentials that can be synced across a user’s devices by their platform, which solves the lost-device problem that held back hardware keys, at the cost of trusting the sync provider’s account security.",
-          "Push approvals sit in between: number matching (typing the number shown on the login screen into the app) and showing location and app details reduce fatigue attacks, but the user can still approve a session they did not start.",
+          "Push approvals sit in between: number matching (typing the number shown on the login screen into the app) and showing location and app details reduce fatigue attacks, but the user can still approve a session they did not start. NIST SP 800-63B-4 cites authentication fatigue and no longer accepts a bare approve tap: the user must transfer a secret between the devices, which number matching does.",
           "Recovery and enrolment are part of the system. Require MFA to add or remove factors, notify on changes, issue single-use backup codes, and make help-desk resets slower and verified, since attackers move to the weakest path."
         ]
       },
@@ -113857,6 +113865,3774 @@
       {
         "topicId": 233,
         "why": "Rate limiting, which caps load per client"
+      }
+    ]
+  },
+  {
+    "id": 571,
+    "slug": "service-identity-and-mtls",
+    "region": "f6-security",
+    "order": 11,
+    "title": "Service-to-Service Authentication: mTLS and Workload Identity",
+    "kind": "lesson",
+    "objectives": [
+      "Explain why network location is not an identity",
+      "Describe what mutual TLS proves and what it leaves to authorisation",
+      "Design short-lived, automatically rotated workload certificates"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 16,
+    "prereqIds": [
+      302
+    ],
+    "cards": [
+      {
+        "id": "t571-c1",
+        "kind": "text",
+        "title": "Being inside the network is not an identity",
+        "body": "Many systems trust any request that comes from an internal address. Then one compromised container, laptop on the VPN or misrouted load balancer can call every internal service. Zero trust, as NIST SP 800-207 describes it, removes that implicit trust: each request is authenticated and authorised on its own, wherever it comes from. Firewalls and private subnets still help, but they limit where traffic can reach. They do not prove who sent it.",
+        "teaches": [
+          "network-trust"
+        ]
+      },
+      {
+        "id": "t571-c2",
+        "kind": "text",
+        "title": "Mutual TLS: both sides show a certificate",
+        "body": "In ordinary TLS only the server proves who it is. In mutual TLS (mTLS) the server also asks for a client certificate, and the client proves it holds the matching private key during the handshake. The receiver checks that the certificate chains to a CA it trusts for workloads. It then reads the identity from the certificate, usually a URI such as spiffe://prod/ns/payments/sa/api in the subject alternative name. That identity becomes the input to an access policy.",
+        "teaches": [
+          "mtls"
+        ]
+      },
+      {
+        "id": "t571-c3",
+        "kind": "diagram",
+        "title": "Worked example: payments calls the ledger",
+        "body": "The payments service must create ledger entries. Nothing else may.",
+        "teaches": [
+          "mtls",
+          "workload-identity"
+        ],
+        "steps": [
+          "The platform verifies the payments workload (which cluster, namespace and service account it runs as) and issues a 24-hour certificate naming it",
+          "Payments opens TLS to the ledger and checks the ledger’s certificate chains to the internal CA and names the ledger",
+          "The ledger asks for a client certificate, verifies the chain and the key proof, and reads the identity spiffe://prod/ns/payments/sa/api",
+          "The ledger’s policy allows that identity to POST /entries and nothing else; every other identity gets 403",
+          "Payments renews at about half the lifetime, so a failed renewal leaves 12 hours to fix it before anything breaks"
+        ]
+      },
+      {
+        "id": "t571-c4",
+        "kind": "text",
+        "title": "Misconception: mTLS is authorisation",
+        "body": "mTLS answers “which workload is calling?” It does not answer “may it do this?”. A ledger that accepts any certificate from the internal CA still lets a compromised reporting service write entries. Pair mTLS with a per-endpoint policy keyed on the workload identity. The certificate also names the service, not the customer. When the end user matters, pass their identity separately as a signed, short-lived token, and check both.",
+        "teaches": [
+          "mtls"
+        ]
+      },
+      {
+        "id": "t571-c5",
+        "kind": "text",
+        "title": "Trap: long-lived certificates nobody rotates",
+        "body": "A two-year certificate installed by hand fails twice. Its private key stays useful to a thief for months, and one day it expires and takes the service down because nobody remembered. Short lifetimes (hours to days) with automatic issuance and renewal fix both. Alert when any certificate is within a quarter of its lifetime of expiry and has not renewed. Keep the CA’s own key in a KMS or HSM, because whoever holds it can mint any identity.",
+        "teaches": [
+          "cert-rotation"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t571-a1",
+        "concept": "network-trust",
+        "type": "multiple_choice",
+        "prompt": "An attacker gets code running in one container of a cluster whose services trust any request from an internal address. What can it most likely do?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Call internal services as if it were any trusted caller"
+          },
+          {
+            "id": "b",
+            "label": "Little, because internal traffic is already encrypted with TLS"
+          },
+          {
+            "id": "c",
+            "label": "Read only the files of the container it compromised"
+          },
+          {
+            "id": "d",
+            "label": "Reach the internet but none of the internal services"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Trust based on source address means any foothold inside inherits that trust. Encryption hides traffic from eavesdroppers but does not authenticate the sender. A foothold is not confined to its own files when the network itself grants access, and egress rules do not stop east-west calls."
+      },
+      {
+        "id": "t571-a2",
+        "concept": "mtls",
+        "type": "multiple_choice",
+        "prompt": "In mutual TLS, what does the server learn that ordinary TLS does not tell it?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "That the connection is encrypted in both directions"
+          },
+          {
+            "id": "b",
+            "label": "The client’s identity, proven with its private key"
+          },
+          {
+            "id": "c",
+            "label": "Which end user is behind the calling service"
+          },
+          {
+            "id": "d",
+            "label": "That the client’s code has not been modified"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "The extra step is the client certificate and the proof of its private key. Ordinary TLS already encrypts both directions. The certificate names the workload, not the end user, and it says nothing about whether the workload’s code was tampered with."
+      },
+      {
+        "id": "t571-a3",
+        "concept": "mtls",
+        "type": "multiple_choice",
+        "prompt": "The ledger accepts mTLS from any certificate signed by the internal workload CA. What is still missing?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A second handshake for each request"
+          },
+          {
+            "id": "b",
+            "label": "Longer RSA keys in each certificate"
+          },
+          {
+            "id": "c",
+            "label": "A policy of which identities may call which endpoints"
+          },
+          {
+            "id": "d",
+            "label": "Encryption of the request body inside TLS"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Authentication without authorisation lets every workload with a certificate call every endpoint. Extra handshakes, bigger keys and body encryption add cost but still let a compromised service make calls it should not."
+      },
+      {
+        "id": "t571-a4",
+        "concept": "cert-rotation",
+        "type": "estimation",
+        "prompt": "A fleet of 2,000 workloads uses 24-hour certificates, each renewed at half its lifetime. How many certificates does the CA issue per hour?",
+        "unit": "certificates per hour",
+        "target": 167,
+        "assumptions": [
+          "2,000 workloads",
+          "Lifetime 24 hours",
+          "Renewal at 12 hours"
+        ],
+        "formula": "workloads / renewal interval",
+        "workedAnswer": "Each workload renews every 12 hours, so 2,000 / 12 ≈ 167 issuances per hour, about 4,000 a day.",
+        "explanation": "Design implication: renewing at half life doubles issuance compared with renewing at expiry (83 per hour), but leaves time to recover from a failed renewal.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          83,
+          2000
+        ]
+      },
+      {
+        "id": "t571-a5",
+        "concept": "workload-identity",
+        "type": "drag_order",
+        "prompt": "Order how a workload gets and uses its identity.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "The workload presents it in an mTLS handshake"
+          },
+          {
+            "id": "s1",
+            "label": "The platform verifies where the workload runs (attestation)"
+          },
+          {
+            "id": "s5",
+            "label": "The workload renews the certificate before it expires"
+          },
+          {
+            "id": "s2",
+            "label": "The platform issues a short-lived certificate naming the workload"
+          },
+          {
+            "id": "s4",
+            "label": "The receiver checks the chain and maps the identity to a policy"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Identity is issued only after the platform has checked what the workload is. It is then used and checked, and renewed before expiry."
+      },
+      {
+        "id": "t571-a6",
+        "concept": "cert-rotation",
+        "type": "multiple_choice",
+        "prompt": "Renewal is automated either way. Why prefer 24-hour service certificates over 2-year ones?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Short certificates make each handshake faster"
+          },
+          {
+            "id": "b",
+            "label": "Clients refuse internal certificates older than a day"
+          },
+          {
+            "id": "c",
+            "label": "Revocation lists only work for short certificates"
+          },
+          {
+            "id": "d",
+            "label": "A stolen private key stops being useful within a day"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "Short lifetimes limit how long a stolen key works without relying on revocation, which clients often check poorly. Handshake speed does not depend on lifetime. No client rule rejects day-old certificates, and revocation lists apply to any lifetime."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t571-f1",
+        "front": "What does zero trust remove?",
+        "back": "Implicit trust based on network location: each request is authenticated and authorised."
+      },
+      {
+        "id": "t571-f2",
+        "front": "What extra thing does mTLS prove?",
+        "back": "The client holds the private key for a certificate naming its identity."
+      },
+      {
+        "id": "t571-f3",
+        "front": "Why short certificate lifetimes?",
+        "back": "A stolen key expires quickly, and automated renewal is exercised all the time."
+      }
+    ],
+    "sources": [
+      {
+        "title": "NIST SP 800-207: Zero Trust Architecture",
+        "url": "https://csrc.nist.gov/pubs/sp/800/207/final"
+      },
+      {
+        "title": "RFC 8446: TLS 1.3",
+        "url": "https://www.rfc-editor.org/rfc/rfc8446"
+      },
+      {
+        "title": "Google Cloud: BeyondProd",
+        "url": "https://cloud.google.com/docs/security/beyondprod"
+      },
+      {
+        "title": "Kubernetes: Service accounts",
+        "url": "https://kubernetes.io/docs/concepts/security/service-accounts/"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "network-trust",
+        "mtls",
+        "workload-identity",
+        "cert-rotation"
+      ],
+      "mechanism": {
+        "title": "How workload identity works end to end",
+        "steps": [
+          "Attest: before issuing anything, the platform checks facts it controls, such as the node, the cluster, the namespace and the service account. Do not trust anything the workload merely claims about itself.",
+          "Issue: a workload CA signs a short-lived certificate whose subject alternative name carries a structured identity (for example a SPIFFE ID). The private key is generated on the workload and never leaves it.",
+          "Authenticate: every connection uses mTLS. Each side checks the peer’s chain against the workload trust bundle and reads the peer identity. A sidecar proxy or a library can do this so application code stays simple.",
+          "Authorise: a policy maps caller identity to allowed operations, such as payments may POST /entries on the ledger. Deny by default, and keep policies in version control with review.",
+          "Propagate the user: when a request acts for a customer, forward a signed, short-lived user token alongside the service identity. The receiver checks both: is this service allowed, and is this user allowed?",
+          "Rotate and observe: renew at about half the lifetime, alert on renewal failures and near-expiry certificates, and log the caller identity for every denied request."
+        ]
+      },
+      "useWhen": [
+        "Many services call each other inside a cluster or across clouds",
+        "Compliance or a past incident demands proof of which service made each call"
+      ],
+      "avoidWhen": [
+        "A single service with one database and no internal callers, where the cost outweighs the gain",
+        "Calls from customers’ browsers, which should use user tokens rather than client certificates"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Approach",
+          "What it proves",
+          "Weak spot"
+        ],
+        "rows": [
+          [
+            "IP allowlists and private subnets",
+            "Where the packet came from",
+            "Any foothold inside inherits the trust"
+          ],
+          [
+            "Shared API key per service",
+            "Someone has the key",
+            "Keys leak, rarely rotate and are copied between services"
+          ],
+          [
+            "mTLS with workload identity",
+            "Which workload holds the private key",
+            "Needs a CA, rotation and an authorisation policy"
+          ],
+          [
+            "Signed service token per request",
+            "Which service the issuer vouched for",
+            "Bearer token: replayable until it expires unless bound to the connection"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "What short lifetimes cost the CA",
+        "assumptions": [
+          "2,000 workloads",
+          "24-hour certificates renewed at 12 hours",
+          "About 5 ms of CA signing time per certificate (illustrative)"
+        ],
+        "steps": [
+          "Issuance: 2,000 × 2 renewals a day = 4,000 certificates a day, or about 167 an hour",
+          "Signing load: 4,000 × 5 ms = 20 seconds of CA work per day, which is negligible",
+          "Exposure: a stolen key works for at most 24 hours, against up to 730 days for a 2-year certificate",
+          "Failure budget: renewing at half life leaves 12 hours to notice and fix a broken renewal before outages start"
+        ],
+        "result": "The CA load is trivial, and the window in which a stolen key is useful shrinks by a factor of about 700."
+      },
+      "india": {
+        "title": "NIST SP 800-207 tenets of zero trust",
+        "label": "Official documentation",
+        "body": "NIST SP 800-207 (Zero Trust Architecture, 2020) lists tenets that match this design. All communication is secured regardless of network location. Access to each resource is granted per session. Access is decided by dynamic policy that includes the identity of the requester. Authentication and authorisation are dynamic and strictly enforced before access is allowed. Google’s BeyondProd paper describes the same idea applied to its own production services: mutual authentication between services, and service identity in place of network location."
+      },
+      "pitfalls": [
+        {
+          "trap": "Accepting any certificate from the internal CA as permission to call anything",
+          "say": "mTLS tells me who is calling. A deny-by-default policy per endpoint tells me whether they may."
+        },
+        {
+          "trap": "Hand-installed certificates with multi-year lifetimes",
+          "say": "Automate issuance and renew at half life, so expiry is routine instead of an outage."
+        },
+        {
+          "trap": "Dropping the end user’s identity at the first internal hop",
+          "say": "Forward a signed user token so downstream services can still enforce per-customer rules."
+        }
+      ],
+      "takeaways": [
+        "Network location limits reach; it does not prove identity",
+        "mTLS proves which workload holds a key, and a policy decides what it may do",
+        "Short-lived, automatically renewed certificates shrink the value of a stolen key",
+        "Carry the end user’s identity separately from the service identity"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Who gets in?",
+      "prompt": "The ledger requires mTLS from the internal CA, and its policy lets only the payments identity POST /entries. An attacker controls the reports service, which has a valid certificate for its own identity.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Reports connects, but POST /entries is refused by policy",
+          "feedback": "Right: authentication succeeds and authorisation denies it."
+        },
+        {
+          "id": "b",
+          "label": "Reports can post entries because its certificate is valid",
+          "feedback": "A valid certificate only says who it is; the policy does not list reports."
+        },
+        {
+          "id": "c",
+          "label": "Reports can post entries after copying the payments certificate",
+          "feedback": "The certificate is public. Without the payments private key the handshake fails."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Identity plus a deny-by-default policy contains a compromised service to what it was already allowed to do."
+    },
+    "seeAlso": [
+      {
+        "topicId": 251,
+        "why": "The TLS handshake that mTLS extends with a client certificate"
+      },
+      {
+        "topicId": 307,
+        "why": "Secrets managers issue short-lived credentials using the same workload identity"
+      },
+      {
+        "topicId": 329,
+        "why": "Private networking limits reach, which complements identity checks"
+      }
+    ]
+  },
+  {
+    "id": 572,
+    "slug": "encryption-at-rest-and-kms",
+    "region": "f6-security",
+    "order": 12,
+    "title": "Encryption at Rest and Envelope Encryption",
+    "kind": "lesson",
+    "objectives": [
+      "Say what storage encryption protects against and what it does not",
+      "Explain envelope encryption with data keys and a KMS",
+      "Plan key rotation and crypto-shredding without re-encrypting everything"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 16,
+    "prereqIds": [
+      302
+    ],
+    "cards": [
+      {
+        "id": "t572-c1",
+        "kind": "text",
+        "title": "What encryption at rest protects, and what it does not",
+        "body": "Disk, volume and database storage encryption protect against someone who gets the bytes without going through your system. Examples are a stolen or discarded drive, a snapshot shared to the wrong account, or a backup tape left in a taxi. They do not protect against an attacker who queries through the application or holds its database credentials. The storage layer decrypts for every authorised read, so it decrypts for them too. To protect a field from people with database access, encrypt it in the application with a key the database cannot use.",
+        "teaches": [
+          "at-rest-threats"
+        ]
+      },
+      {
+        "id": "t572-c2",
+        "kind": "text",
+        "title": "Envelope encryption: a key for the data, a key for the key",
+        "body": "Generate a random data key (DEK), encrypt the data locally with an AEAD cipher such as AES-256-GCM, then ask the key management service (KMS) to encrypt the DEK under a key-encryption key (KEK) that never leaves the KMS. Store the wrapped DEK next to the ciphertext. To read, send the wrapped DEK to the KMS, get the plaintext DEK back and decrypt locally. Bulk data never crosses the network to the KMS. That matters because KMS calls take small inputs: AWS KMS Encrypt accepts up to 4,096 bytes, and Cloud KMS up to 64 KiB.",
+        "teaches": [
+          "envelope-encryption"
+        ]
+      },
+      {
+        "id": "t572-c3",
+        "kind": "diagram",
+        "title": "Worked example: encrypting a 2 GB backup",
+        "body": "A nightly database backup must be unreadable to anyone who copies the file but lacks KMS permission.",
+        "teaches": [
+          "envelope-encryption"
+        ],
+        "steps": [
+          "Ask the KMS for a new 256-bit data key; it returns the key in plain form and wrapped under the backup KEK",
+          "Encrypt the backup locally in chunks with AES-256-GCM, using a unique nonce for each chunk",
+          "Write the wrapped data key, a few hundred bytes, into the backup header",
+          "Erase the plain data key from memory once the backup is written",
+          "To restore, the KMS unwraps the key only after checking the caller’s permission, and it logs the call"
+        ]
+      },
+      {
+        "id": "t572-c4",
+        "kind": "text",
+        "title": "Misconception: rotating the master key means re-encrypting all data",
+        "body": "When a KMS rotates a KEK, it creates a new key version and keeps the old versions to unwrap DEKs they protected. New DEKs are wrapped under the new version. Optionally you re-wrap old DEKs, which means rewriting a few hundred bytes per object, not the object itself. Re-encrypting the data is needed only when a DEK itself may have been exposed. Rotation therefore limits how much data any one key version protects, at almost no cost.",
+        "teaches": [
+          "key-rotation"
+        ]
+      },
+      {
+        "id": "t572-c5",
+        "kind": "text",
+        "title": "Trap: the key stored next to the data",
+        "body": "Encrypting a column while keeping the key in the same database, or in a config file in the repository, means one leak hands over both. Keep KEKs in a KMS or HSM with an access policy separate from the data’s, and audit every unwrap. The reverse danger is just as real: deleting a KEK destroys every DEK it wrapped. KMSs make you schedule deletion with a waiting period (AWS KMS: 7 to 30 days) so a mistake can be cancelled.",
+        "teaches": [
+          "at-rest-threats",
+          "crypto-shredding"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t572-a1",
+        "concept": "at-rest-threats",
+        "type": "multiple_choice",
+        "prompt": "The cloud provider encrypts a database volume at rest. An attacker steals the app’s database password. What does the volume encryption do for you?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "It blocks the queries, since the attacker lacks the disk key"
+          },
+          {
+            "id": "b",
+            "label": "Little: the database decrypts rows for any valid login"
+          },
+          {
+            "id": "c",
+            "label": "It returns rows still encrypted, so they are unreadable"
+          },
+          {
+            "id": "d",
+            "label": "It forces a second login using the KMS key"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Storage encryption is transparent to authorised readers. A valid database login is an authorised reader, so the queries succeed and return plain rows. The disk key is used by the storage layer, not requested from clients, and the KMS is not involved in each SQL login."
+      },
+      {
+        "id": "t572-a2",
+        "concept": "envelope-encryption",
+        "type": "multiple_choice",
+        "prompt": "Why encrypt a 2 GB file with a local data key instead of sending the file to the KMS?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A local key is stronger than a key held in the KMS"
+          },
+          {
+            "id": "b",
+            "label": "Local encryption removes the need to store any key"
+          },
+          {
+            "id": "c",
+            "label": "KMS calls take small inputs, and bulk data stays local"
+          },
+          {
+            "id": "d",
+            "label": "The data key can then be stored unwrapped beside the file"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "KMS encrypt calls are limited to kilobytes, and shipping gigabytes to a central service would be slow and costly. Key strength is the same, since both are 256-bit. You still store the data key, but wrapped by the KMS, never unwrapped next to the data."
+      },
+      {
+        "id": "t572-a3",
+        "concept": "key-rotation",
+        "type": "multiple_choice",
+        "prompt": "The KMS rotates its master key every year. What happens to data encrypted three years ago?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "It must be re-encrypted before the rotation can finish"
+          },
+          {
+            "id": "b",
+            "label": "It becomes unreadable, which is the point of rotating"
+          },
+          {
+            "id": "c",
+            "label": "It stays readable, since old key versions unwrap old data keys"
+          },
+          {
+            "id": "d",
+            "label": "It is quietly re-encrypted in place by the storage layer"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Rotation adds a version and keeps the old ones for decryption. Nothing is re-encrypted unless you choose to re-wrap the data keys. Making old data unreadable is what key deletion does, not rotation."
+      },
+      {
+        "id": "t572-a4",
+        "concept": "crypto-shredding",
+        "type": "multiple_choice",
+        "prompt": "Each customer’s records are encrypted under that customer’s own data key. One customer asks to be erased, but copies sit in 40 backups. What does destroying their key do?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Makes their records in all 40 backups unreadable"
+          },
+          {
+            "id": "b",
+            "label": "Shrinks the backups by removing their records"
+          },
+          {
+            "id": "c",
+            "label": "Has no effect until each backup is restored and edited"
+          },
+          {
+            "id": "d",
+            "label": "Also destroys other customers’ data in those backups"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Crypto-shredding makes the ciphertext useless wherever it is, without touching the backups. The bytes are still there, so the backups do not shrink. Other customers use different keys and are unaffected."
+      },
+      {
+        "id": "t572-a5",
+        "concept": "envelope-encryption",
+        "type": "estimation",
+        "prompt": "A service writes 50 million objects a day and requests a new data key from the KMS for each. On average, how many KMS calls per second is that?",
+        "unit": "calls per second",
+        "target": 579,
+        "assumptions": [
+          "50,000,000 objects a day",
+          "One KMS call per object",
+          "86,400 seconds in a day"
+        ],
+        "formula": "objects per day / 86,400",
+        "workedAnswer": "50,000,000 / 86,400 ≈ 579 calls per second on average, and peaks will be higher.",
+        "explanation": "Design implication: that load can approach a provider’s request quotas, so batch objects under one data key or cache data keys briefly with strict limits.",
+        "tolerance": 0.15,
+        "trapAnswers": [
+          13889,
+          58
+        ]
+      },
+      {
+        "id": "t572-a6",
+        "concept": "envelope-encryption",
+        "type": "drag_order",
+        "prompt": "Order a read of an envelope-encrypted record.",
+        "items": [
+          {
+            "id": "s4",
+            "label": "Decrypt the record locally with the returned data key"
+          },
+          {
+            "id": "s2",
+            "label": "Send the wrapped data key to the KMS"
+          },
+          {
+            "id": "s5",
+            "label": "Erase the plain data key from memory"
+          },
+          {
+            "id": "s1",
+            "label": "Load the ciphertext and its wrapped data key"
+          },
+          {
+            "id": "s3",
+            "label": "The KMS checks the caller’s permission and logs the request"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "The KMS sees only the small wrapped key and decides whether to unwrap it. The bulk decryption happens locally."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t572-f1",
+        "front": "What does disk encryption not stop?",
+        "back": "Anyone who reads through the application or with valid database credentials."
+      },
+      {
+        "id": "t572-f2",
+        "front": "Envelope encryption in one line",
+        "back": "Encrypt data with a local data key; encrypt that key under a KMS key that never leaves the KMS."
+      },
+      {
+        "id": "t572-f3",
+        "front": "What is crypto-shredding?",
+        "back": "Destroying a key so every copy of the data it protected becomes unreadable."
+      }
+    ],
+    "sources": [
+      {
+        "title": "AWS KMS: Cryptography essentials (envelope encryption)",
+        "url": "https://docs.aws.amazon.com/kms/latest/developerguide/kms-cryptography.html"
+      },
+      {
+        "title": "Google Cloud KMS: Envelope encryption",
+        "url": "https://cloud.google.com/kms/docs/envelope-encryption"
+      },
+      {
+        "title": "OWASP Cryptographic Storage Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html"
+      },
+      {
+        "title": "NIST SP 800-57 Part 1 Rev. 5: Key Management",
+        "url": "https://csrc.nist.gov/pubs/sp/800/57/pt1/r5/final"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "at-rest-threats",
+        "envelope-encryption",
+        "key-rotation",
+        "crypto-shredding"
+      ],
+      "mechanism": {
+        "title": "Layers of encryption at rest and how keys flow",
+        "steps": [
+          "Choose the threat first. Storage encryption covers lost media and stray snapshots. Application-level (field) encryption also covers database administrators, SQL injection that reads raw columns, and leaked database credentials, because the database never holds the key.",
+          "Generate a fresh data key per object, per file or per tenant, using the KMS or a CSPRNG. Encrypt with an AEAD cipher and a unique nonce, and bind context (such as the record id) as associated data so ciphertext cannot be swapped between rows.",
+          "Wrap the data key under a KEK in the KMS. The KEK’s access policy names which workloads may unwrap, and every unwrap is logged, which gives you an audit trail of who read what.",
+          "Rotate KEKs on a schedule. The KMS keeps old versions for unwrapping, so rotation is cheap. Re-wrap DEKs if policy requires, and re-encrypt data only if a DEK was exposed.",
+          "Choose the key granularity on purpose. One DEK per customer enables crypto-shredding: destroying it erases that customer’s data everywhere, including in backups you cannot edit.",
+          "Plan for KMS outages and costs. Cache unwrapped DEKs in memory for minutes, with a cap on how many objects each may encrypt. Treat KEK deletion as a destructive change: disable first, watch for failures, and only then schedule deletion."
+        ]
+      },
+      "useWhen": [
+        "Data with legal or contractual protection, or held for many tenants",
+        "You need per-customer erasure that reaches backups"
+      ],
+      "avoidWhen": [
+        "Public or easily regenerated data, where key management adds risk without benefit",
+        "You would have to keep the KEK beside the data, which adds complexity without separation"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Layer",
+          "Protects against",
+          "Does not protect against"
+        ],
+        "rows": [
+          [
+            "Disk or volume encryption",
+            "Stolen or discarded media",
+            "Anyone reading through the database or app"
+          ],
+          [
+            "Database-level (transparent) encryption",
+            "Copied data files and backups",
+            "Database users and SQL injection"
+          ],
+          [
+            "Application-level field encryption",
+            "Database admins and leaked DB credentials",
+            "A compromised app server that can unwrap keys"
+          ],
+          [
+            "Client-side encryption",
+            "The whole server side, including the operator",
+            "Lost keys, and features such as server-side search"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "KMS calls for 50 million objects a day",
+        "assumptions": [
+          "50 million new objects a day",
+          "One data key per object, or one per batch of 1,000 objects",
+          "Peak traffic about 3 times the average (illustrative)"
+        ],
+        "steps": [
+          "Per object: 50,000,000 / 86,400 ≈ 579 calls per second to KMS, on average",
+          "At a 3× peak that is about 1,740 calls per second, which can hit request quotas and adds a network round trip to every write",
+          "Per batch of 1,000: 579 / 1,000 ≈ 0.58 calls per second, about 50,000 calls a day",
+          "Trade-off: one key then protects 1,000 objects, so crypto-shredding a single object is no longer possible"
+        ],
+        "result": "Batching data keys cuts KMS traffic about 1,000-fold. Pick the batch boundary to match what you may need to erase on its own, such as one customer."
+      },
+      "india": {
+        "title": "AWS KMS and Google Cloud KMS on envelope encryption",
+        "label": "Official documentation",
+        "body": "The AWS KMS documentation defines envelope encryption as encrypting plaintext with a data key and then encrypting the data key under another key. Its Encrypt operation accepts at most 4,096 bytes with a symmetric key, which is why bulk data is encrypted locally. Google Cloud’s guidance says Cloud KMS was designed to manage key-encryption keys, so its Encrypt and Decrypt input is capped at 64 KiB. It recommends generating data keys locally and storing them wrapped next to the data they protect. AWS requires a waiting period of 7 to 30 days before a KMS key is actually deleted."
+      },
+      "pitfalls": [
+        {
+          "trap": "Claiming the database is safe because “it is encrypted at rest”",
+          "say": "Storage encryption covers lost media. For people with database access I need field encryption with a key the database cannot use."
+        },
+        {
+          "trap": "Deleting an old KMS key to tidy up",
+          "say": "Disable it first and watch for failures; deletion destroys every data key it wrapped."
+        },
+        {
+          "trap": "Reusing a nonce with AES-GCM because the key is per object",
+          "say": "A per-object key with a fresh random nonce per encryption avoids nonce reuse, which would break GCM."
+        }
+      ],
+      "takeaways": [
+        "Storage encryption protects media, not data read through the system",
+        "Envelope encryption keeps bulk data local and keys in the KMS",
+        "KEK rotation is cheap because old versions keep unwrapping",
+        "Per-customer data keys make erasure reach backups through crypto-shredding"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What does deleting the key do?",
+      "prompt": "An engineer schedules deletion of the KMS key that wraps every data key for the orders database, thinking it is unused. The waiting period is 30 days.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "If nobody cancels, all order data becomes unreadable for good",
+          "feedback": "Right: every data key it wrapped can no longer be unwrapped."
+        },
+        {
+          "id": "b",
+          "label": "Orders stay readable, because the data keys are cached",
+          "feedback": "Caches expire within minutes; after that, nothing can unwrap the data keys."
+        },
+        {
+          "id": "c",
+          "label": "The KMS re-wraps the data keys under a default key",
+          "feedback": "No KMS does this. Deletion is final once the waiting period ends."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Disable the key first and alert on decryption failures during the waiting period; that turns a silent disaster into a cancelled change."
+    },
+    "seeAlso": [
+      {
+        "topicId": 302,
+        "why": "AEAD and key types underpin the data keys used here"
+      },
+      {
+        "topicId": 307,
+        "why": "Secrets managers and KMSs share the same access-policy and audit model"
+      },
+      {
+        "topicId": 330,
+        "why": "Backups need a key strategy, or a restore can fail when you need it"
+      }
+    ]
+  },
+  {
+    "id": 573,
+    "slug": "defending-login-endpoints",
+    "region": "f6-security",
+    "order": 13,
+    "title": "Defending Login: Credential Stuffing, Lockouts and Enumeration",
+    "kind": "lesson",
+    "objectives": [
+      "Recognise credential stuffing and why per-IP limits miss it",
+      "Choose throttling and step-up challenges over hard lockouts",
+      "Remove account-enumeration leaks from login, sign-up and reset flows"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 15,
+    "prereqIds": [
+      303
+    ],
+    "cards": [
+      {
+        "id": "t573-c1",
+        "kind": "text",
+        "title": "Credential stuffing replays passwords that work elsewhere",
+        "body": "People reuse passwords, and billions of username and password pairs from other sites’ breaches circulate. In credential stuffing an attacker replays those pairs against your login, usually one attempt per account, spread across thousands of IP addresses. Only a small fraction succeed. The figures here are illustrative: 0.5% of 10 million attempts is still 50,000 accounts taken over. Because each address and each account sees only a few attempts, limits keyed only on IP or only on account barely notice.",
+        "teaches": [
+          "credential-stuffing"
+        ]
+      },
+      {
+        "id": "t573-c2",
+        "kind": "text",
+        "title": "Hard lockouts hand attackers a denial of service",
+        "body": "Locking an account for a day after five failures stops guessing against that account. It also lets anyone who knows a username lock its owner out, and a script can do that to every user. Prefer per-account throttling that grows the delay with each failure, then a step-up check such as a second factor or a bot challenge, plus a notification to the owner. NIST SP 800-63B-4 caps consecutive failed attempts on one account at 100 before stronger measures. That figure is a ceiling, not a target.",
+        "teaches": [
+          "lockout-tradeoff"
+        ]
+      },
+      {
+        "id": "t573-c3",
+        "kind": "diagram",
+        "title": "Worked example: layered limits on one login endpoint",
+        "body": "A consumer app with 20 million accounts wants to slow attacks without locking out real users.",
+        "teaches": [
+          "credential-stuffing",
+          "lockout-tradeoff"
+        ],
+        "steps": [
+          "Per source address or network: about 20 attempts per minute, which slows single noisy sources",
+          "Per account: after 5 failures add a growing delay or a challenge; after 100 consecutive failures require recovery",
+          "Across the site: watch the failure ratio, since a jump from 10% to 60% failed logins signals a stuffing run",
+          "On every new or changed password: reject ones found in breach corpuses, and force a reset for accounts whose current password is exposed",
+          "Offer MFA and passkeys, which make a correct password alone insufficient"
+        ]
+      },
+      {
+        "id": "t573-c4",
+        "kind": "text",
+        "title": "Misconception: “Wrong password” is a helpful message",
+        "body": "If the login says “No such user” for one input and “Wrong password” for another, it confirms which accounts exist. Status codes, redirects and response times leak the same thing. A server that skips the slow password hash for unknown users answers in milliseconds instead of a quarter of a second. Return one message and status, and hash a dummy password when the user is missing. Sign-up and reset leak too, so say “If an account exists, we have sent a link”.",
+        "teaches": [
+          "account-enumeration"
+        ]
+      },
+      {
+        "id": "t573-c5",
+        "kind": "text",
+        "title": "Trap: a CAPTCHA as the only defence",
+        "body": "Challenges raise the cost per attempt, but paid solving services and automation get through many of them cheaply. They also hurt accessibility, and they do nothing once the attacker holds a correct password. Use challenges as one layer, triggered by risk signals such as a new device, a burst of failures or a flagged network. Behind them, put MFA, breached-password checks and alerts on unusual success patterns.",
+        "teaches": [
+          "credential-stuffing",
+          "breached-passwords"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t573-a1",
+        "concept": "credential-stuffing",
+        "type": "multiple_choice",
+        "prompt": "Failed logins jump to 400,000 an hour from 30,000 addresses. Each attempt pairs a different username with a different password, and about 0.5% succeed. What is happening?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Credential stuffing with pairs leaked from another site"
+          },
+          {
+            "id": "b",
+            "label": "Password spraying: one common password tried on many accounts"
+          },
+          {
+            "id": "c",
+            "label": "Brute force: many guesses aimed at a single account"
+          },
+          {
+            "id": "d",
+            "label": "A broken password hash rejecting real users after a deploy"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Distinct username and password pairs with a small success rate are the signature of replayed breach data. Spraying reuses the same few passwords across accounts. Brute force concentrates on one account. A broken hash would make real users fail, not make strangers succeed."
+      },
+      {
+        "id": "t573-a2",
+        "concept": "lockout-tradeoff",
+        "type": "multiple_choice",
+        "prompt": "Why is “lock the account for 24 hours after 5 failures” risky for a public consumer app?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Anyone who knows a username can lock its owner out"
+          },
+          {
+            "id": "b",
+            "label": "It lets attackers guess without limit once the lock ends"
+          },
+          {
+            "id": "c",
+            "label": "Locking an account resets its MFA enrolment"
+          },
+          {
+            "id": "d",
+            "label": "It slows the password hash for the other users"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The control punishes the account owner for an attacker’s actions, and it can be scripted across many usernames. Five guesses a day is a tight limit, not an unlimited one. Lockout state is unrelated to MFA enrolment and to hashing cost."
+      },
+      {
+        "id": "t573-a3",
+        "concept": "account-enumeration",
+        "type": "multiple_choice",
+        "prompt": "Login answers in 5 ms for unknown usernames and in 250 ms for wrong passwords, with identical text. What leaks?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The password hash, through the error text"
+          },
+          {
+            "id": "b",
+            "label": "Which usernames exist, through the timing"
+          },
+          {
+            "id": "c",
+            "label": "The salt, through the size of the response"
+          },
+          {
+            "id": "d",
+            "label": "Nothing useful, because the messages match"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Only known users go through the slow hash, so timing separates them. Hash a dummy password for unknown users. The text, size and salt are not exposed here; matching messages are not enough when timing differs."
+      },
+      {
+        "id": "t573-a4",
+        "concept": "credential-stuffing",
+        "type": "estimation",
+        "prompt": "An attacker replays 10 million leaked pairs, and 0.5% are valid on your site (an illustrative rate). How many accounts are taken over if none use MFA?",
+        "unit": "accounts",
+        "target": 50000,
+        "assumptions": [
+          "10,000,000 attempts",
+          "Success rate 0.5% (illustrative)",
+          "No second factor"
+        ],
+        "formula": "attempts × success rate",
+        "workedAnswer": "10,000,000 × 0.005 = 50,000 accounts.",
+        "explanation": "Design implication: small percentages of huge lists add up. MFA stops most of these takeovers, because a correct password alone is no longer enough.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          5000,
+          500000
+        ]
+      },
+      {
+        "id": "t573-a5",
+        "concept": "lockout-tradeoff",
+        "type": "drag_order",
+        "prompt": "Order the responses as failed attempts pile up on one account.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Require a bot challenge or a second factor"
+          },
+          {
+            "id": "s1",
+            "label": "Allow attempts at normal speed"
+          },
+          {
+            "id": "s4",
+            "label": "Notify the owner and require recovery at the hard limit"
+          },
+          {
+            "id": "s2",
+            "label": "Add a short delay that grows with each failure"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Escalate friction gradually, so real users who mistype are barely slowed while sustained guessing becomes expensive."
+      },
+      {
+        "id": "t573-a6",
+        "concept": "breached-passwords",
+        "type": "multiple_choice",
+        "prompt": "When should a site check passwords against a list of breached passwords?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "When one is set or changed, and optionally at login"
+          },
+          {
+            "id": "b",
+            "label": "Once a year, by scanning the stored password hashes"
+          },
+          {
+            "id": "c",
+            "label": "Only after the owner reports the account hacked"
+          },
+          {
+            "id": "d",
+            "label": "Only for administrator accounts"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "NIST requires checking new passwords against compromised lists. Checking at login lets you force a reset when a current password turns up in a new breach. Slow, salted hashes cannot be scanned in bulk, waiting for a report is too late, and stuffing targets ordinary users."
+      },
+      {
+        "id": "t573-a7",
+        "concept": "credential-stuffing",
+        "type": "tradeoff",
+        "prompt": "A shopping app sees nightly stuffing runs from residential IP addresses. Support complains that the current lockout policy blocks real customers.",
+        "constraints": [
+          "Attempts spread over tens of thousands of addresses",
+          "One or two attempts per account",
+          "Customers hate friction at checkout"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "Risk-based challenges, breached-password resets and optional MFA",
+            "description": "Layered"
+          },
+          {
+            "id": "p2",
+            "label": "Stricter per-IP limits of 5 attempts per hour",
+            "description": "Per-IP"
+          },
+          {
+            "id": "p3",
+            "label": "Lock each account after 2 failures",
+            "description": "Lockout"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "Distributed attempts slip under per-IP and per-account limits"
+          },
+          {
+            "id": "r2",
+            "label": "Challenges only on risk keep friction low for real customers"
+          },
+          {
+            "id": "r3",
+            "label": "Tighter IP limits stop attacks from residential addresses"
+          },
+          {
+            "id": "r4",
+            "label": "Lockouts stop stuffing because each pair is tried once"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "Each address sends only a few attempts, and residential ranges are shared with real customers.",
+          "r4": "With one attempt per account a lockout never triggers, but it does lock out real users."
+        },
+        "explanation": "Stuffing is distributed and low-and-slow, so defend with signals across the whole site and with factors beyond the password."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t573-f1",
+        "front": "Credential stuffing vs spraying",
+        "back": "Stuffing replays leaked pairs; spraying tries a few common passwords on many accounts."
+      },
+      {
+        "id": "t573-f2",
+        "front": "Why not hard lockouts?",
+        "back": "They let anyone lock a known user out; throttle and step up instead."
+      },
+      {
+        "id": "t573-f3",
+        "front": "How do you stop timing enumeration?",
+        "back": "Same message and status, and hash a dummy password when the user does not exist."
+      }
+    ],
+    "sources": [
+      {
+        "title": "OWASP Credential Stuffing Prevention Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Credential_Stuffing_Prevention_Cheat_Sheet.html"
+      },
+      {
+        "title": "OWASP Authentication Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html"
+      },
+      {
+        "title": "NIST SP 800-63B: Authentication and Lifecycle Management",
+        "url": "https://pages.nist.gov/800-63-4/sp800-63b.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "credential-stuffing",
+        "lockout-tradeoff",
+        "account-enumeration",
+        "breached-passwords"
+      ],
+      "mechanism": {
+        "title": "How a layered login defence works",
+        "steps": [
+          "Measure first: record each attempt with account, source network, device signals and outcome. Without a failure-ratio baseline you cannot tell a stuffing run from a busy evening.",
+          "Rate-limit on several keys at once: source address, network block, account and the whole site. Each key catches a different attack shape, and none catches them all.",
+          "Escalate per account instead of locking. Add a growing delay, then a challenge or second factor, and notify the owner. Keep a hard ceiling (NIST: at most 100 consecutive failures) that leads to recovery, not a timed lock anyone can trigger.",
+          "Make responses uniform: the same message, status and similar timing for unknown users, wrong passwords and locked accounts. Apply the same rule to sign-up and password reset.",
+          "Check passwords against breach corpuses when they are set, and at login if you can do it privately (for example with a k-anonymity range query that sends only a hash prefix). Force a reset when a match appears.",
+          "Remove the password’s value: offer MFA and passkeys, and prompt users toward them after a risky login. A replayed password then fails at the second step."
+        ]
+      },
+      "useWhen": [
+        "Any public login, sign-up or reset endpoint",
+        "Apps where accounts hold money, loyalty points or personal data worth reselling"
+      ],
+      "avoidWhen": [
+        "Internal tools behind single sign-on, where the identity provider enforces these controls",
+        "Machine-to-machine APIs, which should use keys or workload identity, not passwords"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Control",
+          "Stops",
+          "Misses"
+        ],
+        "rows": [
+          [
+            "Per-IP rate limit",
+            "One noisy source",
+            "Attacks spread over many addresses"
+          ],
+          [
+            "Per-account throttle",
+            "Guessing against one account",
+            "One attempt per account across millions"
+          ],
+          [
+            "Breached-password check",
+            "Reuse of known leaked passwords",
+            "Fresh or unique leaks it has not seen"
+          ],
+          [
+            "MFA or passkeys",
+            "Logins with a correct stolen password",
+            "Phishing of OTP codes, unless the factor resists phishing"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Why per-IP and per-account limits miss a stuffing run",
+        "assumptions": [
+          "400,000 attempts an hour from 30,000 addresses",
+          "Each attempt targets a different account",
+          "Per-IP limit 20 per minute; per-account lockout after 5 failures",
+          "Success rate 0.5% (illustrative)"
+        ],
+        "steps": [
+          "Per address: 400,000 / 30,000 ≈ 13 attempts an hour, about 0.2 a minute, far under 20 a minute",
+          "Per account: one attempt each, so the 5-failure rule never fires",
+          "Takeovers: 400,000 × 0.005 = 2,000 accounts an hour",
+          "Site-wide signal: failures far above the normal hourly baseline, which is the alert that fires"
+        ],
+        "result": "Neither limit triggers, yet 2,000 accounts an hour fall. Site-wide anomaly detection, breached-password resets and MFA are what change the outcome."
+      },
+      "india": {
+        "title": "What OWASP and NIST recommend",
+        "label": "Official documentation",
+        "body": "The OWASP Credential Stuffing Prevention Cheat Sheet calls multi-factor authentication by far the best defence against password attacks such as credential stuffing and password spraying. It cites a Microsoft analysis suggesting MFA would have stopped 99.9% of account compromises. NIST SP 800-63B-4 requires verifiers to compare new passwords with lists of commonly used or compromised values. It limits consecutive failed attempts on an account to no more than 100. It says verifiers shall not impose composition rules or force periodic changes, and it sets a 15-character minimum for passwords used alone."
+      },
+      "pitfalls": [
+        {
+          "trap": "Relying on per-IP rate limits for login",
+          "say": "I would rate-limit on several keys and watch the site-wide failure ratio, because stuffing spreads across addresses."
+        },
+        {
+          "trap": "Locking accounts on a timer after a few failures",
+          "say": "Throttle and step up instead, so attackers cannot lock real users out."
+        },
+        {
+          "trap": "Different errors for unknown user and wrong password",
+          "say": "Return one response and equalise timing, including on sign-up and reset."
+        }
+      ],
+      "takeaways": [
+        "Credential stuffing spreads leaked pairs across addresses and accounts",
+        "Throttle and challenge instead of hard lockouts",
+        "Uniform responses and timing stop account enumeration",
+        "MFA and breached-password checks change the outcome most"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Which control stops this run?",
+      "prompt": "Tonight’s attack sends 400,000 attempts an hour from 30,000 residential addresses, one attempt per account, using pairs from another site’s breach.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "A per-IP limit of 20 attempts a minute",
+          "feedback": "Each address sends about 13 an hour, well under the limit."
+        },
+        {
+          "id": "b",
+          "label": "Locking accounts after 5 failures",
+          "feedback": "Each account sees one attempt, so the lock never triggers."
+        },
+        {
+          "id": "c",
+          "label": "MFA plus resets for breached passwords",
+          "feedback": "Right: a correct password is no longer enough, and exposed passwords are retired."
+        }
+      ],
+      "correctId": "c",
+      "reveal": "Defend against distributed stuffing by devaluing the password, and alert on site-wide failure spikes."
+    },
+    "seeAlso": [
+      {
+        "topicId": 233,
+        "why": "Rate limiting algorithms behind the per-key login limits"
+      },
+      {
+        "topicId": 310,
+        "why": "MFA and passkeys, the control that makes stolen passwords insufficient"
+      },
+      {
+        "topicId": 303,
+        "why": "Slow password hashing, which creates the timing gap that leaks usernames"
+      }
+    ]
+  },
+  {
+    "id": 574,
+    "slug": "designing-api-keys",
+    "region": "f6-security",
+    "order": 14,
+    "title": "Designing API Keys: Format, Storage, Scopes and Rotation",
+    "kind": "lesson",
+    "objectives": [
+      "Generate API keys with enough randomness and a recognisable format",
+      "Store and verify keys so a database leak exposes nothing usable",
+      "Scope, rotate and revoke keys without breaking integrations"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 14,
+    "prereqIds": [
+      302
+    ],
+    "cards": [
+      {
+        "id": "t574-c1",
+        "kind": "text",
+        "title": "An API key is a password for a program",
+        "body": "Whoever presents the key acts as its owner, so treat it as a bearer secret. Send it only over TLS and in a header such as Authorization, never in the URL. URLs end up in server and proxy logs, browser history, analytics and Referer headers, and RFC 6750 says bearer tokens should not go in the query string. An API key identifies a program, not a person. When a user delegates access to a third party, use OAuth instead, so the user can see and revoke it.",
+        "teaches": [
+          "api-key-basics"
+        ]
+      },
+      {
+        "id": "t574-c2",
+        "kind": "text",
+        "title": "Random, prefixed, shown once",
+        "body": "Build the secret from at least 128 bits, and preferably 256 bits (32 bytes), from a cryptographically secure random generator, then encode it. Add a readable prefix such as acme_live_ or acme_test_. People can tell environments apart, and secret scanners can match the pattern with few false positives. A short checksum lets a scanner reject random lookalikes without calling you. Show the full key once at creation; after that show only the prefix and last four characters.",
+        "teaches": [
+          "api-key-format"
+        ]
+      },
+      {
+        "id": "t574-c3",
+        "kind": "diagram",
+        "title": "Worked example: storing and checking keys",
+        "body": "A key looks like acme_live_ + key id + secret. The key id is not secret; the secret part is 32 random bytes.",
+        "teaches": [
+          "api-key-storage"
+        ],
+        "steps": [
+          "Store the key id, a SHA-256 hash of the secret (or an HMAC with a server-side pepper), the scopes, owner, expiry, and created and last-used times",
+          "On a request, parse out the key id and load that one record; no table scan, no secret in the lookup",
+          "Hash the presented secret and compare it with the stored hash in constant time",
+          "Check revocation, expiry and that the scopes cover this endpoint and method",
+          "Update last-used in the background, which later shows which keys are stale or unexpectedly busy"
+        ]
+      },
+      {
+        "id": "t574-c4",
+        "kind": "text",
+        "title": "Misconception: API keys need a slow password hash",
+        "body": "Slow hashes such as Argon2id exist because human passwords have little entropy and can be guessed offline. A 256-bit random secret cannot be guessed, even with a fast hash: 2²⁵⁶ candidates is far beyond any computer. A fast hash keeps verification to microseconds per request. A 100 ms hash at 2,000 requests a second would need about 200 CPU cores just to check keys. The right defence for keys is entropy, not slowness.",
+        "teaches": [
+          "api-key-storage"
+        ]
+      },
+      {
+        "id": "t574-c5",
+        "kind": "text",
+        "title": "Trap: one all-powerful key per account",
+        "body": "One key that can do everything, never expires and is pasted into five integrations means any leak is total. Revoking it also breaks all five at once, so nobody does. Issue a separate, named key for each integration, scoped to the resources and actions it needs, with an optional expiry. Allow two active keys per integration so rotation can overlap. Rate-limit and monitor per key, so one leaked key stands out.",
+        "teaches": [
+          "api-key-scoping",
+          "api-key-rotation"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t574-a1",
+        "concept": "api-key-storage",
+        "type": "multiple_choice",
+        "prompt": "How should a server store the API keys it issues?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A fast hash of the random secret, with its id and scopes"
+          },
+          {
+            "id": "b",
+            "label": "Encrypted, with the key held in the same database"
+          },
+          {
+            "id": "c",
+            "label": "A bcrypt hash at cost 14, checked on each request"
+          },
+          {
+            "id": "d",
+            "label": "In plain text, so support can read keys back to customers"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "High-entropy secrets cannot be guessed, so a fast hash is safe and cheap. Encrypting with a key stored beside the data protects little. A cost-14 bcrypt adds roughly a second of CPU to every request for no gain. Plain text turns any database leak into working keys."
+      },
+      {
+        "id": "t574-a2",
+        "concept": "api-key-basics",
+        "type": "multiple_choice",
+        "prompt": "Why send an API key in a request header rather than the URL query string?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Headers are encrypted by TLS but URLs are not"
+          },
+          {
+            "id": "b",
+            "label": "URLs end up in logs, history and Referer headers"
+          },
+          {
+            "id": "c",
+            "label": "Query strings cannot hold more than 64 characters"
+          },
+          {
+            "id": "d",
+            "label": "Servers cannot read query strings on POST requests"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Inside TLS, the path, query and headers are all encrypted. The risk is where URLs are recorded after decryption: access logs, proxies, analytics and Referer. Query strings can be long, and servers read them on any method."
+      },
+      {
+        "id": "t574-a3",
+        "concept": "api-key-format",
+        "type": "estimation",
+        "prompt": "A key’s secret part is 22 characters, each drawn at random from a 64-character alphabet. How many bits of randomness does it carry?",
+        "unit": "bits",
+        "target": 132,
+        "assumptions": [
+          "22 characters",
+          "64 possible symbols each, chosen uniformly at random"
+        ],
+        "formula": "characters × log2(alphabet size)",
+        "workedAnswer": "log2(64) = 6 bits per character, so 22 × 6 = 132 bits.",
+        "explanation": "Sanity check: that is above the 128-bit floor. The length alone is not the measure: 22 characters typed by a person would carry far less.",
+        "tolerance": 0,
+        "trapAnswers": [
+          22,
+          64,
+          128
+        ]
+      },
+      {
+        "id": "t574-a4",
+        "concept": "api-key-scoping",
+        "type": "multiple_choice",
+        "prompt": "A partner integration only needs to read order status. What key should it get?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The account’s main key, so nothing breaks when scopes change"
+          },
+          {
+            "id": "b",
+            "label": "A copy of an admin’s key, with a note to use it carefully"
+          },
+          {
+            "id": "c",
+            "label": "A separate key named for the partner, scoped to read orders"
+          },
+          {
+            "id": "d",
+            "label": "A read-only database login instead of an API key"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Least privilege limits the damage if the partner leaks the key, and a named key can be revoked without touching anyone else. The main or admin key turns a partner leak into a full compromise. A database login bypasses the API’s own authorisation and exposes far more than order status."
+      },
+      {
+        "id": "t574-a5",
+        "concept": "api-key-rotation",
+        "type": "drag_order",
+        "prompt": "Order a key rotation that does not break the integration.",
+        "items": [
+          {
+            "id": "s2",
+            "label": "Deploy the new key to the integration"
+          },
+          {
+            "id": "s4",
+            "label": "Revoke the old key"
+          },
+          {
+            "id": "s1",
+            "label": "Create a second key with the same scopes"
+          },
+          {
+            "id": "s3",
+            "label": "Watch last-used times until the old key goes quiet"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Overlap two valid keys, switch, confirm with usage data, and only then revoke."
+      },
+      {
+        "id": "t574-a6",
+        "concept": "api-key-rotation",
+        "type": "multiple_choice",
+        "prompt": "A key starting with acme_live_ appears in a public code repository. What makes the prefix useful here?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Scanners can recognise the format and alert quickly"
+          },
+          {
+            "id": "b",
+            "label": "The prefix encrypts the rest of the key"
+          },
+          {
+            "id": "c",
+            "label": "Prefixed keys only work from approved addresses"
+          },
+          {
+            "id": "d",
+            "label": "The prefix lets the server skip the hash check"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "A distinctive prefix plus checksum lets secret scanners spot leaks with few false positives, so you can revoke within minutes. The prefix is plain text and grants nothing by itself. Address limits are a separate control, and the hash check always runs."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t574-f1",
+        "front": "Minimum API key entropy?",
+        "back": "At least 128 bits from a secure random generator; 256 bits is common."
+      },
+      {
+        "id": "t574-f2",
+        "front": "Why a fast hash is fine for keys",
+        "back": "Random secrets cannot be guessed, so slowness adds cost without security."
+      },
+      {
+        "id": "t574-f3",
+        "front": "Safe rotation in four steps",
+        "back": "Create a second key, deploy it, watch the old key go quiet, revoke it."
+      }
+    ],
+    "sources": [
+      {
+        "title": "OWASP REST Security Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html"
+      },
+      {
+        "title": "OWASP API Security Top 10 (2023)",
+        "url": "https://owasp.org/API-Security/editions/2023/en/0x11-t10/"
+      },
+      {
+        "title": "RFC 6750: Bearer Token Usage",
+        "url": "https://www.rfc-editor.org/rfc/rfc6750"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "api-key-basics",
+        "api-key-format",
+        "api-key-storage",
+        "api-key-scoping",
+        "api-key-rotation"
+      ],
+      "mechanism": {
+        "title": "The life of an API key",
+        "steps": [
+          "Generate: 32 bytes from a CSPRNG, encoded without ambiguity, plus a non-secret key id. Add a prefix naming the product and environment, and a short checksum.",
+          "Display once: show the full key at creation and store only its hash. If the customer loses it, they create a new one; you cannot and should not recover it.",
+          "Transmit: always over TLS, in the Authorization header. Reject keys sent in query strings instead of quietly accepting them, so the habit never forms.",
+          "Verify: look up by key id, hash the secret, compare in constant time, then check revocation, expiry, scopes and any address or referrer limits.",
+          "Limit and observe: apply rate limits and quotas per key, log the key id (never the secret) with each request, and alert on sudden changes in volume or source networks.",
+          "Rotate and respond: allow two active keys, show last-used times, and give customers a one-click revoke. Watch public repositories for your prefix and revoke leaked keys on the spot, then tell the owner."
+        ]
+      },
+      "useWhen": [
+        "Server-to-server integrations owned by one customer account",
+        "Usage metering and per-client rate limits on a public API"
+      ],
+      "avoidWhen": [
+        "A user granting a third-party app access to their data (use OAuth)",
+        "Code running in a browser or mobile app, where any key is public by design"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Option",
+          "Good for",
+          "Watch out for"
+        ],
+        "rows": [
+          [
+            "Static API key",
+            "Simple server-to-server calls",
+            "Bearer secret: leaks are usable until revoked"
+          ],
+          [
+            "OAuth access token",
+            "Delegated user access with consent",
+            "More moving parts; short lifetimes need refresh"
+          ],
+          [
+            "Signed requests (HMAC of the request)",
+            "Proving integrity and freshness of each call",
+            "Clock skew and canonicalisation bugs"
+          ],
+          [
+            "mTLS client certificate",
+            "High-value partners and internal services",
+            "Certificate issuance and rotation work"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Why entropy beats slow hashing for keys",
+        "assumptions": [
+          "Secret part: 22 characters from a 64-symbol alphabet",
+          "Attacker with a stolen hash table can test 10¹² candidates a second (very generous)",
+          "API traffic: 2,000 requests a second"
+        ],
+        "steps": [
+          "Entropy: 22 × 6 = 132 bits, so 2¹³² ≈ 5.4 × 10³⁹ candidates",
+          "Search time: 5.4 × 10³⁹ / 10¹² ≈ 5.4 × 10²⁷ seconds ≈ 1.7 × 10²⁰ years for the whole space",
+          "Slow hash cost: at 100 ms each, 2,000 × 0.1 = 200 CPU-seconds every second, so about 200 cores",
+          "Fast hash cost: at about 1 µs each, 2,000 × 10^-6 = 0.002 cores"
+        ],
+        "result": "Random keys are safe with a fast hash, and a slow hash would burn about 200 cores for no extra security."
+      },
+      "india": {
+        "title": "OWASP guidance on API keys",
+        "label": "Official documentation",
+        "body": "The OWASP REST Security Cheat Sheet recommends requiring API keys on protected endpoints and returning 429 Too Many Requests when a key exceeds its rate. It also recommends revoking keys that break the usage agreement, and not relying on API keys alone to protect sensitive, critical or high-value resources. The OWASP API Security Top 10 (2023) lists broken authentication as API2. RFC 6750 says bearer tokens should not be passed in page URLs, because URLs are often logged."
+      },
+      "pitfalls": [
+        {
+          "trap": "Storing API keys in plain text so support can look them up",
+          "say": "I would store only a hash and show the key once; a lost key is replaced, not recovered."
+        },
+        {
+          "trap": "Using a slow password hash for every API request",
+          "say": "The key’s 128+ bits of randomness is the defence; a fast hash keeps verification cheap."
+        },
+        {
+          "trap": "Shipping an API key inside a mobile app",
+          "say": "Anything in the app can be extracted, so use per-user tokens issued after login instead."
+        }
+      ],
+      "takeaways": [
+        "Keys are bearer secrets: TLS, headers, never URLs",
+        "At least 128 random bits with a recognisable prefix",
+        "Store a hash with the id and scopes; show the key once",
+        "Scope keys per integration and rotate with two active keys"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What does the table leak expose?",
+      "prompt": "An attacker copies the api_keys table. Each row holds a key id, the SHA-256 of a 256-bit random secret, scopes and owner.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "No working keys: the hashes cannot be turned back into secrets",
+          "feedback": "Right: with 256 random bits, guessing is hopeless even with a fast hash."
+        },
+        {
+          "id": "b",
+          "label": "Every key, because SHA-256 is fast to compute",
+          "feedback": "Speed matters only when the input is guessable; these secrets are not."
+        },
+        {
+          "id": "c",
+          "label": "The keys of accounts with short usernames",
+          "feedback": "Usernames play no part in the secret."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "The metadata still leaks (who has which scopes), so review it, but no request can be authenticated with what was taken."
+    },
+    "seeAlso": [
+      {
+        "topicId": 307,
+        "why": "Where services keep the API keys they use to call others"
+      },
+      {
+        "topicId": 303,
+        "why": "Password hashing, and why low-entropy secrets need slow hashes"
+      },
+      {
+        "topicId": 233,
+        "why": "Per-key rate limits and quotas on a public API"
+      }
+    ]
+  },
+  {
+    "id": 575,
+    "slug": "security-logging-and-audit-trails",
+    "region": "f6-security",
+    "order": 15,
+    "title": "Security Logging and Audit Trails",
+    "kind": "lesson",
+    "objectives": [
+      "Choose which security events to log and which fields each needs",
+      "Keep audit trails that survive an intruder with admin access",
+      "Keep secrets out of logs and turn logs into detections"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 15,
+    "prereqIds": [
+      301
+    ],
+    "cards": [
+      {
+        "id": "t575-c1",
+        "kind": "text",
+        "title": "Logs answer “what happened?” after the fact",
+        "body": "Security logging records the events an investigator will ask about. These include logins and failures, MFA and password changes, role and permission changes, access to sensitive records, data exports, admin actions, key creation and configuration changes. Each event needs who (the actor id, not just an IP), what (action and target), when (UTC timestamp), where (source address, service, request id) and the outcome. Without the actor and target, you can see that something happened but not who did it to what.",
+        "teaches": [
+          "security-events"
+        ]
+      },
+      {
+        "id": "t575-c2",
+        "kind": "text",
+        "title": "An audit trail must survive the attacker",
+        "body": "An intruder with admin rights on a server can edit or delete local logs. Ship security events off the host within seconds to a store in a separate account. Make that store append-only or write-once for a retention period, with delete rights held by nobody in day-to-day operations. Then add tamper evidence, such as a hash chain with signed checkpoints, so any edit that slips through can be detected.",
+        "teaches": [
+          "audit-integrity"
+        ]
+      },
+      {
+        "id": "t575-c3",
+        "kind": "diagram",
+        "title": "Worked example: hash-chaining audit records",
+        "body": "A payments platform needs to prove that its admin-action log has not been edited.",
+        "teaches": [
+          "audit-integrity"
+        ],
+        "steps": [
+          "Each record stores the hash of the record before it",
+          "Record n’s hash = SHA-256(record n’s contents + record n−1’s hash)",
+          "Every hour, sign the latest hash and store the signed checkpoint in a separate system",
+          "To verify, recompute the chain from the last trusted checkpoint and compare",
+          "An edited or deleted record breaks every hash after it, and the checkpoint will not match"
+        ]
+      },
+      {
+        "id": "t575-c4",
+        "kind": "text",
+        "title": "Misconception: log everything, just in case",
+        "body": "Logging full requests and responses captures passwords, session cookies, bearer tokens, card numbers and personal data. The log store then becomes a richer target than the database, and is usually less protected. Log identifiers and outcomes instead: user 8812 exported invoice 5531, success. Redact known secret fields in the logging library, so a careless call cannot leak them. Mask or tokenise personal data you do need.",
+        "teaches": [
+          "log-hygiene"
+        ]
+      },
+      {
+        "id": "t575-c5",
+        "kind": "text",
+        "title": "Trap: logs nobody reads",
+        "body": "Collected but unwatched logs only help after someone else tells you about the breach. Write detections for high-signal events, such as an admin role granted outside change windows, MFA removed and then a login from a new network, a key used from a new country, or bursts of 403s on sequential object ids. Give each alert an owner and a runbook. Keep logs longer than it takes you to discover incidents, or the evidence expires first.",
+        "teaches": [
+          "detection"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t575-a1",
+        "concept": "security-events",
+        "type": "multiple_choice",
+        "prompt": "Which event belongs in a security audit log?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A cache miss on the product catalogue"
+          },
+          {
+            "id": "b",
+            "label": "An admin grants a user the billing-admin role"
+          },
+          {
+            "id": "c",
+            "label": "A slow-query warning on a reporting replica"
+          },
+          {
+            "id": "d",
+            "label": "A health check returning 200 to the load balancer"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Privilege changes are a classic investigation question: who gave this account its power, and when? Cache, performance and health signals belong in operational telemetry, not the audit trail."
+      },
+      {
+        "id": "t575-a2",
+        "concept": "audit-integrity",
+        "type": "multiple_choice",
+        "prompt": "An attacker with root on the app server wants to hide their actions. Which setup best preserves the evidence?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Logs written to a local file only the root account may modify"
+          },
+          {
+            "id": "b",
+            "label": "Logs rotated daily, compressed and kept on the same disk for a year"
+          },
+          {
+            "id": "c",
+            "label": "Logs shipped within seconds to a write-once store in another account"
+          },
+          {
+            "id": "d",
+            "label": "Logs encrypted on the server with a key from its own config"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Evidence must leave the attacker’s reach before they can touch it. Root can edit root-only files, rotated logs on the same disk, and anything encrypted with a key on that server."
+      },
+      {
+        "id": "t575-a3",
+        "concept": "audit-integrity",
+        "type": "multiple_choice",
+        "prompt": "A hash-chained audit log lives on a server the attacker controls. Why also sign the latest hash hourly and store it elsewhere?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The attacker can rewrite the chain but cannot forge the checkpoint"
+          },
+          {
+            "id": "b",
+            "label": "Signing makes the log entries unreadable to the attacker"
+          },
+          {
+            "id": "c",
+            "label": "Hash chains cannot be verified without a signature"
+          },
+          {
+            "id": "d",
+            "label": "Signed checkpoints compress the chain so it takes less disk"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Someone who controls the log can recompute every hash after an edit, so a chain alone proves little. An external, signed checkpoint pins the chain to a value the attacker cannot change. Signing does not hide content or save space, and chains are verifiable by recomputation."
+      },
+      {
+        "id": "t575-a4",
+        "concept": "log-hygiene",
+        "type": "multiple_choice",
+        "prompt": "A debug flag logs full request headers in production. What is the most serious result?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Log storage costs rise by a few percent each month"
+          },
+          {
+            "id": "b",
+            "label": "Response times double across the service"
+          },
+          {
+            "id": "c",
+            "label": "Timestamps in the log drift out of order"
+          },
+          {
+            "id": "d",
+            "label": "Live session tokens become readable to log users"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "Anyone who can read logs can now replay live sessions. That reaches far more people than can read the database. Cost and latency effects are minor, and logging headers does not reorder timestamps."
+      },
+      {
+        "id": "t575-a5",
+        "concept": "security-events",
+        "type": "estimation",
+        "prompt": "A service handles 2,000 requests a second. 5% of them are security events (logins, writes, admin actions), each logged as a 500-byte record. How many GB of audit records is that per day?",
+        "unit": "GB per day",
+        "target": 4.32,
+        "assumptions": [
+          "2,000 requests per second",
+          "5% are security events",
+          "500 bytes per record",
+          "86,400 seconds a day"
+        ],
+        "formula": "requests/s × share × bytes × 86,400 / 10⁹",
+        "workedAnswer": "2,000 × 0.05 = 100 events/s; × 500 B = 50,000 B/s; × 86,400 = 4.32 × 10⁹ B ≈ 4.3 GB a day.",
+        "explanation": "Sanity check: logging every request instead would be 20 times more (86.4 GB). Audit-only records are small enough to keep for a year.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          86.4,
+          0.05
+        ]
+      },
+      {
+        "id": "t575-a6",
+        "concept": "detection",
+        "type": "drag_order",
+        "prompt": "An alert fires: a user’s MFA was removed and a new API key created from an unfamiliar network. Order the response.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Scope: review everything the key and sessions touched"
+          },
+          {
+            "id": "s1",
+            "label": "Confirm the alert against the audit trail"
+          },
+          {
+            "id": "s4",
+            "label": "Recover: restore MFA, reset credentials and record the timeline"
+          },
+          {
+            "id": "s2",
+            "label": "Contain: revoke the new key and the user’s sessions"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Confirm quickly, contain before investigating at length, then scope the damage and recover. The audit trail drives each step."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t575-f1",
+        "front": "Five fields of a security event",
+        "back": "Who, what (action and target), when (UTC), where (source, service, request id), outcome."
+      },
+      {
+        "id": "t575-f2",
+        "front": "How do you protect logs from an intruder?",
+        "back": "Ship off-host fast to a write-once store in another account; add hash chains with signed checkpoints."
+      },
+      {
+        "id": "t575-f3",
+        "front": "What never goes in logs?",
+        "back": "Passwords, tokens, session ids, keys, card numbers and unmasked personal data."
+      }
+    ],
+    "sources": [
+      {
+        "title": "OWASP Logging Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html"
+      },
+      {
+        "title": "OWASP Logging Vocabulary Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html"
+      },
+      {
+        "title": "NIST SP 800-92: Guide to Computer Security Log Management",
+        "url": "https://csrc.nist.gov/pubs/sp/800/92/final"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "security-events",
+        "audit-integrity",
+        "log-hygiene",
+        "detection"
+      ],
+      "mechanism": {
+        "title": "From event to evidence to alert",
+        "steps": [
+          "Define the events: authentication, authorisation failures, privilege changes, sensitive reads and exports, admin actions, key and secret lifecycle, and configuration changes. Use a shared vocabulary such as OWASP’s, so “authn_login_fail” means the same in every service.",
+          "Structure each record: actor id, action, target, outcome, UTC timestamp, source address, service and request or trace id. Structured fields can be queried; free text cannot.",
+          "Redact at the source: the logging library drops or masks fields named password, token, authorization, cookie and secret, and personal data is tokenised. Fixing it downstream is too late, because copies already exist.",
+          "Ship and protect: stream to a separate account within seconds, write-once for the retention period, with tight read access. Hash-chain batches and sign checkpoints into another system.",
+          "Detect: rules and baselines over the stream, such as privilege grants, MFA removals, impossible travel, export spikes and runs of authorisation failures. Each alert has an owner, a severity and a runbook.",
+          "Retain and review: keep security events at least as long as your realistic time to detect, often a year or more. Test the trail by replaying a mock incident and checking that every question can be answered."
+        ]
+      },
+      "useWhen": [
+        "Any system with user accounts, money or personal data",
+        "Regulated environments that must prove who did what"
+      ],
+      "avoidWhen": [
+        "High-volume debug output, which belongs in short-lived operational logs",
+        "Raw request bodies on endpoints that carry secrets or personal data"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Practice",
+          "Benefit",
+          "Cost"
+        ],
+        "rows": [
+          [
+            "Off-host, write-once storage",
+            "Survives a compromised server",
+            "Separate account and retention management"
+          ],
+          [
+            "Hash chain with signed checkpoints",
+            "Edits become detectable",
+            "Key management for the signer"
+          ],
+          [
+            "Redaction in the logging library",
+            "Secrets never reach the store",
+            "Field lists to maintain as code changes"
+          ],
+          [
+            "Detection rules with runbooks",
+            "Incidents found in hours, not months",
+            "Tuning to keep false alarms low"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How big is a year of audit logs?",
+        "assumptions": [
+          "2,000 requests a second",
+          "5% are security events",
+          "500 bytes per event",
+          "Compression of about 10× on structured text (illustrative)"
+        ],
+        "steps": [
+          "Events: 2,000 × 0.05 = 100 per second",
+          "Daily volume: 100 events/s at 500 bytes is 50,000 bytes/s, and 50,000 × 86,400 = 4,320,000,000 bytes, about 4.3 GB a day",
+          "Yearly: 4.32 × 365 ≈ 1,577 GB ≈ 1.6 TB raw",
+          "Compressed: about 160 GB a year at 10×"
+        ],
+        "result": "A year of audit-only events fits in roughly 160 GB, so short retention is rarely a storage problem; it is a choice."
+      },
+      "india": {
+        "title": "OWASP on what to log and what not to",
+        "label": "Official documentation",
+        "body": "The OWASP Logging Cheat Sheet lists events to always record. They include input validation failures, authentication successes and failures, authorisation failures, session management failures, application errors, and use of higher-risk functions such as user administration and data import or export. It also lists data that should usually not be recorded directly. That includes session identifiers, access tokens, passwords, encryption keys, database connection strings and sensitive personal data. The OWASP Top 10:2025 keeps logging as a category, now named Security Logging and Alerting Failures."
+      },
+      "pitfalls": [
+        {
+          "trap": "Logging whole request bodies for debugging in production",
+          "say": "I would log ids and outcomes and redact secret fields in the logging library itself."
+        },
+        {
+          "trap": "Keeping audit logs on the same host as the application",
+          "say": "Stream them off-host to a write-once store, because an intruder with root can edit anything local."
+        },
+        {
+          "trap": "Seven days of retention to save money",
+          "say": "Retention must cover the time it takes to detect incidents, and audit events are small."
+        }
+      ],
+      "takeaways": [
+        "Log who, what, when, where and outcome for security events",
+        "Move logs off-host to write-once storage, with tamper evidence",
+        "Redact secrets and personal data at the source",
+        "Detections with owners turn logs into early warnings"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Can you tell what happened?",
+      "prompt": "On day 20 you learn customer data was exported. Your logs hold only access lines (method, path, status) with no user ids, and retention is 7 days.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "No: the records have expired, and they never named the actor",
+          "feedback": "Right: both retention and missing fields defeat the investigation."
+        },
+        {
+          "id": "b",
+          "label": "Yes: the access lines show the export path",
+          "feedback": "They expired on day 7, and they never said who called it."
+        },
+        {
+          "id": "c",
+          "label": "Yes, if the load balancer kept its own logs",
+          "feedback": "Those lack user ids too, and usually have similar retention."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Log the actor and target for security events, and keep them longer than your realistic time to detect."
+    },
+    "seeAlso": [
+      {
+        "topicId": 229,
+        "why": "General logging and metrics, the operational side of the same pipeline"
+      },
+      {
+        "topicId": 306,
+        "why": "Authorisation failures are among the most useful events to log"
+      },
+      {
+        "topicId": 327,
+        "why": "Incident response uses the audit trail to scope and recover"
+      }
+    ]
+  },
+  {
+    "id": 576,
+    "slug": "tenant-isolation",
+    "region": "f6-security",
+    "order": 16,
+    "title": "Tenant Isolation in Multi-Tenant Systems",
+    "kind": "lesson",
+    "objectives": [
+      "Compare silo, bridge and pool isolation models",
+      "Derive tenant context from credentials and enforce it in the database",
+      "Spot the leaks that cross tenant boundaries outside the main tables"
+    ],
+    "difficulty": "advanced",
+    "durationMinutes": 17,
+    "prereqIds": [
+      306
+    ],
+    "cards": [
+      {
+        "id": "t576-c1",
+        "kind": "text",
+        "title": "Three ways to share infrastructure",
+        "body": "In a silo model each tenant gets its own stack or database. In a pool model all tenants share tables, and every row carries a tenant_id. A bridge (hybrid) model shares the application but gives each tenant its own schema or database, or silos only the largest tenants. Silos cost more and are slower to operate at thousands of tenants, but a bug leaks one tenant’s data at most. Pools are cheap and easy to run, but one missing filter can expose everyone.",
+        "teaches": [
+          "isolation-models"
+        ]
+      },
+      {
+        "id": "t576-c2",
+        "kind": "text",
+        "title": "Tenant context comes from the credential, not the request",
+        "body": "The tenant a request acts for must come from something the server verified, such as the session or a signed token’s tenant claim. It must never come from a header, query parameter or body field the client can change. A subdomain such as acme.example.com is fine for routing, but the server must still check that the authenticated user belongs to that tenant. Carry the verified tenant through internal calls and background jobs, not just the first hop.",
+        "teaches": [
+          "tenant-context"
+        ]
+      },
+      {
+        "id": "t576-c3",
+        "kind": "diagram",
+        "title": "Worked example: pooled tables with a database backstop",
+        "body": "A pooled design adds row-level security in PostgreSQL so a forgotten WHERE clause cannot leak other tenants’ rows.",
+        "teaches": [
+          "row-level-security"
+        ],
+        "steps": [
+          "Every tenant-owned table has a tenant_id column, leading its primary key and indexes",
+          "Each transaction sets the tenant from the verified token, for example SET LOCAL app.tenant_id = ...",
+          "A row-level security policy limits rows to tenant_id = current_setting('app.tenant_id'), and FORCE ROW LEVEL SECURITY applies it to the table owner too",
+          "The application’s database role has no BYPASSRLS; only the migration role does",
+          "A test signs in as tenant A and expects zero rows of tenant B from every endpoint and report"
+        ]
+      },
+      {
+        "id": "t576-c4",
+        "kind": "text",
+        "title": "Misconception: separate databases make cross-tenant leaks impossible",
+        "body": "Silos protect the main tables, but data also lives elsewhere. A connection cache can route a request to the wrong tenant’s database. Shared caches, search indexes, queues, object-storage paths and analytics exports may not carry a tenant key at all. Each of these needs the tenant in its key or path, and a test. Isolation is a property of the whole data path, not of the primary database.",
+        "teaches": [
+          "isolation-models"
+        ]
+      },
+      {
+        "id": "t576-c5",
+        "kind": "text",
+        "title": "Trap: tenant settings that leak through a connection pool",
+        "body": "Pooled database connections keep session state between borrowers. If the app sets the tenant once per session and forgets to clear it, the next request on that connection can run as the previous tenant. A request that never sets the tenant, such as an admin job, inherits whatever was left behind. Set the tenant per transaction so it ends with the transaction, reset on release, and make an unset tenant match no rows.",
+        "teaches": [
+          "row-level-security",
+          "tenant-context"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t576-a1",
+        "concept": "tenant-context",
+        "type": "multiple_choice",
+        "prompt": "Where should a request’s tenant id come from?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "An X-Tenant-Id header the client sends"
+          },
+          {
+            "id": "b",
+            "label": "The verified session or token of the caller"
+          },
+          {
+            "id": "c",
+            "label": "The subdomain alone, such as acme.example.com"
+          },
+          {
+            "id": "d",
+            "label": "A tenant field in the JSON request body"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Only server-verified credentials are trustworthy. Headers and body fields are attacker-controlled. A subdomain is useful for routing but must be checked against the caller’s membership, or a user of one tenant can simply change the hostname."
+      },
+      {
+        "id": "t576-a2",
+        "concept": "row-level-security",
+        "type": "multiple_choice",
+        "prompt": "The code already filters every query by tenant_id. Why add a row-level security policy?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "It speeds up tenant queries by skipping the index"
+          },
+          {
+            "id": "b",
+            "label": "It encrypts each tenant’s rows with a separate key"
+          },
+          {
+            "id": "c",
+            "label": "It lets tenants run their own SQL safely"
+          },
+          {
+            "id": "d",
+            "label": "It still filters rows when one query forgets the filter"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "Defence in depth: the database enforces the rule even when application code has a gap. Row-level security adds a predicate rather than skipping indexes, it does not encrypt anything, and it is not a sandbox for tenant-written SQL."
+      },
+      {
+        "id": "t576-a3",
+        "concept": "isolation-models",
+        "type": "multiple_choice",
+        "prompt": "A bank customer will pay extra to keep its data off shared database servers. Your other 5,000 tenants are small. What fits?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Pool everyone, with the bank in the shared tables"
+          },
+          {
+            "id": "b",
+            "label": "Give all 5,001 tenants their own database"
+          },
+          {
+            "id": "c",
+            "label": "Silo the bank and keep the small tenants pooled"
+          },
+          {
+            "id": "d",
+            "label": "Put the bank in its own schema on the shared server"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "A bridge model matches isolation to need: one silo for the tenant who requires it, cheap pooling for the rest. Pooling the bank breaks its requirement. A database per tenant multiplies cost by thousands. A separate schema still shares the server the bank wants to avoid."
+      },
+      {
+        "id": "t576-a4",
+        "concept": "noisy-neighbour",
+        "type": "multiple_choice",
+        "prompt": "One tenant’s nightly bulk import saturates the shared database and slows the other tenants. Which change addresses this directly?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Per-tenant quotas and a separate queue for bulk imports"
+          },
+          {
+            "id": "b",
+            "label": "A larger cache for the other tenants’ reads"
+          },
+          {
+            "id": "c",
+            "label": "Row-level security on the import tables"
+          },
+          {
+            "id": "d",
+            "label": "Longer query timeouts so slow queries finish"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Noisy-neighbour problems are fixed by limiting and isolating each tenant’s share of capacity. A cache helps only reads. Row-level security isolates data, not load. Longer timeouts hide the symptom and hold connections longer."
+      },
+      {
+        "id": "t576-a5",
+        "concept": "isolation-models",
+        "type": "estimation",
+        "prompt": "Siloing costs at least $150 a month per tenant for its own database (illustrative). What is the monthly database bill for 5,000 siloed tenants?",
+        "unit": "dollars per month",
+        "target": 750000,
+        "assumptions": [
+          "5,000 tenants",
+          "$150 per tenant per month (illustrative)"
+        ],
+        "formula": "tenants × cost per tenant",
+        "workedAnswer": "5,000 × $150 = $750,000 a month.",
+        "explanation": "Design implication: against a pooled cluster at about $9,000 a month that is roughly 83 times more. This is why most SaaS products pool small tenants and silo only those who need it.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          75000,
+          7500000
+        ]
+      },
+      {
+        "id": "t576-a6",
+        "concept": "row-level-security",
+        "type": "drag_order",
+        "prompt": "Order how a pooled request is served safely.",
+        "items": [
+          {
+            "id": "s2",
+            "label": "Borrow a pooled connection and set the tenant for this transaction"
+          },
+          {
+            "id": "s4",
+            "label": "Clear the tenant setting before returning the connection"
+          },
+          {
+            "id": "s1",
+            "label": "Verify the token and read the tenant from it"
+          },
+          {
+            "id": "s3",
+            "label": "Run the queries, filtered by the row-level policy"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "The tenant comes from the credential, is scoped to one transaction and is gone before the next borrower gets the connection."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t576-f1",
+        "front": "Silo, bridge, pool",
+        "back": "Own stack per tenant; shared app with separate schemas or databases; shared tables with tenant_id."
+      },
+      {
+        "id": "t576-f2",
+        "front": "Where does the tenant id come from?",
+        "back": "The verified session or token, never a client-supplied field."
+      },
+      {
+        "id": "t576-f3",
+        "front": "Why set the tenant per transaction?",
+        "back": "Pooled connections keep session state, so the next request could inherit it."
+      }
+    ],
+    "sources": [
+      {
+        "title": "AWS whitepaper: SaaS Tenant Isolation Strategies",
+        "url": "https://docs.aws.amazon.com/whitepapers/latest/saas-tenant-isolation-strategies/saas-tenant-isolation-strategies.html"
+      },
+      {
+        "title": "PostgreSQL: Row Security Policies",
+        "url": "https://www.postgresql.org/docs/current/ddl-rowsecurity.html"
+      },
+      {
+        "title": "OWASP Authorization Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "isolation-models",
+        "tenant-context",
+        "row-level-security",
+        "noisy-neighbour"
+      ],
+      "mechanism": {
+        "title": "Isolation along the whole request path",
+        "steps": [
+          "Identity: authenticate the user, then resolve their tenant memberships on the server. The active tenant is one the user belongs to, chosen from the token or session.",
+          "Propagation: pass the verified tenant in a signed internal token or request context to every downstream service, queue message and scheduled job. Jobs that process many tenants should loop and set the context for each one explicitly.",
+          "Data enforcement: in pooled tables, use row-level security as a backstop under application filters. In bridged or siloed designs, choose the connection from the verified tenant through one routing function, and test that it never falls back to a default.",
+          "Side channels: prefix cache keys, search indexes, object paths and queue topics with the tenant. Per-tenant encryption keys let you prove separation and crypto-shred one tenant on exit.",
+          "Capacity: give each tenant quotas and rate limits, and move bulk work to queues with per-tenant concurrency caps. Graduate very large tenants to their own shard or silo.",
+          "Verification: run cross-tenant tests for every endpoint and export, and log authorisation denials with both the caller tenant and the target tenant so attempts stand out."
+        ]
+      },
+      "useWhen": [
+        "Any SaaS where customers’ data must never mix",
+        "Enterprise tiers with contractual isolation or data-residency terms"
+      ],
+      "avoidWhen": [
+        "Single-tenant deployments, where the tenant boundary is the deployment itself",
+        "Early prototypes with one customer, where a tenant_id column and tests are enough for now"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Model",
+          "Isolation",
+          "Cost and operations"
+        ],
+        "rows": [
+          [
+            "Pool (shared tables)",
+            "Logical: filters plus row-level security",
+            "Cheapest; one schema to migrate"
+          ],
+          [
+            "Bridge (schema or database per tenant)",
+            "Stronger separation of data, shared compute",
+            "Many schemas to migrate; connection routing"
+          ],
+          [
+            "Silo (stack per tenant)",
+            "Strongest; a bug leaks one tenant at most",
+            "Highest cost; fleet management at scale"
+          ],
+          [
+            "Hybrid by tier",
+            "Matches isolation to what each customer pays for",
+            "Two code paths to test and operate"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "What pooling saves, and what it risks",
+        "assumptions": [
+          "5,000 tenants",
+          "Silo database at least $150 a month each (illustrative)",
+          "Pooled cluster about $9,000 a month (illustrative)",
+          "20 enterprise tenants need silos"
+        ],
+        "steps": [
+          "All silo: 5,000 × $150 = $750,000 a month",
+          "All pool: $9,000 a month, about $1.80 per tenant, 83 times cheaper",
+          "Hybrid: 20 × $150 + $9,000 = $12,000 a month",
+          "Risk: in the pool, one missing filter can expose all 5,000 tenants, which is why row-level security and cross-tenant tests are not optional"
+        ],
+        "result": "A hybrid gives enterprise tenants silos for about a third more than pure pooling, while the pool stays protected by database-level policies."
+      },
+      "india": {
+        "title": "PostgreSQL row security in practice",
+        "label": "Official documentation",
+        "body": "The PostgreSQL documentation explains that when row-level security is enabled on a table and no policy exists, a default-deny policy applies, so no rows are visible or modifiable. Superusers and roles with the BYPASSRLS attribute always bypass row security. Table owners normally bypass it too, unless the table is altered with FORCE ROW LEVEL SECURITY. The AWS SaaS Tenant Isolation Strategies whitepaper describes the silo, bridge and pool models and treats isolation as something enforced at every layer, not only in the database."
+      },
+      "pitfalls": [
+        {
+          "trap": "Taking the tenant id from a request header",
+          "say": "I derive it from the verified token and check membership; client-supplied tenant ids are just input."
+        },
+        {
+          "trap": "Relying on application WHERE clauses alone in a pooled design",
+          "say": "Add row-level security as a backstop and force it for the table owner."
+        },
+        {
+          "trap": "Forgetting the cache and search index",
+          "say": "Tenant-prefix every key and index, and include them in cross-tenant tests."
+        }
+      ],
+      "takeaways": [
+        "Silo, bridge and pool trade cost against blast radius",
+        "The tenant comes from verified credentials and travels with every call",
+        "Row-level security backstops application filters in pooled tables",
+        "Caches, indexes, queues and quotas need tenant isolation too"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Whose data does the request see?",
+      "prompt": "The app sets app.tenant_id once per pooled connection at request start, but only when a request has a tenant. A nightly admin report runs a query on a connection last used by tenant B.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Tenant B’s rows, left over from the previous request",
+          "feedback": "Right: session state outlives the request on a pooled connection."
+        },
+        {
+          "id": "b",
+          "label": "No rows, because no tenant is set",
+          "feedback": "A tenant is set: tenant B’s, from the last borrower."
+        },
+        {
+          "id": "c",
+          "label": "An error, because the policy needs a tenant",
+          "feedback": "The setting exists, so the policy runs with the stale value."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Scope the setting to the transaction, reset it on release, and make an empty setting match nothing."
+    },
+    "seeAlso": [
+      {
+        "topicId": 306,
+        "why": "Object-level access checks, the per-request half of tenant isolation"
+      },
+      {
+        "topicId": 274,
+        "why": "Connection pooling, where session state can leak between tenants"
+      },
+      {
+        "topicId": 233,
+        "why": "Per-tenant rate limits and quotas against noisy neighbours"
+      }
+    ]
+  },
+  {
+    "id": 577,
+    "slug": "ddos-resilience",
+    "region": "f6-security",
+    "order": 17,
+    "title": "Surviving DDoS: Absorb, Filter and Shed",
+    "kind": "lesson",
+    "objectives": [
+      "Tell volumetric, protocol and application-layer floods apart",
+      "Explain why floods must be absorbed at the edge, before the origin",
+      "Defend expensive endpoints against request floods without runaway cost"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 15,
+    "prereqIds": [
+      301
+    ],
+    "cards": [
+      {
+        "id": "t577-c1",
+        "kind": "text",
+        "title": "Three kinds of flood",
+        "body": "Volumetric attacks fill the network pipe and are measured in gigabits per second. Protocol attacks, such as SYN floods, exhaust connection tables and firewall state, and are measured in packets per second. Application-layer attacks send valid-looking HTTP requests to expensive endpoints such as search, login or checkout, and are measured in requests per second. A rule that stops one kind does nothing against the others, so identify the layer before choosing a response.",
+        "teaches": [
+          "ddos-layers"
+        ]
+      },
+      {
+        "id": "t577-c2",
+        "kind": "text",
+        "title": "Absorb at the edge, not at the origin",
+        "body": "If your data centre has a 10 Gbps uplink, a 100 Gbps flood fills the link upstream of your firewall, so nothing you run can drop it in time. Large anycast networks (CDNs and cloud DDoS services) advertise the same addresses from many locations, so the flood spreads across all of them and is filtered close to its sources. Your origin then accepts traffic only from the edge provider, ideally over a private connection.",
+        "teaches": [
+          "edge-absorption"
+        ]
+      },
+      {
+        "id": "t577-c3",
+        "kind": "diagram",
+        "title": "Worked example: why reflection multiplies traffic",
+        "body": "Reflection abuses open UDP services that send large replies to small queries. This is how to reason about it as a defender.",
+        "teaches": [
+          "amplification"
+        ],
+        "steps": [
+          "UDP has no handshake, so a query can carry a forged source address: the victim’s",
+          "Each open service replies to that address with a much larger response",
+          "Illustrative: 60-byte queries drawing 3,000-byte replies multiply traffic 50 times, so 2 Gbps sent becomes 100 Gbps received",
+          "Defence for everyone: networks drop packets with forged source addresses (BCP 38), and operators close or rate-limit open UDP services",
+          "Defence for the victim: absorb at an anycast edge and drop unexpected UDP before it reaches the origin"
+        ]
+      },
+      {
+        "id": "t577-c4",
+        "kind": "text",
+        "title": "Misconception: autoscaling defeats a DDoS",
+        "body": "Adding servers does nothing when the link is full, because the traffic never reaches them. Against an application-layer flood, scaling turns the attack into a bill while the shared database still saturates. Put hard maximums on scaling, and filter before you scale: per-client rate limits, bot challenges on risky paths, caching that ignores junk query parameters, and load shedding that keeps checkout alive while dropping low-priority work.",
+        "teaches": [
+          "app-layer-defence"
+        ]
+      },
+      {
+        "id": "t577-c5",
+        "kind": "text",
+        "title": "Trap: leaving the origin reachable directly",
+        "body": "An edge network only helps if attackers must go through it. Origin addresses leak through old DNS records, mail servers on the same host, test subdomains and error pages. Once found, the origin can be flooded directly. Firewall the origin to accept only the edge provider’s address ranges or an authenticated tunnel. If the address has leaked, move to a new one.",
+        "teaches": [
+          "edge-absorption"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t577-a1",
+        "concept": "ddos-layers",
+        "type": "multiple_choice",
+        "prompt": "Inbound traffic is only 200 Mbps, but login receives 80,000 valid-looking requests a second from many addresses, and the database is pegged. What kind of attack is it?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A volumetric flood that fills the link"
+          },
+          {
+            "id": "b",
+            "label": "An application-layer request flood"
+          },
+          {
+            "id": "c",
+            "label": "A reflection attack using open UDP services"
+          },
+          {
+            "id": "d",
+            "label": "A SYN flood filling the connection table"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Low bandwidth with many complete, valid HTTP requests that exhaust a backend is the application-layer pattern. A volumetric or reflection attack would show high bandwidth, and a SYN flood would leave half-open connections rather than completed logins."
+      },
+      {
+        "id": "t577-a2",
+        "concept": "edge-absorption",
+        "type": "multiple_choice",
+        "prompt": "Your origin has a 10 Gbps uplink, and a 300 Gbps flood arrives. Where can it be absorbed?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "On the origin, by adding application servers"
+          },
+          {
+            "id": "b",
+            "label": "At the origin firewall, by dropping bad packets"
+          },
+          {
+            "id": "c",
+            "label": "Across a large anycast edge, before it reaches you"
+          },
+          {
+            "id": "d",
+            "label": "By raising the origin’s TCP backlog setting"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "The link saturates upstream of everything at the origin, so only capacity larger than the attack, spread across many locations, can absorb it. Servers, firewall rules and backlog settings all sit behind the full pipe."
+      },
+      {
+        "id": "t577-a3",
+        "concept": "amplification",
+        "type": "estimation",
+        "prompt": "An attacker sends 2 Gbps of 60-byte queries to open UDP services, each of which replies with 3,000 bytes to the forged source. Roughly how much traffic reaches the victim?",
+        "unit": "Gbps",
+        "target": 100,
+        "assumptions": [
+          "2 Gbps of queries",
+          "60-byte query, 3,000-byte reply",
+          "Every query is answered"
+        ],
+        "formula": "sent rate × (reply size / query size)",
+        "workedAnswer": "Amplification = 3,000 / 60 = 50, so 2 Gbps × 50 = 100 Gbps.",
+        "explanation": "Design implication: that is ten times a 10 Gbps uplink, so only an edge network with more capacity than the flood can absorb it.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          2,
+          50
+        ]
+      },
+      {
+        "id": "t577-a4",
+        "concept": "app-layer-defence",
+        "type": "multiple_choice",
+        "prompt": "During a request flood on /search, autoscaling has grown the fleet from 20 to 400 servers. What is the main risk of letting it continue?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The bill climbs while the database behind it still saturates"
+          },
+          {
+            "id": "b",
+            "label": "Autoscaling makes the attack traffic itself larger"
+          },
+          {
+            "id": "c",
+            "label": "New servers cannot join the load balancer mid-attack"
+          },
+          {
+            "id": "d",
+            "label": "Scaling turns off the edge cache for the site"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Stateless servers scale but the shared database does not, so cost rises with no gain in availability. The attack rate is set by the attacker, servers can still register, and scaling does not change cache settings."
+      },
+      {
+        "id": "t577-a5",
+        "concept": "ddos-layers",
+        "type": "drag_order",
+        "prompt": "Order the response when a flood begins.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Apply the matching filter at the edge"
+          },
+          {
+            "id": "s1",
+            "label": "Detect: traffic or errors far above the baseline"
+          },
+          {
+            "id": "s5",
+            "label": "Review and tune the rules after the attack"
+          },
+          {
+            "id": "s2",
+            "label": "Classify the layer: bandwidth, packets or requests"
+          },
+          {
+            "id": "s4",
+            "label": "Shed low-priority work at the origin if it is still overloaded"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "The layer decides the filter, so classify before acting. Shedding protects what is left, and a review makes the next attack cheaper to stop."
+      },
+      {
+        "id": "t577-a6",
+        "concept": "app-layer-defence",
+        "type": "multiple_choice",
+        "prompt": "The 2023 HTTP/2 Rapid Reset attacks opened streams and cancelled them at once, many times per connection. Why did this hurt servers so much?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The resets used up the victims’ network bandwidth"
+          },
+          {
+            "id": "b",
+            "label": "Servers started work on each stream before it was cancelled"
+          },
+          {
+            "id": "c",
+            "label": "The resets broke the encryption on each connection"
+          },
+          {
+            "id": "d",
+            "label": "Each reset forced a new TLS handshake"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Cancelling a stream let the client open another at once without hitting the concurrent-stream limit, while the server had already begun work. Bandwidth was modest, TLS stayed intact, and the same connection was reused. That is why fixes limit how fast a client may reset streams."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t577-f1",
+        "front": "Three DDoS layers",
+        "back": "Volumetric (Gbps), protocol (packets/s and state), application (requests/s)."
+      },
+      {
+        "id": "t577-f2",
+        "front": "Why absorb at the edge?",
+        "back": "A flood larger than your uplink fills it before any origin defence runs."
+      },
+      {
+        "id": "t577-f3",
+        "front": "Origin hardening for DDoS",
+        "back": "Accept traffic only from the edge provider; move the address if it leaks."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Google Cloud: mitigating a 398 million rps DDoS attack",
+        "url": "https://cloud.google.com/blog/products/identity-security/google-cloud-mitigated-largest-ddos-attack-peaking-above-398-million-rps"
+      },
+      {
+        "title": "AWS: How DDoS attacks work and how to protect against them",
+        "url": "https://docs.aws.amazon.com/waf/latest/developerguide/ddos-overview.html"
+      },
+      {
+        "title": "OWASP Denial of Service Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Denial_of_Service_Cheat_Sheet.html"
+      },
+      {
+        "title": "RFC 2827 (BCP 38): Network Ingress Filtering",
+        "url": "https://www.rfc-editor.org/rfc/rfc2827"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "ddos-layers",
+        "edge-absorption",
+        "amplification",
+        "app-layer-defence"
+      ],
+      "mechanism": {
+        "title": "Defence in layers, from the internet inward",
+        "steps": [
+          "Edge capacity: put public endpoints behind an anycast network whose capacity is far larger than plausible attacks. It absorbs volumetric and reflection floods across many locations and drops obviously invalid packets.",
+          "Protocol protection: SYN cookies and stateless filtering at the edge keep connection tables from filling. Only well-formed, completed connections are passed on.",
+          "Request filtering: a web application firewall and per-client rate limits act on paths, headers and behaviour. Challenges are reserved for risky traffic, and rules can be switched on in minutes during an attack.",
+          "Caching: serve as much as possible from the edge, and normalise cache keys so random query strings cannot force misses.",
+          "Origin protection: accept traffic only from the edge, cap autoscaling, and shed load by priority. Keep checkout and login alive, and drop recommendations and analytics first.",
+          "Preparation: baseline normal traffic, rehearse the runbook, know how to reach your provider’s response team, and set budget alerts so an attack cannot quietly run up the bill."
+        ]
+      },
+      "useWhen": [
+        "Any public-facing service that would lose money or trust when unavailable",
+        "Services with expensive endpoints such as search, login or report generation"
+      ],
+      "avoidWhen": [
+        "Internal-only services with no public addresses, where network controls suffice",
+        "Using challenges on every request, which harms real users and accessibility"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Defence",
+          "Handles",
+          "Limits"
+        ],
+        "rows": [
+          [
+            "Anycast edge or scrubbing service",
+            "Volumetric and reflection floods",
+            "Must be in the path; a leaked origin bypasses it"
+          ],
+          [
+            "SYN cookies and stateless filters",
+            "Protocol and state exhaustion",
+            "Little help against valid HTTP floods"
+          ],
+          [
+            "WAF and per-client rate limits",
+            "Application-layer request floods",
+            "Rules need tuning; distributed bots spread load"
+          ],
+          [
+            "Caching and load shedding",
+            "Expensive or repeated requests",
+            "Only cacheable content; shedding drops some real users"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "When caching saves you, and when it does not",
+        "assumptions": [
+          "Attack: 1,000,000 requests a second on a product page",
+          "Origin capacity: 20,000 requests a second",
+          "Edge cache hit ratio for that page: 99%"
+        ],
+        "steps": [
+          "With caching: 1,000,000 × 0.01 = 10,000 requests a second reach the origin, half its capacity",
+          "Attacker adds a random query string to every request; if the cache key includes it, the hit ratio drops to about 0%",
+          "Then 1,000,000 a second reach the origin, 50 times its capacity",
+          "Fix: drop unknown query parameters from the cache key and rate-limit per client, which brings origin load back under 20,000"
+        ],
+        "result": "Caching absorbs a request flood only when attackers cannot bust the cache, so normalise cache keys and keep per-client limits on uncached paths."
+      },
+      "india": {
+        "title": "HTTP/2 Rapid Reset, 2023",
+        "label": "Publicly reported",
+        "body": "In October 2023 Google Cloud reported mitigating a DDoS attack that peaked above 398 million requests per second. That was about 7.5 times its previous record of 46 million. The attack used a new HTTP/2 technique called Rapid Reset, which opens and cancels streams in quick succession, and was tracked as CVE-2023-44487. Google said the two-minute attack generated more requests than Wikipedia’s reported article views for all of September 2023. Absorbing it relied on global edge capacity and load balancing, plus server fixes that limit how quickly a client can reset streams."
+      },
+      "pitfalls": [
+        {
+          "trap": "Counting on autoscaling to ride out an attack",
+          "say": "Scaling cannot clear a full link, and it bills you for request floods; I would filter at the edge and cap scaling."
+        },
+        {
+          "trap": "Putting a CDN in front but leaving the origin open",
+          "say": "Firewall the origin to the edge provider’s ranges, or attackers simply go around it."
+        },
+        {
+          "trap": "One rule for every flood",
+          "say": "Classify the layer first: bandwidth, packets and requests each need a different filter."
+        }
+      ],
+      "takeaways": [
+        "Identify the layer: bandwidth, packets or requests",
+        "Absorb floods at an anycast edge larger than the attack",
+        "Hide and lock down the origin behind the edge",
+        "Filter, cache and shed before you scale"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Will autoscaling save you?",
+      "prompt": "Your origin has a 10 Gbps uplink and autoscaling up to 500 servers. A 150 Gbps UDP flood arrives at its address.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "No: the link is full before traffic reaches a server",
+          "feedback": "Right: the bottleneck is upstream of everything you can scale."
+        },
+        {
+          "id": "b",
+          "label": "Yes: more servers can absorb more traffic",
+          "feedback": "Servers sit behind the saturated 10 Gbps link."
+        },
+        {
+          "id": "c",
+          "label": "Yes, if the servers drop the UDP packets",
+          "feedback": "By the time packets reach a server, the link has already dropped real traffic."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Volumetric floods are absorbed by capacity larger than the attack, which in practice means an anycast edge."
+    },
+    "seeAlso": [
+      {
+        "topicId": 233,
+        "why": "Rate limiting, the core tool against application-layer floods"
+      },
+      {
+        "topicId": 308,
+        "why": "SSRF, another way attackers turn your own servers into their tool"
+      },
+      {
+        "topicId": 329,
+        "why": "Locking the origin down to edge-only traffic with network rules"
+      }
+    ]
+  },
+  {
+    "id": 578,
+    "slug": "vulnerability-triage-and-patching",
+    "region": "f6-security",
+    "order": 18,
+    "title": "Vulnerability Triage and Patch Management",
+    "kind": "lesson",
+    "objectives": [
+      "Separate severity scores from real-world risk",
+      "Use exploitation evidence, exposure and reachability to set order",
+      "Set patch deadlines a team can actually meet"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 15,
+    "prereqIds": [
+      309
+    ],
+    "cards": [
+      {
+        "id": "t578-c1",
+        "kind": "text",
+        "title": "Severity is not the same as risk",
+        "body": "A CVSS base score (0 to 10) describes how bad a vulnerability would be in a typical setup: how it is reached, what privileges it needs and what it affects. It does not say whether anyone is exploiting it, whether your service is exposed, or whether your code even calls the flawed function. Risk is likelihood times impact in your context, and the score is only one input to it.",
+        "teaches": [
+          "severity-vs-risk"
+        ]
+      },
+      {
+        "id": "t578-c2",
+        "kind": "text",
+        "title": "Signals of likelihood: known exploitation and EPSS",
+        "body": "Two public signals help with likelihood. CISA’s Known Exploited Vulnerabilities catalogue lists flaws with evidence of exploitation in the wild. FIRST’s Exploit Prediction Scoring System (EPSS) estimates the probability that a flaw will see exploitation activity in the next 30 days. Combine them with exposure: an internet-facing gateway with a known-exploited flaw outranks a higher-scored flaw in an internal batch tool.",
+        "teaches": [
+          "exploit-likelihood"
+        ]
+      },
+      {
+        "id": "t578-c3",
+        "kind": "diagram",
+        "title": "Worked example: triaging 1,200 scanner findings",
+        "body": "A container scan across 60 images reports 1,200 findings. The team can fix about 25 a week.",
+        "teaches": [
+          "reachability",
+          "patch-slas"
+        ],
+        "steps": [
+          "Deduplicate: the same library flaw in 40 images is one fix, which cuts the list to about 300 distinct items",
+          "Pull to the top anything that is known-exploited or has a high exploitation probability",
+          "Check exposure and reachability: is the component internet-facing, and does untrusted input reach the vulnerable code?",
+          "Set a deadline by tier, such as days for exposed and exploited, weeks for exposed, the normal cycle for the rest",
+          "Record each accepted risk with an owner, a reason and an expiry date"
+        ]
+      },
+      {
+        "id": "t578-c4",
+        "kind": "text",
+        "title": "Misconception: “critical” means drop everything",
+        "body": "Take a 9.8 in a test library that never ships, and a 7.5 that is being exploited in your VPN appliance. The second is the emergency. Treating every high score as urgent burns the team out and buries the few findings that matter. Rank by exploitation evidence, exposure and reachability, and use the score to break ties.",
+        "teaches": [
+          "severity-vs-risk"
+        ]
+      },
+      {
+        "id": "t578-c5",
+        "kind": "text",
+        "title": "Trap: wanting to patch fast without being able to",
+        "body": "Most delay is not in deciding but in shipping. Typical causes are an unknown inventory, no automated tests to trust an upgrade, and manual deploys. Keep a software bill of materials, so you know where a component runs within minutes of an advisory. Take routine dependency updates in small, tested steps every week, so an urgent bump is ordinary work rather than a leap across two years of versions.",
+        "teaches": [
+          "patch-slas"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t578-a1",
+        "concept": "severity-vs-risk",
+        "type": "multiple_choice",
+        "prompt": "What does a CVSS base score of 9.8 tell you on its own?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The flaw is being exploited in the wild right now"
+          },
+          {
+            "id": "b",
+            "label": "Your service calls the vulnerable code"
+          },
+          {
+            "id": "c",
+            "label": "The flaw would be severe if exploited in a typical setup"
+          },
+          {
+            "id": "d",
+            "label": "The vendor’s patch is safe to deploy untested"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "The base score describes intrinsic severity. Exploitation evidence comes from sources such as the KEV catalogue, reachability from your own analysis, and patch safety from your tests."
+      },
+      {
+        "id": "t578-a2",
+        "concept": "exploit-likelihood",
+        "type": "multiple_choice",
+        "prompt": "Finding one: CVSS 9.1 in a library no exposed service loads. Finding two: CVSS 7.2, on the known-exploited list, in your internet-facing gateway. Which first?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The 9.1, because the higher base score sets the order"
+          },
+          {
+            "id": "b",
+            "label": "The 7.2 gateway flaw, which is exploited and exposed"
+          },
+          {
+            "id": "c",
+            "label": "Both together in one release next quarter"
+          },
+          {
+            "id": "d",
+            "label": "Neither until a second scanner confirms them"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Active exploitation plus internet exposure makes the gateway flaw the likely breach. The base score alone ignores both. Waiting a quarter or for a second scanner leaves an exploited, exposed hole open."
+      },
+      {
+        "id": "t578-a3",
+        "concept": "reachability",
+        "type": "multiple_choice",
+        "prompt": "A scanner flags a parsing flaw in a library your build includes. What reduces its urgency most?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The library is popular and actively maintained"
+          },
+          {
+            "id": "b",
+            "label": "The service runs inside a container"
+          },
+          {
+            "id": "c",
+            "label": "Evidence that no untrusted input reaches that parser"
+          },
+          {
+            "id": "d",
+            "label": "The finding has been open a while without incident"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "If attacker-controlled data cannot reach the flawed code, it cannot be exploited through that path. You still patch, but on the normal cycle. Popularity, containers and quiet history do not stop an exploit that can reach the code."
+      },
+      {
+        "id": "t578-a4",
+        "concept": "patch-slas",
+        "type": "estimation",
+        "prompt": "You have 300 open findings and fix 25 a week, while 15 new ones arrive each week. How many weeks until the backlog is clear?",
+        "unit": "weeks",
+        "target": 30,
+        "assumptions": [
+          "300 open findings",
+          "25 fixed per week",
+          "15 new per week"
+        ],
+        "formula": "backlog / (fixed per week − new per week)",
+        "workedAnswer": "Net progress is 25 − 15 = 10 a week, so 300 / 10 = 30 weeks.",
+        "explanation": "Sanity check: ignoring new arrivals gives 12 weeks, a plan that will slip badly. To clear it in 10 weeks you need 300 / 10 + 15 = 45 fixes a week.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          12,
+          7.5
+        ]
+      },
+      {
+        "id": "t578-a5",
+        "concept": "reachability",
+        "type": "drag_order",
+        "prompt": "Order a triage pass over a new scanner report.",
+        "items": [
+          {
+            "id": "s4",
+            "label": "Set a fix deadline by tier"
+          },
+          {
+            "id": "s1",
+            "label": "Group duplicate findings into single fixes"
+          },
+          {
+            "id": "s3",
+            "label": "Check exposure and reachability for each item"
+          },
+          {
+            "id": "s5",
+            "label": "Track accepted risks with an owner and expiry"
+          },
+          {
+            "id": "s2",
+            "label": "Raise exploited and likely-exploited items to the top"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Shrink the list, rank by likelihood, refine with your own context, then commit to dates and record the exceptions."
+      },
+      {
+        "id": "t578-a6",
+        "concept": "patch-slas",
+        "type": "tradeoff",
+        "prompt": "A critical, actively exploited flaw hits the web server software on 400 internet-facing hosts. The vendor fix is out, and your normal release window is monthly.",
+        "constraints": [
+          "Exploitation seen in the wild",
+          "Hosts are internet-facing",
+          "Monthly change window"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "Mitigate within hours, then roll out the fix within days",
+            "description": "Emergency change"
+          },
+          {
+            "id": "p2",
+            "label": "Wait for the monthly window to keep change control simple",
+            "description": "Wait"
+          },
+          {
+            "id": "p3",
+            "label": "Put the hosts behind a VPN for good and skip the patch",
+            "description": "Move instead"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "Known exploitation makes delay the larger risk"
+          },
+          {
+            "id": "r2",
+            "label": "A mitigation buys time while the patch is tested"
+          },
+          {
+            "id": "r3",
+            "label": "Change windows matter more than exposure"
+          },
+          {
+            "id": "r4",
+            "label": "A network move removes the need to patch"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "An exploited, exposed flaw is exactly the case emergency change exists for.",
+          "r4": "The flaw is still there for anyone who reaches the VPN, and public sites cannot hide anyway."
+        },
+        "explanation": "Exploited and exposed means emergency: mitigate now (a WAF rule or disabling the feature), patch fast, verify."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t578-f1",
+        "front": "CVSS vs risk",
+        "back": "CVSS rates severity in general; risk adds exploitation, exposure and reachability in your system."
+      },
+      {
+        "id": "t578-f2",
+        "front": "KEV and EPSS",
+        "back": "KEV: evidence of exploitation in the wild. EPSS: probability of exploitation activity in 30 days."
+      },
+      {
+        "id": "t578-f3",
+        "front": "Backlog arithmetic",
+        "back": "Weeks to clear = backlog / (fix rate − arrival rate)."
+      }
+    ],
+    "sources": [
+      {
+        "title": "NIST SP 800-40 Rev. 4: Enterprise Patch Management Planning",
+        "url": "https://csrc.nist.gov/pubs/sp/800/40/r4/final"
+      },
+      {
+        "title": "OWASP Vulnerable Dependency Management Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Vulnerable_Dependency_Management_Cheat_Sheet.html"
+      },
+      {
+        "title": "OWASP Top 10:2025, Software Supply Chain Failures",
+        "url": "https://owasp.org/Top10/2025/A03_2025-Software_Supply_Chain_Failures/"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "severity-vs-risk",
+        "exploit-likelihood",
+        "reachability",
+        "patch-slas"
+      ],
+      "mechanism": {
+        "title": "A triage pipeline that keeps up",
+        "steps": [
+          "Inventory: generate a software bill of materials for every build and image, and keep a list of what is deployed where. Without it, every advisory starts with a hunt.",
+          "Collect: scanners for dependencies, images and hosts feed one queue. Deduplicate by component and version, so one upgrade closes many findings.",
+          "Enrich: add the CVSS score, known-exploited status, EPSS probability, and your own context, such as internet exposure, data sensitivity and whether the vulnerable function is reachable.",
+          "Decide: map each finding to a tier with a deadline, and choose a response. Patch or upgrade; mitigate (configuration change, WAF rule, disabling a feature); or accept with an owner and an expiry.",
+          "Ship: small, frequent dependency updates through automated tests and staged rollout, so urgent fixes use the same path as routine ones.",
+          "Measure: track time to remediate by tier and the backlog trend. If arrivals outpace fixes, the plan is fiction, so add capacity or reduce the attack surface."
+        ]
+      },
+      "useWhen": [
+        "Any team running third-party code, which is every team",
+        "Regulated environments that must show patch timelines"
+      ],
+      "avoidWhen": [
+        "Treating every scanner finding as an emergency, which drowns the real ones",
+        "Waivers with no expiry, which quietly become permanent"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Signal",
+          "Tells you",
+          "Misses"
+        ],
+        "rows": [
+          [
+            "CVSS base score",
+            "Intrinsic severity of the flaw",
+            "Whether it is exploited or reachable in your system"
+          ],
+          [
+            "Known Exploited Vulnerabilities list",
+            "Real attacks are happening",
+            "New flaws before evidence is collected"
+          ],
+          [
+            "EPSS probability",
+            "Likelihood of exploitation activity soon",
+            "Your exposure and business impact"
+          ],
+          [
+            "Reachability and exposure analysis",
+            "Whether attackers can reach the code",
+            "Future code changes that make it reachable"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Will this backlog ever clear?",
+        "assumptions": [
+          "300 distinct findings after deduplication",
+          "25 fixes a week",
+          "15 new findings a week"
+        ],
+        "steps": [
+          "Net burn-down: 25 − 15 = 10 a week",
+          "Time to clear: 300 / 10 = 30 weeks",
+          "To clear in 10 weeks: 300 / 10 + 15 = 45 fixes a week, nearly double the current rate",
+          "Alternative: cut arrivals by dropping unused dependencies; at 5 new a week, 300 / 20 = 15 weeks"
+        ],
+        "result": "Backlog plans must include the arrival rate. Removing unused dependencies is often cheaper than hiring more fixers."
+      },
+      "india": {
+        "title": "NIST SP 800-40 Rev. 4 on patching as maintenance",
+        "label": "Official documentation",
+        "body": "NIST SP 800-40 Revision 4 (April 2022) defines enterprise patch management as identifying, prioritising, acquiring, installing and verifying the installation of patches, updates and upgrades. It frames patching as preventive maintenance and a normal cost of doing business, not an exceptional event. It recommends an enterprise strategy that simplifies and operationalises patching, and maintenance plans for groups of assets with similar risk, so that routine updates and emergency fixes follow known paths. The OWASP Top 10:2025 widened its former vulnerable-components category into Software Supply Chain Failures (A03)."
+      },
+      "pitfalls": [
+        {
+          "trap": "Sorting the backlog by CVSS score alone",
+          "say": "Rank by exploitation evidence and exposure first, then use the score to break ties between findings that are otherwise equally urgent."
+        },
+        {
+          "trap": "Promising a 7-day patch SLA with monthly manual deploys",
+          "say": "The deadline must match the delivery pipeline, so automate updates and rollouts first."
+        },
+        {
+          "trap": "Accepting risks with no end date",
+          "say": "Every exception gets an owner and an expiry, and is reviewed when it lapses."
+        }
+      ],
+      "takeaways": [
+        "CVSS measures severity; risk needs likelihood and context",
+        "Known exploitation and exposure decide what is urgent",
+        "Deduplicate and check reachability before scheduling work",
+        "Plan with arrival rates, and make patching routine"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Which goes first?",
+      "prompt": "Three findings arrive on Monday. You can fix one today.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "CVSS 9.8 in a test-only tool that never ships",
+          "feedback": "Severe in theory, but not present in production."
+        },
+        {
+          "id": "b",
+          "label": "CVSS 6.5, known-exploited, in the internet-facing login proxy",
+          "feedback": "Right: exploited and exposed beats a higher score."
+        },
+        {
+          "id": "c",
+          "label": "CVSS 8.1 in an internal admin tool behind single sign-on",
+          "feedback": "Real but less exposed; it goes on the short-deadline tier."
+        }
+      ],
+      "correctId": "b",
+      "reveal": "Exploitation evidence and exposure set urgency; the base score refines it."
+    },
+    "seeAlso": [
+      {
+        "topicId": 309,
+        "why": "Supply-chain security, where these dependencies come from"
+      },
+      {
+        "topicId": 301,
+        "why": "Threat modelling supplies the exposure context for triage"
+      },
+      {
+        "topicId": 575,
+        "why": "Audit logs help confirm whether a flaw was exploited before the patch"
+      }
+    ]
+  },
+  {
+    "id": 579,
+    "slug": "protecting-personal-data",
+    "region": "f6-security",
+    "order": 19,
+    "title": "Protecting Personal Data: Minimise, Pseudonymise, Delete",
+    "kind": "lesson",
+    "objectives": [
+      "Apply data minimisation to forms, logs and analytics",
+      "Distinguish pseudonymised data from anonymous data",
+      "Design deletion that reaches backups, indexes and processors"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 15,
+    "prereqIds": [
+      301
+    ],
+    "cards": [
+      {
+        "id": "t579-c1",
+        "kind": "text",
+        "title": "Data you never collected cannot leak",
+        "body": "Minimisation means collecting, using and keeping only what a stated purpose needs. An age gate needs “over 18: yes”, not a date of birth. Delivery needs an address until the parcel arrives, not forever. Apply the same test to logs, analytics events, support exports and test databases, where copies multiply quietly. Every field you drop is one you never have to secure, disclose or delete.",
+        "teaches": [
+          "data-minimisation"
+        ]
+      },
+      {
+        "id": "t579-c2",
+        "kind": "text",
+        "title": "Pseudonymised is not anonymous",
+        "body": "Replacing names with random ids or keyed hashes is pseudonymisation. Anyone with the key, the mapping table or enough other attributes can still re-identify people, so the data remains personal data. Combinations of quasi-identifiers such as postcode, birth date and sex single out a large share of people. Anonymisation needs more: aggregate, generalise (age bands, regions), suppress small groups, or add noise. Then test that individuals cannot reasonably be singled out.",
+        "teaches": [
+          "pseudonymisation"
+        ]
+      },
+      {
+        "id": "t579-c3",
+        "kind": "diagram",
+        "title": "Worked example: tokenising phone numbers for analytics",
+        "body": "Analysts need to count repeat callers without seeing phone numbers.",
+        "teaches": [
+          "tokenisation"
+        ],
+        "steps": [
+          "At ingest, a tokenisation service swaps each phone number for a random token and keeps the mapping in a locked-down vault",
+          "Analytics tables hold only tokens, so joins and repeat counts still work",
+          "Support staff who need a real number call the vault, which checks their role and logs the lookup",
+          "Deleting a customer deletes their mapping; their tokens no longer lead to a person, though rows still link to each other",
+          "Reports publish only aggregates for groups of at least 10 people"
+        ]
+      },
+      {
+        "id": "t579-c4",
+        "kind": "text",
+        "title": "Misconception: hashing an email address anonymises it",
+        "body": "An unkeyed hash such as SHA-256 of an email address is easy to reverse. Hash a list of known addresses and match the results. It is also a stable identifier that links datasets across companies. If you need a pseudonym, use an HMAC with a secret key held in a KMS, and still treat the output as personal data. If you need no link back at all, aggregate instead.",
+        "teaches": [
+          "pseudonymisation"
+        ]
+      },
+      {
+        "id": "t579-c5",
+        "kind": "text",
+        "title": "Trap: deleting from the main database only",
+        "body": "A person’s data also sits in backups, logs, search indexes, caches, the analytics warehouse, email tools and third-party processors. Keep a data map of where each category flows. Run deletion as a pipeline that reaches each store and each processor. Let backups age out on a known schedule, or encrypt per person and destroy the key. Record that the request was completed, without recording the deleted data itself.",
+        "teaches": [
+          "retention-deletion"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t579-a1",
+        "concept": "data-minimisation",
+        "type": "multiple_choice",
+        "prompt": "A sign-up form must confirm users are adults. What should it store?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The full date of birth, in case the rules change"
+          },
+          {
+            "id": "b",
+            "label": "A yes or no result of the check, and when it ran"
+          },
+          {
+            "id": "c",
+            "label": "A scan of the user’s identity document"
+          },
+          {
+            "id": "d",
+            "label": "The date of birth, encrypted in the same database"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "The purpose needs only the outcome. A date of birth is a strong identifier, and encrypting it in the same database still keeps it. An identity scan is far more sensitive than the question needs. “In case the rules change” is exactly the reasoning minimisation rejects."
+      },
+      {
+        "id": "t579-a2",
+        "concept": "pseudonymisation",
+        "type": "multiple_choice",
+        "prompt": "An analytics table swaps names for random ids but keeps full postcode, birth date and sex. Is it anonymous?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Yes, because no names or emails remain"
+          },
+          {
+            "id": "b",
+            "label": "Yes, if the random ids are 128 bits long"
+          },
+          {
+            "id": "c",
+            "label": "No: those three fields together single out many people"
+          },
+          {
+            "id": "d",
+            "label": "No, unless the table is encrypted at rest"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Quasi-identifiers combine to re-identify individuals, whatever the id length. Removing direct identifiers is not enough. Encryption at rest protects stolen disks, not people who can query the table, so it does not make data anonymous."
+      },
+      {
+        "id": "t579-a3",
+        "concept": "pseudonymisation",
+        "type": "multiple_choice",
+        "prompt": "Why is SHA-256 of an email address a weak pseudonym?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Anyone can hash a list of known emails and match them"
+          },
+          {
+            "id": "b",
+            "label": "SHA-256 outputs collide too often for email addresses"
+          },
+          {
+            "id": "c",
+            "label": "The hash is longer than most email addresses"
+          },
+          {
+            "id": "d",
+            "label": "Hashes cannot be used as join keys"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Email addresses are guessable and widely leaked, so an unkeyed hash is reversed by lookup. SHA-256 collisions are not a practical concern, length is irrelevant, and stable hashes make excellent join keys, which is part of the danger."
+      },
+      {
+        "id": "t579-a4",
+        "concept": "retention-deletion",
+        "type": "estimation",
+        "prompt": "Nightly backups are kept for 35 days and weekly backups for 12 weeks. A customer is deleted from the live database today. After how many days is their data gone from all backups, if nothing is restored?",
+        "unit": "days",
+        "target": 84,
+        "assumptions": [
+          "Nightly backups kept 35 days",
+          "Weekly backups kept 12 weeks",
+          "No restores in the meantime"
+        ],
+        "formula": "the longest retention period, in days",
+        "workedAnswer": "The longest-lived copy is a weekly backup: 12 × 7 = 84 days.",
+        "explanation": "Design implication: tell the customer about the backup window in your privacy notice, or crypto-shred per-customer keys to make the copies unreadable at once.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          35,
+          12
+        ]
+      },
+      {
+        "id": "t579-a5",
+        "concept": "retention-deletion",
+        "type": "drag_order",
+        "prompt": "Order a deletion request so that no copy is missed.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Delete or anonymise in live stores, and tell processors to do the same"
+          },
+          {
+            "id": "s1",
+            "label": "Verify that the requester owns the account"
+          },
+          {
+            "id": "s5",
+            "label": "Record that the request was completed"
+          },
+          {
+            "id": "s2",
+            "label": "Use the data map to find every store holding their data"
+          },
+          {
+            "id": "s4",
+            "label": "Let backups expire on schedule, or destroy the customer’s key"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Verify first, so deletion cannot be abused. Map, delete, handle backups, then keep evidence of completion without the data itself."
+      },
+      {
+        "id": "t579-a6",
+        "concept": "tokenisation",
+        "type": "multiple_choice",
+        "prompt": "A vault maps card numbers to random tokens for the rest of the system. Where does the remaining risk concentrate?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "In the analytics tables that store tokens"
+          },
+          {
+            "id": "b",
+            "label": "In the vault and the services allowed to detokenise"
+          },
+          {
+            "id": "c",
+            "label": "In the token format, which can be reversed with maths"
+          },
+          {
+            "id": "d",
+            "label": "In the link between the browser and the CDN"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Random tokens carry no information, so they reveal nothing without the vault. Risk concentrates where real values can be recovered, which is why the vault gets strict access control and logging. That is also why tokenisation can shrink the scope of a compliance audit."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t579-f1",
+        "front": "Minimisation test",
+        "back": "Does this purpose need this field, at this precision, for this long?"
+      },
+      {
+        "id": "t579-f2",
+        "front": "Pseudonymised vs anonymous",
+        "back": "Pseudonymised data can be re-identified with a key or other attributes; it is still personal data."
+      },
+      {
+        "id": "t579-f3",
+        "front": "Where deletion must reach",
+        "back": "Live stores, logs, indexes, caches, warehouse, processors and backups."
+      }
+    ],
+    "sources": [
+      {
+        "title": "NIST SP 800-122: Protecting the Confidentiality of PII",
+        "url": "https://csrc.nist.gov/pubs/sp/800/122/final"
+      },
+      {
+        "title": "NIST SP 800-188: De-Identifying Government Data Sets",
+        "url": "https://csrc.nist.gov/pubs/sp/800/188/final"
+      },
+      {
+        "title": "OWASP User Privacy Protection Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/User_Privacy_Protection_Cheat_Sheet.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "data-minimisation",
+        "pseudonymisation",
+        "tokenisation",
+        "retention-deletion"
+      ],
+      "mechanism": {
+        "title": "Privacy engineering, step by step",
+        "steps": [
+          "Inventory and classify: list each personal-data field, its purpose, its sensitivity (contact, financial, health, location) and every store and processor it flows to. This data map drives everything else.",
+          "Minimise at the source: drop fields without a purpose, reduce precision (age band, city), and stop personal data entering logs and analytics events in the first place.",
+          "Separate identities from activity: tokenise or pseudonymise direct identifiers with keyed functions, and keep the mapping in a vault with its own access policy and audit log.",
+          "Control access: give people and services the least access their role needs, mask fields in support tools, and log every detokenisation or bulk export.",
+          "Set retention per category: delete or aggregate data when its purpose ends, automatically, with backups on a known expiry. Per-person keys enable crypto-shredding where backups cannot be edited.",
+          "Handle requests and breaches: a tested pipeline for access and deletion requests, and an incident plan that knows which data categories each system holds."
+        ]
+      },
+      "useWhen": [
+        "Any system holding data about identifiable people",
+        "Analytics and machine-learning pipelines that copy production data"
+      ],
+      "avoidWhen": [
+        "Claiming aggregated or public data needs no thought, since joins can re-identify people",
+        "Building custom anonymisation for high-risk releases without expert review"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Technique",
+          "What it gives",
+          "What remains"
+        ],
+        "rows": [
+          [
+            "Minimisation",
+            "Less data to protect or lose",
+            "Product pressure to collect “just in case”"
+          ],
+          [
+            "Pseudonymisation (keyed hash or token)",
+            "Joins without direct identifiers",
+            "Still personal data; key and mapping must be guarded"
+          ],
+          [
+            "Aggregation with minimum group sizes",
+            "Statistics without individuals",
+            "Small groups and repeated queries can leak"
+          ],
+          [
+            "Crypto-shredding per person",
+            "Erasure that reaches backups",
+            "Key management and per-person key overhead"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How long does deletion really take?",
+        "assumptions": [
+          "Nightly backups kept 35 days",
+          "Weekly backups kept 12 weeks",
+          "Application logs kept 30 days",
+          "Warehouse rebuilt from live data weekly"
+        ],
+        "steps": [
+          "Live database and search index: deleted today by the pipeline",
+          "Warehouse: gone at the next weekly rebuild, within 7 days",
+          "Logs: aged out within 30 days, if personal data was logged at all",
+          "Backups: the longest copy is weekly, 12 × 7 = 84 days"
+        ],
+        "result": "Deletion completes in 84 days unless per-person keys are destroyed, so state that window honestly or shorten backup retention."
+      },
+      "india": {
+        "title": "NIST guidance on personal data",
+        "label": "Official documentation",
+        "body": "NIST SP 800-122 recommends that organisations minimise the use, collection and retention of personally identifiable information to what is strictly necessary for their purpose. It also recommends assigning an impact level to each set of PII, so that safeguards match the harm a breach would cause. NIST SP 800-188 describes de-identification techniques and warns that removing direct identifiers alone may not prevent re-identification. India’s Digital Personal Data Protection Act, 2023 likewise expects personal data to be erased once its purpose is served or consent is withdrawn, which makes a working deletion pipeline a legal need, not a nicety."
+      },
+      "pitfalls": [
+        {
+          "trap": "Calling hashed emails anonymous",
+          "say": "An unkeyed hash is reversible by lookup; at best it is a pseudonym and still personal data."
+        },
+        {
+          "trap": "Deleting from the main database and calling it done",
+          "say": "Use the data map to reach logs, indexes, warehouses, processors and backups."
+        },
+        {
+          "trap": "Collecting fields in case they are useful later",
+          "say": "Each field needs a purpose and a retention period, or we do not collect it."
+        }
+      ],
+      "takeaways": [
+        "Collect only what a purpose needs, at the precision it needs",
+        "Pseudonymised data is still personal; anonymisation needs aggregation and testing",
+        "Tokenisation concentrates risk in a guarded vault",
+        "Deletion must reach every copy, including backups"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What does the leaked export expose?",
+      "prompt": "A support export with columns user_id, SHA-256(email), city and last order is posted publicly by mistake.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The emails of anyone on a list the finder already has",
+          "feedback": "Right: hash the candidate list and match."
+        },
+        {
+          "id": "b",
+          "label": "Nothing personal, since the emails are hashed",
+          "feedback": "Unkeyed hashes of guessable values are reversible by lookup."
+        },
+        {
+          "id": "c",
+          "label": "Only the cities and orders",
+          "feedback": "The hashes link straight back to known addresses."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Minimise exports, and use keyed pseudonyms or aggregates when analysts need joins."
+    },
+    "seeAlso": [
+      {
+        "topicId": 572,
+        "why": "Per-person keys and crypto-shredding make deletion reach backups"
+      },
+      {
+        "topicId": 575,
+        "why": "Logs are a common place personal data piles up unnoticed"
+      },
+      {
+        "topicId": 330,
+        "why": "Backup retention sets how long deleted data really lingers"
       }
     ]
   }
