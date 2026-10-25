@@ -11,6 +11,8 @@ for (const w of [1024, 1280, 1920]) {
       await page.goto(`/s/${s}?unlockAll=1`)
       const btn = page.getByTestId('section-switcher-sidebar')
       await expect(btn).toBeVisible()
+      // Measure in the real display font: the fallback font is wider, so a measurement taken mid-FOUT under load overflows by a few px
+      await page.evaluate(() => document.fonts.ready)
       // Measure the settled wordmark, not mid-way through its springy swap animation
       await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || !(a as CSSAnimation).animationName?.startsWith('wordmark')))
       const m = await btn.evaluate((b) => {

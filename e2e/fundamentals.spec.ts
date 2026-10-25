@@ -5,7 +5,8 @@ type T = { id: number; slug: string; region: string; order: number; title: strin
 async function areas(page: Page) {
   const topics = (await (await page.request.get('/src/content/generated/topics.json')).json()) as T[]
   const by = new Map<string, T[]>()
-  for (const t of topics.filter((x) => x.id >= 200)) by.set(t.region, [...(by.get(t.region) ?? []), t].sort((a, b) => a.order - b.order))
+  // Fundamentals by region, not by id: System Design extras (501-508) also sit above 200
+  for (const t of topics.filter((x) => x.region in SECTION_OF)) by.set(t.region, [...(by.get(t.region) ?? []), t].sort((a, b) => a.order - b.order))
   return by
 }
 
