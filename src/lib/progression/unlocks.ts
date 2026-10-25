@@ -26,11 +26,21 @@ export function missingFundPrereqs(topicId: number, completed?: Set<number>): nu
   return pre.filter((id) => !completed?.has(id))
 }
 
+/** Lesson number → topic id, to find the lesson right before a given one */
+const LESSON_BY_N = new Map([...LESSON_N].map(([id, n]) => [n, id]))
+
 export function isTopicUnlocked(topicId: number, unlockedIds: number[], completed?: Set<number>): boolean {
   // Fundamentals: each area's first topic is open from the start, and any topic whose real prerequisites are
   // cleared (or that has none) is open too, so revision does not force a strict line. No stored unlock is needed,
   // so old saves just work.
   if (devUnlockAll() || unlockedIds.includes(topicId) || FUND_FIRST.has(topicId)) return true
+  // System Design lessons added later (501+) sit mid-unit. A player who cleared that point before the lesson existed
+  // has no stored unlock for it, so open it once the lesson right before it in the numbering is cleared: exactly the
+  // unlock a new player gets, so nobody is locked out and nobody skips ahead of the unit.
+  if (topicId >= 501 && LESSON_N.has(topicId)) {
+    const prev = LESSON_BY_N.get(LESSON_N.get(topicId)! - 1)
+    if (prev !== undefined && completed?.has(prev)) return true
+  }
   return FUND_N.has(topicId) && missingFundPrereqs(topicId, completed).length === 0
 }
 

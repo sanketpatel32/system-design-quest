@@ -1,11 +1,13 @@
 import type { DeepLesson } from '../content/types'
 import { DiagramFigure } from './DiagramFigure'
 import { SectionNav } from './SectionNav'
+import { FUND_N } from '../content/numbering'
 
 /** "Go deeper" material under the card deck: collapsible cards, callouts and a comparison table. */
 export function DeepLessonView({ deep, accent, topicId, numbersInCards = false }: { deep: DeepLesson; accent: string; topicId: number; numbersInCards?: boolean }) {
   // Fundamentals topics use this slot for a real-world example rather than an India-market one
-  const exampleWord = topicId >= 200 ? 'Real-world example' : 'India example'
+  // (System Design lessons 501+ keep the India example)
+  const exampleWord = FUND_N.has(topicId) ? 'Real-world example' : 'India example'
   return (
     <section aria-labelledby="deep-title" className="space-y-3" style={{ ['--accent' as string]: accent }}>
       <h2 id="deep-title" className="font-display text-2xl text-chalk">Go deeper</h2>

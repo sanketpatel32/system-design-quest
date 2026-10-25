@@ -76,9 +76,9 @@ test('bug 4: "See all bosses" scrolls to the full boss list on the map', async (
 
 test('bug 5: one numbering scheme and consistent lock messages', async ({ page }) => {
   await seed(page)
-  await expect(page.getByText(/79 lessons cleared in 10 units · practice track/)).toBeVisible()
+  await expect(page.getByText(/87 lessons cleared in 10 units · practice track/)).toBeVisible()
   await page.goto('/topic/interview-playbook')
-  await expect(page.getByText(/^Clear Unit 1 \(finish Lesson 3/)).toBeVisible()
+  await expect(page.getByText(/^Clear Unit 1 \(finish Lesson 4/)).toBeVisible()
   await page.goto('/topic/pastebin')
   await expect(page.getByText('Locked · Boss 2 of 40')).toBeVisible()
   await expect(page.getByText('Defeat Boss 1 (URL Shortener) to unlock Boss 2.')).toBeVisible()
