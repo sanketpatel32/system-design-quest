@@ -5822,5 +5822,1257 @@
     "why": "Zone and region capacity plans that quotas must match"
    }
   ]
+ },
+ {
+  "id": 685,
+  "slug": "multi-account-landing-zones",
+  "region": "f7-cloud",
+  "order": 22,
+  "title": "Multi-Account Landing Zones and Organisation Guardrails",
+  "kind": "lesson",
+  "objectives": [
+   "Use separate accounts or projects as the strongest boundary for blast radius, access, quotas and billing",
+   "Explain how organisation guardrails cap permissions without granting any",
+   "Design a landing zone with shared log, security and network accounts and automated account vending"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 13,
+  "prereqIds": [
+   582,
+   329
+  ],
+  "cards": [
+   {
+    "id": "t685-c1",
+    "kind": "text",
+    "title": "The account is the real boundary",
+    "body": "Every provider has a container that owns resources, permissions, quotas and the bill: an account, a project or a subscription. It is the hardest wall you get, because by default nothing in one can touch another. Putting production, staging and development, and often each team, in separate accounts limits what a leaked credential, a bad script or a runaway cost can reach. Inside one shared account the same mistakes only stop at whatever policies you remember to write.",
+    "teaches": [
+     "account-boundary"
+    ]
+   },
+   {
+    "id": "t685-c2",
+    "kind": "text",
+    "title": "Hierarchy and guardrails",
+    "body": "Accounts sit in a hierarchy: an organisation, then groups such as organisational units, folders or management groups, then accounts. Policies attached high in the tree apply to everything below. Guardrails come in two kinds. Preventive ones deny actions outright, such as creating resources outside approved regions or disabling audit logs. Detective ones only report, such as flagging an unencrypted volume or a public bucket, and feed a ticket or an automatic fix.",
+    "teaches": [
+     "org-hierarchy",
+     "guardrails"
+    ]
+   },
+   {
+    "id": "t685-c3",
+    "kind": "text",
+    "title": "Misconception: an organisation policy that allows something grants it",
+    "body": "Organisation-level allow lists set the maximum any principal in the account could ever do; they grant nothing. A role still needs its own policy that allows the action. If the guardrail allows storage actions but the role has no storage permission, the request is denied. And if the role allows everything but the guardrail denies a region, the request is denied too. Access needs both layers to agree.",
+    "teaches": [
+     "guardrails"
+    ]
+   },
+   {
+    "id": "t685-c4",
+    "kind": "diagram",
+    "title": "Vending a new account",
+    "body": "New accounts arrive with the baseline already in place.",
+    "teaches": [
+     "account-vending"
+    ],
+    "steps": [
+     "A team requests an account through a form or a pull request",
+     "Automation creates it under the right organisational unit",
+     "Inherited guardrails apply at once from the hierarchy",
+     "A baseline is applied: audit logs to the log archive, security tooling, network attachment, budgets",
+     "Single sign-on roles are mapped to the team’s groups",
+     "The team gets access; nobody holds the account’s root credentials day to day"
+    ]
+   },
+   {
+    "id": "t685-c5",
+    "kind": "text",
+    "title": "Worked example: the accounts in a small landing zone",
+    "body": "Eight product teams each get production, staging and development accounts: 8 × 3 = 24. Shared services add three more: a log archive that receives every account’s audit logs and that workload accounts cannot delete from, a security account for tooling and investigations, and a network account that owns the transit hub and the data-centre links. That is 27 accounts, each created by the same automation, so the count is not the hard part; drift between them would be.",
+    "teaches": [
+     "account-vending",
+     "account-boundary"
+    ]
+   },
+   {
+    "id": "t685-c6",
+    "kind": "text",
+    "title": "Trap: one shared account that grew",
+    "body": "A company starts with one account for everything, and five years later it holds production, experiments and contractor projects. Every role is broad, because narrowing them would break someone, quotas are shared, the bill cannot be split, and a compromised test machine sits next to customer data. Splitting later means migrating live resources. Start with separate accounts per environment, even when it feels early.",
+    "teaches": [
+     "account-boundary"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t685-a1",
+    "concept": "account-boundary",
+    "type": "multiple_choice",
+    "prompt": "Why put production and development in separate accounts rather than separate subnets of one account?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Traffic between separate accounts is faster than traffic between subnets"
+     },
+     {
+      "id": "b",
+      "label": "Separate accounts are cheaper, because each one has its own free tier"
+     },
+     {
+      "id": "c",
+      "label": "A credential or mistake in development cannot reach production by default"
+     },
+     {
+      "id": "d",
+      "label": "Providers refuse to run production workloads in shared accounts"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "The account boundary isolates access, quotas and blast radius by default. Network speed does not depend on accounts, free tiers are not the reason and are often shared across an organisation, and providers do not forbid mixed accounts."
+   },
+   {
+    "id": "t685-a2",
+    "concept": "guardrails",
+    "type": "multiple_choice",
+    "prompt": "An organisation guardrail allows all storage actions. A role in the account has no storage permissions. Can the role read a bucket?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "No, because the guardrail only caps permissions and grants none"
+     },
+     {
+      "id": "b",
+      "label": "Yes, because the guardrail allows every storage action"
+     },
+     {
+      "id": "c",
+      "label": "Yes, but only from inside the organisation’s own networks"
+     },
+     {
+      "id": "d",
+      "label": "Only if the bucket is in the same account as the role"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Guardrails set the maximum; the role must also grant the action, so the read is denied. The guardrail grants nothing, network location is a separate condition, and the bucket’s account is not what blocks it here: the role lacks a storage permission."
+   },
+   {
+    "id": "t685-a3",
+    "concept": "guardrails",
+    "type": "multiple_choice",
+    "prompt": "Security wants it to be impossible to create resources outside two approved regions in any account. What fits?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A weekly report of resources found in other regions"
+     },
+     {
+      "id": "b",
+      "label": "A preventive organisation policy that denies other regions"
+     },
+     {
+      "id": "c",
+      "label": "A naming rule that puts the region in every resource name"
+     },
+     {
+      "id": "d",
+      "label": "A budget alert in each account for spending in other regions"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Only a preventive deny at the organisation level stops the create in every account. A report and a budget alert are detective and act after the fact, and naming rules do not control where resources are created."
+   },
+   {
+    "id": "t685-a4",
+    "concept": "org-hierarchy",
+    "type": "multiple_choice",
+    "prompt": "Why send every account’s audit logs to a separate log archive account that workload accounts cannot delete from?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Logs are cheaper to store in an account with no workloads"
+     },
+     {
+      "id": "b",
+      "label": "Workload accounts cannot write logs to their own storage"
+     },
+     {
+      "id": "c",
+      "label": "Searching logs is faster when they are kept in one account"
+     },
+     {
+      "id": "d",
+      "label": "An attacker in a workload account cannot erase their tracks"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Keeping audit logs out of reach of workload credentials preserves the evidence after a compromise. Storage price does not depend on the account, workload accounts can store logs locally, and central search is a convenience rather than the security reason."
+   },
+   {
+    "id": "t685-a5",
+    "concept": "account-vending",
+    "type": "estimation",
+    "prompt": "Eight teams each get production, staging and development accounts, plus three shared accounts for logs, security and networking. How many accounts in total?",
+    "unit": "accounts",
+    "target": 27,
+    "assumptions": [
+     "One account per team per environment",
+     "Shared accounts are not per team"
+    ],
+    "formula": "8 × 3 + 3",
+    "workedAnswer": "24 team accounts + 3 shared = 27",
+    "explanation": "Sanity check: 27 accounts is only manageable because creation and baselines are automated; by hand, each new account is a chance for drift.",
+    "tolerance": 0.05,
+    "trapAnswers": [
+     24,
+     11
+    ]
+   },
+   {
+    "id": "t685-a6",
+    "concept": "account-vending",
+    "type": "drag_order",
+    "prompt": "Order the steps of vending a new workload account.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "Apply the baseline: audit logs, security tooling, network, budget"
+     },
+     {
+      "id": "s5",
+      "label": "Hand over access to the team"
+     },
+     {
+      "id": "s1",
+      "label": "Create the account under the right organisational unit"
+     },
+     {
+      "id": "s4",
+      "label": "Map single sign-on roles to the team’s groups"
+     },
+     {
+      "id": "s2",
+      "label": "Let inherited guardrails apply"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Placement in the hierarchy brings the guardrails; the baseline and access follow, so the account is safe before anyone uses it."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t685-f1",
+    "front": "Strongest isolation boundary in a cloud?",
+    "back": "The account, project or subscription: separate access, quotas, billing and blast radius."
+   },
+   {
+    "id": "t685-f2",
+    "front": "Do organisation guardrails grant access?",
+    "back": "No. They cap the maximum; a role still needs its own allow."
+   },
+   {
+    "id": "t685-f3",
+    "front": "Typical shared accounts?",
+    "back": "Log archive, security tooling and network hub."
+   }
+  ],
+  "sources": [
+   {
+    "title": "AWS whitepaper: Organizing your AWS environment using multiple accounts",
+    "url": "https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/organizing-your-aws-environment.html"
+   },
+   {
+    "title": "AWS Organizations: Service control policies",
+    "url": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html"
+   },
+   {
+    "title": "Google Cloud: Resource hierarchy",
+    "url": "https://cloud.google.com/resource-manager/docs/cloud-platform-resource-hierarchy"
+   },
+   {
+    "title": "Microsoft Learn: What is an Azure landing zone?",
+    "url": "https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/landing-zone/"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "account-boundary",
+    "org-hierarchy",
+    "guardrails",
+    "account-vending"
+   ],
+   "mechanism": {
+    "title": "How a landing zone is put together",
+    "steps": [
+     "A landing zone is the pre-built environment that new workloads land in: an organisation of accounts, the guardrails over them, shared services, identity and networking, all created by code. The goal is that a team can get a new, compliant account in minutes, rather than each team inventing its own setup and the security team auditing a different layout every time.",
+     "Accounts are grouped in a hierarchy that mirrors how policy should differ: for example security, infrastructure, production workloads, non-production workloads, sandboxes and a suspended group for accounts being closed. Policies attached to a group are inherited by everything below it, so a rule that applies to all production accounts is written once. Keep the hierarchy shallow and based on policy needs rather than the org chart, which changes more often.",
+     "Preventive guardrails cap what is possible: deny regions outside an approved list, deny turning off audit logging, deny leaving the organisation, require encryption, block public access to storage. They do not grant anything, so permissions still come from roles inside the account, and both must allow an action. Detective guardrails evaluate resources continuously and report or fix violations, which suits rules too nuanced to deny outright.",
+     "Shared accounts hold what every workload needs. The log archive receives audit and flow logs from every account, with retention locks and no delete access for workload roles. The security account runs threat detection and holds read-only roles into every account for investigations. The network account owns the transit hub, the data-centre links and shared DNS, and workload networks attach to it.",
+     "Account vending is the automation that creates an account, places it in the hierarchy, applies the baseline of logging, security tooling, network attachment and budgets, and maps single sign-on groups to roles. Root or owner credentials are locked away with strong MFA and used only for break-glass tasks. Because vending is code, changing the baseline is a reviewed change rolled out to every account, not a manual checklist."
+    ]
+   },
+   "useWhen": [
+    "Organisations with more than one team or environment, or any regulated data.",
+    "Platforms that hand out sandboxes or per-team accounts frequently."
+   ],
+   "avoidWhen": [
+    "Avoid one shared account for production and development, however small the company.",
+    "Avoid deep hierarchies that copy the org chart; group by policy needs instead."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Layer",
+     "Does",
+     "Example"
+    ],
+    "rows": [
+     [
+      "Account boundary",
+      "Isolates access, quotas, billing",
+      "One account per team and environment"
+     ],
+     [
+      "Preventive guardrail",
+      "Denies actions everywhere below",
+      "No resources outside two regions"
+     ],
+     [
+      "Detective guardrail",
+      "Reports or fixes after the fact",
+      "Flag unencrypted volumes"
+     ],
+     [
+      "Account vending",
+      "Creates accounts with a baseline",
+      "Logs, security, network, budget, SSO"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Sizing a landing zone",
+    "assumptions": [
+     "8 product teams, 3 environments each",
+     "3 shared accounts: log archive, security, network",
+     "Each workload account sends about 2 GB of audit logs a day, illustrative"
+    ],
+    "steps": [
+     "Workload accounts: 8 × 3 = 24, plus 3 shared, 27 in total.",
+     "Log volume into the archive: 24 × 2 = 48 GB a day.",
+     "One year retained: 48 × 365 = 17,520 GB, about 17.5 TB, which should go to a cheaper archive storage class after 30 days."
+    ],
+    "result": "Account count is cheap with automation; the real numbers to plan are log volume, retention and who can delete what."
+   },
+   "india": {
+    "title": "Landing zone guidance from providers",
+    "label": "Official documentation",
+    "body": "AWS’s multi-account whitepaper recommends separating workloads into accounts grouped by organisational units, with dedicated log archive and security tooling accounts, and documents that service control policies set maximum permissions without granting any. Google Cloud documents its resource hierarchy of organisation, folders and projects with inherited policies, and Microsoft’s Cloud Adoption Framework describes Azure landing zones built from management groups, policy and platform subscriptions."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We’re small, one account is fine for now.”",
+     "say": "“I’d separate production from everything else from day one; splitting a live account later is a migration.”"
+    },
+    {
+     "trap": "“The organisation policy allows storage, so the role can read the bucket.”",
+     "say": "“I’d check the role’s own policy; guardrails cap permissions but never grant them.”"
+    }
+   ],
+   "takeaways": [
+    "The account, project or subscription is the strongest isolation boundary.",
+    "Guardrails cap permissions and grant none; a role must allow the action too.",
+    "Shared log, security and network accounts serve every workload account.",
+    "Vend accounts by code so every one starts with the same baseline."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "The region that was not allowed",
+   "prompt": "A developer with an administrator role in a sandbox account tries to start a VM in a region outside the organisation’s approved list. The organisation has a preventive policy that denies all other regions.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "The request is denied, because the organisation deny caps even administrators",
+     "feedback": "Right: the guardrail sets the maximum for every principal in the account."
+    },
+    {
+     "id": "b",
+     "label": "The request succeeds, because the administrator role allows every action",
+     "feedback": "The role allows it, but the guardrail denies it, and both must allow."
+    },
+    {
+     "id": "c",
+     "label": "The request succeeds, and a detective rule reports it afterwards",
+     "feedback": "That is how a detective guardrail behaves; this one is preventive."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Preventive guardrails are why administrators in member accounts still cannot turn off audit logs or use unapproved regions; only administrators of the organisation itself can change them."
+  },
+  "seeAlso": [
+   {
+    "topicId": 582,
+    "why": "Roles and policies inside an account, which guardrails cap"
+   },
+   {
+    "topicId": 683,
+    "why": "The transit hub that the network account owns"
+   },
+   {
+    "topicId": 684,
+    "why": "Quotas, which are counted per account and region"
+   }
+  ]
+ },
+ {
+  "id": 686,
+  "slug": "policy-as-code-admission-control",
+  "region": "f7-cloud",
+  "order": 23,
+  "title": "Policy as Code and Admission Control",
+  "kind": "lesson",
+  "objectives": [
+   "Write platform rules as versioned, tested policy code instead of wiki pages",
+   "Enforce the same rules in CI and at admission, so no path around them exists",
+   "Roll out a new rule through audit mode, with time-limited exceptions and safe failure settings"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 13,
+  "prereqIds": [
+   325,
+   322
+  ],
+  "cards": [
+   {
+    "id": "t686-c1",
+    "kind": "text",
+    "title": "Rules that a machine can check",
+    "body": "Platform rules such as “no privileged containers”, “every image from our registry”, “every bucket encrypted” or “resources carry an owner tag” used to live in documents and reviews. Policy as code writes each rule as a small program that takes a resource description, such as a Kubernetes manifest or an infrastructure plan, and returns allow or deny with a message. The rules live in a repository, are reviewed and tested like code, and run the same way everywhere they are enforced.",
+    "teaches": [
+     "policy-as-code"
+    ]
+   },
+   {
+    "id": "t686-c2",
+    "kind": "text",
+    "title": "Two checkpoints: the pipeline and the front door",
+    "body": "In CI, policies check infrastructure plans and manifests before merge, giving fast feedback with the exact line to fix. At admission, the cluster or the cloud checks every create and update request, whoever sends it. CI alone can be bypassed by anyone with direct access; admission alone gives feedback late, at deploy time. Running the same policy code at both points gives early feedback and no way around the rule.",
+    "teaches": [
+     "admission-control"
+    ]
+   },
+   {
+    "id": "t686-c3",
+    "kind": "diagram",
+    "title": "How admission control handles a request",
+    "body": "Every write passes the same checks, whatever tool sent it.",
+    "teaches": [
+     "admission-control"
+    ],
+    "steps": [
+     "A client sends a create or update request to the API server",
+     "Authentication and authorisation check who is asking",
+     "Mutating admission may add defaults, such as labels or a sidecar",
+     "Validating admission evaluates policies against the final object",
+     "A deny returns the policy’s message to the client",
+     "Allowed objects are stored and controllers act on them"
+    ]
+   },
+   {
+    "id": "t686-c4",
+    "kind": "text",
+    "title": "Worked example: rolling out “no latest tags”",
+    "body": "A new rule rejects images tagged latest. Run in audit mode first, it reports 60 violating workloads out of 400 without blocking anything. Owners are notified with the fix, and teams clear about 15 a week, so after about 4 weeks the count reaches zero and the rule switches to enforce. Two workloads that cannot move yet get exceptions written in the policy repository, each with an owner and an expiry date.",
+    "teaches": [
+     "enforcement-modes",
+     "policy-exceptions"
+    ]
+   },
+   {
+    "id": "t686-c5",
+    "kind": "text",
+    "title": "Trap: the webhook that blocked every deploy",
+    "body": "An external admission webhook is set to fail closed, so if it cannot answer, requests are rejected. One day its pods crash. Now no pod can be created anywhere, including the webhook’s own replacement pods, and the cluster cannot heal itself. Exempt system namespaces, run the webhook with several replicas and a short timeout, and choose deliberately per rule whether failing open or failing closed is the smaller risk. Simple rules can use in-process policies that need no webhook at all.",
+    "teaches": [
+     "admission-control",
+     "enforcement-modes"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t686-a1",
+    "concept": "admission-control",
+    "type": "multiple_choice",
+    "prompt": "Policies run in CI, yet a privileged container reached production. How could that happen?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Someone applied the manifest straight to the cluster, skipping CI"
+     },
+     {
+      "id": "b",
+      "label": "The CI policy tests were flaky and passed the change by chance"
+     },
+     {
+      "id": "c",
+      "label": "The policy language cannot express rules about privileged mode"
+     },
+     {
+      "id": "d",
+      "label": "The container image was rebuilt after it passed the CI checks"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "CI only sees changes that go through CI, so direct access bypasses it; admission control closes that path. Flaky tests are possible but not the structural gap, privileged mode is one of the simplest rules to express, and rebuilding the image does not change the manifest’s privileged setting."
+   },
+   {
+    "id": "t686-a2",
+    "concept": "enforcement-modes",
+    "type": "multiple_choice",
+    "prompt": "A new policy is ready. How should it start in a cluster that already runs hundreds of workloads?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Enforce at once, so that violations stop from day one"
+     },
+     {
+      "id": "b",
+      "label": "In audit or warn mode, then enforce once violations are fixed"
+     },
+     {
+      "id": "c",
+      "label": "Only in CI, leaving the running workloads alone for good"
+     },
+     {
+      "id": "d",
+      "label": "Enforce at once, but only in the production namespaces"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Audit mode shows what would break without breaking it, so owners can fix workloads before enforcement. Enforcing at once, in production first of all, blocks deploys of existing workloads, often during an incident; CI only never covers direct changes or existing resources."
+   },
+   {
+    "id": "t686-a3",
+    "concept": "admission-control",
+    "type": "multiple_choice",
+    "prompt": "A fail-closed admission webhook crashes, and no pods can be created anywhere. What prevents this next time?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Removing the webhook and relying on code review for the rule"
+     },
+     {
+      "id": "b",
+      "label": "Setting a longer timeout on the webhook so calls wait for it"
+     },
+     {
+      "id": "c",
+      "label": "Running it with several replicas and exempting system namespaces"
+     },
+     {
+      "id": "d",
+      "label": "Restarting the API server whenever the webhook becomes unhealthy"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Replicas keep the webhook available and exemptions let the platform heal itself; for simple rules an in-process policy avoids the webhook entirely. Dropping enforcement loses the rule, a longer timeout makes every request slower while it is down, and restarting the API server does not bring the webhook back."
+   },
+   {
+    "id": "t686-a4",
+    "concept": "policy-exceptions",
+    "type": "multiple_choice",
+    "prompt": "A legacy workload cannot meet a new rule for three months. How should the exception be handled?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Turn the rule off for the cluster until the workload is fixed"
+     },
+     {
+      "id": "b",
+      "label": "Give the team admin rights so it can bypass the policy itself"
+     },
+     {
+      "id": "c",
+      "label": "Tell the team on chat that the rule does not apply to it"
+     },
+     {
+      "id": "d",
+      "label": "An exception in the policy repo, scoped to the workload, with an owner and expiry"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "A scoped, reviewed exception with an owner and an expiry keeps the rule for everyone else and resurfaces when it lapses. Disabling the rule removes it for all, admin rights bypass far more than one rule, and a chat message leaves no record and no expiry."
+   },
+   {
+    "id": "t686-a5",
+    "concept": "enforcement-modes",
+    "type": "estimation",
+    "prompt": "Audit mode finds 60 violating workloads. Teams fix about 15 a week, and no new violations appear. How many weeks until the rule can be enforced without breaking anything?",
+    "unit": "weeks",
+    "target": 4,
+    "assumptions": [
+     "Fixes happen at a steady rate",
+     "No new violations appear in the meantime"
+    ],
+    "formula": "60 ÷ 15",
+    "workedAnswer": "60 ÷ 15 = 4 weeks",
+    "explanation": "Sanity check: if new violations kept arriving at the same rate, the count would never fall, so block new ones early with a CI check while the old ones are fixed.",
+    "tolerance": 0.05,
+    "trapAnswers": [
+     1,
+     15
+    ]
+   },
+   {
+    "id": "t686-a6",
+    "concept": "admission-control",
+    "type": "tradeoff",
+    "prompt": "You need the cluster to reject privileged containers in every namespace except system ones.",
+    "constraints": [
+     "The rule is simple and well known",
+     "The cluster must keep working if any add-on is down",
+     "Feedback should reach developers before deploy"
+    ],
+    "approaches": [
+     {
+      "id": "p1",
+      "label": "An external admission webhook running a general policy engine",
+      "description": "External webhook"
+     },
+     {
+      "id": "p2",
+      "label": "The built-in, in-process policy check, plus the same rule in CI",
+      "description": "Built-in policy plus CI"
+     },
+     {
+      "id": "p3",
+      "label": "A CI check only, with no enforcement in the cluster",
+      "description": "CI only"
+     }
+    ],
+    "correctApproachId": "p2",
+    "rationaleOptions": [
+     {
+      "id": "r1",
+      "label": "A built-in check needs no extra service, so it cannot be down"
+     },
+     {
+      "id": "r3",
+      "label": "Only a webhook can express a rule about privileged mode"
+     },
+     {
+      "id": "r2",
+      "label": "The CI copy gives developers the error before they deploy"
+     },
+     {
+      "id": "r4",
+      "label": "CI alone is enough when every team uses the pipeline"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": {
+     "r3": "Privileged mode is covered by the cluster’s built-in pod security checks and simple in-process policies.",
+     "r4": "Direct applies, break-glass access and other tools skip the pipeline."
+    },
+    "explanation": "Use the built-in check for a simple, standard rule, so enforcement has no extra moving part, and mirror it in CI for early feedback."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t686-f1",
+    "front": "Why enforce at admission as well as in CI?",
+    "back": "CI only sees changes that use CI; admission checks every write from any client."
+   },
+   {
+    "id": "t686-f2",
+    "front": "How to roll out a new rule?",
+    "back": "Audit or warn first, fix violations, then enforce; exceptions in code with an owner and expiry."
+   },
+   {
+    "id": "t686-f3",
+    "front": "Fail-closed webhook risk?",
+    "back": "If it is down, writes are rejected, possibly including its own pods; exempt system namespaces and run replicas."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Kubernetes: Admission Control",
+    "url": "https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/"
+   },
+   {
+    "title": "Kubernetes: Validating Admission Policy",
+    "url": "https://kubernetes.io/docs/reference/access-authn-authz/validating-admission-policy/"
+   },
+   {
+    "title": "Kubernetes: Dynamic Admission Control",
+    "url": "https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/"
+   },
+   {
+    "title": "Microsoft Learn: Azure Policy overview",
+    "url": "https://learn.microsoft.com/en-us/azure/governance/policy/overview"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "policy-as-code",
+    "admission-control",
+    "enforcement-modes",
+    "policy-exceptions"
+   ],
+   "mechanism": {
+    "title": "How policy as code is enforced end to end",
+    "steps": [
+     "A policy takes structured input, such as a manifest, an admission request or an infrastructure plan, and returns a decision with a reason. Policies are written in a policy language or in the platform’s built-in rule format, stored in a repository, and tested with example inputs that should pass and fail. Because the input is structured, a rule like “no public buckets” checks the actual setting rather than searching text.",
+     "Policies run at several points. In the editor and CI, they check plans and manifests before merge. At admission, the Kubernetes API server or the cloud’s policy service evaluates every write request after authentication and authorisation. After the fact, audit scans evaluate resources that already exist, which catches anything created before a rule was introduced. The same policy code at every point keeps the answers consistent.",
+     "Kubernetes admission runs mutating policies first, which may set defaults, then validating ones, which allow or deny the final object. Built-in checks such as pod security standards and in-process validating policies run inside the API server, with no network call. External webhooks call a service, which allows any logic but adds latency and a dependency: each needs a timeout, a failure policy and exemptions for the namespaces the platform needs in order to recover.",
+     "New rules roll out in stages. Audit or warn mode records or shows violations without blocking, which measures the impact. Owners get the list and the fix. CI enforcement can start early to stop new violations, while existing ones are cleared. Enforcement at admission comes last, once the count is near zero, and the switch is itself a reviewed change that can be reverted.",
+     "Exceptions are part of the design. Each one is written in the policy repository, scoped to a specific resource or namespace, with an owner, a reason and an expiry date, and reviewed like any other change. Expired exceptions fail loudly. Tracking violations and exceptions over time shows whether the rules are working, or whether a rule is so often excepted that it needs rethinking."
+    ]
+   },
+   "useWhen": [
+    "Platforms with many teams where the same rules must hold everywhere.",
+    "Regulated environments that must show which rules are enforced and since when."
+   ],
+   "avoidWhen": [
+    "Avoid enforcing a new rule before measuring it in audit mode.",
+    "Avoid fail-closed webhooks without replicas, timeouts and system exemptions."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Checkpoint",
+     "Catches",
+     "Misses"
+    ],
+    "rows": [
+     [
+      "CI on plans and manifests",
+      "Changes made through the pipeline",
+      "Direct applies and console changes"
+     ],
+     [
+      "Admission control",
+      "Every write to the API",
+      "Resources created before the rule"
+     ],
+     [
+      "Audit scan",
+      "Existing resources",
+      "Nothing until the next scan runs"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Rolling out a rule without breaking deploys",
+    "assumptions": [
+     "400 workloads; audit finds 60 violations",
+     "Teams fix about 15 a week",
+     "About 30 deploys a day across the cluster, illustrative"
+    ],
+    "steps": [
+     "Violating share: 60 out of 400 is 15% of workloads.",
+     "Enforcing on day one: about 15% of 30, so roughly 4 or 5 blocked deploys a day, some during incidents.",
+     "Audit first: 60 ÷ 15 = 4 weeks to clear, then enforce with close to zero blocked deploys."
+    ],
+    "result": "Four weeks of audit mode turns a rule that would block several deploys a day into one that blocks almost none."
+   },
+   "india": {
+    "title": "Admission control in the Kubernetes docs",
+    "label": "Official documentation",
+    "body": "The Kubernetes documentation describes admission controllers that run after authentication and authorisation, mutating before validating, and validating admission policies that use expressions evaluated inside the API server as an alternative to webhooks. Its dynamic admission control page documents failure policies, timeouts and namespace selectors for webhooks. Azure Policy documents audit and deny effects for cloud resources, the same audit-then-enforce idea."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We check policies in CI, so the cluster is compliant.”",
+     "say": "“I’d enforce the same policies at admission; anyone with direct access skips CI.”"
+    },
+    {
+     "trap": "“Ship the rule in enforce mode, it’s obviously right.”",
+     "say": "“I’d run it in audit mode first to see what it would block, then enforce.”"
+    }
+   ],
+   "takeaways": [
+    "Write platform rules as tested policy code in a repository.",
+    "Enforce in CI for feedback and at admission so nothing bypasses the rule.",
+    "Audit first, then enforce; exceptions in code with an owner and expiry.",
+    "Webhooks need replicas, timeouts and system exemptions, or use built-in policies."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "The rule that went straight to enforce",
+   "prompt": "A team enables a new “every pod must set memory limits” rule in enforce mode on a Friday. About 20% of existing workloads have no limits. That night an incident requires a hotfix deploy to one of them.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "The hotfix is rejected at admission until someone adds limits or an exception",
+     "feedback": "Right: enforcement applies to every new pod, including the urgent ones."
+    },
+    {
+     "id": "b",
+     "label": "The hotfix goes through, because existing workloads are exempt",
+     "feedback": "Admission checks each new pod; nothing exempts a workload for being old."
+    },
+    {
+     "id": "c",
+     "label": "The running pods are evicted, because they now break the rule",
+     "feedback": "Admission checks writes; it does not evict pods that are already running."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Run new rules in audit mode first, fix the violators, and keep a documented break-glass exception process for incidents."
+  },
+  "seeAlso": [
+   {
+    "topicId": 325,
+    "why": "Infrastructure plans that policies check before apply"
+   },
+   {
+    "topicId": 309,
+    "why": "Admission checks on image signatures in the supply chain"
+   },
+   {
+    "topicId": 685,
+    "why": "Organisation guardrails, the cloud-level version of the same idea"
+   }
+  ]
+ },
+ {
+  "id": 688,
+  "slug": "immutable-infrastructure-machine-images",
+  "region": "f7-cloud",
+  "order": 24,
+  "title": "Immutable Infrastructure and Machine Images",
+  "kind": "lesson",
+  "objectives": [
+   "Explain why replacing servers beats patching them in place",
+   "Choose what to bake into an image and what to configure at boot",
+   "Run an image pipeline that builds, tests, promotes and retires images"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 12,
+  "prereqIds": [
+   321,
+   325
+  ],
+  "cards": [
+   {
+    "id": "t688-c1",
+    "kind": "text",
+    "title": "Replace, do not repair",
+    "body": "In immutable infrastructure a server is never changed after it starts. To patch, upgrade or reconfigure, you build a new image, launch new servers from it and remove the old ones. Every server from the same image is identical, so what was tested is what runs, and rollback is launching the previous image. The opposite is a long-lived server patched by hand over years, a snowflake that nobody can rebuild exactly.",
+    "teaches": [
+     "immutable-servers"
+    ]
+   },
+   {
+    "id": "t688-c2",
+    "kind": "text",
+    "title": "Misconception: immutable means nothing ever varies",
+    "body": "An immutable image still runs in different places with different settings. What is fixed is the software: the operating system, packages, agents and usually the application. What varies is injected at boot: the environment name, endpoints, feature settings and secrets, fetched from a parameter store or secrets manager using the instance’s identity. Bake the slow, stable parts; inject the small, changing parts.",
+    "teaches": [
+     "image-baking"
+    ]
+   },
+   {
+    "id": "t688-c3",
+    "kind": "diagram",
+    "title": "An image pipeline",
+    "body": "Images are built and promoted like any other artefact.",
+    "teaches": [
+     "image-pipeline"
+    ],
+    "steps": [
+     "A schedule or a change triggers an image build from code",
+     "The build starts from the latest patched base and installs packages and agents",
+     "Scans and tests run against an instance booted from the image",
+     "The image gets a version and an ID, and is shared to staging",
+     "After staging soaks, the same image ID is promoted to production",
+     "Old images are retired after a set age so nothing launches unpatched"
+    ]
+   },
+   {
+    "id": "t688-c4",
+    "kind": "text",
+    "title": "Worked example: baked vs configured at boot",
+    "body": "An instance that installs its packages at boot takes 7 minutes to serve traffic; one from a baked image takes 1 minute. During a spike the autoscaler adds 40 instances. Configured at boot, each spends 6 more minutes not serving, so the fleet loses 40 × 6 = 240 instance-minutes of capacity exactly when it is needed. Boot-time installs also depend on package mirrors being up during the incident that caused the spike.",
+    "teaches": [
+     "image-baking"
+    ]
+   },
+   {
+    "id": "t688-c5",
+    "kind": "text",
+    "title": "Trap: one quick fix over SSH",
+    "body": "During an incident an engineer logs in to one server and edits a config file. It works, and the change is never written back to code. Weeks later the autoscaler replaces that server, and the bug returns on a server that looks identical to the others. Treat interactive access as read-only in normal operation, turn every fix into a code change and a new image, and alert on manual sessions so drift is noticed.",
+    "teaches": [
+     "drift-snowflakes"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t688-a1",
+    "concept": "immutable-servers",
+    "type": "multiple_choice",
+    "prompt": "A critical OS patch is released. What does an immutable approach do?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Runs the package manager on every live server overnight"
+     },
+     {
+      "id": "b",
+      "label": "Patches one server by hand and copies its disk to the rest"
+     },
+     {
+      "id": "c",
+      "label": "Builds a new image with the patch and replaces the servers"
+     },
+     {
+      "id": "d",
+      "label": "Waits for the next major release to include the patch"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Immutable servers are replaced, not modified: a new image is built, tested and rolled out. In-place patching makes servers diverge when some updates fail, copying a hand-patched disk spreads an untested snowflake, and waiting leaves a known hole open."
+   },
+   {
+    "id": "t688-a2",
+    "concept": "image-baking",
+    "type": "multiple_choice",
+    "prompt": "Which item belongs in the image rather than being fetched at boot?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The database password for this environment"
+     },
+     {
+      "id": "b",
+      "label": "The monitoring and logging agents"
+     },
+     {
+      "id": "c",
+      "label": "The name of the environment the server runs in"
+     },
+     {
+      "id": "d",
+      "label": "The endpoint of this region’s message queue"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Agents are slow to install and the same everywhere, so they are baked. Secrets, environment names and regional endpoints differ by deployment and should be injected at boot, and baking a secret into an image leaks it to everyone who can launch it."
+   },
+   {
+    "id": "t688-a3",
+    "concept": "drift-snowflakes",
+    "type": "multiple_choice",
+    "prompt": "A bug fixed by hand on one server returns weeks later. What most likely happened?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The server was replaced from an image that never had the fix"
+     },
+     {
+      "id": "b",
+      "label": "The fix was rolled back by a scheduled package update"
+     },
+     {
+      "id": "c",
+      "label": "The load balancer started routing to an older version"
+     },
+     {
+      "id": "d",
+      "label": "The config file on disk was corrupted by a reboot"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "A manual fix lives only on that disk, so the next replacement from the image brings the bug back. Package updates and reboots do not usually revert a config edit, and the load balancer routes to whatever servers exist rather than to versions."
+   },
+   {
+    "id": "t688-a4",
+    "concept": "image-pipeline",
+    "type": "multiple_choice",
+    "prompt": "Why retire images after a set age, such as 30 days?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Old images cost more to store than new ones"
+     },
+     {
+      "id": "b",
+      "label": "Providers delete custom images after a month"
+     },
+     {
+      "id": "c",
+      "label": "Launch templates can only refer to recent images"
+     },
+     {
+      "id": "d",
+      "label": "So nothing launches with months of missing patches"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "An old image may still be launched by an autoscaler or a forgotten template, bringing back every patch since it was built. Storage cost does not grow with age, providers keep custom images until you delete them, and templates can refer to any image you keep."
+   },
+   {
+    "id": "t688-a5",
+    "concept": "image-baking",
+    "type": "estimation",
+    "prompt": "Instances configured at boot take 7 minutes to serve; baked ones take 1. The autoscaler adds 40 instances during a spike. How many instance-minutes of serving capacity does configuring at boot lose?",
+    "unit": "instance-minutes",
+    "target": 240,
+    "assumptions": [
+     "All 40 launch at the same time",
+     "Both kinds serve equally once ready"
+    ],
+    "formula": "40 × (7 − 1)",
+    "workedAnswer": "40 × 6 = 240 instance-minutes",
+    "explanation": "Sanity check: 240 instance-minutes is the work of 40 instances for 6 minutes, lost during the spike itself, which is why scale-out paths should use baked images.",
+    "tolerance": 0.05,
+    "trapAnswers": [
+     280,
+     6
+    ]
+   },
+   {
+    "id": "t688-a6",
+    "concept": "image-pipeline",
+    "type": "drag_order",
+    "prompt": "Order the life of a machine image.",
+    "items": [
+     {
+      "id": "s2",
+      "label": "Scan and test an instance booted from it"
+     },
+     {
+      "id": "s4",
+      "label": "Promote the same image ID to production"
+     },
+     {
+      "id": "s1",
+      "label": "Build from the latest patched base"
+     },
+     {
+      "id": "s5",
+      "label": "Retire it once it passes its age limit"
+     },
+     {
+      "id": "s3",
+      "label": "Version it and promote it to staging"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Build, test, promote by ID through environments, and retire on a schedule so stale images cannot launch."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t688-f1",
+    "front": "Immutable server?",
+    "back": "Never changed after launch; to change it, build a new image and replace it."
+   },
+   {
+    "id": "t688-f2",
+    "front": "Bake vs boot?",
+    "back": "Bake slow, stable parts (OS, packages, agents, app); inject config and secrets at boot."
+   },
+   {
+    "id": "t688-f3",
+    "front": "Why retire old images?",
+    "back": "So nothing launches with months of missing patches."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Martin Fowler: ImmutableServer",
+    "url": "https://martinfowler.com/bliki/ImmutableServer.html"
+   },
+   {
+    "title": "HashiCorp Packer: Introduction",
+    "url": "https://developer.hashicorp.com/packer/docs/intro"
+   },
+   {
+    "title": "AWS: What is EC2 Image Builder?",
+    "url": "https://docs.aws.amazon.com/imagebuilder/latest/userguide/what-is-image-builder.html"
+   },
+   {
+    "title": "Google Cloud: Image management best practices",
+    "url": "https://cloud.google.com/compute/docs/images/image-management-best-practices"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "immutable-servers",
+    "image-baking",
+    "image-pipeline",
+    "drift-snowflakes"
+   ],
+   "mechanism": {
+    "title": "How immutable infrastructure works in practice",
+    "steps": [
+     "Mutable infrastructure keeps servers for years and changes them in place with scripts, configuration management or hand edits. Over time servers drift: a failed update here, a manual fix there, until no two are the same and no one can rebuild one exactly. Immutable infrastructure stops changing running servers and replaces them instead, the same idea as container images applied to whole machines.",
+     "Images are built by code from a base image the provider or your security team maintains. A build tool boots a temporary instance, installs packages, agents and often the application, hardens the operating system, and snapshots the result. Builds run on a schedule, such as weekly, to pick up patches, and on demand when a package or the application changes. Every image gets a version and an immutable ID.",
+     "What to bake is a trade-off. Baking everything gives the fastest, most predictable boot and no dependency on package mirrors during scale-out, but every change needs a new image. Configuring at boot is flexible but slow and fragile. The usual split is to bake the operating system, packages, agents and the application, and to inject environment-specific settings and secrets at boot from a parameter store or secrets manager, using the instance’s identity.",
+     "Images are tested and promoted like any artefact. Scans check for known vulnerabilities and configuration benchmarks, and smoke tests boot an instance and check that services start and health checks pass. The same image ID moves from staging to production, and fleets move to it by rolling replacement, usually through an instance group or autoscaling group refresh with health checks, so a bad image stops after the first batch.",
+     "Drift still has to be prevented. Interactive logins should be rare, logged and read-only by default, with every fix turned into code and a new image. Old images are deprecated and deleted after an age limit so autoscalers and templates cannot launch stale software. With this in place, recovering any server, or a whole fleet in a new region, is a launch from a known image rather than an archaeology project."
+    ]
+   },
+   "useWhen": [
+    "Fleets behind autoscaling, where new instances must be identical and fast to start.",
+    "Regulated environments that must show exactly what software runs where."
+   ],
+   "avoidWhen": [
+    "Avoid baking secrets or environment-specific settings into images.",
+    "Avoid manual fixes on running servers that are never written back to code."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Approach",
+     "Boot time",
+     "Change cost",
+     "Drift"
+    ],
+    "rows": [
+     [
+      "Patch servers in place",
+      "Fast (already running)",
+      "Low per change",
+      "High over time"
+     ],
+     [
+      "Configure fully at boot",
+      "Slow",
+      "Low",
+      "Low"
+     ],
+     [
+      "Bake image, inject config",
+      "Fast",
+      "A new image per change",
+      "Very low"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Keeping a fleet patched by replacement",
+    "assumptions": [
+     "200 instances; a new image every week",
+     "Rolling replacement 20 at a time",
+     "About 6 minutes per batch, illustrative"
+    ],
+    "steps": [
+     "Batches: 200 ÷ 20 = 10.",
+     "Time per refresh: 10 × 6 = 60 minutes.",
+     "Weekly images keep every instance at most about 7 days behind on patches, plus the hour of the refresh."
+    ],
+    "result": "Replacement is routine when each refresh takes about an hour, so the patch gap is set by how often you build images, not by how long patching takes."
+   },
+   "india": {
+    "title": "Immutable servers in published guidance",
+    "label": "Publicly reported",
+    "body": "Martin Fowler’s ImmutableServer article describes servers that are never modified after deployment and are replaced to change them, as a cure for configuration drift. HashiCorp Packer documents building identical machine images for several platforms from one template, and AWS EC2 Image Builder and Google Cloud’s image management guidance describe automated pipelines with testing, versioning, sharing and deprecation of images."
+   },
+   "pitfalls": [
+    {
+     "trap": "“I’ll just SSH in and fix it on the box.”",
+     "say": "“I’d put the fix in the image code and roll it out, or the next replacement brings the bug back.”"
+    },
+    {
+     "trap": "“Bake everything, including the database password.”",
+     "say": "“I’d bake the software and fetch secrets at boot with the instance’s identity.”"
+    }
+   ],
+   "takeaways": [
+    "Replace servers to change them; never patch running ones in place.",
+    "Bake the OS, packages, agents and app; inject config and secrets at boot.",
+    "Build images on a schedule, test them, promote by ID and retire old ones.",
+    "Every manual fix becomes code and a new image, or it will be lost."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "The forgotten launch template",
+   "prompt": "Your pipeline builds a patched image every week. A rarely used batch job’s launch template still points to an image from 14 months ago. Tonight the batch job scales from 0 to 50 instances.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "50 instances start with 14 months of missing patches",
+     "feedback": "Right: nothing forced the template forward, so the old image is launched as is."
+    },
+    {
+     "id": "b",
+     "label": "The provider substitutes the newest image from the same family",
+     "feedback": "A template that names an image ID launches exactly that image."
+    },
+    {
+     "id": "c",
+     "label": "The launch fails, because images older than a year cannot start",
+     "feedback": "Old images still launch until someone deprecates or deletes them."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Retire images after an age limit, point templates at a family or parameter that tracks the latest promoted image, and alert on launches from stale images."
+  },
+  "seeAlso": [
+   {
+    "topicId": 321,
+    "why": "Container images, the same build-once idea for processes"
+   },
+   {
+    "topicId": 325,
+    "why": "Infrastructure as code that defines the fleets images run in"
+   },
+   {
+    "topicId": 324,
+    "why": "Rolling replacement and rollback strategies for a new image"
+   }
+  ]
  }
 ]
