@@ -919,6 +919,20 @@ Control plane|certs + policy {svc} ~> Sidecar A {svc}
 Control plane|certs + policy {svc} ~> Sidecar B {svc}
 Service A {svc} > Sidecar A {svc} [mTLS]> Sidecar B {svc} > Service B {svc}
 
+@589 How the scheduler places a pod: nodes without enough unreserved requests or with an untolerated taint are filtered out, the rest are scored for zone balance, and the pod is bound.
+Pending pod|requests + tolerations {svc} > Filter|requests, taints, affinity {svc} > Score|zone spread {svc} > Bind to node {svc}
+Filter|requests, taints, affinity {svc} [no node fits]?> Pending|autoscaler or preemption
+
+@590 Traffic into a cluster: the cloud load balancer sends requests to a shared gateway, which routes by host to a Service, whose virtual IP forwards each connection to a ready pod; a network policy limits which pods may call it.
+Browser {client} > Cloud load balancer {ext} > Gateway|TLS + host routes {svc} > Service|virtual IP {svc} > Ready pod {svc}
+Frontend pod {svc} [allowed by policy]> Service|virtual IP {svc}
+Batch pod {svc} [no rule]?> Dropped
+
+@681 A node drain during an upgrade: the node is cordoned, each pod eviction is checked against its disruption budget, and allowed pods are recreated on new nodes.
+Control plane|upgraded first {svc} > Cordon old node {svc} > Evict pod {svc}
+Evict pod {svc} [budget allows]> Recreated on new node {svc}
+Evict pod {svc} [budget refuses]?> Retry later
+
 # ---------- Frontend additions (215-220) ----------
 @215 Event propagation for one click: the event is captured from the window down through the table and row to the clicked button, runs on the button, then bubbles back up through the row to the table in the same dispatch, where one delegated listener handles clicks for every row.
 Window > Document > Table|delegated listener {client} [capture]> Row > Button|target {client}
