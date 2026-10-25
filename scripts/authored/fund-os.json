@@ -62,8 +62,8 @@
    {
     "id": "t281-c5",
     "kind": "text",
-    "title": "Trap: forking a process that has many threads",
-    "body": "fork copies only the calling thread into the child. If another thread held a lock at that moment, the child inherits the locked lock with no thread to release it. POSIX therefore allows only async-signal-safe calls in the child of a multi-threaded process until it calls exec.",
+    "title": "Trap: copy-on-write makes fork look free",
+    "body": "fork does not copy memory straight away: parent and child share every page, marked copy-on-write, and a page is copied only when one side writes to it. A child that calls exec at once costs little. A large process that forks a long-lived child, for example to write a snapshot, pays for a copy of every page it keeps writing: a 10 GB process that rewrites half its heap during the child’s life needs about 5 GB more memory, enough to trigger an out-of-memory kill.",
     "teaches": [
      "fork-exec"
     ]
@@ -74,6 +74,7 @@
     "title": "Edge case: fork in a multithreaded program",
     "body": "fork copies the whole address space but only the thread that called it. If another thread held a lock at that moment, such as the memory allocator’s, the child inherits the lock in its held state with no thread to release it, and can hang on its next allocation. POSIX allows only async-signal-safe calls in the child of a multithreaded fork until it calls exec; prefer posix_spawn or spawning before starting threads.",
     "teaches": [
+     "fork-exec",
      "process-model"
     ]
    }
@@ -91,7 +92,7 @@
      },
      {
       "id": "b",
-      "label": "Nothing until the kernel syncs them"
+      "label": "A copy held in each core’s cache until a lock is taken"
      },
      {
       "id": "c",
@@ -105,7 +106,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Threads share the address space; only stacks and registers are per thread."
+    "explanation": "Threads share one address space, so a global is one memory location for all of them; only stacks and registers are per thread. Caches are kept coherent by hardware, so there is no private per-core copy to sync (ordering still needs locks or atomics). Copy-on-write applies between processes after fork, and threads never get a private copy at start."
    },
    {
     "id": "t281-a2",
@@ -147,7 +148,7 @@
      },
      {
       "id": "b",
-      "label": "A larger thread stack"
+      "label": "A thread with its own exception handler"
      },
      {
       "id": "c",
@@ -161,7 +162,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Process boundaries contain crashes and memory corruption; threads do not."
+    "explanation": "A separate process has its own address space, so a crash or memory corruption in the plugin cannot reach the main app. A thread shares the address space: a segmentation fault ends the whole process, and an exception handler cannot catch memory corruption or a crash in native code. Scheduling priority changes when code runs, not what a crash takes down."
    },
    {
     "id": "t281-a4",
@@ -235,7 +236,7 @@
     "approaches": [
      {
       "id": "p3",
-      "label": "Run decoders inside the request handler",
+      "label": "Run decoders inside each request handler",
       "description": "Inline"
      },
      {
@@ -245,7 +246,7 @@
      },
      {
       "id": "p1",
-      "label": "A pool of worker processes the main server hands jobs to",
+      "label": "A pool of worker processes",
       "description": "Worker processes"
      }
     ],
@@ -280,7 +281,7 @@
      "r3": "A segmentation fault in one thread terminates the whole process.",
      "r4": "Separate processes run on separate cores like threads do."
     },
-    "explanation": "Use processes when isolation matters more than the small cost of copying data between them."
+    "explanation": "A segmentation fault in a decoder kills whatever process it runs in, so only separate worker processes keep other users’ requests alive, and each worker can run with fewer permissions. Running inline or on threads shares one process, so one bad file drops everyone. Processes still use every core, and copying a file to a worker costs little next to a CPU-heavy conversion."
    }
   ],
   "flashcards": [
@@ -953,10 +954,11 @@
    {
     "id": "t283-c6",
     "kind": "text",
-    "title": "Edge case: memory that fails later",
-    "body": "Linux overcommits memory by default: allocating a large block usually succeeds, and physical pages are assigned only when they are first written. If the system then runs out, the allocation does not fail; the out-of-memory killer ends a process, possibly a different one. In containers the cgroup memory limit triggers the same kill, so watch for exit code 137 rather than for allocation errors.",
+    "title": "Edge case: adding up resident memory overcounts",
+    "body": "Resident set size (RSS) counts every page a process has in memory, including shared library code and shared memory that other processes map too. Summing RSS across 50 worker processes that share 200 MB of code counts that 200 MB fifty times. Proportional set size (PSS) divides each shared page among the processes using it, so it adds up correctly; use it, or the cgroup’s total, when sizing a machine. In containers the memory limit, not the sum of RSS, decides when the kill comes.",
     "teaches": [
-     "address-translation"
+     "address-translation",
+     "memory-pressure"
     ]
    }
   ],
@@ -977,17 +979,17 @@
      },
      {
       "id": "c",
-      "label": "Yes, addresses are global"
+      "label": "Yes, a pointer value names one physical byte"
      },
      {
       "id": "d",
-      "label": "Yes, unless one is a thread"
+      "label": "Yes, if both processes run the same program"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "The same virtual address can map to different physical pages per process."
+    "explanation": "Each process has its own page tables, so the same virtual address can map to different physical pages, or to the same page only if they deliberately share memory. Pointers are virtual, not physical; running the same program gives the same layout, not the same pages; and the kernel happily lets equal addresses exist in different processes."
    },
    {
     "id": "t283-a2",
@@ -1009,13 +1011,13 @@
      },
      {
       "id": "d",
-      "label": "A minor fault on a cached page"
+      "label": "A minor fault on a page already in the page cache"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Major faults wait for storage; minor ones only update mappings."
+    "explanation": "A major fault must wait for storage to read the page, which costs microseconds to milliseconds. A minor fault on a page already in the page cache only updates the page table, a fault on an already-mapped page is a permission or copy-on-write fault handled in memory, and a guard-page fault signals stack overflow rather than costing I/O."
    },
    {
     "id": "t283-a3",
@@ -1372,7 +1374,7 @@
      },
      {
       "id": "b",
-      "label": "Disk drivers run in the browser"
+      "label": "The file system locks the device for its own use"
      },
      {
       "id": "c",
@@ -1386,7 +1388,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "The CPU enforces privilege levels; the kernel mediates devices."
+    "explanation": "The CPU runs programs in user mode, where instructions that touch device registers fault; only the kernel, in privileged mode, drives hardware, and programs ask it through system calls. The file system is kernel code that also goes through drivers, devices do not check which kind of thread is asking, and compilers emit whatever instructions you write."
    },
    {
     "id": "t284-a2",
@@ -1396,7 +1398,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "The disk rotates more slowly"
+      "label": "Each call forces the disk head to seek again"
      },
      {
       "id": "b",
@@ -1408,13 +1410,13 @@
      },
      {
       "id": "d",
-      "label": "Each byte is encrypted twice"
+      "label": "The page cache flushes to disk after each call"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Overhead scales with the number of calls; buffer to reduce them."
+    "explanation": "Each write is a system call with fixed overhead, so 1 MB in 10-byte calls makes 100,000 transitions into the kernel; buffer in user space and write in large chunks. The page cache absorbs small writes, so neither seeks nor flushes happen per call, and the page cache is not disabled by small writes."
    },
    {
     "id": "t284-a3",
@@ -1798,7 +1800,7 @@
      },
      {
       "id": "b",
-      "label": "An immediate 503 from the kernel"
+      "label": "The kernel resets their connections at once"
      },
      {
       "id": "c",
@@ -1812,7 +1814,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "A single loop thread runs one callback at a time."
+    "explanation": "An event loop runs one callback at a time on its thread, so every other client waits until the parse finishes. The kernel keeps accepting and queuing connections rather than resetting them, nothing runs in parallel on a single loop, and no cache makes replies faster. Move the parse to a worker or stream it in chunks."
    },
    {
     "id": "t285-a3",
@@ -3090,8 +3092,8 @@
    {
     "id": "t288-c6",
     "kind": "text",
-    "title": "Edge case: waking up for no reason",
-    "body": "A condition-variable wait can return even though no one signalled (a spurious wakeup), and by the time a signalled thread runs, another may have taken the item. Check the condition in a loop: while the queue is empty, wait. A plain if-check works in tests and fails rarely in production.",
+    "title": "Edge case: the lost wake-up",
+    "body": "A producer that adds an item and signals without holding the mutex can slip between a consumer’s check (queue empty) and its wait, so the signal arrives before anyone is waiting and the consumer sleeps with an item ready. Change the shared state while holding the mutex the waiters use, then signal. Use broadcast when threads wait for different conditions on one condition variable, because signal may wake a thread that cannot proceed.",
     "teaches": [
      "condition-variable"
     ]
@@ -3110,7 +3112,7 @@
      },
      {
       "id": "b",
-      "label": "The loop makes the wait faster"
+      "label": "The loop retakes the mutex after every wake-up"
      },
      {
       "id": "c",
@@ -3118,13 +3120,13 @@
      },
      {
       "id": "d",
-      "label": "Signals are delivered twice"
+      "label": "Each signal wakes every thread that is waiting"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Re-check the predicate every time you wake."
+    "explanation": "A wait can return without a signal, and another thread may take the item between the signal and this thread running, so the condition must be re-checked after every wake-up. The wait itself retakes the mutex before returning; signal wakes at most one waiter (broadcast wakes all); and the loop costs time rather than saving it."
    },
    {
     "id": "t288-a2",
@@ -3194,7 +3196,7 @@
      },
      {
       "id": "b",
-      "label": "Keeps holding it while asleep"
+      "label": "Keeps holding it, so signallers wait for the sleeper"
      },
      {
       "id": "c",
@@ -3202,13 +3204,13 @@
      },
      {
       "id": "d",
-      "label": "Destroys it after the wait"
+      "label": "Releases it for good; the waiter locks it again later"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Atomic release-and-sleep avoids missing a signal."
+    "explanation": "Waiting atomically releases the mutex and sleeps, so a producer can lock it and change the state, and the wait retakes it before returning. Holding it while asleep would deadlock the signaller, the mutex is never handed directly to another thread, and the caller does not have to relock it after the wait returns."
    },
    {
     "id": "t288-a5",
@@ -3526,9 +3528,10 @@
    {
     "id": "t289-c6",
     "kind": "text",
-    "title": "Edge case: a failed fsync cannot be retried",
-    "body": "In 2018, PostgreSQL developers found that on Linux, when fsync fails, the kernel may drop the dirty pages and clear the error, so a retried fsync reports success although the data never reached disk. PostgreSQL changed to stop with a PANIC and recover from its write-ahead log instead. Treat an fsync failure as data loss, not as a temporary error.",
+    "title": "Edge case: fdatasync, metadata and drive caches",
+    "body": "fsync flushes a file’s data and the metadata needed to find it, such as its size and timestamps; fdatasync skips metadata that is not needed to read the data back, which saves a write per call for logs that overwrite space allocated in advance. Either call also asks the device to empty its volatile write cache. A drive or virtual disk that acknowledges flushes without honouring them silently breaks durability, so test with real power loss rather than trusting the acknowledgement.",
     "teaches": [
+     "fsync",
      "page-cache"
     ]
    }
@@ -3928,7 +3931,7 @@
     "id": "t290-c5",
     "kind": "text",
     "title": "Trap: the main process does not receive the signal",
-    "body": "If a container starts the server through a shell script, the shell may be process 1 and not forward SIGTERM to its child. The server never sees the signal and is killed after the grace period. Use exec to replace the shell, or a small init process that forwards signals.",
+    "body": "If a container starts the server through a shell script, the shell may be process 1 and not forward SIGTERM to its child. The server never sees the signal and is killed after the grace period. Even when the server itself is PID 1, the kernel applies no default action to signals it has not handled, so it must install its own SIGTERM handler. Use exec to replace the shell, or a small init process that forwards signals.",
     "teaches": [
      "signals"
     ]
@@ -3936,9 +3939,10 @@
    {
     "id": "t290-c6",
     "kind": "text",
-    "title": "Edge case: PID 1 in a container ignores SIGTERM",
-    "body": "The first process in a container is PID 1, and the kernel does not apply default signal actions to it, so without its own handler it ignores SIGTERM. A shell-form start command also makes the shell PID 1, which may not forward signals to the app. The platform then waits out its grace period (10 seconds by default in Docker) and sends SIGKILL. Use exec form, handle SIGTERM, or run a small init such as tini.",
+    "title": "Edge case: PID 1 must reap orphaned children",
+    "body": "When a process exits, it stays a zombie holding a process-table entry until its parent collects its exit status with wait. Orphans are re-parented to PID 1. An application running as PID 1 that never calls wait collects zombies from every helper its children leave behind, until the container’s process limit is reached and new processes cannot start. A minimal init such as tini forwards signals and reaps zombies, so the application does not have to.",
     "teaches": [
+     "exit-codes",
      "signals"
     ]
    }
@@ -4008,15 +4012,15 @@
     "choices": [
      {
       "id": "a",
-      "label": "It hit a syntax error"
+      "label": "It failed to start because of a syntax error"
      },
      {
       "id": "b",
-      "label": "It exited normally"
+      "label": "It exited normally after a clean shutdown"
      },
      {
       "id": "c",
-      "label": "It was killed by SIGKILL (128 + 9)"
+      "label": "It was killed by signal 9, SIGKILL"
      },
      {
       "id": "d",
@@ -4026,7 +4030,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Shells report 128 + signal number; 137 often means an OOM kill or a grace-period expiry."
+    "explanation": "Shells and runtimes report death by signal as 128 plus the signal number, and 137 − 128 = 9 is SIGKILL, commonly from an out-of-memory kill or a grace period running out. A start-up error usually exits with a small code such as 1 or 2, a clean exit is 0, and a handled SIGTERM normally ends with the program’s own code (often 0, or 143 if it re-raises SIGTERM)."
    },
    {
     "id": "t290-a4",
@@ -4054,7 +4058,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Make the server process 1 with exec, or use an init that forwards signals."
+    "explanation": "With a shell as PID 1, SIGTERM reaches the shell, which does not pass it on, so the server never starts shutting down and is killed when the grace period ends. Platforms send SIGTERM first and SIGKILL only after the grace period, containers receive signals like any other process, and the log buffer size does not stop a message being written."
    },
    {
     "id": "t290-a5",
