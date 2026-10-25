@@ -1238,3 +1238,101 @@ Firewall|conntrack table [entry NEW, then ESTABLISHED]> Server|203.0.113.9:443 {
 Server|203.0.113.9:443 [SYN-ACK matches entry]> Firewall|conntrack table
 Firewall|conntrack table [after close: entry kept 120 s]~> Table full at 262,144|new packets dropped
 Unsolicited packet {ext} [no entry, no rule]?> Dropped
+# ---------- Fundamentals · Databases round 3 (551-560, 621-626) ----------
+@551 Choosing an index type: equality and range lookups use a B-tree, a condition matching few rows uses a partial index, a large append-only table filtered by time uses a compact BRIN index, and searches inside arrays, JSON or text use a GIN index.
+%concept
+WHERE id = 42, or a range > B-tree|the default {store}
+WHERE status = 'failed'|few matching rows > Partial index|only the matching rows {store}
+WHERE created_at in a range|append-only table > BRIN|one summary per 128 pages {store}
+Tags, JSON keys or words|search inside a value > GIN|one entry per element {store}
+
+@552 Where a primary key sends each insert: a bigint sequence and a UUIDv7, which starts with a millisecond timestamp, both land at the right edge of the B-tree where pages stay cached, while a random UUIDv4 lands on any leaf page.
+%concept
+bigint sequence|8 bytes, ordered > Right edge of the B-tree|hot pages stay cached {store}
+UUIDv7|16 bytes, time first > Right edge of the B-tree|hot pages stay cached {store}
+UUIDv4|16 bytes, random > Any leaf page|cache misses and page splits {store}
+
+@553 Storing a tree in tables: an adjacency list keeps parent_id and is walked with a recursive query, a materialised path stores the ancestors for prefix searches, and a closure table stores every ancestor-descendant pair.
+%concept
+comments|id, parent_id {store} > Adjacency list|one recursive query walks it
+comments|id, parent_id > Materialised path|/1/4/9/ and a prefix search
+comments|id, parent_id > Closure table|one row per ancestor pair
+
+@554 Range partitioning by month: each insert is routed to the partition for its timestamp, a query with a date filter reads only matching partitions, and retention drops the oldest partition instead of deleting rows.
+App {client} [INSERT, 12 Oct 2026]> orders|partitioned by month {store}
+Weekly report {client} [WHERE created_at >= 19 Oct]> orders|partitioned by month
+orders|partitioned by month [new rows and last week's reads]> orders_2026_10 {store}
+orders|partitioned by month > orders_2026_09 {store}
+orders|partitioned by month [retention drops it whole]?> orders_2025_10 {store}
+
+@555 Keeping the past: a soft delete sets deleted_at and readers go through a view of live rows, a mostly-deleted table can move rows to an archive table instead, and a price change closes the current history row and opens a new one.
+App {client} [soft delete: set deleted_at]> projects|deleted_at {store}
+projects|deleted_at > Live view|deleted_at IS NULL {concept}
+projects|deleted_at [or move the row out]?> projects_archive {store}
+App {client} [change a price]> prices_history|close old row, open new {store}
+
+@556 A materialised view: a refresh runs the expensive query once and stores the result, and readers query that stored result, which is as fresh as the last refresh.
+order_lines|500M rows {store} [aggregate query]> Refresh job|every 15 min {svc}
+Refresh job|every 15 min [REFRESH ... CONCURRENTLY]> Materialised view|daily totals {store}
+Dashboard {client} [fast reads, about 50 ms]> Materialised view|daily totals
+
+@557 Shared tables for many tenants: the server sets the authenticated tenant for each transaction, row-level security adds the tenant filter to every query, and keys and foreign keys include tenant_id.
+Request {client} [authenticated as tenant 42]> App {svc}
+App {svc} [SET LOCAL app.tenant_id = 42]> PostgreSQL|row-level security {store}
+PostgreSQL|row-level security [adds tenant_id = 42]> invoices|key (tenant_id, id) {store}
+invoices|key (tenant_id, id) [composite foreign key]< invoice_lines|(tenant_id, invoice_id) {store}
+
+@558 The buffer pool: a read is served from a cached page when it can be; a miss reads the page from storage and evicts a cold page, so a working set larger than the pool turns many reads into storage reads.
+Query {client} [hit: about 0.001 ms]> Buffer pool|recently used pages {store}
+Buffer pool|recently used pages [miss: about 0.1 ms]~> Storage|data files {store}
+Storage|data files [page loaded, a cold page evicted]~> Buffer pool|recently used pages
+
+@559 Picking column types: money goes to numeric or integer minor units with a currency code, instants to timestamptz, future local events to local time plus a zone name, and text to full Unicode with a chosen collation.
+%concept
+Payment amount > numeric(14,2) or bigint paise|plus a currency code {store}
+When it happened > timestamptz|stored as a UTC instant {store}
+Appointment next year > Local time + zone name|Europe/Berlin {store}
+Names and emails > Unicode text|utf8mb4, chosen collation {store}
+
+@560 JSON columns: fixed, frequently filtered fields live in typed columns, while attributes that vary by row go in a jsonb column with a GIN index, or an expression index for one key that is queried constantly.
+%concept
+Product data > Typed columns|id, sku, price, category {store}
+Product data > attrs jsonb|varies by category {store}
+attrs jsonb|varies by category > GIN index|containment on any key {store}
+attrs jsonb|varies by category > Expression index|attrs->>'brand' {store}
+
+@621 Prepared statements in PostgreSQL: the first five executions get custom plans for their values; after that a generic plan is used if its estimate is not much costlier, and that one plan can be wrong for rare values.
+App {client} [PREPARE once]> Prepared statement {svc}
+Prepared statement [runs 1 to 5]> Custom plan|for these values {concept}
+Prepared statement [run 6 onward]> Generic plan|if not much costlier {concept}
+Generic plan|if not much costlier [a rare value]?> Plan made for average values {concept}
+
+@622 Loading a million rows: one row per statement pays a round trip and a commit per row, batches of 1,000 pay one per batch, and COPY streams every row in one command; indexes are built after the load.
+%concept
+1M rows > One INSERT per row|about 2,000 s > Table {store}
+1M rows > Batches of 1,000|about 2 s of waiting > Table
+1M rows > COPY|one streamed command > Table
+Table [then]> Build indexes, ANALYZE
+
+@623 A table as a job queue: the order's transaction inserts the job, workers claim ready jobs with FOR UPDATE SKIP LOCKED so they never take the same row, and a lease lets a crashed worker's job be claimed again.
+Order transaction {svc} [INSERT job, same commit]> jobs|ready jobs {store}
+Worker A {svc} [FOR UPDATE SKIP LOCKED]> jobs|ready jobs
+Worker B {svc} [skips rows A has locked]> jobs|ready jobs
+jobs|ready jobs [lease expired]~> Claimed again {concept}
+
+@624 Finding slow queries: statement statistics rank query shapes by total time, a real example is run under EXPLAIN with actual timings and buffers, and the fix is checked against the same statistics.
+Database {store} > Statement statistics|calls x mean time {store}
+Statement statistics|calls x mean time [top by total time]> Query shape {concept}
+Query shape [EXPLAIN ANALYZE, BUFFERS]> Plan|estimated vs actual rows {concept}
+Plan|estimated vs actual rows [index or rewrite]> Measure again {concept}
+
+@625 Estimating table and index size: rows times bytes per row, counting the tuple header, aligned data and line pointer, gives the table; index entries times their size, divided by how full the pages are, gives each index.
+%concept
+Rows|500 million > Bytes per row|header + aligned data + pointer > Table size|about 50 GB {store}
+Rows|500 million > Index entries|about 20 bytes each > Pages about 90% full > Index size {store}
+
+@626 Timeouts inside the database: statement_timeout cancels a statement that runs too long, lock_timeout cancels a wait for a lock, and idle_in_transaction_session_timeout ends a session that sits in an open transaction.
+App {client} > Database session {svc}
+Database session [runs too long]?> statement_timeout|cancels the statement {concept}
+Database session [waits too long for a lock]?> lock_timeout|cancels the wait {concept}
+Database session [idle in an open transaction]?> idle_in_transaction_session_timeout|ends the session {concept}

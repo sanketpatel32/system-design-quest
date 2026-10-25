@@ -70,10 +70,11 @@
    {
     "id": "t261-c6",
     "kind": "text",
-    "title": "Edge case: NULL in a unique column",
-    "body": "In standard SQL, NULL is not equal to NULL, so a UNIQUE constraint lets many rows hold NULL in that column. PostgreSQL behaves this way by default (version 15 added UNIQUE NULLS NOT DISTINCT to change it); SQL Server allows only one NULL in a unique index. If “at most one row without a value” matters, say so explicitly rather than relying on the default.",
+    "title": "Edge case: a cascade that reaches further than expected",
+    "body": "ON DELETE CASCADE removes child rows when the parent goes, and their children too if those foreign keys also cascade. Deleting one customer can then remove orders, order items, payments and shipment records in a single statement, locking each row and writing each removal to the log. A mistaken delete becomes a large, silent one. Cascade only into rows that are truly part of the parent, such as an order's line items. Use RESTRICT, or a soft delete, for records with a life of their own, such as invoices and payments. And index the referencing columns, or every parent delete scans the child tables to find matches.",
     "teaches": [
-     "relational-model"
+     "relational-model",
+     "foreign-keys"
     ]
    }
   ],
@@ -104,7 +105,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Only the database sees both inserts and can reject the second."
+    "explanation": "Only the database sees both inserts, so only a unique constraint can reject the second one reliably. A check in the handler races: both requests can look, find no account, and insert. Browser validation checks the format, not duplicates, and a unique index on id does nothing for email."
    },
    {
     "id": "t261-a2",
@@ -132,7 +133,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Referential integrity: no orphaned child rows."
+    "explanation": "A foreign key guarantees referential integrity: every orders.customer_id matches an existing customers.id, at insert and on parent delete. It says nothing about id reuse, physical storage order, or customers having orders; a customer with no orders is perfectly valid."
    },
    {
     "id": "t261-a3",
@@ -160,7 +161,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Keys should be stable; use a surrogate key with a unique email."
+    "explanation": "Primary keys are copied into every referencing row, so a key that changes forces updates everywhere it is used. Use a stable surrogate id and a unique constraint on email. Indexes handle email-length strings fine, keys need not be integers, and uniqueness of email is a reason for a unique constraint, not a reason against using it as a key."
    },
    {
     "id": "t261-a4",
@@ -174,21 +175,21 @@
      },
      {
       "id": "b",
-      "label": "One request to the API"
+      "label": "One order, with its line items kept as a list in a column"
      },
      {
       "id": "c",
-      "label": "One screen in the application"
+      "label": "Whatever one screen of the application needs to show"
      },
      {
       "id": "d",
-      "label": "One file on disk"
+      "label": "One customer plus a copy of their latest order details"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Tables model the domain, not the user interface."
+    "explanation": "A table describes one kind of thing, and each row states one fact about one instance of it, such as one order or one order line. A list of line items in a column breaks first normal form: items can no longer be queried, constrained or referenced individually. Shaping tables around screens couples storage to today's interface, and copying the latest order onto the customer row creates two copies of the same fact that drift apart."
    },
    {
     "id": "t261-a5",
@@ -568,7 +569,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "The left join keeps unmatched left rows."
+    "explanation": "A left join keeps every row from the left table and fills the right side with NULLs when nothing matches, so customers without orders stay. An inner join drops them, orders LEFT JOIN customers keeps orders rather than customers, and a cross join pairs every customer with every order."
    },
    {
     "id": "t262-a2",
@@ -596,7 +597,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "WHERE runs before groups exist; HAVING runs after."
+    "explanation": "WHERE filters rows before grouping, when COUNT(*) per group does not exist yet. HAVING filters after the groups are formed, so it can test aggregates. FROM and ON only name tables and match rows."
    },
    {
     "id": "t262-a3",
@@ -624,7 +625,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "COUNT(column) skips NULLs; COUNT(*) counts the row."
+    "explanation": "COUNT(column) counts non-NULL values, and the unmatched customer's orders.id is NULL, so the result is 0. COUNT(*) would count the row itself and give 1. Counting NULLs is not an error, and COUNT never returns NULL."
    },
    {
     "id": "t262-a4",
@@ -652,7 +653,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Fan-out joins multiply parent rows."
+    "explanation": "Joining order_items repeats each order row once per item, so SUM(orders.total) adds the same total several times. Sum item amounts instead, or aggregate items in a subquery before joining. An inner join that drops orders without items would lower revenue, NULL handling would too, and sorting does not change sums."
    },
    {
     "id": "t262-a5",
@@ -757,7 +758,7 @@
     "steps": [
      "A join is conceptually a filtered pairing: take every combination of rows from the two inputs and keep those where the join condition is true. The database never actually builds every pair; it uses nested loops, hashing or merging (see the query-planning lesson), but the result is defined this way.",
      "Join cardinality follows the relationship. One-to-one keeps row counts; one-to-many repeats the “one” side once per match; many-to-many through a link table can multiply rows quickly. Knowing the expected count is the fastest way to spot a wrong join condition.",
-     "Outer joins keep unmatched rows and fill the missing side with NULLs. A WHERE condition on the right table’s columns after a left join (WHERE orders.status = ’paid’) silently turns it back into an inner join, because NULL rows fail the condition; put such conditions in the ON clause instead.",
+     "Outer joins keep unmatched rows and fill the missing side with NULLs. A WHERE condition on the right table’s columns after a left join (WHERE orders.status = 'paid') silently turns it back into an inner join, because NULL rows fail the condition; put such conditions in the ON clause instead.",
      "GROUP BY forms one group per distinct combination of grouping columns. Each output column must be either a grouping column or an aggregate. Aggregates ignore NULLs except COUNT(*), and an empty set gives NULL for SUM and AVG but 0 for COUNT.",
      "The logical order (FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY, LIMIT) explains many rules: you cannot use an aggregate in WHERE, and a column alias defined in SELECT is not visible in WHERE.",
      "Set operations combine whole query results: UNION removes duplicates (costing a sort or hash) while UNION ALL keeps them; INTERSECT and EXCEPT find common and missing rows."
@@ -844,7 +845,7 @@
   "interactive": {
    "kind": "predict",
    "title": "How many rows?",
-   "prompt": "customers has 10 rows. 6 customers have 2 orders each; 4 have none. You run customers LEFT JOIN orders ON … WHERE orders.status = ’paid’, and every order is paid.",
+   "prompt": "customers has 10 rows. 6 customers have 2 orders each; 4 have none. You run customers LEFT JOIN orders ON … WHERE orders.status = 'paid', and every order is paid.",
    "choices": [
     {
      "id": "a",
@@ -986,7 +987,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "One fact in many rows can be updated inconsistently."
+    "explanation": "The city is one fact copied onto many rows, so a move must update every copy, and missing one leaves the data contradicting itself: an update anomaly. Deadlocks and phantom reads are concurrency effects, and a delete anomaly is losing facts when rows are deleted."
    },
    {
     "id": "t263-a2",
@@ -1014,7 +1015,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "A column that depends on part of a composite key violates 2NF."
+    "explanation": "The key is (order_id, product_id), and product_name depends on product_id alone, part of the key: a second normal form violation. The table is not fully normalised, it holds single values rather than lists so first normal form is fine, and third normal form concerns dependencies between non-key columns."
    },
    {
     "id": "t263-a3",
@@ -1042,7 +1043,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Historical values are facts in their own right."
+    "explanation": "The price paid at purchase is a historical fact, different from the current list price, so storing it on the order line is correct modelling, not duplication. Copies are not always harmless, it breaks no normal form, and moving it to products would lose what customers were charged."
    },
    {
     "id": "t263-a4",
@@ -1070,7 +1071,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Facts about one thing vanish with rows about another."
+    "explanation": "When customer details live only on order rows, deleting the last order deletes the only record of the customer: a delete anomaly. Nothing archives the data, a cache is not a source of truth, and there is no customer row for a foreign key to protect."
    },
    {
     "id": "t263-a5",
@@ -1397,7 +1398,7 @@
     "id": "t264-c5",
     "kind": "text",
     "title": "Trap: an index for every column",
-    "body": "Every index is updated on every insert, and on updates that touch its columns, and takes disk and memory. Unused indexes slow writes for nothing. Index for the queries you actually run, and drop indexes the statistics show are never used.",
+    "body": "Every index gets a new entry on every insert, and takes disk and memory. Updates depend on the engine. In PostgreSQL, an update that cannot be done as a heap-only (HOT) update, because an indexed column changed or the page had no room, adds an entry to every index on the table, including indexes on columns that did not change. In InnoDB, a secondary index changes only when its own columns, or the primary key, change. Unused indexes slow writes for nothing. Index for the queries you actually run, and drop indexes the usage statistics show are never scanned.",
     "teaches": [
      "index-cost"
     ]
@@ -1421,25 +1422,25 @@
     "choices": [
      {
       "id": "a",
-      "label": "WHERE status = ’paid’ ORDER BY total"
+      "label": "WHERE status = 'paid' ORDER BY total"
      },
      {
       "id": "b",
-      "label": "WHERE total > 100 AND status = ’paid’"
+      "label": "WHERE total > 100 AND status = 'paid'"
      },
      {
       "id": "c",
-      "label": "WHERE customer_id = 7 AND created_at > ’2026-01-01’"
+      "label": "WHERE customer_id = 7 AND created_at > '2026-01-01'"
      },
      {
       "id": "d",
-      "label": "WHERE created_at > ’2026-01-01’ alone"
+      "label": "WHERE created_at > '2026-01-01' alone"
      }
     ],
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "The leading column must be constrained for a normal B-tree lookup."
+    "explanation": "A composite B-tree is sorted by customer_id first, then created_at, so an equality on customer_id plus a range on created_at reads one contiguous slice. Filters on status or total cannot use it at all, and created_at alone skips the leading column, so the database cannot seek into the tree."
    },
    {
     "id": "t264-a2",
@@ -1453,11 +1454,11 @@
      },
      {
       "id": "b",
-      "label": "WHERE email = ’a@example.com’"
+      "label": "WHERE email = 'a@example.com'"
      },
      {
       "id": "c",
-      "label": "WHERE sku = ’AB-1’"
+      "label": "WHERE sku = 'AB-1'"
      },
      {
       "id": "d",
@@ -1467,7 +1468,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Hashes do not preserve order, so ranges need a B-tree."
+    "explanation": "A hash index maps each value to a bucket and keeps no order, so it answers equality only. A BETWEEN range needs ordered keys, which a B-tree provides. The three equality lookups are exactly what a hash index serves."
    },
    {
     "id": "t264-a3",
@@ -1495,7 +1496,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Write cost grows with the number of indexes."
+    "explanation": "Each insert must add an entry to every one of the 12 indexes, so write cost grows with the index count. Inserts do not lock the whole table or make it read-only, and the planner does not scan indexes to insert; it updates each one directly."
    },
    {
     "id": "t264-a4",
@@ -1523,7 +1524,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Depth grows with the logarithm to a large base."
+    "explanation": "An 8 KB page holds hundreds of keys, so each level multiplies the reach by hundreds: three levels reach tens of millions of entries and four reach billions. Nothing keeps the whole table in memory, trees are not rebuilt into one level, and indexes contain every row, not a sample."
    },
    {
     "id": "t264-a5",
@@ -1627,7 +1628,7 @@
      "Lookups cost one page read per level. Because fan-out is in the hundreds, depth grows very slowly: each extra level multiplies capacity by the fan-out. The root and upper levels are hot and usually stay in memory.",
      "A composite index sorts by its first column, then the second within equal first values, and so on, like a phone book by surname then first name. It serves conditions on a leading prefix of its columns; equality on early columns and a range or ORDER BY on the next is the ideal shape.",
      "If an index contains every column a query needs, the database can answer from the index alone (an index-only scan in PostgreSQL, which also checks a visibility map). INCLUDE columns add payload to leaves without making them part of the key.",
-     "Hash indexes store hash values and support only equality. B-trees also support uniqueness, ranges, sorting and prefix matches such as LIKE ’abc%’ (with suitable collation or operator class), which is why they are the default.",
+     "Hash indexes store hash values and support only equality. B-trees also support uniqueness, ranges, sorting and prefix matches such as LIKE 'abc%' (with suitable collation or operator class), which is why they are the default.",
      "Each index adds write work, storage and memory pressure, and must be maintained during bulk loads. The planner may also ignore an index when a query returns a large fraction of the table, because reading the table sequentially is cheaper."
     ]
    },
@@ -1806,7 +1807,7 @@
     "id": "t265-c5",
     "kind": "text",
     "title": "Trap: running EXPLAIN ANALYZE on a write",
-    "body": "EXPLAIN only plans; EXPLAIN ANALYZE actually executes the statement to measure it. On an UPDATE or DELETE that changes data. Wrap it in a transaction you roll back, or test on a copy.",
+    "body": "EXPLAIN only plans; EXPLAIN ANALYZE actually executes the statement to measure it. On an INSERT, UPDATE or DELETE that means the data really changes, and triggers fire. Wrap it in BEGIN … ROLLBACK, or run it on a copy.",
     "teaches": [
      "explain"
     ]
@@ -1830,15 +1831,15 @@
     "choices": [
      {
       "id": "a",
-      "label": "Planners ignore every index on very large tables"
+      "label": "The planner uses indexes only for equality, not for ranges"
      },
      {
       "id": "b",
-      "label": "Sequential scans always win for any filter at all"
+      "label": "Stale statistics hid the index from the planner"
      },
      {
       "id": "c",
-      "label": "Reading the table in order is cheaper than millions of random lookups"
+      "label": "Reading in order beats millions of random lookups"
      },
      {
       "id": "d",
@@ -1848,7 +1849,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Low selectivity makes index lookups more expensive than a scan."
+    "explanation": "At 40% selectivity an index scan would make millions of random page reads, often touching each page several times, while a sequential scan reads every page once in order. The planner's cost model sees that and picks the scan. B-tree indexes serve ranges as well as equality. Statistics change the planner's row estimates, not whether it knows an index exists. A corrupted index produces errors or wrong results, not a sensible plan choice."
    },
    {
     "id": "t265-a2",
@@ -1876,7 +1877,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Twenty index probes are far cheaper than reading 50 million rows."
+    "explanation": "With 20 outer rows and an index on the join column, a nested loop does 20 index probes and touches a handful of pages. A hash join would read all 50 million rows to build or probe, a merge join would sort both inputs first, and a cross join builds every pair before filtering."
    },
    {
     "id": "t265-a3",
@@ -1904,7 +1905,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Misestimates lead to wrong join and scan choices; refresh statistics first."
+    "explanation": "Estimates come from table statistics, so a 10 versus 2 million gap usually means statistics are stale or too coarse for the data, and the planner then picks a nested loop or index scan suited to 10 rows. Memory, index count and join type change speed, not the row estimate itself. Run ANALYZE and recheck."
    },
    {
     "id": "t265-a4",
@@ -1932,7 +1933,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Actual numbers reveal misestimates, at the cost of executing."
+    "explanation": "EXPLAIN ANALYZE runs the statement and shows actual rows, loops and time beside each estimate, which is how you spot misestimates. Plain EXPLAIN shows the plan without running it. Neither suggests indexes nor rewrites the query."
    },
    {
     "id": "t265-a5",
@@ -2119,7 +2120,7 @@
   "interactive": {
    "kind": "predict",
    "title": "Index or scan?",
-   "prompt": "orders has 20 million rows and an index on status. 95% of orders are ’delivered’. A report filters WHERE status = ’delivered’.",
+   "prompt": "orders has 20 million rows and an index on status. 95% of orders are 'delivered'. A report filters WHERE status = 'delivered'.",
    "choices": [
     {
      "id": "a",
@@ -2138,7 +2139,7 @@
     }
    ],
    "correctId": "a",
-   "reveal": "Indexes pay off for selective conditions. For status = ’cancelled’ (rare), the same index would be the right choice."
+   "reveal": "Indexes pay off for selective conditions. For status = 'cancelled' (rare), the same index would be the right choice."
   },
   "seeAlso": [
    {
@@ -2255,35 +2256,35 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "In autocommit mode each statement commits on its own."
+    "explanation": "Without BEGIN, autocommit makes each statement its own transaction, so the first update committed when it finished and only the second failed. The database does not retry it or roll back earlier statements, and there was no batch transaction to undo. Wrap related statements in one transaction."
    },
    {
     "id": "t266-a2",
     "concept": "acid",
     "type": "multiple_choice",
-    "prompt": "Which ACID property means a committed change survives a power cut?",
+    "prompt": "The database reports COMMIT succeeded, and the server loses power one second later. After restart the change is still there. Which property is that, and what made it hold?",
     "choices": [
      {
       "id": "a",
-      "label": "Durability"
+      "label": "Durability: its log records reached disk before COMMIT returned"
      },
      {
       "id": "b",
-      "label": "Consistency"
+      "label": "Atomicity: every statement in the transaction applied together"
      },
      {
       "id": "c",
-      "label": "Atomicity"
+      "label": "Consistency: the constraints were checked before commit"
      },
      {
       "id": "d",
-      "label": "Isolation"
+      "label": "Isolation: other sessions could not see it before commit"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Commit returns only once the change is safely logged."
+    "explanation": "Durability is the promise that a reported commit survives a crash, and the write-ahead log keeps it: COMMIT returns only after the transaction's log records are flushed, so recovery can replay them even if the table pages never reached disk. Atomicity means all or nothing, consistency means constraints hold, and isolation limits what concurrent transactions see. All three are true here too, but none of them explains surviving the power cut."
    },
    {
     "id": "t266-a3",
@@ -2311,7 +2312,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Long transactions block other writers and tie up connections."
+    "explanation": "The row lock and the connection are held for the whole 4-second call, so other writers to that order wait and the pool loses a connection for that time. Do the external call outside the transaction. The provider never sees uncommitted data, rollback still works, and durability is unaffected."
    },
    {
     "id": "t266-a4",
@@ -2339,7 +2340,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "ROLLBACK TO SAVEPOINT undoes work after the savepoint only."
+    "explanation": "A savepoint marks a point inside a transaction; ROLLBACK TO SAVEPOINT undoes only what came after it, and the transaction carries on. It cannot be shared across connections, does not bypass the log, and nothing is committed until the outer COMMIT."
    },
    {
     "id": "t266-a5",
@@ -2710,7 +2711,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Same row, different value within one transaction."
+    "explanation": "The same row returned a different value within one transaction because another transaction committed in between: a non-repeatable read. A dirty read would see uncommitted data, a phantom is a new row appearing in a repeated range query, and a deadlock is two transactions waiting on each other."
    },
    {
     "id": "t267-a2",
@@ -2738,7 +2739,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Each statement sees a fresh snapshot of committed data."
+    "explanation": "PostgreSQL defaults to Read Committed: each statement sees a fresh snapshot of data committed before it started. Repeatable Read and Serializable must be requested explicitly, and asking for Read Uncommitted in PostgreSQL behaves like Read Committed."
    },
    {
     "id": "t267-a3",
@@ -2766,7 +2767,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Each wrote a different row based on a check the other invalidated."
+    "explanation": "Each doctor read the same on-call count, then updated a different row, so no row-level conflict was detected and the rule broke: write skew. Nothing read uncommitted data, no new rows were inserted, and the two transactions wrote different rows, so it is not a lost update on one row."
    },
    {
     "id": "t267-a4",
@@ -2794,7 +2795,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "The transaction was rolled back; re-run all of it."
+    "explanation": "A serialisation failure rolls back the whole transaction, so the app must rerun all of it, re-reading the data its decisions were based on. Retrying one statement continues a transaction that no longer exists, nothing was saved, and lowering isolation removes the protection rather than fixing the conflict."
    },
    {
     "id": "t267-a7",
@@ -3204,10 +3205,10 @@
    {
     "id": "t268-c6",
     "kind": "text",
-    "title": "Edge case: long transactions block cleanup",
-    "body": "MVCC keeps old row versions while any open transaction might still need them. One transaction left open for hours, such as an idle session in a forgotten console, stops PostgreSQL’s VACUUM from removing dead rows, so tables and indexes bloat and queries slow down. Set an idle-in-transaction timeout and alert on old open transactions.",
+    "title": "Edge case: inserting a child row locks the parent",
+    "body": "A foreign key check locks the parent row it reads. In PostgreSQL, inserting an order takes a key-share lock on its customer row until the transaction ends; that blocks deleting the customer or changing its key, but not ordinary updates. InnoDB takes a shared lock on the parent record for the check. So two transactions that each insert an order and then update the same customer row, say to bump an order count, each hold a shared lock the other's update needs: a deadlock. Keep such transactions short, update the parent before inserting children, or drop the stored count.",
     "teaches": [
-     "mvcc"
+     "row-locks"
     ]
    }
   ],
@@ -3238,7 +3239,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Readers and writers do not block each other under MVCC."
+    "explanation": "Under MVCC each update writes a new row version, and the report keeps reading the versions its snapshot saw, so readers and writers do not block each other. It never sees half-updated rows, and neither side waits for the other."
    },
    {
     "id": "t268-a2",
@@ -3266,7 +3267,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Consistent ordering makes a waiting cycle impossible."
+    "explanation": "A deadlock needs a cycle of waits. If every transfer locks the lower account id first, two transfers on A and B queue for the same first lock instead of each holding one. Longer timeouts only delay detection, locking after updating is impossible, and Read Uncommitted does not change row locking."
    },
    {
     "id": "t268-a3",
@@ -3276,25 +3277,25 @@
     "choices": [
      {
       "id": "a",
-      "label": "Locks the whole table for writes"
+      "label": "Locks the whole table against writes until commit"
      },
      {
       "id": "b",
-      "label": "Locks the selected rows until the transaction ends"
+      "label": "Locks those rows until commit or rollback"
      },
      {
       "id": "c",
-      "label": "Updates the rows immediately"
+      "label": "Locks the rows only while the SELECT itself runs"
      },
      {
       "id": "d",
-      "label": "Creates a snapshot for later reads"
+      "label": "Stops other sessions from reading those rows at all"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Other writers and FOR UPDATE readers of those rows wait."
+    "explanation": "FOR UPDATE takes row locks on exactly the rows returned and keeps them until COMMIT or ROLLBACK, so another transaction that wants to update, delete or lock them FOR UPDATE waits. Other rows of the table stay writable. Releasing the locks when the SELECT finishes would defeat the purpose, since the check-then-write pattern needs them held until the write. Under MVCC, plain SELECTs by other sessions are not blocked; they read the last committed version."
    },
    {
     "id": "t268-a4",
@@ -3322,7 +3323,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Its snapshot keeps dead versions alive for everyone."
+    "explanation": "An open transaction's snapshot may still need old row versions, so cleanup cannot remove anything newer than it, across the whole database, and tables and indexes bloat. The log is not deleted, other writes continue, and indexes are not rebuilt. Set an idle-in-transaction timeout."
    },
    {
     "id": "t268-a5",
@@ -3657,8 +3658,8 @@
    {
     "id": "t269-c6",
     "kind": "text",
-    "title": "Edge case: the disk says written but is not",
-    "body": "Durability depends on fsync reaching stable storage. Some consumer drives and misconfigured RAID controllers acknowledge a flush while data is still in a volatile cache, so a power cut loses commits the database reported as durable. Use drives with power-loss protection or a battery-backed cache, and test with a tool that pulls power, not just a clean shutdown.",
+    "title": "Edge case: log files that can never be removed",
+    "body": "Old log segments are recycled after a checkpoint, but only once nothing still needs them. Two things can keep them indefinitely: a replication slot whose consumer has gone away, such as a decommissioned replica or a switched-off change-data-capture tool, and log archiving that keeps failing. The log directory then grows until the disk fills, and a database that cannot write its log stops accepting writes. Alert on slot lag and archive failures, drop slots nobody uses, and in PostgreSQL 13 and later cap what a slot may hold with max_slot_wal_keep_size.",
     "teaches": [
      "write-ahead"
     ]
@@ -3691,11 +3692,11 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Pages can be rebuilt from the log; the log must be flushed."
+    "explanation": "At commit only the WAL records must be flushed; changed table and index pages can stay in memory because recovery can rebuild them from the log. Flushing every page would make commits slow, and backups are a separate process entirely."
    },
    {
     "id": "t269-a2",
-    "concept": "crash-recovery",
+    "concept": "write-ahead",
     "type": "multiple_choice",
     "prompt": "Why does a database write to a sequential log instead of updating pages at commit?",
     "choices": [
@@ -3705,21 +3706,21 @@
      },
      {
       "id": "b",
-      "label": "Appending to one log is faster than many random page writes"
+      "label": "One sequential append beats many random writes"
      },
      {
       "id": "c",
-      "label": "Log files never need to be flushed to disk"
+      "label": "The log can be flushed lazily, unlike table pages"
      },
      {
       "id": "d",
-      "label": "The log removes the need for any indexes at all"
+      "label": "Writing the log lets the database skip index updates"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Sequential appends are cheap; pages are written in the background."
+    "explanation": "A commit may change pages scattered all over the table and its indexes. Flushing all of them would mean many random writes per commit, while appending a few log records is one sequential write, and many commits can share one flush. Pages are written later in the background, and the log rebuilds them after a crash. Pages are changed in place all the time. It is the log that must be flushed at commit; pages are the ones written lazily. Indexes are still updated; the log records those changes too."
    },
    {
     "id": "t269-a3",
@@ -3747,7 +3748,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "It risks recent commits, not consistency."
+    "explanation": "Asynchronous commit returns before the log is flushed, so a crash can lose the last fraction of a second of transactions that were reported as committed. The database stays consistent: no corruption, no uncommitted work becoming committed, and only recent commits are at risk."
    },
    {
     "id": "t269-a4",
@@ -3775,7 +3776,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Recovery replays everything since the last checkpoint."
+    "explanation": "Fewer checkpoints mean pages are flushed less often, but recovery must replay all the log written since the last checkpoint, so it takes longer. Commits stay durable because the log is still flushed at commit, and the log remains essential."
    },
    {
     "id": "t269-a5",
@@ -4113,7 +4114,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "The commit returns only once a standby has it, so a failover loses nothing."
+    "explanation": "With synchronous replication the primary waits for a standby to confirm it has the commit's log records before telling the client, so a failover to that standby loses nothing. It does not write a second log, copy tables or lock replicas; the cost is one extra network round trip per commit."
    },
    {
     "id": "t270-a2",
@@ -4141,7 +4142,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Async replicas trail the primary."
+    "explanation": "Asynchronous replicas apply changes a little after the primary, so a read right after a write can miss it: replication lag. Read your own recent writes from the primary or wait for the replica to catch up. Nothing went to the wrong table or rolled back, and replicas do not cache results for a day."
    },
    {
     "id": "t270-a3",
@@ -4169,7 +4170,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Physical replicas must run the same major version."
+    "explanation": "Logical replication sends row changes, so the target can run a newer major version; you switch over once it has caught up. Physical replication, synchronous or not, copies the binary pages, which requires the same major version, and restoring last night's backup loses a day and takes long."
    },
    {
     "id": "t270-a4",
@@ -4197,7 +4198,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Replicas faithfully copy the delete."
+    "explanation": "Replicas copy every change, including the mistaken DELETE, within moments; a synchronous standby copies it before the commit even returns. Only a backup with point-in-time recovery can bring the database back to just before the delete. Increasing lag merely delays the damage."
    },
    {
     "id": "t270-a5",
@@ -4530,7 +4531,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Single-key access is exactly what key-value stores do."
+    "explanation": "Get by id and delete by id are single-key operations, which is exactly what a key-value store is built for, usually with expiry too. Graph, document-with-indexes and wide-column models add capabilities this workload never uses."
    },
    {
     "id": "t271-a2",
@@ -4558,7 +4559,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Query-first modelling duplicates data per access pattern."
+    "explanation": "Wide-column stores answer queries from one partition and cannot join, so each access pattern gets its own table keyed for it, and the message is written to both. Scanning a chat table filtered by user reads every partition, one partition for everything grows without bound, and joins are not available."
    },
    {
     "id": "t271-a3",
@@ -4586,7 +4587,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Multi-hop relationship traversal."
+    "explanation": "Friends of friends who like a band is a multi-hop traversal over relationships, which graph databases store as direct links. Latest log lines suit time-series or wide-column stores, get-by-id suits key-value stores, and monthly totals suit relational or columnar analytics."
    },
    {
     "id": "t271-a4",
@@ -4614,7 +4615,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Relational models handle new questions without redesign."
+    "explanation": "When the questions keep changing, a relational database answers new ones with new queries and indexes on the same normalised data. Key-value and wide-column stores are modelled around known queries, so new ones mean new tables and backfills, and graph databases fit traversals, not general reporting."
    },
    {
     "id": "t271-a5",
@@ -4976,8 +4977,8 @@
    {
     "id": "t272-c6",
     "kind": "text",
-    "title": "Edge case: a quick ALTER that waits in line",
-    "body": "Even a fast schema change needs a brief exclusive lock. If a long-running query holds a conflicting lock, the ALTER waits, and every new query on that table queues behind the ALTER, so an “instant” migration takes the table offline. Set a short lock timeout on migrations (for example lock_timeout in PostgreSQL) and retry, instead of waiting indefinitely.",
+    "title": "Edge case: SET NOT NULL scans the whole table",
+    "body": "Adding NOT NULL to an existing column makes the database check every row, and in PostgreSQL it holds an exclusive lock while it scans, so a large table is unavailable for the duration. In PostgreSQL 12 and later, split it up: add CHECK (col IS NOT NULL) NOT VALID, which is instant; run VALIDATE CONSTRAINT, which scans without blocking reads or writes; then SET NOT NULL, which sees the validated check and skips the scan; finally drop the now-redundant check.",
     "teaches": [
      "migrations"
     ]
@@ -5010,7 +5011,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Expand first, so old and new code both work."
+    "explanation": "Expand first: add display_name next to fullname, so old code keeps working while new code starts using the new column. A one-statement rename breaks every running server that still reads fullname, dropping the column loses data, and stopping all servers is the downtime the plan avoids."
    },
    {
     "id": "t272-a2",
@@ -5038,7 +5039,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "It builds the index without the write-blocking lock, at the cost of time."
+    "explanation": "CREATE INDEX CONCURRENTLY builds the index while allowing writes, at the cost of a slower build and two table scans. ADD INDEX syntax with a lock, a build inside a long transaction, or VACUUM FULL all hold locks that block writes on a busy table."
    },
    {
     "id": "t272-a3",
@@ -5094,7 +5095,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "A version table records what has been applied."
+    "explanation": "A migration tool records applied versions in a table, so each migration runs exactly once and in the same order in every environment. Random order, per-environment scripts or editing applied migrations all make environments drift apart."
    },
    {
     "id": "t272-a5",
@@ -5420,7 +5421,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "One list query followed by one query per row."
+    "explanation": "One query for the list followed by one query per row is the N+1 pattern: 101 round trips where 2 would do. Pooling, deadlock retries and replication lag do not multiply queries per row like this."
    },
    {
     "id": "t273-a2",
@@ -5448,7 +5449,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Batching makes the query count constant."
+    "explanation": "Fetching all authors in one query, with WHERE id IN (…) or a join, makes the query count constant whatever the page size. A bigger pool or per-author caching still pays one round trip per author, and an index on posts.title does not touch the author lookups."
    },
    {
     "id": "t273-a3",
@@ -5476,7 +5477,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Query counts are stable and machine-independent."
+    "explanation": "The number of queries a request makes is deterministic, so a test can assert it and fail when an N+1 sneaks in. Status codes pass with any query count, laptop timings are noisy, and database CPU depends on everything else running."
    },
    {
     "id": "t273-a4",
@@ -5504,7 +5505,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Added latency is multiplied by the number of round trips."
+    "explanation": "Extra latency is paid once per round trip, so 2 ms more turns into 402 ms more for the 201-query page and only 2 to 4 ms for the batched and join pages. That is why the slowdown is not equal across pages."
    },
    {
     "id": "t273-a5",
@@ -5785,8 +5786,8 @@
    {
     "id": "t274-c6",
     "kind": "text",
-    "title": "Edge case: pools multiplied by instances",
-    "body": "Each application instance has its own pool. Twenty instances with a pool of 20 each can open 400 connections, and autoscaling to 50 instances makes it 1,000, past the database’s max_connections. Size pools from the database’s limit divided by the maximum instance count, or put a shared pooler such as PgBouncer in front.",
+    "title": "Edge case: pooled connections that died silently",
+    "body": "A connection sitting idle in a pool can be cut without either end noticing: a firewall, NAT gateway or load balancer drops flows that stay idle too long (AWS NAT gateways, for example, after 350 seconds), or the database restarts or fails over. The pool finds out only when a request borrows the dead connection and its query errors or hangs until a timeout. Set the pool's idle timeout and maximum connection lifetime below the network's idle cutoff, enable TCP keepalives, and validate connections on borrow or retry once on a connection error.",
     "teaches": [
      "pooling"
     ]
@@ -5819,7 +5820,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Pooling pays these costs once and reuses the connection."
+    "explanation": "A new PostgreSQL connection needs a TCP handshake, often TLS, authentication, and a new server process that loads its caches, which can cost several milliseconds. Pooling pays that once. The database is not copied per connection, and connections run many queries over their life."
    },
    {
     "id": "t274-a2",
@@ -5847,7 +5848,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "1,000 × 0.015 s = 15 (Little’s law)."
+    "explanation": "Little's law: busy connections = arrival rate × time each is held = 1,000 a second × 0.015 s = 15. 1,000 is the query rate, 150 multiplies by 0.15 s, and 67 divides 1,000 by 15."
    },
    {
     "id": "t274-a3",
@@ -5875,7 +5876,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "40 × 10 = 400 wanted, against 200 allowed."
+    "explanation": "40 instances × 10 connections want 400, but the server allows 200, so connection attempts beyond the limit are refused and requests fail. Instances do not share connections, the limit does not rise by itself, and pools do not shrink to fit. Size pools from the limit, or add a shared pooler."
    },
    {
     "id": "t274-a4",
@@ -5903,7 +5904,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Past the database’s capacity, concurrency adds contention, not throughput."
+    "explanation": "Once the database's CPU, disk or locks are saturated, extra concurrent queries queue for the same resources and add contention, so each takes longer. Pooled connections do run in parallel, pool size has nothing to do with query caching, and there is no 64-connection limit."
    },
    {
     "id": "t274-a5",
