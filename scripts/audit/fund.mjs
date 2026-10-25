@@ -2,7 +2,7 @@
 // valid links into the System Design track, and the same depth as the core lessons (enforced via DEEP_REGIONS).
 export const FUND_AREAS = ['f1-frontend', 'f2-backend', 'f3-networking', 'f4-databases', 'f5-os', 'f6-security', 'f7-cloud']
 // The first areas were sized 12–16; Frontend and Backend grew to fill their catalog ranges (201–220, 221–240); the three later sections 10–14
-const AREA_SIZE = { 'f1-frontend': [12, 28], 'f2-backend': [12, 28], 'f5-os': [10, 14], 'f6-security': [10, 14], 'f7-cloud': [10, 14] }
+const AREA_SIZE = { 'f1-frontend': [12, 40], 'f2-backend': [12, 28], 'f5-os': [10, 14], 'f6-security': [10, 14], 'f7-cloud': [10, 14] }
 export const FUND_SOURCE_HOSTS = [
   'developer.mozilla.org', 'web.dev', 'developer.chrome.com', 'www.rfc-editor.org', 'datatracker.ietf.org', 'www.w3.org', 'html.spec.whatwg.org',
   'fetch.spec.whatwg.org', 'dom.spec.whatwg.org', 'url.spec.whatwg.org', 'cheatsheetseries.owasp.org', 'owasp.org', 'www.postgresql.org', '12factor.net',
@@ -23,7 +23,7 @@ export function checkFundamentals(topics) {
     slugs.set(t.slug, t.id)
   }
   for (const t of topics) {
-    // System Design lessons added after the original 120 use 501-599 so they never collide with Fundamentals (200+)
+    // System Design lessons added after the original 120 live in the 500s (501-508); the region check below is what separates them from Fundamentals extras that also use the 500s (e.g. Frontend 521-530)
     if (t.id > 120 && !(t.id >= 501 && t.id <= 599) && !FUND_AREAS.includes(t.region)) errors.push(`Topic ${t.id}: IDs above 120 are reserved for the Fundamentals track (System Design extras use 501-599)`)
   }
   const counts = {}

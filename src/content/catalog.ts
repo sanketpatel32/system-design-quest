@@ -86,7 +86,7 @@ export const regions: RegionMeta[] = [
     topicIds: [115, 116, 117, 118, 119, 120],
   },
   // Fundamentals track: language-agnostic foundations, IDs 200+ so system-design progress (1–120) never moves
-  { id: 'f1-frontend', name: 'Frontend', subtitle: 'How the browser works', theme: 'sky', topicIds: [...range(201, 220), ...range(341, 346)], track: 'fundamentals' },
+  { id: 'f1-frontend', name: 'Frontend', subtitle: 'How the browser works', theme: 'sky', topicIds: [...range(201, 220), ...range(341, 346), ...range(521, 530)], track: 'fundamentals' },
   { id: 'f2-backend', name: 'Backend', subtitle: 'How servers handle work', theme: 'green', topicIds: [...range(221, 240), ...range(351, 356)], track: 'fundamentals' },
   { id: 'f3-networking', name: 'Networking', subtitle: 'How packets get there', theme: 'violet', topicIds: range(241, 260), track: 'fundamentals' },
   { id: 'f4-databases', name: 'Databases', subtitle: 'How data is stored and queried', theme: 'emerald', topicIds: range(261, 280), track: 'fundamentals' },

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { checkQuiz } from './audit/quiz-quality.mjs'
 import { checkR3 } from './audit/r3.mjs'
-import { checkFundamentals } from './audit/fund.mjs'
+import { checkFundamentals, FUND_AREAS } from './audit/fund.mjs'
 import { checkStems, STEM_DUP_THRESHOLD } from './audit/stems.mjs'
 import { checkGrading, loadGlyphCheck } from './audit/grading.mjs'
 import { checkDepth, checkBossDepth, DEEP_REGIONS } from './audit/depth.mjs'
@@ -253,5 +253,6 @@ if (errors.length) {
   errors.forEach((e) => console.error(' -', e))
   process.exit(1)
 }
-const sdExtraCount = ids.filter((i) => i >= 501 && i <= 599).length
+// Count by track, not ID range: System Design extras (501-508) and Frontend extras (521-530) share the 500s
+const sdExtraCount = topics.filter((t) => t.id > 120 && !FUND_AREAS.includes(t.region)).length
 console.log(`AUDIT OK: ${topics.length} topics (${coreCount + sdExtraCount} System Design + ${topics.length - coreCount - sdExtraCount} Fundamentals), 40 bosses, counts and keys valid`)
