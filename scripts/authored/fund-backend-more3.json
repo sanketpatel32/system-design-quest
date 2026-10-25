@@ -3464,12 +3464,872 @@
     "why": "Keyset chunks are keyset pagination applied to a job instead of a screen"
    },
    {
+    "topicId": 272,
+    "why": "A backfill is the middle step of an expand-and-contract schema change"
+   },
+   {
     "topicId": 356,
     "why": "Throttling a batch job is backpressure applied to your own work"
    },
    {
     "topicId": 227,
     "why": "Long backfills usually run as background jobs with retries and progress"
+   }
+  ]
+ },
+ {
+  "id": 539,
+  "slug": "audit-trails-in-a-service",
+  "region": "f2-backend",
+  "order": 35,
+  "title": "Audit Trails: Recording Who Did What",
+  "kind": "lesson",
+  "objectives": [
+   "Decide which actions need an audit record and what each record must hold",
+   "Write audit records atomically with the change they describe, append-only",
+   "Make tampering evident with hash chains and narrow write permissions"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 12,
+  "prereqIds": [
+   225
+  ],
+  "cards": [
+   {
+    "id": "t539-c1",
+    "kind": "text",
+    "title": "Audit logs are not debug logs",
+    "body": "Debug logs are for engineers: sampled, rotated within days, and allowed to drop lines under load. An audit trail is for security, support and compliance: a complete record of every privileged or sensitive action, kept for months or years and searchable by person and by record. Each entry says who acted (and on whose behalf), what they did to which record, when by server time, from where (IP address, request id), why if a reason was given, and whether it was allowed or denied.",
+    "teaches": [
+     "audit-scope"
+    ]
+   },
+   {
+    "id": "t539-c2",
+    "kind": "diagram",
+    "title": "Writing an audit record with the change",
+    "body": "The record and the change commit together, then move to a separate store.",
+    "teaches": [
+     "audit-atomic"
+    ],
+    "steps": [
+     "A support agent issues a ₹2,000 refund on order 81",
+     "One transaction updates the order and inserts the audit row",
+     "Audit row: actor, action refund.issue, target order 81, amount, reason, request id",
+     "A relay copies committed audit rows to a separate append-only store",
+     "Investigators search by actor, target or time range"
+    ]
+   },
+   {
+    "id": "t539-c3",
+    "kind": "text",
+    "title": "Worked example: the refund nobody can explain",
+    "body": "A refund handler commits the refund and then sends an audit event to a logging service. The process crashes between the two, and the refund has no record. In the reverse order, the audit event is sent, the refund’s transaction then fails, and the trail shows a refund that never happened. Writing the audit row in the same database transaction removes both cases. Record denied attempts too: 30 refused refund attempts from one account in a minute is exactly what an investigator wants to find.",
+    "teaches": [
+     "audit-atomic"
+    ]
+   },
+   {
+    "id": "t539-c4",
+    "kind": "text",
+    "title": "Tamper evidence: hash chains and narrow permissions",
+    "body": "An attacker or insider who can edit the trail can hide what they did. Store with each record a hash of the previous record’s hash plus its own content; changing or deleting any record breaks every hash after it, and a verifier finds the break. Copy the latest hash somewhere the same people cannot write. Give the application’s database role permission to insert and read audit rows, never to update or delete them.",
+    "teaches": [
+     "tamper-evidence"
+    ]
+   },
+   {
+    "id": "t539-c5",
+    "kind": "text",
+    "title": "Trap: secrets and personal data inside audit records",
+    "body": "A before-and-after diff of a user record can capture password hashes, tokens, card numbers or full addresses, and an audit store kept for years then becomes a prize for attackers and a problem for erasure requests. Record which fields changed, mask sensitive values, and refer to people by id so their details can be erased elsewhere while the trail stays intact.",
+    "teaches": [
+     "audit-scope"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t539-a1",
+    "concept": "audit-scope",
+    "type": "multiple_choice",
+    "prompt": "Which event most needs an audit record?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A user views their own order list"
+     },
+     {
+      "id": "b",
+      "label": "The service retries a slow database query"
+     },
+     {
+      "id": "c",
+      "label": "An admin makes a user an account owner"
+     },
+     {
+      "id": "d",
+      "label": "A worker finishes a thumbnail job"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "a: reading one’s own data is normal use; debug logs or metrics are enough. b: retries belong in operational logs and metrics. c: correct, a privilege change by an admin is exactly what security and auditors will ask about. d: routine background work is an operational event, not a privileged action."
+   },
+   {
+    "id": "t539-a2",
+    "concept": "audit-atomic",
+    "type": "multiple_choice",
+    "prompt": "Why write the audit row in the same transaction as the change it describes?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "So the audit queries run faster"
+     },
+     {
+      "id": "b",
+      "label": "So the record exists exactly when the change does"
+     },
+     {
+      "id": "c",
+      "label": "So the record gets a database timestamp"
+     },
+     {
+      "id": "d",
+      "label": "So the change can be undone from the record"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "a: where the row is written does not make searches faster. b: correct, a crash can no longer leave a change without a record or a record without a change. c: a timestamp can be set either way. d: undoing a change is a separate, deliberate action with its own record."
+   },
+   {
+    "id": "t539-a3",
+    "concept": "tamper-evidence",
+    "type": "multiple_choice",
+    "prompt": "Each audit record stores a hash of the previous record’s hash plus its own content. What does this give you?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Records can no longer be read by attackers"
+     },
+     {
+      "id": "b",
+      "label": "Old records can be deleted to save space"
+     },
+     {
+      "id": "c",
+      "label": "Editing any old record breaks every later hash"
+     },
+     {
+      "id": "d",
+      "label": "The audit store no longer needs backups"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "a: hashing is not encryption; the records stay readable. b: deleting records breaks the chain, which is the point. c: correct, a verifier recomputing the chain finds where it was altered. d: a chain shows tampering but cannot bring back lost data."
+   },
+   {
+    "id": "t539-a4",
+    "concept": "audit-scope",
+    "type": "multiple_choice",
+    "prompt": "A support agent signs in as a customer to debug an issue and changes the customer’s address. Who should the record show as the actor?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The customer, as it was their session"
+     },
+     {
+      "id": "b",
+      "label": "The agent, acting on behalf of the customer"
+     },
+     {
+      "id": "c",
+      "label": "The support tool’s service account"
+     },
+     {
+      "id": "d",
+      "label": "Nobody, as it was only debugging"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "a: the customer did not make the change, and a dispute would blame the wrong person. b: correct, record the real actor and the account they acted for. c: a shared service account hides which person acted. d: changes made while debugging are still changes to a customer’s data."
+   },
+   {
+    "id": "t539-a5",
+    "concept": "tamper-evidence",
+    "type": "multiple_choice",
+    "prompt": "Which database permissions fit the application’s role on the audit table?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "All privileges, for flexibility"
+     },
+     {
+      "id": "b",
+      "label": "UPDATE and DELETE, for corrections"
+     },
+     {
+      "id": "c",
+      "label": "Owner of the table, to manage it"
+     },
+     {
+      "id": "d",
+      "label": "INSERT and SELECT only"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "a: full privileges let a compromised application rewrite history. b: corrections are new records, not edits. c: an owner can alter or drop the table. d: correct, the application can add and read records but cannot change or remove them."
+   },
+   {
+    "id": "t539-a6",
+    "concept": "audit-atomic",
+    "type": "drag_order",
+    "prompt": "Order the handling of a refund that must be audited.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "Update the order and insert the audit row"
+     },
+     {
+      "id": "s5",
+      "label": "Relay the audit row to the append-only store"
+     },
+     {
+      "id": "s1",
+      "label": "Check the agent may refund this amount"
+     },
+     {
+      "id": "s4",
+      "label": "Commit"
+     },
+     {
+      "id": "s2",
+      "label": "Begin a transaction"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Authorise first, so a denied attempt is recorded as denied; commit the change and its record together; copy to the separate store only after commit."
+   },
+   {
+    "id": "t539-a7",
+    "concept": "audit-scope",
+    "type": "estimation",
+    "prompt": "A service records 2M audit events a day at about 1 KB each and keeps them for 7 years. Roughly how many terabytes is that?",
+    "unit": "TB",
+    "target": 5.1,
+    "assumptions": [
+     "No compression",
+     "Replicas not counted"
+    ],
+    "formula": "2M × 1 KB × 365 × 7",
+    "workedAnswer": "2 GB a day × 2,555 days ≈ 5,110 GB ≈ 5.1 TB",
+    "explanation": "Sanity check: about 5 TB before replicas belongs in cheap append-only storage indexed by actor, target and time, not in the main database’s hot tables.",
+    "tolerance": 0.1,
+    "trapAnswers": [
+     0.7,
+     51
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t539-f1",
+    "front": "Fields of an audit record?",
+    "back": "Who (and on whose behalf), what, which target, when, from where, why, and the outcome."
+   },
+   {
+    "id": "t539-f2",
+    "front": "Why write it in the same transaction?",
+    "back": "So the record exists exactly when the change commits."
+   },
+   {
+    "id": "t539-f3",
+    "front": "Hash chain?",
+    "back": "Each record hashes the previous hash plus its content, so edits break every later hash."
+   }
+  ],
+  "sources": [
+   {
+    "title": "OWASP: Logging cheat sheet",
+    "url": "https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html"
+   },
+   {
+    "title": "NIST SP 800-92: Guide to Computer Security Log Management",
+    "url": "https://csrc.nist.gov/pubs/sp/800/92/final"
+   },
+   {
+    "title": "PostgreSQL: GRANT",
+    "url": "https://www.postgresql.org/docs/current/sql-grant.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "audit-scope",
+    "audit-atomic",
+    "tamper-evidence"
+   ],
+   "mechanism": {
+    "title": "How a service keeps a trustworthy audit trail",
+    "steps": [
+     "Start with a list of auditable actions, agreed with security, support and whoever handles compliance: sign-ins and failed sign-ins, permission and role changes, exports of personal data, refunds and other money movements, configuration changes, and any action taken by staff on a customer’s account. Each gets a stable action name, such as role.grant or refund.issue, so records can be searched and counted.",
+     "Each record has a fixed shape. The actor is a person or service id, plus the account they acted on behalf of when staff impersonate a customer. The action and target type and id say what happened to what. Server time, request id and source address place it. A reason or ticket number explains it when one is required, and the outcome says whether it was allowed or denied, with the rule that denied it.",
+     "The record is written in the same database transaction as the change, usually into an audit table, so the two commit or roll back together. Denied attempts are written in their own small transaction, because the main change never happens. A relay, the same outbox pattern used for events, then copies committed rows to a separate append-only store that the application cannot modify.",
+     "Tampering is made evident rather than assumed impossible. Each record includes the hash of the previous record’s hash plus its own content, and a scheduled job recomputes the chain and alerts on a break. The latest hash is copied periodically to a place with different administrators. Database permissions let the application insert and read audit rows only; retention and deletion are handled by a separate, itself audited, process.",
+     "Records are useful only if people can search them. Index by actor, target and time; give support and security a search screen with its own access controls; and report regularly on unusual patterns, such as staff exporting many customers’ data or a spike in denied attempts. Keep personal details out of the records themselves, referencing people by id, so the trail can outlive erasure of the underlying data."
+    ]
+   },
+   "useWhen": [
+    "Admin panels, support tools, money movements and access to personal data.",
+    "Any system where someone may later ask who changed what, and when."
+   ],
+   "avoidWhen": [
+    "Avoid treating debug logs as the audit trail; they are sampled, rotated and editable.",
+    "Avoid storing secrets or full personal data in audit records."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Approach",
+     "Atomic with change",
+     "Tamper evidence",
+     "Main cost"
+    ],
+    "rows": [
+     [
+      "Lines in application logs",
+      "No",
+      "None",
+      "Gaps and short retention"
+     ],
+     [
+      "Separate audit call after commit",
+      "No, a crash loses records",
+      "Depends on the store",
+      "Network call per action"
+     ],
+     [
+      "Audit row in the transaction, relayed to an append-only store",
+      "Yes",
+      "Hash chain and narrow permissions",
+      "Extra table and relay"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Verifying a hash chain",
+    "assumptions": [
+     "2M audit records a day",
+     "About 2 µs to hash a 1 KB record (an estimate)",
+     "One verifier process"
+    ],
+    "steps": [
+     "One day: 2M × 2 µs = 4 s to recompute the chain.",
+     "One year: about 730M records × 2 µs ≈ 1,460 s, about 25 minutes.",
+     "Daily verification of the new records is cheap; a full re-verification fits in a maintenance job.",
+     "Each daily checkpoint hash stored elsewhere lets a verifier start from that point instead of the beginning."
+    ],
+    "result": "Tamper evidence costs seconds a day to check. The expensive part is storing years of records, which is why they move to cheap append-only storage."
+   },
+   "india": {
+    "title": "A support panel at a lending company",
+    "label": "Illustrative example",
+    "body": "Illustrative: support staff at a lending app can waive late fees and update a borrower’s bank details. Each action writes an audit row in the same transaction, naming the agent, the borrower’s account, the fee or field changed and the ticket number. When a borrower disputes a change months later, or an internal review asks why one agent waived fees on many accounts in a week, the team searches the trail by agent and date and shows each step, without the trail ever holding the full bank account number."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We log everything, so we have an audit trail.”",
+     "say": "“Debug logs are sampled and rotated; I’d write audit rows with the change and keep them append-only.”"
+    },
+    {
+     "trap": "“Nobody can edit the audit table.”",
+     "say": "“I’d make edits evident with a hash chain and give the application insert-only rights.”"
+    }
+   ],
+   "takeaways": [
+    "Audit privileged and sensitive actions with a fixed record shape.",
+    "Write the record in the same transaction as the change.",
+    "Make tampering evident with hash chains and insert-only permissions.",
+    "Keep secrets and personal details out of the records."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Auditing after the commit",
+   "prompt": "A refund handler commits the refund, then calls a separate audit service over the network. The audit service is down for 5 minutes and the calls fail silently. What does the trail show for those minutes?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "No record of the refunds made in those minutes",
+     "feedback": "Right: the refunds committed, and the only copy of the audit event was a failed network call."
+    },
+    {
+     "id": "b",
+     "label": "The refunds, written late once the service returns",
+     "feedback": "Only if the events were stored durably and retried; failed calls are simply gone."
+    },
+    {
+     "id": "c",
+     "label": "Nothing, because the refunds were rolled back",
+     "feedback": "The refunds had already committed before the audit call was made."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Write the audit row in the same transaction as the refund and relay it afterwards. Then an outage of the audit store delays the copy but never loses a record."
+  },
+  "seeAlso": [
+   {
+    "topicId": 229,
+    "why": "Debug logs and metrics serve engineers; audit trails serve investigators"
+   },
+   {
+    "topicId": 225,
+    "why": "Authorisation decisions, including denials, are what an audit trail records"
+   },
+   {
+    "topicId": 238,
+    "why": "Relaying audit rows after commit is the outbox pattern again"
+   }
+  ]
+ },
+ {
+  "id": 540,
+  "slug": "holding-many-live-connections",
+  "region": "f2-backend",
+  "order": 36,
+  "title": "Holding Many Live Connections on the Server",
+  "kind": "lesson",
+  "objectives": [
+   "Estimate the memory and file descriptors that many long-lived connections need",
+   "Deliver a message to a user connected to another server through pub/sub",
+   "Survive deploys and outages without a reconnect storm or lost messages"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 13,
+  "prereqIds": [
+   356
+  ],
+  "cards": [
+   {
+    "id": "t540-c1",
+    "kind": "text",
+    "title": "A connection is a resource you hold",
+    "body": "Each open WebSocket or server-sent events stream holds a file descriptor, kernel socket buffers and some application state for as long as the user stays connected. At an estimated 20 KB per connection, 100,000 connections need about 2 GB on one server. Raise the per-process file-descriptor limit (a soft limit of 1,024 is a common default), and use event-driven I/O so one thread serves many sockets instead of a thread per connection.",
+    "teaches": [
+     "connection-cost"
+    ]
+   },
+   {
+    "id": "t540-c2",
+    "kind": "diagram",
+    "title": "Reaching a user on another server",
+    "body": "Gateways hold the sockets; a pub/sub layer connects them.",
+    "teaches": [
+     "cross-node-fanout"
+    ],
+    "steps": [
+     "User A is connected to gateway 3, user B to gateway 7",
+     "A’s message reaches the chat service through gateway 3",
+     "The service publishes it to B’s channel in a pub/sub system",
+     "Gateway 7, subscribed to B’s channel, writes it down B’s connection",
+     "If B is offline, it waits in storage until B reconnects and asks for it"
+    ]
+   },
+   {
+    "id": "t540-c3",
+    "kind": "text",
+    "title": "Worked example: a reconnect storm",
+    "body": "A gateway holding 200,000 connections restarts. If every client reconnects within about a second, the fleet faces 200,000 TLS handshakes and authentications at once. Against an estimated capacity of 10,000 a second, that is a 20 s backlog; clients time out and retry, adding still more. If clients instead wait a random delay spread over 60 s before reconnecting, the load is about 3,300 a second, well within capacity.",
+    "teaches": [
+     "reconnect-storm"
+    ]
+   },
+   {
+    "id": "t540-c4",
+    "kind": "text",
+    "title": "Heartbeats and graceful drains",
+    "body": "Load balancers and home routers silently drop connections that look idle, and the server gets no close event. Send a ping every 30 s or so and close the connection if two in a row go unanswered. For deploys, drain instead of killing: take the gateway out of the load balancer, send connected clients a reconnect message that tells each to wait a random delay, give them a few minutes to move, then close what remains and stop.",
+    "teaches": [
+     "heartbeats",
+     "draining"
+    ]
+   },
+   {
+    "id": "t540-c5",
+    "kind": "text",
+    "title": "Trap: treating the socket as the delivery guarantee",
+    "body": "A message written to a socket can still be lost if the connection dies before the client reads it. Give each message a per-conversation sequence number and store it before sending. The client remembers the last number it processed and, on reconnecting, asks for everything after it; the server replays from storage. Live delivery is the fast path, and the replay on reconnect is what makes delivery reliable.",
+    "teaches": [
+     "resume"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t540-a1",
+    "concept": "connection-cost",
+    "type": "multiple_choice",
+    "prompt": "A gateway holds 250,000 connections at about 16 KB each. Roughly how much memory do the connections use?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "About 400 MB"
+     },
+     {
+      "id": "b",
+      "label": "About 4 GB"
+     },
+     {
+      "id": "c",
+      "label": "About 16 GB"
+     },
+     {
+      "id": "d",
+      "label": "About 40 GB"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "a: that is ten times too small. b: correct, 250,000 × 16 KB = 4,000,000 KB, about 4 GB. c: that would be 64 KB each. d: ten times too large."
+   },
+   {
+    "id": "t540-a2",
+    "concept": "cross-node-fanout",
+    "type": "multiple_choice",
+    "prompt": "User B is connected to a different server from user A. How does A’s message reach B?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A’s server opens a socket to B’s device"
+     },
+     {
+      "id": "b",
+      "label": "B’s client polls A’s server every second"
+     },
+     {
+      "id": "c",
+      "label": "B’s server receives it through pub/sub"
+     },
+     {
+      "id": "d",
+      "label": "The load balancer copies it to every server"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "a: devices accept no inbound connections; they connect out to gateways. b: B does not know which server A uses, and polling every second defeats the open connection. c: correct, B’s gateway subscribes to B’s channel and pushes what is published there. d: load balancers route requests; they do not broadcast messages to servers."
+   },
+   {
+    "id": "t540-a3",
+    "concept": "reconnect-storm",
+    "type": "multiple_choice",
+    "prompt": "After a gateway restart, every dropped client reconnects at once and the replacement gateway falls over. What prevents this?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Longer heartbeat intervals on the server"
+     },
+     {
+      "id": "b",
+      "label": "Reconnecting at once to another gateway"
+     },
+     {
+      "id": "c",
+      "label": "A higher file-descriptor limit"
+     },
+     {
+      "id": "d",
+      "label": "A random, growing delay before reconnects"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "a: heartbeats detect dead connections; they do not spread out reconnects. b: moving the whole crowd to another gateway moves the overload with it. c: the bottleneck is handshakes per second, not open descriptors. d: correct, jittered backoff spreads the reconnects over time so the fleet absorbs them."
+   },
+   {
+    "id": "t540-a4",
+    "concept": "heartbeats",
+    "type": "multiple_choice",
+    "prompt": "Idle connections die after a few minutes with no close event on the server. What is the usual fix?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Raise the server’s read timeout to an hour"
+     },
+     {
+      "id": "b",
+      "label": "Have every client reconnect each minute"
+     },
+     {
+      "id": "c",
+      "label": "Ping every 30 s; close if pongs stop"
+     },
+     {
+      "id": "d",
+      "label": "Switch from server-sent events to polling"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "a: the middlebox drops the idle connection regardless of the server’s timeout. b: constant reconnects add handshake load for no reason. c: correct, regular pings keep the path active and reveal dead connections so the server can free them. d: polling avoids idle sockets but gives up the push model and adds request load."
+   },
+   {
+    "id": "t540-a5",
+    "concept": "resume",
+    "type": "multiple_choice",
+    "prompt": "A phone loses signal for 20 s during a chat. How does it get the messages it missed?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "It reconnects and asks for all after its last id"
+     },
+     {
+      "id": "b",
+      "label": "The server resends everything since login"
+     },
+     {
+      "id": "c",
+      "label": "The socket holds them until signal returns"
+     },
+     {
+      "id": "d",
+      "label": "It does not; chats show only live messages"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "a: correct, sequence numbers let the client ask for exactly the gap, which the server replays from storage. b: resending everything wastes bandwidth and duplicates what was already shown. c: the old connection is dead; its buffers are gone. d: users expect to see what was sent while they were away."
+   },
+   {
+    "id": "t540-a6",
+    "concept": "draining",
+    "type": "drag_order",
+    "prompt": "Order a graceful deploy of one connection gateway.",
+    "items": [
+     {
+      "id": "s4",
+      "label": "Close the connections that remain"
+     },
+     {
+      "id": "s2",
+      "label": "Send connected clients a reconnect hint with a random delay"
+     },
+     {
+      "id": "s5",
+      "label": "Stop the process and start the new version"
+     },
+     {
+      "id": "s1",
+      "label": "Stop sending it new connections at the load balancer"
+     },
+     {
+      "id": "s3",
+      "label": "Wait a few minutes while clients move"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Draining moves clients over minutes, at a pace the other gateways can absorb, instead of dropping them all at once."
+   },
+   {
+    "id": "t540-a7",
+    "concept": "reconnect-storm",
+    "type": "estimation",
+    "prompt": "200,000 dropped clients reconnect with jitter, spread evenly over 50 s. About how many handshakes per second must the fleet absorb?",
+    "unit": "handshakes/s",
+    "target": 4000,
+    "assumptions": [
+     "Reconnects are spread evenly",
+     "Each client reconnects once"
+    ],
+    "formula": "200,000 ÷ 50 s",
+    "workedAnswer": "200,000 ÷ 50 = 4,000 handshakes/s",
+    "explanation": "Sanity check: with no jitter all 200,000 arrive within about a second, fifty times this rate.",
+    "tolerance": 0.1,
+    "trapAnswers": [
+     200000,
+     40000
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t540-f1",
+    "front": "Cost of a live connection?",
+    "back": "A file descriptor, socket buffers and app state, held for as long as it is open."
+   },
+   {
+    "id": "t540-f2",
+    "front": "Reaching a user on another gateway?",
+    "back": "Publish to the user’s channel; the gateway holding their socket subscribes and pushes."
+   },
+   {
+    "id": "t540-f3",
+    "front": "Avoiding a reconnect storm?",
+    "back": "Jittered, growing reconnect delays, and draining gateways gradually on deploy."
+   }
+  ],
+  "sources": [
+   {
+    "title": "RFC 6455: The WebSocket Protocol",
+    "url": "https://www.rfc-editor.org/rfc/rfc6455"
+   },
+   {
+    "title": "MDN: Using server-sent events",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events"
+   },
+   {
+    "title": "man7.org: epoll(7)",
+    "url": "https://man7.org/linux/man-pages/man7/epoll.7.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "connection-cost",
+    "cross-node-fanout",
+    "reconnect-storm",
+    "heartbeats",
+    "draining",
+    "resume"
+   ],
+   "mechanism": {
+    "title": "How a gateway fleet holds connections and delivers messages",
+    "steps": [
+     "Clients open a long-lived connection to a gateway: a WebSocket for two-way traffic or a server-sent events stream for server-to-client updates. The gateway authenticates the connection once, records which user it belongs to, and keeps it open. Gateways do little else, so they can be scaled and restarted separately from the services that hold the business logic.",
+     "Each gateway serves many sockets from a few threads with event-driven I/O, such as epoll on Linux, which tells the process which sockets are ready instead of parking a thread on each. Its capacity is set by memory per connection, the file-descriptor limit, CPU for heartbeats and messages, and above all how many new handshakes it can complete per second.",
+     "When a service wants to reach a user, it does not need to know which gateway holds them. It publishes to the user’s channel in a pub/sub system, and the gateway holding that user subscribes to the channel while the connection is open. Messages are also written to storage with a sequence number before publishing, so a client that was away can catch up.",
+     "Connections fail all the time: phones change networks, routers drop idle flows, gateways restart. Heartbeats find dead connections so their resources are freed. Clients reconnect with exponential backoff and random jitter, and on reconnecting they send the last sequence number they processed, so the server replays only the gap. Delivery is at least once, so clients ignore duplicates by sequence number.",
+     "Deploys and incidents are where fleets break. A gateway being replaced is drained: removed from the load balancer, its clients told to reconnect after a random delay, then closed after a few minutes. Capacity is planned for the reconnect rate after losing a whole gateway, not only for the steady number of connections, and admission control sheds handshakes beyond what the fleet can complete."
+    ]
+   },
+   "useWhen": [
+    "Chat, live scores, notifications, collaborative editing and dashboards that push updates.",
+    "Any feature where users stay connected for minutes or hours."
+   ],
+   "avoidWhen": [
+    "Avoid a thread per connection; memory and scheduling fall over long before sockets do.",
+    "Avoid relying on the open socket alone for delivery; store and replay by sequence number."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Concern",
+     "Usual limit",
+     "Mitigation"
+    ],
+    "rows": [
+     [
+      "Memory per connection",
+      "RAM per gateway",
+      "Lean per-connection state, more gateways"
+     ],
+     [
+      "New handshakes per second",
+      "TLS and auth CPU",
+      "Jittered reconnects, gradual drains"
+     ],
+     [
+      "Cross-gateway delivery",
+      "Pub/sub throughput",
+      "Channels per user or room, sharded pub/sub"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Sizing a gateway",
+    "assumptions": [
+     "A 32 GB gateway, keeping half its RAM free for headroom",
+     "About 16 KB per connection (an estimate)",
+     "About 5,000 new handshakes per second per gateway (an estimate)"
+    ],
+    "steps": [
+     "Memory: 16 GB ÷ 16 KB ≈ 1,000,000 connections.",
+     "If that gateway dies, its clients must reconnect elsewhere. Spread over 60 s, that is about 16,700 handshakes per second.",
+     "At about 5,000 handshakes per second per gateway, absorbing it takes about 3.3 gateways’ worth of spare handshake capacity.",
+     "So a fleet often holds far fewer connections per gateway than memory allows, such as 200,000, to keep failures absorbable."
+    ],
+    "result": "Memory says how many connections a gateway can hold; the reconnect rate after a failure says how many it should hold."
+   },
+   "india": {
+    "title": "Live scores during a big match",
+    "label": "Illustrative example",
+    "body": "Illustrative: a sports app pushes ball-by-ball updates to millions of fans during a cricket final. Each fan’s app holds a connection to a gateway subscribed to the match channel. When a wicket falls, many more users open the app at once, so the team pre-scales gateways before the match, uses jittered reconnects, and drains gateways slowly if one must be replaced mid-match. Updates carry sequence numbers, so an app that dropped off in a tunnel fetches exactly the balls it missed."
+   },
+   "pitfalls": [
+    {
+     "trap": "“WebSockets scale to millions; we will just open them.”",
+     "say": "“Each one costs memory and a descriptor, and a failed gateway causes a reconnect storm, so I’d size for that.”"
+    },
+    {
+     "trap": "“If we wrote it to the socket, the user got it.”",
+     "say": "“The connection can die first, so I’d store messages with sequence numbers and replay the gap on reconnect.”"
+    }
+   ],
+   "takeaways": [
+    "Each live connection holds memory and a file descriptor.",
+    "Pub/sub lets any service reach a user on any gateway.",
+    "Jittered reconnects and gradual drains prevent reconnect storms.",
+    "Sequence numbers and replay on reconnect make delivery reliable."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Ten gateways, no pub/sub",
+   "prompt": "A chat service runs 10 gateways and users are assigned to them at random. Each gateway delivers a message only if the recipient is connected to that same gateway. What do users see?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Only about 1 message in 10 arrives live",
+     "feedback": "Right: sender and recipient share a gateway only about a tenth of the time."
+    },
+    {
+     "id": "b",
+     "label": "Every message arrives, a little more slowly",
+     "feedback": "Nothing carries messages between gateways, so most never reach the recipient’s socket."
+    },
+    {
+     "id": "c",
+     "label": "Every message arrives twice",
+     "feedback": "Duplicates come from retries, not from missing cross-gateway delivery."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Connections are spread over many servers, so delivery needs a layer that finds the right one: pub/sub channels per user or room, or a lookup of which gateway holds each user. Store messages too, so the ones that miss live delivery are fetched on reconnect."
+  },
+  "seeAlso": [
+   {
+    "topicId": 10,
+    "why": "Polling, server-sent events and WebSockets compared at system scale"
+   },
+   {
+    "topicId": 218,
+    "why": "The client side of the same connection: reconnecting and resuming in the browser"
+   },
+   {
+    "topicId": 356,
+    "why": "Admission control and load shedding protect gateways during reconnect storms"
    }
   ]
  }

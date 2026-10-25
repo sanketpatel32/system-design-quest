@@ -1067,3 +1067,19 @@ Batch job [id > last, LIMIT 2000]> Primary database {store}
 Batch job [write chunk + checkpoint]> Primary database
 Primary database ~> Replica {store}
 Replica [lag over 1 s, pause]?> Batch job
+
+@539 An audited change: the service writes the order update and the audit row in one transaction, a relay copies committed audit rows to an append-only store, and investigators search that store.
+Support agent {client} [refund order 81]> Refund service {svc}
+Refund service [one transaction]> Orders + audit table {store}
+Orders + audit table ~> Audit relay {svc}
+Audit relay [hash-chained rows]> Append-only audit store {store}
+Investigator {client} [search by actor, target, time]> Append-only audit store
+
+@540 A connection gateway fleet: clients hold long-lived connections to gateways, gateways subscribe to user channels in pub/sub, and services publish messages after storing them with sequence numbers.
+Phone {client} [WebSocket]> Gateway A {svc}
+Laptop {client} [SSE stream]> Gateway B {svc}
+Chat service {svc} [store with seq]> Message store {store}
+Chat service [publish user channel]> Pub/sub {queue}
+Pub/sub ~> Gateway A
+Pub/sub ~> Gateway B
+Gateway A [reconnect: replay after seq 41]?> Message store
