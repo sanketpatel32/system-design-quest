@@ -766,6 +766,33 @@ Orchestrator [remove from endpoints]> Load balancer
 Orchestrator [SIGTERM]> Server|drain in-flight requests > Close pools + flush > Exit 0
 Orchestrator [after grace period: SIGKILL]~> Server|drain in-flight requests
 
+@643 Priority inversion and its fix: High blocks on a lock held by Low, Medium preempts Low so High waits on Medium; with priority inheritance Low runs at High's priority and releases the lock quickly.
+High|priority 90 [blocks on]~> Lock [held by]> Low|priority 10
+Medium|priority 50 [preempts unless Low inherits 90]~> Low|priority 10
+
+@644 A thread pool: tasks go to an idle worker or wait in a bounded queue; when the queue is full the overflow policy rejects them or runs them on the caller; workers call a downstream service.
+Submitters {client} [submit]> Bounded queue|capacity 400 {queue}
+Bounded queue|capacity 400 {queue} > Workers|cores x (1 + wait / compute)
+Bounded queue|capacity 400 {queue} [full: reject or caller-runs]~> Submitters {client}
+Workers|cores x (1 + wait / compute) [calls]> Downstream service {svc}
+
+@645 Memory reclaim: below the low watermark the kernel scans inactive pages, drops clean file pages, writes dirty ones back and anonymous ones to swap; pages needed again fault back in.
+Low free memory [wake reclaim]> Inactive list|accessed bit clear
+Inactive list|accessed bit clear [clean file page: drop]> Free pages {store}
+Inactive list|accessed bit clear [anonymous page]> Swap {store}
+Swap {store} [needed again: major fault]~> Process memory
+
+@647 The two-pipe deadlock: the parent writes all input before reading, the child's output pipe fills at 64 KiB so it stops reading input, and the input pipe then fills too.
+Parent {client} [writes input]> Input pipe|full {queue}
+Input pipe|full {queue} > Child process
+Child process [writes results]> Output pipe|full at 64 KiB {queue}
+Output pipe|full at 64 KiB {queue} [not read yet]~> Parent {client}
+
+@649 What a container is: ordinary host processes placed in new namespaces for PIDs, network, mounts and users, limited by a control group, and still calling the host kernel.
+Container process|PID 1 inside {client} > Namespaces|pid, net, mount, user
+Container process|PID 1 inside {client} [limited by]> Control group|CPU + memory
+Container process|PID 1 inside {client} [system calls]> Host kernel {svc}
+
 # ---------- Fundamentals · Security ----------
 @301 A data-flow diagram for threat modelling: the user's browser crosses the internet trust boundary to the API, which reads a database and calls a payment provider; a nightly job copies data to an analytics bucket.
 Browser {client} [trust boundary: internet]> API {svc} > Database {store}
