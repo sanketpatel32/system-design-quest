@@ -1539,7 +1539,7 @@
     "id": "t554-c6",
     "kind": "text",
     "title": "Edge case: a row with nowhere to go",
-    "body": "If an insert arrives with a timestamp beyond the last partition, PostgreSQL rejects it because no partition matches. A default partition catches such rows, but has its own cost: creating a partition for a range later requires checking that the default holds no rows for that range, and moving any it does. Create partitions ahead of time with a scheduled job, alert when anything lands in the default partition, and treat a full default partition as a bug.",
+    "body": "If an insert arrives with a timestamp beyond the last partition, PostgreSQL rejects it because no partition matches. A default partition catches such rows, but has its own cost: creating a partition for a range later scans the default to check that it holds no rows for that range, and fails if it does, so those rows must be moved out first. Create partitions ahead of time with a scheduled job, alert when anything lands in the default partition, and treat a full default partition as a bug.",
     "teaches": [
      "partition-limits"
     ]
@@ -1926,12 +1926,12 @@
   "slug": "soft-deletes-and-history",
   "region": "f4-databases",
   "order": 19,
-  "title": "Soft Deletes, Audit Trails and History Tables",
+  "title": "Soft Deletes, Archive Tables and History Tables",
   "kind": "lesson",
   "objectives": [
    "Weigh soft deletes against hard deletes, including their effect on constraints and queries",
-   "Record changes in an audit trail that cannot drift from the data",
-   "Query a value as it was at a past moment, and plan for erasure requests"
+   "Decide whether deleted rows stay in place or move to an archive table",
+   "Keep row versions in a history table and query a value as it was at a past moment"
   ],
   "difficulty": 2,
   "durationMinutes": 12,
@@ -1943,7 +1943,7 @@
     "id": "t555-c1",
     "kind": "text",
     "title": "Deleted, or just hidden?",
-    "body": "A hard delete removes the row. A soft delete sets a column such as deleted_at and every query filters those rows out. Soft deletes make undo a one-row update, keep old orders pointing at a real customer row, and leave evidence for support. They also cost something: every query must remember the filter, unique constraints still see the hidden rows, tables keep growing, and the data is still there when someone has a right to have it removed.",
+    "body": "A hard delete removes the row. A soft delete sets a column such as deleted_at and every query filters those rows out. Soft deletes make undo a one-row update, keep old orders pointing at a real customer row, and leave evidence for support. They also cost something: every query must remember the filter, unique constraints still see the hidden rows, and the table keeps growing with rows that ordinary queries never return.",
     "teaches": [
      "soft-delete"
     ]
@@ -1961,23 +1961,23 @@
      "Ann closes her account: deleted_at is set and the row stays",
      "A month later she signs up again with the same email, and the unique constraint rejects it",
      "Fix: replace the constraint with a unique index on email WHERE deleted_at IS NULL, so only live rows compete",
-     "Her old orders still reference the hidden row, which is the point of soft deletion"
+     "Do not reach for UNIQUE (email, deleted_at): live rows all have a NULL deleted_at, and NULLs never count as equal, so two live accounts could share an email"
     ]
    },
    {
     "id": "t555-c3",
     "kind": "text",
-    "title": "An audit trail that cannot drift",
-    "body": "An audit trail records each change: which row, who made it, when, and the old and new values. Write the audit row in the same transaction as the change, either from the application or from a trigger. Then an audit row exists exactly when the change commits: a rolled-back change leaves no audit row, and no committed change is missing one. Writing audit events afterwards to a separate system can lose them on a crash; if they must leave the database, use an outbox or change data capture, which also start from the same transaction.",
+    "title": "Where deleted rows live",
+    "body": "A deleted_at column keeps deleted rows in place: a restore is one UPDATE, and foreign keys from old orders stay valid. But hidden rows still fill the table's pages, so a table where most rows are deleted spends most of every scan and most of its cached pages on rows nobody asked for. Partial indexes WHERE deleted_at IS NULL keep the indexes small, but not the table. The alternative is an archive table with the same columns. One statement moves the row, for example WITH gone AS (DELETE FROM projects WHERE id = 7 RETURNING *) INSERT INTO projects_archive SELECT * FROM gone, so the live table holds only live rows and queries need no filter. The price: no foreign key can point at an archived row, and a restore is the same move in reverse.",
     "teaches": [
-     "audit-trail"
+     "deleted-row-storage"
     ]
    },
    {
     "id": "t555-c4",
     "kind": "diagram",
     "title": "A history table with valid time",
-    "body": "Some questions need the value as it was, not just who changed it: the price on the invoice date, the address at the time of shipping.",
+    "body": "Some questions need the value as it was, not just whether a row exists: the price on the invoice date, the address at the time of shipping.",
     "teaches": [
      "temporal-history"
     ],
@@ -1985,7 +1985,7 @@
      "prices_history(product_id, price, valid_from, valid_to), where an open valid_to means current",
      "A price change closes the current row (valid_to = now) and inserts the new price with an open valid_to, in one transaction",
      "Price on 3 March: the row where valid_from <= '2026-03-03' and (valid_to > '2026-03-03' or valid_to IS NULL)",
-     "An exclusion constraint or an overlap check stops two rows from covering the same moment",
+     "A unique index on product_id WHERE valid_to IS NULL allows one current row; an exclusion constraint stops any two periods from overlapping",
      "An index on (product_id, valid_from) finds the right version quickly; SQL Server and MariaDB system-versioned tables do this bookkeeping for you, PostgreSQL needs triggers"
     ]
    },
@@ -2001,10 +2001,10 @@
    {
     "id": "t555-c6",
     "kind": "text",
-    "title": "Edge case: an erasure request",
-    "body": "Privacy laws such as the EU GDPR and India's Digital Personal Data Protection Act can require removing a person's data on request. Soft-deleted rows, audit trails, history tables and backups all still hold it. Design for it early: keep personal fields in a few known columns, so they can be nulled or deleted, and replace the person's identity in history rows with a random token, so the history stays useful without naming them. Give backups a retention period, so erased data ages out of them too.",
+    "title": "Edge case: two changes at the same moment",
+    "body": "Two sessions change product 5's price at once. Each closes \"the current row\" and inserts its own new price, and if nothing stops them the table ends up with two open versions, so the current price has two answers. Serialise changes per key, for example by locking product 5's row in products with SELECT … FOR UPDATE before touching its history. And let the schema refuse the bad state anyway: a unique index on product_id WHERE valid_to IS NULL allows only one current version, and in PostgreSQL an exclusion constraint such as EXCLUDE USING gist (product_id WITH =, tstzrange(valid_from, valid_to) WITH &&), which needs the btree_gist extension, rejects any two overlapping periods.",
     "teaches": [
-     "erasure"
+     "temporal-history"
     ]
    }
   ],
@@ -2041,57 +2041,57 @@
     "id": "t555-a2",
     "concept": "soft-delete",
     "type": "multiple_choice",
-    "prompt": "users has a unique email and soft deletes. A deleted user signs up again with the same email and is rejected. Which change lets them rejoin while keeping the old row?",
+    "prompt": "To let deleted users rejoin, a team replaced UNIQUE (email) with UNIQUE (email, deleted_at). A week later two live accounts share one email. Why?",
     "choices": [
      {
       "id": "a",
-      "label": "Make email unique together with deleted_at"
+      "label": "Live rows have NULL deleted_at, and NULLs never equal each other"
      },
      {
       "id": "b",
-      "label": "Drop the constraint and check for duplicates in code"
+      "label": "The constraint is only checked when deleted_at itself changes value"
      },
      {
       "id": "c",
-      "label": "A unique index on email WHERE deleted_at IS NULL"
+      "label": "Unique constraints skip rows that were inserted in the same second"
      },
      {
       "id": "d",
-      "label": "Hard-delete the old row before each sign-up"
+      "label": "The two sign-ups committed in different transactions"
      }
     ],
     "correctChoiceIds": [
-     "c"
+     "a"
     ],
-    "explanation": "The partial unique index enforces uniqueness among live rows only, so the old hidden row no longer blocks the new one. UNIQUE(email, deleted_at) looks right but breaks: live rows all have NULL deleted_at, and NULLs count as distinct, so two live accounts could share an email. A check in code races with concurrent sign-ups. Hard-deleting throws away the history the soft delete was meant to keep. In engines without partial indexes, such as MySQL, a unique index on a generated column that is NULL for deleted rows gives the same effect."
+    "explanation": "A unique constraint treats NULLs as distinct by default, so (ann@example.com, NULL) and (ann@example.com, NULL) do not conflict. Use a unique index on email WHERE deleted_at IS NULL, so only live rows compete; PostgreSQL 15 and later also offer UNIQUE NULLS NOT DISTINCT. Unique constraints are checked on every insert and on updates of any of their columns, with no time window, and they work across transactions; that is their whole purpose."
    },
    {
     "id": "t555-a3",
-    "concept": "audit-trail",
+    "concept": "temporal-history",
     "type": "multiple_choice",
-    "prompt": "A developer suggests a background job that copies each change into the audit log a few seconds after it commits. Compared with inserting the audit row inside the change's own transaction, what is lost?",
+    "prompt": "Two price changes for product 5 ran at the same moment, and prices_history now has two rows with an open valid_to. Which rule would have rejected the second one?",
     "choices": [
      {
       "id": "a",
-      "label": "Nothing, as long as the job retries on errors"
+      "label": "A unique index on product_id WHERE valid_to IS NULL"
      },
      {
       "id": "b",
-      "label": "The guarantee that every committed change has its audit row"
+      "label": "An index on (product_id, valid_from) for faster lookups"
      },
      {
       "id": "c",
-      "label": "The ability to index the audit table by row id"
+      "label": "A CHECK that valid_to is later than valid_from"
      },
      {
       "id": "d",
-      "label": "Only a few seconds of freshness in the audit log"
+      "label": "Running both changes at Read Committed isolation"
      }
     ],
     "correctChoiceIds": [
-     "b"
+     "a"
     ],
-    "explanation": "Inside one transaction, the change and its audit row commit or roll back together, so the trail can have no missing or phantom entries. A job that runs later can crash, be paused or skip rows between its last checkpoint and the next, and retries help only if it knows what it missed. That is why the loss is more than freshness. Either design can index the audit table. If audit events must also leave the database, an outbox row written in the same transaction keeps the guarantee."
+    "explanation": "The partial unique index lets each product have only one row with an open valid_to, so the second insert fails and that change can retry. The lookup index speeds up queries but enforces nothing. A CHECK sees one row at a time, and both rows pass it. Read Committed is the usual default and does not stop two transactions from inserting rows that conflict only in meaning."
    },
    {
     "id": "t555-a4",
@@ -2123,51 +2123,51 @@
    },
    {
     "id": "t555-a5",
-    "concept": "audit-trail",
+    "concept": "deleted-row-storage",
     "type": "estimation",
-    "prompt": "An orders table receives 2 million updates a day, and each audit row takes about 300 bytes including overhead. Roughly how many GB does the audit table grow per year?",
-    "unit": "GB",
-    "target": 219,
+    "prompt": "A projects table gains 40,000 rows a day, and 35,000 projects a day are soft-deleted. Nothing is ever purged. After two years, roughly what percentage of its rows are live?",
+    "unit": "%",
+    "target": 12.5,
     "assumptions": [
-     "2 million audited changes a day",
-     "About 300 bytes per audit row",
-     "365 days",
-     "1 GB = 10^9 bytes"
+     "40,000 new rows a day",
+     "35,000 soft deletes a day",
+     "730 days",
+     "Rows of similar size"
     ],
-    "formula": "changes per day × bytes per row × 365",
-    "workedAnswer": "2,000,000 × 300 bytes = 600 MB a day; × 365 ≈ 219 GB a year",
-    "explanation": "Design implication: about 219 GB a year before indexes, which is why audit tables need a retention plan and often time partitions. 600 is the daily figure in MB, and 22 drops a factor of ten.",
-    "tolerance": 0.1,
+    "formula": "(new rows − deletes) × days ÷ (new rows × days) × 100",
+    "workedAnswer": "40,000 × 730 = 29.2 million rows; live: 5,000 × 730 = 3.65 million; 3.65 ÷ 29.2 = 12.5%",
+    "explanation": "Design implication: seven rows in eight are hidden, and every scan and cached page carries them. Partial indexes keep the indexes small, but the table needs an archive table or a purge. 87.5 is the deleted share, and 14.3 divides live rows by deletes instead of by all rows.",
+    "tolerance": 0.05,
     "trapAnswers": [
-     600,
-     22
+     87.5,
+     14.3
     ]
    },
    {
     "id": "t555-a6",
-    "concept": "erasure",
+    "concept": "temporal-history",
     "type": "drag_order",
-    "prompt": "Put these steps for handling an erasure request in a system with soft deletes and history tables in order.",
+    "prompt": "Order the steps that change product 5's price in prices_history, which has a unique index on product_id WHERE valid_to IS NULL.",
     "items": [
      {
-      "id": "s2",
-      "label": "Delete or null the personal fields in live and soft-deleted rows"
+      "id": "s3",
+      "label": "Set valid_to = now() on product 5's open history row"
      },
      {
       "id": "s5",
-      "label": "Let backups that still hold the data expire on their retention schedule"
+      "label": "COMMIT, so readers see both rows change at once"
      },
      {
       "id": "s1",
-      "label": "Find every table and column that holds the person's data"
+      "label": "BEGIN a transaction"
      },
      {
       "id": "s4",
-      "label": "Record that the erasure was carried out, without the erased data"
+      "label": "Insert the new price with valid_from = now() and an open valid_to"
      },
      {
-      "id": "s3",
-      "label": "Replace the person's identity in history rows with a random token"
+      "id": "s2",
+      "label": "Lock product 5's row in products with FOR UPDATE"
      }
     ],
     "correctOrder": [
@@ -2177,61 +2177,52 @@
      "s4",
      "s5"
     ],
-    "explanation": "You cannot erase what you have not found, so the inventory comes first. Live rows and history can be cleaned in either order, which is why both orders are accepted. The record of the erasure must not contain the erased data, and backups are handled by retention, not by editing them.",
-    "alternativeOrders": [
-     [
-      "s1",
-      "s3",
-      "s2",
-      "s4",
-      "s5"
-     ]
-    ]
+    "explanation": "The lock serialises changes to one product, so two changes cannot both close the same version. The old version must be closed before the new one is inserted, or the unique index sees two open rows. In PostgreSQL now() is fixed for the whole transaction, so the old period ends exactly where the new one starts, and COMMIT publishes both rows together."
    },
    {
     "id": "t555-a7",
-    "concept": "soft-delete",
+    "concept": "deleted-row-storage",
     "type": "tradeoff",
-    "prompt": "Support must be able to restore accidentally deleted projects for 30 days. Projects have many child rows, and personal data must be removable on request.",
+    "prompt": "A projects table has grown to 30 million rows, 26 million of them soft-deleted. Live queries touch only live projects, restores happen a few times a month, and no other table references deleted projects.",
     "constraints": [
-     "Restore within 30 days",
-     "Deleted data not kept indefinitely",
-     "Simple restores"
+     "Fast live queries",
+     "Occasional restores",
+     "No dangling references"
     ],
     "approaches": [
      {
       "id": "p3",
-      "label": "Soft delete and keep deleted projects forever",
-      "description": "Never purge"
-     },
-     {
-      "id": "p2",
-      "label": "Hard delete at once and restore from backup when asked",
-      "description": "Backups as undo"
+      "label": "Hard delete",
+      "description": "Delete rows outright and restore from backups when asked"
      },
      {
       "id": "p1",
-      "label": "Soft delete, with a nightly job that hard-deletes rows older than 30 days",
-      "description": "Soft delete plus purge"
+      "label": "Keep deleted_at",
+      "description": "Leave deleted rows in place and add partial indexes on live rows"
+     },
+     {
+      "id": "p2",
+      "label": "Archive table",
+      "description": "Move deleted rows to projects_archive in the deleting statement, and back to restore"
      }
     ],
-    "correctApproachId": "p1",
+    "correctApproachId": "p2",
     "rationaleOptions": [
      {
-      "id": "r4",
-      "label": "Keeping deleted data indefinitely is the safest choice for privacy"
+      "id": "r3",
+      "label": "Partial indexes also shrink the table that scans have to read"
      },
      {
       "id": "r1",
-      "label": "A restore within the window is a single update"
+      "label": "The live table and its indexes hold only the 4 million live rows"
      },
      {
-      "id": "r3",
+      "id": "r4",
       "label": "Restoring one project from a full backup is quick and precise"
      },
      {
       "id": "r2",
-      "label": "The purge job bounds how long deleted data is kept"
+      "label": "Deleting and restoring are each one atomic move between two tables"
      }
     ],
     "correctRationaleIds": [
@@ -2243,10 +2234,10 @@
      "r4"
     ],
     "rationaleConflicts": {
-     "r3": "A backup restore brings back the whole database as of a past moment; extracting one project and its children by hand is slow and error-prone.",
-     "r4": "Data you keep is data you must protect and may have to erase; indefinite retention works against privacy."
+     "r3": "Partial indexes shrink only the indexes; the 26 million hidden rows still fill the table pages that scans and the cache read.",
+     "r4": "A backup restore brings back a whole database as of one moment; pulling out one project and its children by hand is slow and error-prone."
     },
-    "explanation": "A soft delete with a bounded purge gives one-update restores inside the window and real deletion after it. Pair it with a view of live rows so queries do not see deleted projects."
+    "explanation": "With most rows deleted and nothing referencing them, moving them out keeps the busy table small and removes the filter from every query. If other tables did reference deleted projects, deleted_at in place would be the better choice."
    }
   ],
   "flashcards": [
@@ -2262,6 +2253,11 @@
    },
    {
     "id": "t555-f3",
+    "front": "Archive table",
+    "back": "Deleted rows moved out in the same statement; the live table stays small, but nothing can reference them"
+   },
+   {
+    "id": "t555-f4",
     "front": "System-versioned table",
     "back": "The database keeps old row versions and answers AS OF queries; SQL Server and MariaDB have them"
    }
@@ -2272,8 +2268,12 @@
     "url": "https://learn.microsoft.com/en-us/sql/relational-databases/tables/temporal-tables"
    },
    {
-    "title": "PostgreSQL: Trigger functions (includes an audit example)",
-    "url": "https://www.postgresql.org/docs/current/plpgsql-trigger.html"
+    "title": "PostgreSQL: Exclusion constraints",
+    "url": "https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-EXCLUSION"
+   },
+   {
+    "title": "PostgreSQL: Data-modifying statements in WITH",
+    "url": "https://www.postgresql.org/docs/current/queries-with.html#QUERIES-WITH-MODIFYING"
    },
    {
     "title": "PostgreSQL: Partial indexes",
@@ -2283,31 +2283,30 @@
   "deep": {
    "teaches": [
     "soft-delete",
-    "audit-trail",
-    "temporal-history",
-    "erasure"
+    "deleted-row-storage",
+    "temporal-history"
    ],
    "mechanism": {
     "title": "What each way of keeping the past stores, and what it costs",
     "steps": [
      "A hard delete removes the row and, through foreign keys, either blocks the delete, cascades to children or nulls references. The data is gone except in backups. It is the simplest option and the right one for data nobody needs to recover.",
      "A soft delete flags the row instead. Undo is one update, references stay valid, and support can see what happened. But the row still takes part in unique constraints and joins, and the flag becomes part of every query. A view or row-level policy over live rows keeps that filter in one place.",
-     "An audit trail adds a row per change in a separate table: who, when, which row, and old and new values. Written in the same transaction as the change, by the application or a trigger, it commits or rolls back with it, so it is complete and has no phantom entries. It answers “who changed this?”.",
-     "A history table keeps whole row versions with a validity interval, valid_from and valid_to, so it answers “what was the value at time T?”. Each change closes the current version and opens a new one in one transaction. Overlap checks keep intervals from colliding, and an index on (key, valid_from) makes point-in-time lookups fast.",
+     "An archive table moves deleted rows out instead. A data-modifying statement deletes from the live table and inserts into the archive in one step, so the live table and its indexes hold only live rows and need no filter. Nothing can reference an archived row, so it suits entities whose references are gone or were never kept.",
+     "A history table keeps whole row versions with a validity interval, valid_from and valid_to, so it answers “what was the value at time T?”. Each change closes the current version and opens a new one in one transaction. A partial unique index on the key WHERE valid_to IS NULL allows one current version, an exclusion constraint stops periods from overlapping, and an index on (key, valid_from) makes point-in-time lookups fast.",
      "System-versioned tables, from the SQL:2011 standard, do this bookkeeping in the engine and add AS OF query syntax. SQL Server and MariaDB support them; in PostgreSQL the same effect needs triggers or an extension.",
-     "All of these keep personal data longer. Plan erasure from the start: know which columns hold personal data, null or delete them in live, deleted and history rows, swap identities in history for random tokens, and let backups expire on a schedule."
+     "All of these keep data longer, and growth is the bill. A table where most rows are hidden, or a history table with a version per change, needs a purge, archive or partitioning plan from day one. Which data must be erased, and when, is a retention policy decided by the application; the schema should make carrying it out a simple delete."
     ]
    },
    "useWhen": [
     "Users or support need undo for a while after a delete",
     "Other rows must keep pointing at the deleted entity, such as orders of a closed account",
-    "Regulators, customers or your own incident reviews need to know who changed what",
+    "Most rows end up deleted and nothing references them: move them to an archive table",
     "Invoices, prices or addresses must be reproduced exactly as they were at a past time"
    ],
    "avoidWhen": [
-    "The data has no recovery or audit value, such as expired sessions or temporary tokens",
+    "The data has no recovery value, such as expired sessions or temporary tokens",
     "Tables are huge and churn fast, so keeping every deleted row would dominate storage",
-    "Personal data must be erased promptly and you have no purge or pseudonymisation plan",
+    "Other tables must keep referencing deleted rows: an archive table would break those foreign keys",
     "A full history of every row version would cost more than the questions it answers"
    ],
    "tradeoffs": {
@@ -2328,9 +2327,9 @@
       "Every query needs the filter; unique constraints need care"
      ],
      [
-      "Audit trail",
-      "Who changed what, and when",
-      "One extra row per change"
+      "Archive table",
+      "What was deleted, kept out of the live table",
+      "No foreign keys to archived rows; restore is a move"
      ],
      [
       "History table",
@@ -2340,24 +2339,25 @@
     ]
    },
    "numbers": {
-    "title": "How fast an audit trail grows",
+    "title": "How much of a never-purged table is live",
     "assumptions": [
-     "2 million audited changes a day",
-     "About 300 bytes per audit row, including overhead",
+     "40,000 new projects a day",
+     "35,000 soft deletes a day",
+     "Two years (730 days), nothing purged",
      "Illustrative figures"
     ],
     "steps": [
-     "Daily: 2,000,000 × 300 bytes = 600,000,000 bytes = 600 MB.",
-     "Yearly: 600 MB × 365 = 219 GB before indexes.",
-     "With two indexes adding about half again: roughly 330 GB a year (an estimate).",
-     "Monthly partitions make a 2-year retention one partition drop a month."
+     "Rows written: 40,000 × 730 = 29.2 million.",
+     "Live rows: (40,000 − 35,000) × 730 = 3.65 million, which is 12.5%.",
+     "Seven rows in eight that a scan reads, and that cached pages hold, are hidden rows.",
+     "Partial indexes keep the indexes near the size of the 3.65 million live rows; the table itself needs an archive table or a purge."
     ],
-    "result": "An audit trail on a busy table is a large table of its own within a year; give it partitions and a retention rule on day one."
+    "result": "A soft-delete table that is never purged becomes mostly dead weight; decide early where deleted rows go and when they leave."
    },
    "india": {
-    "title": "SQL Server temporal tables and the PostgreSQL trigger example",
+    "title": "SQL Server temporal tables and PostgreSQL exclusion constraints",
     "label": "Official documentation",
-    "body": "Microsoft's documentation on temporal tables describes system-versioned tables: the engine moves each old row version into a history table with period columns and supports FOR SYSTEM_TIME AS OF, BETWEEN and ALL queries. The PostgreSQL manual's PL/pgSQL trigger chapter includes an audit trigger example that copies each inserted, updated or deleted row into an audit table with the operation, time and user, all inside the same transaction as the change."
+    "body": "Microsoft's documentation on temporal tables describes system-versioned tables: the engine moves each old row version into a history table with period columns and supports FOR SYSTEM_TIME AS OF, BETWEEN and ALL queries. The PostgreSQL manual's section on exclusion constraints explains that EXCLUDE guarantees no two rows satisfy all the listed operator comparisons, which with = on the key and && on a range type means no two versions of one key overlap in time."
    },
    "pitfalls": [
     {
@@ -2365,19 +2365,19 @@
      "say": "NULLs are distinct, so live duplicates slip through; use a partial unique index"
     },
     {
-     "trap": "Writing audit events to a separate store after commit",
-     "say": "A crash between the two loses events; write in the same transaction or use an outbox"
+     "trap": "Closing and opening versions without a per-key lock",
+     "say": "Two concurrent changes leave two open rows; lock the key and add a partial unique index"
     },
     {
      "trap": "Keeping soft-deleted and history rows forever",
-     "say": "Set a purge window and pseudonymise history so erasure requests can be met"
+     "say": "Plan a purge, archive table or partitions so growth stays bounded"
     }
    ],
    "takeaways": [
     "Soft deletes give undo, but every query and unique constraint must account for them",
     "Put the live-rows filter in one place: a view or a row-level policy",
-    "Write audit and history rows in the same transaction as the change",
-    "Plan erasure and retention for deleted, audit and history data from the start"
+    "Move mostly-deleted, unreferenced rows to an archive table",
+    "Change history rows under a lock, with a partial unique index or exclusion constraint as the backstop"
    ]
   },
   "interactive": {
@@ -2410,12 +2410,12 @@
     "why": "Keys, constraints and delete actions, which soft deletes change"
    },
    {
-    "topicId": 44,
-    "why": "The outbox pattern and change data capture send history to other systems safely"
+    "topicId": 551,
+    "why": "Partial indexes, which keep soft-deleted rows out of unique and lookup indexes"
    },
    {
-    "topicId": 330,
-    "why": "Backups and their retention, which also decide how long erased data survives"
+    "topicId": 554,
+    "why": "Partitioning, which turns purging old history into dropping a partition"
    }
   ]
  },
@@ -2888,9 +2888,9 @@
   "title": "Multi-Tenant Data Models and Row-Level Security",
   "kind": "lesson",
   "objectives": [
-   "Compare shared tables, schema per tenant and database per tenant",
-   "Make every query, constraint and index tenant-aware, with row-level security as a backstop",
-   "Contain a noisy tenant without re-architecting"
+   "Compare shared tables, schema per tenant and database per tenant as data layouts",
+   "Put tenant_id in keys, foreign keys and indexes so the schema itself keeps tenants apart",
+   "Set up row-level security so a query that forgets the tenant filter cannot leak rows"
   ],
   "difficulty": 3,
   "durationMinutes": 13,
@@ -2902,7 +2902,7 @@
     "id": "t557-c1",
     "kind": "text",
     "title": "One application, many customers",
-    "body": "A software-as-a-service product keeps data for many customer organisations, called tenants. There are three main layouts. Shared tables put every tenant in the same tables, with a tenant_id column on every row. A schema or database per tenant gives each its own copy of the tables on shared servers. A dedicated database server per tenant isolates them fully. Moving from the first to the last buys isolation and per-tenant control at the cost of more things to migrate, monitor and pay for.",
+    "body": "A software-as-a-service product keeps data for many customer organisations, called tenants. There are three main layouts. Shared tables put every tenant in the same tables, with a tenant_id column on every row. A schema or database per tenant gives each its own copy of the tables on shared servers. A dedicated database server per tenant isolates them fully. The layout also decides per-tenant operations: with a database per tenant, restoring one tenant to an hour ago is an ordinary point-in-time restore; with shared tables it means restoring a copy elsewhere and copying that tenant's rows back table by table.",
     "teaches": [
      "tenancy-models"
     ]
@@ -2926,17 +2926,17 @@
    {
     "id": "t557-c3",
     "kind": "text",
-    "title": "Every query carries the tenant",
-    "body": "In shared tables, tenant_id belongs in every WHERE clause, every join condition between tenant tables, and every unique rule: emails unique within a company means UNIQUE (tenant_id, email), not UNIQUE (email). It should also lead most indexes, such as (tenant_id, created_at), so one tenant's queries read only that tenant's part of the index. Composite foreign keys that include tenant_id stop a row from referencing another tenant's row by mistake.",
+    "title": "tenant_id in keys and constraints",
+    "body": "In shared tables, the schema can carry the tenant. Unique rules include it: emails unique within a company means UNIQUE (tenant_id, email), not UNIQUE (email). Foreign keys between tenant tables include it too. If invoices has UNIQUE (tenant_id, id), then invoice_lines can declare FOREIGN KEY (tenant_id, invoice_id) REFERENCES invoices (tenant_id, id), and a line can no longer point at another tenant's invoice; a key on invoice_id alone only checks that the invoice exists somewhere. Joins between tenant tables match on tenant_id as well as the id, so the planner and the constraints agree.",
     "teaches": [
-     "tenant-isolation"
+     "tenant-keys"
     ]
    },
    {
     "id": "t557-c4",
     "kind": "text",
     "title": "Row-level security as a backstop",
-    "body": "Row-level security makes the database add a filter to every query on a table. In PostgreSQL, a policy such as USING (tenant_id = current_setting('app.tenant_id')::bigint) means a query that forgets WHERE tenant_id = … sees only the current tenant's rows instead of everyone's. SQL Server has an equivalent feature. Two details matter. In PostgreSQL, the table owner bypasses policies unless the table is set to FORCE ROW LEVEL SECURITY, and superusers always bypass them, so the application should connect as a separate, ordinary role. And the tenant setting must be set for each transaction; behind a transaction pooler, use SET LOCAL so it cannot leak to the next client.",
+    "body": "Row-level security makes the database add a filter to every query on a table. In PostgreSQL, a policy such as USING (tenant_id = current_setting('app.tenant_id')::bigint) means a query that forgets WHERE tenant_id = … sees only the current tenant's rows instead of everyone's; a policy for all commands also applies that condition to rows being inserted or updated. SQL Server has an equivalent feature. Two details matter. In PostgreSQL, the table owner bypasses policies unless the table is set to FORCE ROW LEVEL SECURITY, and superusers always bypass them, so the application should connect as a separate, ordinary role. And the tenant setting must be set for each transaction, from the tenant the server derived when it authenticated the request; behind a transaction pooler, use SET LOCAL so it cannot leak to the next client.",
     "teaches": [
      "row-level-security"
     ]
@@ -2944,26 +2944,26 @@
    {
     "id": "t557-c5",
     "kind": "text",
-    "title": "Trap: a tenant id taken from the request",
-    "body": "If the tenant comes from a request parameter, a header the client controls or the request body, a user can change it and read another company's data. Derive the tenant from the authenticated session or token on the server, and pass that value to the database. Row-level security does not help here: it faithfully filters by whatever tenant you tell it.",
+    "title": "Trap: indexes that do not start with tenant_id",
+    "body": "An index on (created_at) looks right for \"tenant 42's 20 newest invoices\", but every tenant's rows are interleaved in it. The database walks the newest entries of all tenants and throws away each one that is not tenant 42's; for a small tenant whose last invoice was months ago, that can mean most of the index. An index on (tenant_id, created_at) jumps straight to tenant 42's slice and reads 20 entries. Lead primary keys and indexes with tenant_id. The tenant_id = … condition that a row-level security policy adds can use such an index like any other condition.",
     "teaches": [
-     "tenant-isolation"
+     "tenant-indexes"
     ]
    },
    {
     "id": "t557-c6",
     "kind": "text",
-    "title": "Edge case: the noisy neighbour",
-    "body": "In shared infrastructure, one tenant's huge export, import or badly written report uses the CPU, I/O, connections and locks that everyone shares, and every tenant's pages slow down. Contain it in layers: per-tenant rate limits and statement timeouts, a separate small connection pool for bulk jobs, heavy reads moved to a replica, and, for tenants that stay heavy, a move to their own database. Per-tenant metrics (queries, rows read, time) are what tell you which tenant it is.",
+    "title": "Edge case: moving a tenant between databases",
+    "body": "A large tenant outgrows the shared tables and moves to its own database, or a small one moves back. If ids come from a sequence per database, the tenant's invoice 9001 may already exist in the target, and fixing that means renumbering every row and every foreign key that points at it. Keys that do not depend on one database's sequence copy across unchanged: UUIDs, or ids scoped to the tenant under a (tenant_id, id) key. With tenant_id in every table, extracting a tenant is the same WHERE tenant_id = 42 on each table, and the cutover is a change to connection routing.",
     "teaches": [
-     "noisy-neighbour"
+     "tenant-keys"
     ]
    }
   ],
   "questions": [
    {
     "id": "t557-a1",
-    "concept": "tenant-isolation",
+    "concept": "tenant-keys",
     "type": "multiple_choice",
     "prompt": "In shared tables, emails must be unique within each company, but two companies may have users with the same email. Which constraint fits?",
     "choices": [
@@ -3021,57 +3021,57 @@
     "id": "t557-a3",
     "concept": "tenancy-models",
     "type": "multiple_choice",
-    "prompt": "A product has 20,000 small tenants with similar usage. Which layout keeps migrations and operations simplest?",
+    "prompt": "Tenant 42 ran a bad import an hour ago and wants only its own data put back as it was before. Which layout makes that one standard restore?",
     "choices": [
      {
       "id": "a",
-      "label": "A dedicated database server per tenant"
+      "label": "Shared tables, restoring the latest backup over the database"
      },
      {
       "id": "b",
-      "label": "Shared tables with a tenant_id on every row"
+      "label": "A database per tenant, restored to a point in time"
      },
      {
       "id": "c",
-      "label": "A schema per tenant on shared servers"
+      "label": "Shared tables with row-level security on every table"
      },
      {
       "id": "d",
-      "label": "A separate application deployment per tenant"
+      "label": "Shared tables with indexes that lead with tenant_id"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "With shared tables, a migration runs once and there is one set of tables to monitor and tune. A schema per tenant multiplies every migration and catalog entry by 20,000. Dedicated servers or deployments per tenant multiply the whole operational load, which only makes sense for a few large or regulated tenants."
+    "explanation": "When the tenant has its own database, a point-in-time restore of that database rewinds tenant 42 and nobody else. Restoring the shared database rewinds every tenant and loses their last hour too; the shared-table route is to restore a copy elsewhere and copy tenant 42's rows back table by table. Row-level security and tenant-leading indexes control reads and their speed, not recovery."
    },
    {
     "id": "t557-a4",
-    "concept": "noisy-neighbour",
+    "concept": "tenant-keys",
     "type": "multiple_choice",
-    "prompt": "One tenant's nightly export makes every tenant's pages slow. Which first step contains it without re-architecting?",
+    "prompt": "invoice_lines rows of tenant 7 point at invoice 9001, which belongs to tenant 3. Which rule on invoice_lines, referencing invoices, would have rejected them?",
     "choices": [
      {
       "id": "a",
-      "label": "Add more indexes that start with tenant_id"
+      "label": "A foreign key on invoice_id referencing invoices"
      },
      {
       "id": "b",
-      "label": "Double the shared connection pool so exports get more connections"
+      "label": "A foreign key on (tenant_id, invoice_id)"
      },
      {
       "id": "c",
-      "label": "Move every tenant to its own schema"
+      "label": "An index on invoice_lines (tenant_id, invoice_id)"
      },
      {
       "id": "d",
-      "label": "Run exports on a replica through a small separate pool"
+      "label": "A CHECK that tenant_id is positive"
      }
     ],
     "correctChoiceIds": [
-     "d"
+     "b"
     ],
-    "explanation": "A replica takes the export's reads off the primary, and a small pool caps how much it can use at once. Indexes do not help a bulk export that reads everything anyway. A bigger shared pool lets the export take even more of the database. Moving every tenant to its own schema is a re-architecture, and the schemas would still share one server's CPU and I/O."
+    "explanation": "The composite key requires an invoice with the same tenant_id and id, so a line of tenant 7 cannot reference tenant 3's invoice; invoices needs UNIQUE (tenant_id, id) for it to point at. A key on invoice_id alone only checks that invoice 9001 exists somewhere, which it does. An index speeds up lookups but enforces nothing. A CHECK sees only its own row, and 7 is positive."
    },
    {
     "id": "t557-a5",
@@ -3127,52 +3127,52 @@
      "s4",
      "s5"
     ],
-    "explanation": "The tenant must come from authentication, not the request. SET LOCAL lasts only until the end of the transaction, so when the pooler hands the connection to another client, no tenant setting is left behind. Setting it before BEGIN or with plain SET would keep it for the whole session, which is exactly what leaks across clients."
+    "explanation": "The tenant must come from authentication, not the request. SET LOCAL lasts only until the end of the transaction, so when the pooler hands the connection to another client, no tenant setting is left behind. SET LOCAL before BEGIN does nothing at all (PostgreSQL only warns), so the queries would run without the tenant; plain SET would keep it for the whole session, which is exactly what leaks across clients."
    },
    {
     "id": "t557-a7",
-    "concept": "tenancy-models",
+    "concept": "tenant-indexes",
     "type": "tradeoff",
-    "prompt": "A business software product has 2,000 small customers on a shared database. A bank wants to sign up, and its contract requires isolated infrastructure and its own encryption keys.",
+    "prompt": "A shared invoices table holds 2,000 tenants. Every screen lists one tenant's recent invoices, and the largest tenants will later move to their own databases.",
     "constraints": [
-     "Meet the bank's contract",
-     "Keep costs low for small customers",
-     "One codebase"
+     "Fast per-tenant listings",
+     "No cross-tenant references",
+     "Tenants can move without renumbering"
     ],
     "approaches": [
      {
-      "id": "p2",
-      "label": "Move all 2,000 customers to dedicated databases",
-      "description": "Isolate everyone"
+      "id": "p1",
+      "label": "Global keys",
+      "description": "bigint id from one sequence as the primary key, plus an index on created_at"
      },
      {
       "id": "p3",
-      "label": "Put the bank in the shared tables with row-level security",
-      "description": "Logical isolation"
+      "label": "Table per tenant",
+      "description": "invoices_0001 to invoices_2000, with their own indexes"
      },
      {
-      "id": "p1",
-      "label": "Keep shared tables for small customers and give the bank a dedicated database",
-      "description": "Hybrid"
+      "id": "p2",
+      "label": "Tenant-scoped keys",
+      "description": "Primary key (tenant_id, id) with UUID ids, composite foreign keys, indexes led by tenant_id"
      }
     ],
-    "correctApproachId": "p1",
+    "correctApproachId": "p2",
     "rationaleOptions": [
      {
       "id": "r1",
-      "label": "The isolation cost is paid only where it is required"
+      "label": "Indexes that start with tenant_id read only that tenant's slice"
      },
      {
       "id": "r3",
-      "label": "Row-level security satisfies a contract that asks for isolated infrastructure"
+      "label": "A created_at index serves every tenant's listing equally well"
      },
      {
       "id": "r2",
-      "label": "Small customers keep cheap, simple shared operations"
+      "label": "Composite foreign keys reject a reference to another tenant's row"
      },
      {
       "id": "r4",
-      "label": "Dedicated databases are cheaper than shared tables at 2,000 tenants"
+      "label": "A table per tenant keeps the catalog and migrations small"
      }
     ],
     "correctRationaleIds": [
@@ -3184,25 +3184,30 @@
      "r4"
     ],
     "rationaleConflicts": {
-     "r3": "Row-level security separates rows logically, but the bank still shares servers, storage and keys with everyone else.",
-     "r4": "Two thousand databases means two thousand of everything to run; shared tables are far cheaper for small tenants."
+     "r3": "Tenants are interleaved in a created_at index, so a small tenant's listing walks past other tenants' entries to find its own.",
+     "r4": "Two thousand tenants become two thousand copies of every table and index, and each migration runs two thousand times."
     },
-    "explanation": "A hybrid keeps one schema and codebase while placing each tenant where its requirements put it. Route connections by tenant so the application does not care which database holds which customer."
+    "explanation": "Putting tenant_id first in keys and indexes makes the schema itself tenant-aware, and ids that do not depend on one database's sequence let a tenant's rows move unchanged."
    }
   ],
   "flashcards": [
    {
     "id": "t557-f1",
     "front": "Shared tables",
-    "back": "One schema for all tenants; tenant_id in every row, query, unique rule and leading index"
+    "back": "One schema for all tenants; tenant_id in every row, key, unique rule and leading index"
    },
    {
     "id": "t557-f2",
+    "front": "Composite foreign key",
+    "back": "(tenant_id, parent_id) references the parent's (tenant_id, id), so rows cannot point across tenants"
+   },
+   {
+    "id": "t557-f3",
     "front": "Row-level security",
     "back": "The database adds the tenant filter to every query; owners bypass it unless forced"
    },
    {
-    "id": "t557-f3",
+    "id": "t557-f4",
     "front": "SET LOCAL behind a pooler",
     "back": "Scopes the tenant setting to one transaction so it cannot leak to the next client"
    }
@@ -3211,6 +3216,10 @@
    {
     "title": "PostgreSQL: Row security policies",
     "url": "https://www.postgresql.org/docs/current/ddl-rowsecurity.html"
+   },
+   {
+    "title": "PostgreSQL: Foreign keys (multi-column)",
+    "url": "https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-FK"
    },
    {
     "title": "SQL Server: Row-level security",
@@ -3224,19 +3233,19 @@
   "deep": {
    "teaches": [
     "tenancy-models",
-    "tenant-isolation",
-    "row-level-security",
-    "noisy-neighbour"
+    "tenant-keys",
+    "tenant-indexes",
+    "row-level-security"
    ],
    "mechanism": {
     "title": "How tenant data is separated, from shared rows to separate servers",
     "steps": [
      "Every multi-tenant system answers two questions: where each tenant's rows live, and what stops one tenant from seeing another's. The layouts range from pooled (everyone in the same tables) to siloed (each tenant on its own database), with schema-per-tenant in between.",
-     "In shared tables, isolation is a property of every query. tenant_id is in each row and in each WHERE clause, joins between tenant tables match on it, unique rules include it, and indexes lead with it so a tenant's queries touch only its part of each index. One forgotten filter is a data leak.",
-     "Row-level security moves that filter into the database. A policy on the table is added to every query from ordinary roles, and the application sets the current tenant for each transaction. A forgotten WHERE then returns only the current tenant's rows. It is a backstop, not a substitute for deriving the tenant from authentication.",
-     "A schema or database per tenant makes isolation structural: a query on one tenant's tables cannot touch another's. The cost is multiplied operations: every migration runs once per tenant, the catalog holds a copy of every table and index for each, and connection routing must pick the right schema or database.",
-     "All tenants that share a server share its CPU, memory, I/O, connections and locks. Isolation of data is not isolation of performance. Rate limits, statement timeouts, separate pools and replicas for bulk jobs keep one tenant from slowing the rest, and per-tenant metrics show who is responsible.",
-     "Most products end up hybrid: pooled tables for the many small tenants, and dedicated databases for the few that are very large, regulated or paying for isolation. Keep one schema and one migration path so moving a tenant between the two is a data copy, not a rewrite."
+     "In shared tables, the schema can carry the tenant. tenant_id is in each row and leads the primary key, unique rules include it, foreign keys between tenant tables include it so a row cannot point at another tenant's row, and joins match on it.",
+     "Indexes lead with tenant_id, so one tenant's queries touch only its slice of each index instead of walking past every other tenant's entries. The same holds for the condition a row-level security policy adds.",
+     "Row-level security moves the tenant filter into the database. A policy on the table is added to every query from ordinary roles, and the application sets the current tenant for each transaction with SET LOCAL. A forgotten WHERE then returns only the current tenant's rows. It is a backstop: it trusts whatever tenant it is given.",
+     "A schema or database per tenant makes isolation structural: a query on one tenant's tables cannot touch another's, and per-tenant restore is a normal restore. The cost is multiplied operations: every migration runs once per tenant, the catalog holds a copy of every table and index for each, and connection routing must pick the right schema or database.",
+     "Most products end up hybrid: pooled tables for the many small tenants, and dedicated databases for the few that are very large, regulated or paying for isolation. Keep one schema, and keys that do not depend on one database's sequence, so moving a tenant between the two is a data copy, not a renumbering. Separating data does not separate load: tenants on one server still share its CPU, I/O and connections."
     ]
    },
    "useWhen": [
@@ -3248,7 +3257,7 @@
    "avoidWhen": [
     "Avoid schema-per-tenant for tens of thousands of tenants; migrations and catalog size explode",
     "Avoid a server per tenant for a long tail of small customers",
-    "Avoid trusting a tenant id sent by the client",
+    "Avoid foreign keys and indexes that leave tenant_id out",
     "Avoid connecting the application as the table owner or a superuser when relying on row-level security"
    ],
    "tradeoffs": {
@@ -3262,9 +3271,9 @@
     "rows": [
      [
       "Shared tables",
-      "Every query, plus optional row-level security",
+      "Keys and queries, plus optional row-level security",
       "One schema",
-      "Hard: filter rows out of a backup",
+      "Hard: copy rows back from a restored copy",
       "Many small tenants"
      ],
      [
@@ -3305,8 +3314,8 @@
    },
    "pitfalls": [
     {
-     "trap": "Taking the tenant id from the request body or a client header",
-     "say": "Derive it from authentication on the server"
+     "trap": "Foreign keys on the id alone between tenant tables",
+     "say": "Include tenant_id so a row cannot reference another tenant's row"
     },
     {
      "trap": "Using plain SET for the tenant behind a transaction pooler",
@@ -3318,10 +3327,10 @@
     }
    ],
    "takeaways": [
-    "Shared tables scale to many tenants; tenant_id goes in every query, unique rule and leading index",
+    "Shared tables scale to many tenants; tenant_id goes in every key, unique rule, foreign key and leading index",
     "Row-level security is a backstop; owners bypass it unless forced",
-    "Derive the tenant from authentication, and scope it per transaction with SET LOCAL",
-    "Data isolation is not performance isolation; contain noisy tenants with limits, pools and replicas"
+    "Set the tenant per transaction with SET LOCAL, from a value the server derived",
+    "Use keys that survive moving a tenant to another database"
    ]
   },
   "interactive": {
@@ -3428,7 +3437,7 @@
     "id": "t558-c5",
     "kind": "text",
     "title": "Edge case: a cold cache after restart or failover",
-    "body": "After a restart the buffer pool is empty, and after a failover the promoted replica's cache holds whatever that replica was serving. For the first minutes, queries run at storage speed. InnoDB saves the list of cached pages at shutdown and reloads them at startup by default. PostgreSQL offers the pg_prewarm extension to load chosen tables or the previous cache contents. Include warm-up in failover tests, and size capacity so the system survives a few minutes of cold-cache latency.",
+    "body": "After a restart the buffer pool is empty, and after a failover the promoted replica's cache holds whatever that replica was serving. For the first minutes, queries run at storage speed. By default InnoDB saves the list of its most recently used pages (25% of the buffer pool) at shutdown and reloads them at startup. PostgreSQL offers the pg_prewarm extension to load chosen tables or the previous cache contents. Include warm-up in failover tests, and size capacity so the system survives a few minutes of cold-cache latency.",
     "teaches": [
      "working-set"
     ]
@@ -3827,7 +3836,7 @@
   "title": "Choosing Column Types: Money, Time and Text",
   "kind": "lesson",
   "objectives": [
-   "Store money exactly, with its currency and minor units",
+   "Store money exactly: decimal precision and scale, or integer minor units, with a currency code",
    "Tell instants apart from wall-clock times and store each correctly",
    "Pick text types, encodings and collations that compare the way users expect"
   ],
@@ -3849,24 +3858,24 @@
    {
     "id": "t559-c2",
     "kind": "diagram",
-    "title": "Worked example: adding 0.1 ten million times",
-    "body": "Binary floating point cannot represent most decimal fractions exactly, so sums of money drift.",
+    "title": "Worked example: what numeric(12,2) does with each value",
+    "body": "A decimal column is exact, but its precision and scale are rules the database applies to every value written to it.",
     "teaches": [
      "money-types"
     ],
     "steps": [
-     "0.1 has no exact binary form; a double stores the nearest value, about 0.1000000000000000055",
-     "Each addition rounds again, so the small errors accumulate",
-     "Adding 0.1 ten million times in double precision gives 999999.9998389754, not 1,000,000",
-     "A decimal (numeric) column stores decimal digits, so 0.10 × 10,000,000 sums to exactly 1,000,000.00",
-     "Integers of minor units (paise, cents) are exact too: ₹1,234.50 is stored as 123450"
+     "numeric(12,2) allows 12 significant digits, 2 of them after the point, so the largest value is 9,999,999,999.99",
+     "Inserting 1234.5 stores 1234.50 exactly: decimal digits need no binary approximation, unlike double precision",
+     "Inserting 10.005 stores 10.01: PostgreSQL rounds to the declared scale, half away from zero, with no error",
+     "Inserting 12,345,678,901.00 fails with \"numeric field overflow\": it needs 11 digits before the point, and only 10 fit",
+     "Integer minor units sidestep scale: ₹1,234.50 is 123450 paise, and a bigint holds about 9.2 × 10^16 rupees"
     ]
    },
    {
     "id": "t559-c3",
     "kind": "text",
     "title": "Instants and wall-clock times",
-    "body": "Most timestamps record an instant: when an order was paid. Store these as an instant, normally a timestamp with time zone, which PostgreSQL stores internally in UTC and converts to the session time zone on output. A timestamp without time zone is only a wall-clock reading with no zone, so the same value means different instants in Delhi and New York. Future local events are different: \"9:00 in Berlin on 3 June next year\" should be stored as the local time plus the IANA zone name (Europe/Berlin), because zone rules can change before the date arrives. Engines differ here: MySQL TIMESTAMP converts from the session time zone to UTC and only reaches 2038-01-19, while DATETIME stores the value as written.",
+    "body": "Most timestamps record an instant: when an order was paid. Store these as an instant, normally a timestamp with time zone, which PostgreSQL stores internally in UTC and converts to the session time zone on output; the zone the value was written with is not kept. A timestamp without time zone is only a wall-clock reading with no zone, so the same value means different instants in Delhi and New York. Future local events are different: \"9:00 in Berlin on 3 June next year\" should be stored as the local time plus the IANA zone name (Europe/Berlin), because zone rules can change before the date arrives. Engines differ here: MySQL TIMESTAMP converts from the session time zone to UTC and only reaches 2038-01-19, while DATETIME stores the value as written.",
     "teaches": [
      "time-types"
     ]
@@ -3875,7 +3884,7 @@
     "id": "t559-c4",
     "kind": "text",
     "title": "Text: encoding, length and collation",
-    "body": "Use a Unicode encoding that covers every character, including emoji. In MySQL that means utf8mb4: the older utf8 name is an alias for utf8mb3, which stores at most 3 bytes per character and rejects 4-byte characters such as emoji. Length limits are business rules; in PostgreSQL, varchar(n) and text are stored the same way, so a limit costs nothing but should match a real rule. The collation decides sort order and equality. MySQL's default utf8mb4_0900_ai_ci is accent- and case-insensitive, so 'Jose' = 'José' and a unique index treats them as the same value; a binary or case-sensitive collation does not.",
+    "body": "Use a Unicode encoding that covers every character, including emoji. In MySQL that means utf8mb4: the older utf8 name is an alias for utf8mb3, which stores at most 3 bytes per character and rejects 4-byte characters such as emoji. Length limits are business rules; in PostgreSQL, varchar(n) and text are stored the same way, so a limit costs nothing but should match a real rule. The collation decides sort order and equality. MySQL's default utf8mb4_0900_ai_ci is accent- and case-insensitive, so 'Jose' = 'José' and a unique index treats them as the same value; a binary or case-sensitive collation does not. It also decides what an index can do. In PostgreSQL, a B-tree index under a linguistic collation such as en_US cannot answer LIKE 'Ash%' as a range; an index built with text_pattern_ops, or a column in the C collation, can.",
     "teaches": [
      "text-collation"
     ]
@@ -3893,7 +3902,7 @@
     "id": "t559-c6",
     "kind": "text",
     "title": "Edge case: currencies without two decimals",
-    "body": "Not every currency has 2 minor digits: ISO 4217 lists 0 for the Japanese yen and 3 for the Kuwaiti dinar and Bahraini dinar. Store the currency code next to every amount, and choose a scale (or minor-unit integer) that fits the currencies you accept. Splitting needs a rule too: ₹100 split three ways is 33.34 + 33.33 + 33.33, with the leftover paisa assigned deliberately, not dropped by rounding.",
+    "body": "Not every currency has 2 minor digits: ISO 4217 lists 0 for the Japanese yen and 3 for the Kuwaiti dinar and Bahraini dinar. Store the currency code next to every amount. Then either give the column a scale that covers every currency you accept, such as numeric(15,3), and validate decimals per currency, or store integer minor units and keep each currency's exponent in a lookup table. A numeric(14,2) column given 1.234 KWD silently stores 1.23.",
     "teaches": [
      "minor-units"
     ]
@@ -3904,29 +3913,29 @@
     "id": "t559-a1",
     "concept": "money-types",
     "type": "multiple_choice",
-    "prompt": "A ledger sums millions of payment amounts and must reconcile to the paisa. Which column type fits?",
+    "prompt": "An order_total column is numeric(8,2). A ₹12,50,000.00 order (1.25 million rupees) fails to insert with \"numeric field overflow\". Why?",
     "choices": [
      {
       "id": "a",
-      "label": "Double precision, rounded to 2 places when shown"
+      "label": "Precision 8 with scale 2 leaves 6 digits before the point"
      },
      {
       "id": "b",
-      "label": "numeric(14,2), or integer paise in a bigint"
+      "label": "numeric cannot store amounts above one million exactly"
      },
      {
       "id": "c",
-      "label": "Single-precision real, which is smaller and faster"
+      "label": "The value has more decimal places than the column allows"
      },
      {
       "id": "d",
-      "label": "Text holding strings such as \"1234.50\""
+      "label": "The Indian digit grouping in the amount confuses the parser"
      }
     ],
     "correctChoiceIds": [
-     "b"
+     "a"
     ],
-    "explanation": "Decimal types and integer minor units are exact, so sums reconcile. Double precision stores most decimal fractions approximately and the error grows with every addition; rounding on display hides it but totals still drift. Real is less precise still. Text is exact but cannot be summed or range-checked without casting every row."
+    "explanation": "numeric(8,2) holds 8 significant digits with 2 after the point, so its largest value is 999,999.99, and 1,250,000.00 needs 7 digits before the point. Widen it, for example to numeric(14,2). numeric is exact up to whatever precision you declare, far beyond a million. The value has exactly 2 decimals, and extra decimals are rounded, not rejected. The database receives a number, not a string with separators."
    },
    {
     "id": "t559-a2",
@@ -3953,29 +3962,29 @@
     "id": "t559-a3",
     "concept": "time-types",
     "type": "multiple_choice",
-    "prompt": "A clinic books an appointment for 9:00 in Berlin on 3 June next year. How should it be stored?",
+    "prompt": "A PostgreSQL timestamptz column receives '2026-06-03 09:00 Europe/Berlin'. A session whose TimeZone is Asia/Kolkata reads it back. What does it see?",
     "choices": [
      {
       "id": "a",
-      "label": "Converted to a UTC instant today"
+      "label": "2026-06-03 12:30:00+05:30"
      },
      {
       "id": "b",
-      "label": "Local time plus the zone name Europe/Berlin"
+      "label": "2026-06-03 09:00:00+02:00"
      },
      {
       "id": "c",
-      "label": "Local time plus the fixed offset +01:00 for Berlin"
+      "label": "2026-06-03 09:00:00+05:30"
      },
      {
       "id": "d",
-      "label": "In the server's own local time zone"
+      "label": "2026-06-03 13:30:00+05:30"
      }
     ],
     "correctChoiceIds": [
-     "b"
+     "a"
     ],
-    "explanation": "The patient means 9:00 on the wall clock in Berlin, whatever the zone rules are by then. Keep the local time and zone name, and compute the instant when it is needed. A UTC instant fixed today is wrong if the rules change before June. +01:00 is Berlin's winter offset; in June it is +02:00. The server's zone has nothing to do with Berlin and changes if the server moves."
+    "explanation": "timestamptz stores the instant, 07:00 UTC, and shows it in the reading session's zone: 12:30 in India. The name Europe/Berlin is not kept, so store it in its own column if you need it later. 09:00+02:00 is the same instant shown in Berlin time, which only a Berlin session would see. 09:00+05:30 keeps the wall-clock digits and changes the instant. 13:30 uses Berlin's winter offset of +01:00, but on 3 June Berlin is on summer time."
    },
    {
     "id": "t559-a4",
@@ -4009,29 +4018,29 @@
     "id": "t559-a5",
     "concept": "text-collation",
     "type": "multiple_choice",
-    "prompt": "A MySQL column declared utf8 rejects a name containing an emoji, while other names save fine. Why?",
+    "prompt": "A PostgreSQL database uses the en_US.UTF-8 collation. WHERE name LIKE 'Ash%' ignores the B-tree index on name and scans the table. Why?",
     "choices": [
      {
       "id": "a",
-      "label": "Emoji are not part of Unicode"
+      "label": "Its sort order cannot serve a LIKE prefix as an index range"
      },
      {
       "id": "b",
-      "label": "utf8 here means utf8mb3, at most 3 bytes per character"
+      "label": "LIKE patterns do not use B-tree indexes at all in PostgreSQL"
      },
      {
       "id": "c",
-      "label": "The column's length limit counts emoji as 10 characters"
+      "label": "The index is rebuilt after inserts and is not ready yet"
      },
      {
       "id": "d",
-      "label": "The collation sorts emoji before all letters"
+      "label": "Prefix matches need a GIN index over the whole column"
      }
     ],
     "correctChoiceIds": [
-     "b"
+     "a"
     ],
-    "explanation": "In MySQL, utf8 is an alias for utf8mb3, which cannot store 4-byte characters such as emoji. Use utf8mb4. Emoji are Unicode characters. Length limits count characters, not a fixed 10 per emoji. Sort order does not cause an insert to be rejected."
+    "explanation": "Under a linguistic collation the planner cannot turn LIKE 'Ash%' into a range of index keys. An index created with text_pattern_ops, or a column in the C collation, can serve it. With such an index, or the C collation, a fixed-prefix LIKE does use a B-tree. B-tree indexes are maintained on every insert, not rebuilt later. A trigram GIN index can serve LIKE too, including infix patterns, but a prefix needs only the pattern-ops B-tree."
    },
    {
     "id": "t559-a6",
@@ -4255,8 +4264,8 @@
      "say": "Future local events and local-day reports still need the zone name"
     },
     {
-     "trap": "“utf8 covers all of Unicode”",
-     "say": "In MySQL use utf8mb4; utf8 is the 3-byte form"
+     "trap": "“numeric(10,2) is big enough”",
+     "say": "Precision limits digits before the point; size it for the largest total, not one price"
     }
    ],
    "takeaways": [
@@ -4268,27 +4277,27 @@
   },
   "interactive": {
    "kind": "predict",
-   "title": "Adding money in floating point",
-   "prompt": "A query computes 0.1 + 0.2 = 0.3 using double-precision (float8) values. What does it return?",
+   "title": "Too many decimals for the column",
+   "prompt": "In PostgreSQL, a price column is numeric(12,2). An import inserts the value 10.005. What is stored?",
    "choices": [
     {
      "id": "a",
-     "label": "true",
-     "feedback": "In binary floating point 0.1 + 0.2 is 0.30000000000000004, so it is not equal to 0.3."
+     "label": "10.00",
+     "feedback": "That would be truncation; PostgreSQL rounds to the declared scale instead."
     },
     {
      "id": "b",
-     "label": "false",
-     "feedback": "Right: neither 0.1 nor 0.2 is exact in binary, and their sum lands on a slightly different value from 0.3."
+     "label": "10.01",
+     "feedback": "Right: the value is rounded to 2 decimal places, half away from zero, with no error or warning."
     },
     {
      "id": "c",
-     "label": "An error, because floats cannot be compared",
-     "feedback": "Floats can be compared; the comparison is just exact on approximate values."
+     "label": "An error, because the value has 3 decimals",
+     "feedback": "Only too many digits before the point raise an error; extra decimals are rounded."
     }
    ],
    "correctId": "b",
-   "reveal": "Floating point is exact only for values such as 0.5 and 0.25. With numeric, 0.1 + 0.2 = 0.3 is true, which is what money needs."
+   "reveal": "Scale is enforced by rounding, silently. If an extra decimal means bad input, reject it before it reaches the column: the value is rounded to the column type before any CHECK constraint sees it."
   },
   "seeAlso": [
    {
@@ -4870,7 +4879,7 @@
     "id": "t621-c6",
     "kind": "text",
     "title": "Edge case: poolers and schema changes",
-    "body": "A prepared statement lives on one server connection. Behind a pooler in transaction mode, the next transaction may run on another connection, where the statement does not exist; poolers either track statements per connection or need session mode. Schema changes invalidate cached plans, which are replanned on next use. In PostgreSQL, a prepared SELECT * whose result columns change after an ALTER TABLE fails with \"cached plan must not change result type\" and has to be prepared again.",
+    "body": "A prepared statement lives on one server connection. Behind a pooler in transaction mode, the next transaction may run on another connection, where the statement does not exist; poolers either track statements per connection or need session mode. PgBouncer 1.21 and later tracks protocol-level prepared statements when max_prepared_statements is set, but not SQL PREPARE. Schema changes invalidate cached plans, which are replanned on next use. In PostgreSQL, a prepared SELECT * whose result columns change after an ALTER TABLE fails with \"cached plan must not change result type\" and has to be prepared again.",
     "teaches": [
      "plan-invalidation"
     ]
@@ -4930,7 +4939,7 @@
     "id": "t621-a3",
     "concept": "generic-plans",
     "type": "multiple_choice",
-    "prompt": "A PostgreSQL prepared query for rare statuses is fast for its first five runs, then slow from the sixth. What happened?",
+    "prompt": "A PostgreSQL prepared query by status ran five times for 'delivered', which matches 90% of rows. From the sixth run, calls for 'cancelled' (0.1% of rows) are slow. What happened?",
     "choices": [
      {
       "id": "a",
@@ -4952,7 +4961,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "After five custom plans, PostgreSQL may adopt a generic plan whose estimate looked no worse, and for skewed data that plan can be a scan. plan_cache_mode = force_custom_plan for that statement or session restores per-value planning. Statistics do not expire per run. Eviction would slow the first runs too. There is no limit on how often a statement may execute."
+    "explanation": "The first five runs got custom plans for a common value, so the generic plan, estimated for an average value, looked no costlier and was adopted. Rare values then get that one plan, which can read far more than they need. plan_cache_mode = force_custom_plan for that statement or session restores per-value planning. Had the first five runs been for rare values, their cheap custom plans would have kept the generic plan out. Statistics do not expire per run. Eviction would slow the first runs too. There is no limit on how often a statement may execute."
    },
    {
     "id": "t621-a4",
@@ -5382,10 +5391,10 @@
     ],
     "formula": "rows × round-trip time",
     "workedAnswer": "2,000,000 × 0.5 ms = 1,000,000 ms = 1,000 s",
-    "explanation": "Sanity check: about 17 minutes of pure waiting. In batches of 1,000 rows it would be 2,000 round trips, about 1 s. 0.5 s is that batched figure, and 2,000 s uses a 1 ms round trip.",
+    "explanation": "Sanity check: about 17 minutes of pure waiting. In batches of 1,000 rows it would be 2,000 round trips, about 1 s. 1,000,000 is the same total left in milliseconds, and 2,000 s uses a 1 ms round trip.",
     "tolerance": 0.05,
     "trapAnswers": [
-     0.5,
+     1000000,
      2000
     ]
    },
@@ -5929,7 +5938,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "It is rolled back and ready again at once"
+      "label": "It is rolled back and becomes ready again at once for any worker"
      },
      {
       "id": "b",
@@ -5937,7 +5946,7 @@
      },
      {
       "id": "c",
-      "label": "It is lost unless an operator resets it by hand"
+      "label": "It is lost for good unless an operator resets its status by hand"
      },
      {
       "id": "d",
@@ -6023,11 +6032,11 @@
      },
      {
       "id": "c",
-      "label": "About 50 jobs a second must be processed"
+      "label": "About 50 jobs a second must now be processed by the workers"
      },
      {
       "id": "d",
-      "label": "Failed jobs should be retried three times"
+      "label": "Failed jobs should be retried three times before giving up"
      }
     ],
     "correctChoiceIds": [
@@ -6905,7 +6914,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "Change both booleans to smallint"
+      "label": "Change both booleans to smallint so they align better"
      },
      {
       "id": "b",
@@ -6917,13 +6926,13 @@
      },
      {
       "id": "d",
-      "label": "Add a fill factor of 100 on the table"
+      "label": "Set the table fill factor to 100 so pages are packed full"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Each 8-byte value must start on an 8-byte boundary, so a boolean before it wastes 7 bytes of padding, twice here. Ordering widest to narrowest removes 14 bytes per row. smallint is wider than boolean and still needs padding. Text timestamps are larger. 100 is already the default table fill factor."
+    "explanation": "Each 8-byte value must start on an 8-byte boundary, so a boolean before it wastes 7 bytes of padding, twice here: the data takes 32 bytes instead of 18. The whole row is then padded to a multiple of 8, so with the 23-byte header each row shrinks from 56 to 48 bytes. smallint is wider than boolean and still needs padding. Text timestamps are larger. 100 is already the default table fill factor."
    },
    {
     "id": "t625-a4",

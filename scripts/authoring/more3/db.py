@@ -8,15 +8,42 @@ import db_a, db_b, db_c, db_d, db_e, db_f, db_g, db_h
 
 topics = db_a.T + db_b.T + db_c.T + db_d.T + db_e.T + db_f.T + db_g.T + db_h.T
 
-# Steps whose relative order does not matter get alternative orders.
-for t in topics:
-    for q in t['questions']:
-        if q['id'] == 't555-a6':
-            q['alternativeOrders'] = [['s1', 's3', 's2', 's4', 's5']]
-
 # 551 also links to the system-design inverted index lesson.
 next(t for t in topics if t['id'] == 551)['seeAlso'].append(
     {'topicId': 63, 'why': 'Inverted indexes at search-engine scale, the next step after in-database full text'})
+
+# Cross-section links to lessons authored on other branches (System Design 508; Backend 531, 537, 539, 711, 712).
+# Each is added only once its target exists in scripts/authored, so this branch audits cleanly on its own
+# and the links appear when the integrator reruns this script after merging those sections.
+CROSS = {
+    555: [(537, 'Deleting data across a service: cascades, tombstones and deletion workflows'),
+          (539, 'Audit trails in code: who acted, impersonation and activity logs')],
+    557: [(508, 'Noisy neighbours: keeping one tenant from slowing the rest on shared infrastructure')],
+    559: [(531, 'Money in application code: rounding rules, splitting amounts and currency'),
+          (711, 'Time zones in business logic: schedules, daylight saving and local days'),
+          (712, 'Text in a backend: Unicode normalisation, case folding and length limits')],
+}
+def authored_ids():
+    import glob
+    found = set()
+    for p in glob.glob(os.path.join(os.path.dirname(__file__), '..', '..', 'authored', '**', '*.json'), recursive=True):
+        if p.endswith('fund-databases-more.json'):
+            continue
+        try:
+            data = json.load(open(p))
+        except Exception:
+            continue
+        items = data if isinstance(data, list) else data.get('topics', []) if isinstance(data, dict) else []
+        found.update(t['id'] for t in items if isinstance(t, dict) and isinstance(t.get('id'), int) and 'title' in t)
+    return found
+present = authored_ids()
+for t in topics:
+    for tid, why in CROSS.get(t['id'], []):
+        if tid in present and all(s['topicId'] != tid for s in t['seeAlso']):
+            t['seeAlso'].append({'topicId': tid, 'why': why})
+missing = sorted({tid for v in CROSS.values() for tid, _ in v} - present)
+if missing:
+    print('cross-section See also links waiting for their lessons:', missing)
 
 # Option-length balance: make a distractor at least as long as the answer (or shorten the answer).
 LABELS = {
@@ -36,11 +63,16 @@ LABELS = {
     ('t558-a3', 'b'): 'Older rows have moved to a slower storage format on disk over the year',
     ('t558-a4', 'a'): 'Scans read through the operating system cache and bypass the pool',
     ('t558-a4', 'c'): 'Scans reuse a small ring of buffers or enter the list mid-way',
-    ('t559-a3', 'c'): 'Local time plus the fixed offset +01:00 for Berlin',
     ('t621-a1', 'd'): 'Disk reads, because the prepared statement caches the rows it returns',
     ('t621-a3', 'a'): 'Its statistics expired after five runs and were not rebuilt',
     ('t621-a4', 'b'): 'Add memory so the large scan plan runs from cached pages instead',
     ('t622-a2', 'a'): 'Throughput keeps doubling with batch size, so one statement is fastest',
+    ('t623-a3', 'a'): 'It is rolled back and becomes ready again at once for any worker',
+    ('t623-a3', 'c'): 'It is lost for good unless an operator resets its status by hand',
+    ('t623-a6', 'c'): 'About 50 jobs a second must now be processed by the workers',
+    ('t623-a6', 'd'): 'Failed jobs should be retried three times before giving up',
+    ('t625-a3', 'a'): 'Change both booleans to smallint so they align better',
+    ('t625-a3', 'd'): 'Set the table fill factor to 100 so pages are packed full',
     ('t622-a6', 'a'): 'A longer timeout on each batch so replies arrive in time',
 }
 used = set()

@@ -67,7 +67,7 @@ T.append(topic(625, 'estimating-table-index-size', REGION, 23,
     ('b', 'Put the 8-byte columns first, then the booleans'),
     ('c', 'Store created_at as text instead'),
     ('d', 'Add a fill factor of 100 on the table')], 'b',
-   'Each 8-byte value must start on an 8-byte boundary, so a boolean before it wastes 7 bytes of padding, twice here. Ordering widest to narrowest removes 14 bytes per row. '
+   'Each 8-byte value must start on an 8-byte boundary, so a boolean before it wastes 7 bytes of padding, twice here: the data takes 32 bytes instead of 18. The whole row is then padded to a multiple of 8, so with the 23-byte header each row shrinks from 56 to 48 bytes. '
    'smallint is wider than boolean and still needs padding. Text timestamps are larger. 100 is already the default table fill factor.'),
   mc('t625-a4', 'index-size',
    'An index built fresh last year is now 40% larger, though the table\'s row count barely changed. Keys are random UUIDs. What explains it?',

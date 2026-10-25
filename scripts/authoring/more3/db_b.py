@@ -193,7 +193,7 @@ T.append(topic(554, 'table-partitioning', REGION, 18,
    'Hourly partitions kept for two years means 17,520 tables. Size partitions so typical queries touch a handful, and keep the total in the hundreds or low thousands; daily or monthly is usually enough.',
    ['partition-limits']),
   text(554, 6, 'Edge case: a row with nowhere to go',
-   'If an insert arrives with a timestamp beyond the last partition, PostgreSQL rejects it because no partition matches. A default partition catches such rows, but has its own cost: creating a partition for a range later requires checking that the default holds no rows for that range, and moving any it does. '
+   'If an insert arrives with a timestamp beyond the last partition, PostgreSQL rejects it because no partition matches. A default partition catches such rows, but has its own cost: creating a partition for a range later scans the default to check that it holds no rows for that range, and fails if it does, so those rows must be moved out first. '
    'Create partitions ahead of time with a scheduled job, alert when anything lands in the default partition, and treat a full default partition as a bug.',
    ['partition-limits'])],
  [mc('t554-a1', 'retention',
