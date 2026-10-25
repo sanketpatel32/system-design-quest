@@ -99288,7 +99288,7 @@
           },
           {
             "id": "c",
-            "label": "The mutex needs to be retaken"
+            "label": "It lets the wait run without holding the mutex"
           },
           {
             "id": "d",
@@ -99298,7 +99298,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "A wait can return without a signal, and another thread may take the item between the signal and this thread running, so the condition must be re-checked after every wake-up. The wait itself retakes the mutex before returning; signal wakes at most one waiter (broadcast wakes all); and the loop costs time rather than saving it."
+        "explanation": "A wait can return without a signal, and another thread may take the item between the signal and this thread running, so the condition must be re-checked after every wake-up. The wait itself retakes the mutex before returning, so the loop does not need to; the mutex must be held when the wait is called, loop or not; and signal wakes at most one waiter (broadcast wakes all)."
       },
       {
         "id": "t288-a2",
@@ -99701,7 +99701,7 @@
         "id": "t289-c6",
         "kind": "text",
         "title": "Edge case: fdatasync, metadata and drive caches",
-        "body": "fsync flushes a file’s data and the metadata needed to find it, such as its size and timestamps; fdatasync skips metadata that is not needed to read the data back, which saves a write per call for logs that overwrite space allocated in advance. Either call also asks the device to empty its volatile write cache. A drive or virtual disk that acknowledges flushes without honouring them silently breaks durability, so test with real power loss rather than trusting the acknowledgement.",
+        "body": "fsync flushes a file’s data and all of its metadata, including size and timestamps; fdatasync skips metadata that is not needed to read the data back, such as the modification time, but still flushes a change in size, which saves a write per call for logs that overwrite space allocated in advance. On Linux either call normally also asks the device to empty its volatile write cache. A drive or virtual disk that acknowledges flushes without honouring them silently breaks durability, so test with real power loss rather than trusting the acknowledgement.",
         "teaches": [
           "fsync",
           "page-cache"
@@ -114427,7 +114427,7 @@
         "id": "t562-a4",
         "concept": "gc-pauses",
         "type": "multiple_choice",
-        "prompt": "A service has a 150 ms p99 target. The collector pauses for 200 ms about every 10 seconds, and requests take 20 ms otherwise. Which effect should you expect?",
+        "prompt": "A service has a 150 ms p99 target. The collector pauses for 300 ms about every 10 seconds, and requests take 20 ms otherwise. Which effect should you expect?",
         "choices": [
           {
             "id": "a",
@@ -114439,17 +114439,17 @@
           },
           {
             "id": "c",
-            "label": "About 2% of requests are delayed, so p99 breaks the target"
+            "label": "About 3% of requests are delayed, so p99 breaks the target"
           },
           {
             "id": "d",
-            "label": "The p50 rises to about 200 ms while the p99 stays fine"
+            "label": "The p50 rises to about 300 ms while the p99 stays fine"
           }
         ],
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "Requests arriving during a 200 ms window out of every 10 s, about 2% of them, wait up to 200 ms, which is more than 1% of traffic, so the 99th percentile falls inside the delayed group. All requests in flight or arriving are delayed, not one, and the median is unaffected because 98% of requests miss the pause."
+        "explanation": "About 3% of requests (300 ms out of every 10 s) arrive during a pause, and their extra waits spread evenly from 0 to 300 ms. The slowest 1% of all traffic is the worst third of that group, which waits more than 200 ms, so p99 is about 220 ms and breaks the 150 ms target. Every request in flight or arriving is delayed, not just one, and the median is unaffected because 97% of requests miss the pause."
       },
       {
         "id": "t562-a5",
@@ -116494,7 +116494,7 @@
         ],
         "formula": "1 ÷ ((1 − p) + p ÷ N)",
         "workedAnswer": "1 ÷ (0.2 + 0.8 ÷ 4) = 1 ÷ 0.4 = 2.5",
-        "explanation": "Sanity check: the ceiling for this job is 1 ÷ 0.2 = 5 times, and 4 cores already reach half of it, so another 4 cores add only about 1.1 times more (to 3.3).",
+        "explanation": "Sanity check: the ceiling for this job is 1 ÷ 0.2 = 5 times, and 4 cores already reach half of it, so another 4 cores add only about 1.3 times more (from 2.5 to 3.3).",
         "tolerance": 0.05,
         "trapAnswers": [
           3.2,
@@ -116685,28 +116685,23 @@
       ]
     },
     "interactive": {
-      "kind": "predict",
+      "kind": "slider",
       "title": "Is triple the cores worth it?",
-      "prompt": "A job has 10 s of serial setup and 90 s of perfectly parallel work when run on one core. You can run it on 10 cores or on 30.",
-      "choices": [
-        {
-          "id": "a",
-          "label": "About 1.5 times faster: 19 s on 10 cores becomes 13 s on 30",
-          "feedback": "Right: 10 + 90 ÷ 10 = 19 s and 10 + 90 ÷ 30 = 13 s."
-        },
-        {
-          "id": "b",
-          "label": "About 3 times faster, because the cores triple",
-          "feedback": "Only the 90 s parallel part speeds up; the 10 s setup stays."
-        },
-        {
-          "id": "c",
-          "label": "No faster at all, because the setup dominates",
-          "feedback": "Setup is 10 s of the 19 s, so the parallel part still shrinks from 9 s to 3 s."
-        }
-      ],
-      "correctId": "a",
-      "reveal": "Triple the hardware buys 19 ÷ 13 ≈ 1.46 times the speed. Cutting the setup from 10 s to 5 s on 10 cores gives 14 s, almost as fast as 30 cores, without any new hardware."
+      "prompt": "A job has 10 s of serial setup and 90 s of perfectly parallel work on one core. Slide the core count and watch what each extra core buys.",
+      "model": "amdahl",
+      "params": {
+        "serialS": 10,
+        "parallelS": 90
+      },
+      "control": {
+        "label": "Cores",
+        "min": 1,
+        "max": 64,
+        "step": 1,
+        "initial": 10,
+        "unit": "cores"
+      },
+      "takeaway": "10 cores give 19 s (5.3 times faster); 30 cores give 13 s, only 1.46 times better again for triple the hardware, and no number of cores beats 10 s. Cutting the setup from 10 s to 5 s on 10 cores gives 14 s, almost as fast as 30 cores, without any new hardware."
     },
     "seeAlso": [
       {
@@ -117063,7 +117058,7 @@
       "india": {
         "title": "How one runtime documents pinning",
         "label": "Official documentation",
-        "body": "Oracle’s documentation for Java virtual threads explains that a virtual thread is mounted on a platform carrier thread and unmounted when it blocks, freeing the carrier to run another virtual thread. It cannot be unmounted while pinned: when it runs code inside a synchronized block or method, or runs a native method or foreign function. The documentation notes that pinning does not make an application incorrect but can hinder scalability."
+        "body": "Oracle’s documentation for Java virtual threads explains that a virtual thread is mounted on a platform carrier thread and unmounted when it blocks, freeing the carrier to run another virtual thread. It cannot be unmounted while pinned: when it runs code inside a synchronized block or method, or runs a native method or foreign function. The documentation notes that pinning does not make an application incorrect but can hinder scalability. From JDK 24 (JEP 491), synchronized code no longer pins; native methods and foreign functions still do."
       },
       "pitfalls": [
         {
@@ -117680,7 +117675,7 @@
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "sendfile and splice move data from the page cache to the socket inside the kernel, so the two copies through user space disappear. A larger buffer reduces calls but not bytes copied, direct I/O still copies into the user buffer and then into the socket, and compression adds CPU work."
+        "explanation": "sendfile and splice move data from the page cache to the socket inside the kernel, so the two copies through user space disappear. A larger buffer reduces calls but not bytes copied, direct I/O lets the disk write straight into the user buffer but still copies from it into the socket, and compression adds CPU work."
       },
       {
         "id": "t570-a3",
@@ -117874,7 +117869,7 @@
           ],
           [
             "Direct I/O with own cache",
-            "One into the user buffer",
+            "One, from the user buffer to the socket",
             "Program controls caching and ordering",
             "Databases"
           ]
@@ -118437,7 +118432,7 @@
           },
           {
             "id": "b",
-            "label": "About 10 million, one per lock and pair"
+            "label": "About 10 million, one per lock-and-unlock pair"
           },
           {
             "id": "c",
@@ -119193,7 +119188,7 @@
           "Each task computes for 10 ms and waits 40 ms on a database",
           "A worker keeps a core busy only 10 ÷ 50 = 20% of the time",
           "To keep 8 cores busy: 8 × (1 + 40 ÷ 10) = 40 workers",
-          "Cross-check with arrivals: at 800 tasks a second each lasting 50 ms, about 800 × 0.05 = 40 tasks are in progress at once",
+          "At full use the pool finishes at most 8 cores ÷ 10 ms = 800 tasks a second; how many workers a given arrival rate needs is a separate question, answered by Little’s Law",
           "More workers than this cannot add CPU; they only queue on the database"
         ]
       },
@@ -119393,7 +119388,7 @@
         "id": "t644-a6",
         "concept": "bounded-queue",
         "type": "drag_order",
-        "prompt": "Order what a typical pool does as load rises on a newly submitted task.",
+        "prompt": "Put in order the checks a typical pool makes for a newly submitted task as load rises.",
         "items": [
           {
             "id": "s3",
@@ -119429,8 +119424,8 @@
       },
       {
         "id": "t644-f2",
-        "front": "Why bound the queue?",
-        "back": "An unbounded queue turns overload into ever-growing latency and memory with no errors."
+        "front": "Caller-runs overflow policy?",
+        "back": "When the queue is full, the submitting thread runs the task itself, so producers slow to the pool’s pace."
       },
       {
         "id": "t644-f3",
@@ -119462,7 +119457,7 @@
           "Some pools start extra workers, up to a maximum, only when the queue is full; with an unbounded queue that never happens, so the maximum has no effect.",
           "When the queue is full and the pool is at its maximum, the overflow policy runs: reject with an error, run on the caller, or discard a task.",
           "Workers loop: take a task, run it, repeat. Extra workers above the core size exit after an idle timeout.",
-          "Throughput is capped by the slowest of workers × 1 ÷ task time, available cores, and what downstream services can take; queue time rises sharply as utilisation nears that cap."
+          "Throughput is capped by the lowest of workers ÷ task time, available cores, and what downstream services can take. How queue time grows as load nears that cap is queueing maths (Little’s Law and utilisation) rather than pool mechanics."
         ]
       },
       "useWhen": [
@@ -119508,17 +119503,19 @@
         ]
       },
       "numbers": {
-        "title": "Sizing a pool and its queue",
+        "title": "What the queue bound decides in an overload",
         "assumptions": [
-          "1,000 requests a second; each takes 2 ms of CPU and 18 ms waiting on a cache; 8 cores; callers time out at 200 ms (illustrative)"
+          "40 workers, each task 40 ms, so the pool finishes 1,000 tasks a second",
+          "A spike brings 1,250 tasks a second for 60 s",
+          "Callers time out at 300 ms; a queued task holds about 20 KB (illustrative)"
         ],
         "steps": [
-          "Concurrent requests in progress: 1,000 × 0.020 s = 20.",
-          "CPU needed: 1,000 × 2 ms = 2 core-seconds per second, so 8 cores are 25% busy.",
-          "Workers: 20 at steady load; allow 40 for bursts, still far below what 8 cores can switch between.",
-          "Queue: a task queued behind 40 workers each taking 20 ms waits about 20 ms per batch of 40, so 200 ms allows about 10 batches; cap the queue at about 400 and reject beyond."
+          "Excess: 1,250 − 1,000 = 250 tasks a second more than the pool can finish.",
+          "Unbounded queue: after 60 s it holds 250 × 60 = 15,000 tasks, about 15,000 × 20 KB = 300 MB, and a new task waits 15,000 ÷ 1,000 = 15 s, so every caller has given up long before its task runs.",
+          "Queue bounded at 200 with rejection: a queued task waits at most 200 ÷ 1,000 = 0.2 s, plus 40 ms to run, so 240 ms, inside the timeout; the excess 250 a second, 20% of arrivals, fail at once and can back off.",
+          "Caller-runs instead of rejection: the submitting threads run the excess themselves, so producers slow to what the system finishes and nothing is dropped, at the cost of slower submitters."
         ],
-        "result": "Forty workers and a queue of about 400 keep queued tasks inside the 200 ms deadline; anything more would only be answered after the caller has given up."
+        "result": "The bound turns a minute of overload from 300 MB of stale work that nobody receives into fast, visible rejections for 20% of tasks; caller-runs is the alternative when producers can wait."
       },
       "india": {
         "title": "What a standard pool’s documentation warns",
@@ -119578,6 +119575,10 @@
       {
         "topicId": 288,
         "why": "Bounded queues and semaphores that pools are built from"
+      },
+      {
+        "topicId": 274,
+        "why": "Connection pools: the same bound, queue and reject mechanics for database connections"
       }
     ]
   },
@@ -120304,7 +120305,7 @@
           ],
           [
             "1 GiB explicit",
-            "1.5 TiB",
+            "1.5 TiB in theory; real CPUs hold far fewer 1 GiB entries",
             "Reserved at boot",
             "Very large fixed memory pools"
           ]
@@ -120434,7 +120435,7 @@
           "The child reads input and writes results to its output pipe as it goes",
           "The output pipe fills at 64 KiB, so the child blocks on its write and stops reading input",
           "The input pipe then fills, so the parent blocks on its write",
-          "Each waits for the other: read output while writing input, using a second thread or readiness polling"
+          "Each waits for the other. Fix: read output while writing input, using a second thread or readiness polling"
         ]
       },
       {
@@ -121376,7 +121377,7 @@
         "id": "t649-a4",
         "concept": "user-namespace",
         "type": "multiple_choice",
-        "prompt": "A process runs as root inside a container with a user namespace mapping inside ID 0 to host ID 100,000. It escapes to a host directory mounted in. What can it do there?",
+        "prompt": "A process runs as root inside a container with a user namespace mapping inside ID 0 to host ID 100,000. It writes into a host directory mounted into the container. What can it do there?",
         "choices": [
           {
             "id": "a",
@@ -121664,7 +121665,7 @@
         "steps": [
           "Sampling at 99 per second on each CPU gives up to 99 × 8 × 30 = 23,760 samples",
           "A compression function appears in 4,752 samples",
-          "Per second of wall time that is 4,752 ÷ (99 × 30) = 1.6 samples-worth of a CPU, so it uses about 1.6 cores",
+          "4,752 ÷ (99 × 30) = 1.6, so it keeps about 1.6 CPUs busy on average",
           "Removing it entirely could free at most those 1.6 cores",
           "A function in only 30 samples has a sampling error near 1 ÷ √30, about 18%, so treat small boxes as rough"
         ]

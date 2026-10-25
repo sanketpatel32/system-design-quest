@@ -562,7 +562,7 @@
     "id": "t562-a4",
     "concept": "gc-pauses",
     "type": "multiple_choice",
-    "prompt": "A service has a 150 ms p99 target. The collector pauses for 200 ms about every 10 seconds, and requests take 20 ms otherwise. Which effect should you expect?",
+    "prompt": "A service has a 150 ms p99 target. The collector pauses for 300 ms about every 10 seconds, and requests take 20 ms otherwise. Which effect should you expect?",
     "choices": [
      {
       "id": "a",
@@ -574,17 +574,17 @@
      },
      {
       "id": "c",
-      "label": "About 2% of requests are delayed, so p99 breaks the target"
+      "label": "About 3% of requests are delayed, so p99 breaks the target"
      },
      {
       "id": "d",
-      "label": "The p50 rises to about 200 ms while the p99 stays fine"
+      "label": "The p50 rises to about 300 ms while the p99 stays fine"
      }
     ],
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Requests arriving during a 200 ms window out of every 10 s, about 2% of them, wait up to 200 ms, which is more than 1% of traffic, so the 99th percentile falls inside the delayed group. All requests in flight or arriving are delayed, not one, and the median is unaffected because 98% of requests miss the pause."
+    "explanation": "About 3% of requests (300 ms out of every 10 s) arrive during a pause, and their extra waits spread evenly from 0 to 300 ms. The slowest 1% of all traffic is the worst third of that group, which waits more than 200 ms, so p99 is about 220 ms and breaks the 150 ms target. Every request in flight or arriving is delayed, not just one, and the median is unaffected because 97% of requests miss the pause."
    },
    {
     "id": "t562-a5",
@@ -2629,7 +2629,7 @@
     ],
     "formula": "1 ÷ ((1 − p) + p ÷ N)",
     "workedAnswer": "1 ÷ (0.2 + 0.8 ÷ 4) = 1 ÷ 0.4 = 2.5",
-    "explanation": "Sanity check: the ceiling for this job is 1 ÷ 0.2 = 5 times, and 4 cores already reach half of it, so another 4 cores add only about 1.1 times more (to 3.3).",
+    "explanation": "Sanity check: the ceiling for this job is 1 ÷ 0.2 = 5 times, and 4 cores already reach half of it, so another 4 cores add only about 1.3 times more (from 2.5 to 3.3).",
     "tolerance": 0.05,
     "trapAnswers": [
      3.2,
@@ -2820,28 +2820,23 @@
    ]
   },
   "interactive": {
-   "kind": "predict",
+   "kind": "slider",
    "title": "Is triple the cores worth it?",
-   "prompt": "A job has 10 s of serial setup and 90 s of perfectly parallel work when run on one core. You can run it on 10 cores or on 30.",
-   "choices": [
-    {
-     "id": "a",
-     "label": "About 1.5 times faster: 19 s on 10 cores becomes 13 s on 30",
-     "feedback": "Right: 10 + 90 ÷ 10 = 19 s and 10 + 90 ÷ 30 = 13 s."
-    },
-    {
-     "id": "b",
-     "label": "About 3 times faster, because the cores triple",
-     "feedback": "Only the 90 s parallel part speeds up; the 10 s setup stays."
-    },
-    {
-     "id": "c",
-     "label": "No faster at all, because the setup dominates",
-     "feedback": "Setup is 10 s of the 19 s, so the parallel part still shrinks from 9 s to 3 s."
-    }
-   ],
-   "correctId": "a",
-   "reveal": "Triple the hardware buys 19 ÷ 13 ≈ 1.46 times the speed. Cutting the setup from 10 s to 5 s on 10 cores gives 14 s, almost as fast as 30 cores, without any new hardware."
+   "prompt": "A job has 10 s of serial setup and 90 s of perfectly parallel work on one core. Slide the core count and watch what each extra core buys.",
+   "model": "amdahl",
+   "params": {
+    "serialS": 10,
+    "parallelS": 90
+   },
+   "control": {
+    "label": "Cores",
+    "min": 1,
+    "max": 64,
+    "step": 1,
+    "initial": 10,
+    "unit": "cores"
+   },
+   "takeaway": "10 cores give 19 s (5.3 times faster); 30 cores give 13 s, only 1.46 times better again for triple the hardware, and no number of cores beats 10 s. Cutting the setup from 10 s to 5 s on 10 cores gives 14 s, almost as fast as 30 cores, without any new hardware."
   },
   "seeAlso": [
    {
@@ -3198,7 +3193,7 @@
    "india": {
     "title": "How one runtime documents pinning",
     "label": "Official documentation",
-    "body": "Oracle’s documentation for Java virtual threads explains that a virtual thread is mounted on a platform carrier thread and unmounted when it blocks, freeing the carrier to run another virtual thread. It cannot be unmounted while pinned: when it runs code inside a synchronized block or method, or runs a native method or foreign function. The documentation notes that pinning does not make an application incorrect but can hinder scalability."
+    "body": "Oracle’s documentation for Java virtual threads explains that a virtual thread is mounted on a platform carrier thread and unmounted when it blocks, freeing the carrier to run another virtual thread. It cannot be unmounted while pinned: when it runs code inside a synchronized block or method, or runs a native method or foreign function. The documentation notes that pinning does not make an application incorrect but can hinder scalability. From JDK 24 (JEP 491), synchronized code no longer pins; native methods and foreign functions still do."
    },
    "pitfalls": [
     {
@@ -3815,7 +3810,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "sendfile and splice move data from the page cache to the socket inside the kernel, so the two copies through user space disappear. A larger buffer reduces calls but not bytes copied, direct I/O still copies into the user buffer and then into the socket, and compression adds CPU work."
+    "explanation": "sendfile and splice move data from the page cache to the socket inside the kernel, so the two copies through user space disappear. A larger buffer reduces calls but not bytes copied, direct I/O lets the disk write straight into the user buffer but still copies from it into the socket, and compression adds CPU work."
    },
    {
     "id": "t570-a3",
@@ -4009,7 +4004,7 @@
      ],
      [
       "Direct I/O with own cache",
-      "One into the user buffer",
+      "One, from the user buffer to the socket",
       "Program controls caching and ordering",
       "Databases"
      ]

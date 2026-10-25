@@ -481,7 +481,7 @@
      },
      {
       "id": "b",
-      "label": "About 10 million, one per lock and pair"
+      "label": "About 10 million, one per lock-and-unlock pair"
      },
      {
       "id": "c",
@@ -1237,7 +1237,7 @@
      "Each task computes for 10 ms and waits 40 ms on a database",
      "A worker keeps a core busy only 10 ÷ 50 = 20% of the time",
      "To keep 8 cores busy: 8 × (1 + 40 ÷ 10) = 40 workers",
-     "Cross-check with arrivals: at 800 tasks a second each lasting 50 ms, about 800 × 0.05 = 40 tasks are in progress at once",
+     "At full use the pool finishes at most 8 cores ÷ 10 ms = 800 tasks a second; how many workers a given arrival rate needs is a separate question, answered by Little’s Law",
      "More workers than this cannot add CPU; they only queue on the database"
     ]
    },
@@ -1437,7 +1437,7 @@
     "id": "t644-a6",
     "concept": "bounded-queue",
     "type": "drag_order",
-    "prompt": "Order what a typical pool does as load rises on a newly submitted task.",
+    "prompt": "Put in order the checks a typical pool makes for a newly submitted task as load rises.",
     "items": [
      {
       "id": "s3",
@@ -1473,8 +1473,8 @@
    },
    {
     "id": "t644-f2",
-    "front": "Why bound the queue?",
-    "back": "An unbounded queue turns overload into ever-growing latency and memory with no errors."
+    "front": "Caller-runs overflow policy?",
+    "back": "When the queue is full, the submitting thread runs the task itself, so producers slow to the pool’s pace."
    },
    {
     "id": "t644-f3",
@@ -1506,7 +1506,7 @@
      "Some pools start extra workers, up to a maximum, only when the queue is full; with an unbounded queue that never happens, so the maximum has no effect.",
      "When the queue is full and the pool is at its maximum, the overflow policy runs: reject with an error, run on the caller, or discard a task.",
      "Workers loop: take a task, run it, repeat. Extra workers above the core size exit after an idle timeout.",
-     "Throughput is capped by the slowest of workers × 1 ÷ task time, available cores, and what downstream services can take; queue time rises sharply as utilisation nears that cap."
+     "Throughput is capped by the lowest of workers ÷ task time, available cores, and what downstream services can take. How queue time grows as load nears that cap is queueing maths (Little’s Law and utilisation) rather than pool mechanics."
     ]
    },
    "useWhen": [
@@ -1552,17 +1552,19 @@
     ]
    },
    "numbers": {
-    "title": "Sizing a pool and its queue",
+    "title": "What the queue bound decides in an overload",
     "assumptions": [
-     "1,000 requests a second; each takes 2 ms of CPU and 18 ms waiting on a cache; 8 cores; callers time out at 200 ms (illustrative)"
+     "40 workers, each task 40 ms, so the pool finishes 1,000 tasks a second",
+     "A spike brings 1,250 tasks a second for 60 s",
+     "Callers time out at 300 ms; a queued task holds about 20 KB (illustrative)"
     ],
     "steps": [
-     "Concurrent requests in progress: 1,000 × 0.020 s = 20.",
-     "CPU needed: 1,000 × 2 ms = 2 core-seconds per second, so 8 cores are 25% busy.",
-     "Workers: 20 at steady load; allow 40 for bursts, still far below what 8 cores can switch between.",
-     "Queue: a task queued behind 40 workers each taking 20 ms waits about 20 ms per batch of 40, so 200 ms allows about 10 batches; cap the queue at about 400 and reject beyond."
+     "Excess: 1,250 − 1,000 = 250 tasks a second more than the pool can finish.",
+     "Unbounded queue: after 60 s it holds 250 × 60 = 15,000 tasks, about 15,000 × 20 KB = 300 MB, and a new task waits 15,000 ÷ 1,000 = 15 s, so every caller has given up long before its task runs.",
+     "Queue bounded at 200 with rejection: a queued task waits at most 200 ÷ 1,000 = 0.2 s, plus 40 ms to run, so 240 ms, inside the timeout; the excess 250 a second, 20% of arrivals, fail at once and can back off.",
+     "Caller-runs instead of rejection: the submitting threads run the excess themselves, so producers slow to what the system finishes and nothing is dropped, at the cost of slower submitters."
     ],
-    "result": "Forty workers and a queue of about 400 keep queued tasks inside the 200 ms deadline; anything more would only be answered after the caller has given up."
+    "result": "The bound turns a minute of overload from 300 MB of stale work that nobody receives into fast, visible rejections for 20% of tasks; caller-runs is the alternative when producers can wait."
    },
    "india": {
     "title": "What a standard pool’s documentation warns",
@@ -1622,6 +1624,10 @@
    {
     "topicId": 288,
     "why": "Bounded queues and semaphores that pools are built from"
+   },
+   {
+    "topicId": 274,
+    "why": "Connection pools: the same bound, queue and reject mechanics for database connections"
    }
   ]
  },
@@ -2348,7 +2354,7 @@
      ],
      [
       "1 GiB explicit",
-      "1.5 TiB",
+      "1.5 TiB in theory; real CPUs hold far fewer 1 GiB entries",
       "Reserved at boot",
       "Very large fixed memory pools"
      ]
@@ -2478,7 +2484,7 @@
      "The child reads input and writes results to its output pipe as it goes",
      "The output pipe fills at 64 KiB, so the child blocks on its write and stops reading input",
      "The input pipe then fills, so the parent blocks on its write",
-     "Each waits for the other: read output while writing input, using a second thread or readiness polling"
+     "Each waits for the other. Fix: read output while writing input, using a second thread or readiness polling"
     ]
    },
    {
@@ -3420,7 +3426,7 @@
     "id": "t649-a4",
     "concept": "user-namespace",
     "type": "multiple_choice",
-    "prompt": "A process runs as root inside a container with a user namespace mapping inside ID 0 to host ID 100,000. It escapes to a host directory mounted in. What can it do there?",
+    "prompt": "A process runs as root inside a container with a user namespace mapping inside ID 0 to host ID 100,000. It writes into a host directory mounted into the container. What can it do there?",
     "choices": [
      {
       "id": "a",
@@ -3708,7 +3714,7 @@
     "steps": [
      "Sampling at 99 per second on each CPU gives up to 99 × 8 × 30 = 23,760 samples",
      "A compression function appears in 4,752 samples",
-     "Per second of wall time that is 4,752 ÷ (99 × 30) = 1.6 samples-worth of a CPU, so it uses about 1.6 cores",
+     "4,752 ÷ (99 × 30) = 1.6, so it keeps about 1.6 CPUs busy on average",
      "Removing it entirely could free at most those 1.6 cores",
      "A function in only 30 samples has a sampling error near 1 ÷ √30, about 18%, so treat small boxes as rough"
     ]

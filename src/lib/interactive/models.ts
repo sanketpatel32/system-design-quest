@@ -39,6 +39,7 @@ export type ModelId =
   | 'virtual-list'
   | 'layout-thrash'
   | 'long-task'
+  | 'amdahl'
 
 export interface ModelRow {
   label: string
@@ -686,6 +687,28 @@ export const MODELS: Record<ModelId, { params: string[]; run: (x: number, p: Par
         verdict: x <= p.goodInpMs!
           ? { ok: true, text: `Input delay alone stays under the ${p.goodInpMs} ms "good" INP threshold; handler and paint time add to it` }
           : { ok: false, text: `A tap at the start waits ${fmt(x)} ms before any handler runs, past the ${p.goodInpMs} ms "good" INP threshold on its own` },
+      }
+    },
+  },
+  // Fundamentals · OS: Amdahl's law, x = cores; the serial part never shrinks
+  amdahl: {
+    params: ['serialS', 'parallelS'],
+    run: (x, p) => {
+      const one = p.serialS! + p.parallelS!
+      const time = p.serialS! + p.parallelS! / x
+      const speedup = one / time
+      const ceiling = one / p.serialS!
+      const efficiency = (speedup / x) * 100
+      return {
+        rows: [
+          { label: `Run time on ${fmt(x)} core${x === 1 ? '' : 's'}`, value: `${fmt(time, 1)} s`, strong: true },
+          { label: 'Speedup over one core', value: `${fmt(speedup, 1)}×`, strong: true },
+          { label: 'Ceiling with unlimited cores', value: `${fmt(ceiling, 1)}×` },
+          { label: 'Work each core earns (speedup ÷ cores)', value: `${fmt(efficiency)}%` },
+        ],
+        verdict: efficiency >= 50
+          ? { ok: true, text: `Each core still earns at least half its share; the ${fmt(p.serialS!)} s serial part is ${fmt((p.serialS! / time) * 100)}% of the run` }
+          : { ok: false, text: `Most of each added core sits idle: the ${fmt(p.serialS!)} s serial part is ${fmt((p.serialS! / time) * 100)}% of the run, so shrink it rather than add cores` },
       }
     },
   },
