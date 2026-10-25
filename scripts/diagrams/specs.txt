@@ -898,6 +898,118 @@ Production database {store} [snapshots + log archive]> Backup vault|same region 
 Backup vault|same region {store} [copy]> Immutable vault|other account and region {store}
 Immutable vault|other account and region {store} [scheduled test]> Restore check|measure RTO
 
+@581 Static stability across zones: each zone runs enough capacity to carry the peak with one zone lost, so a zone failure needs no new launches from the control plane.
+Users {client} > Regional load balancer {svc}
+Regional load balancer {svc} [1/3]> Zone A|105 per zone at 67% {svc}
+Regional load balancer {svc} [1/3]> Zone B|105 per zone at 67% {svc}
+Regional load balancer {svc} [zone lost]?> Zone C|out {svc}
+Control plane|launch API {ext} ?> Not needed to recover
+
+@582 CI federation: the job gets an OIDC token from its CI provider, the cloud token service checks the role's trust policy, including the token's sub, and issues a short-lived session that the job uses to call cloud APIs.
+CI job {client} [1. request ID token]> CI OIDC provider|signs token with repo + env in sub {ext}
+CI job {client} [2. exchange token]> Cloud token service {svc}
+Cloud token service {svc} [3. check issuer, audience, sub]> Role trust policy {store}
+Cloud token service {svc} [no match]?> Refused
+Cloud token service {svc} [4. issue]> Short-lived session|expires, often in 1 hour {svc}
+Short-lived session|expires, often in 1 hour {svc} [5. signed API calls]> Cloud APIs|deploy, upload {svc}
+
+@583 Serverless invocation: a request is routed to a warm instance when one is free, or a new instance cold-starts, within the account's concurrency limit.
+Request {client} > Function router {svc}
+Function router {svc} [warm instance free]> Warm instance {svc}
+Function router {svc} [none free]> Cold start|init runtime + code {svc}
+Function router {svc} [concurrency limit hit]?> Throttled|429 or retry
+
+@584 Where a cloud bill comes from: on-demand, committed and spot compute, storage, and data transfer between zones, regions and the internet.
+%concept
+Compute {svc} > On-demand|flexible
+Compute {svc} > Committed|discount for 1–3 years
+Compute {svc} > Spot|cheap, can be reclaimed
+App in zone A {svc} [cross-zone GB]> App in zone B {svc}
+App in zone B {svc} [egress GB]> Internet {ext}
+
+@585 GitOps reconciliation: a merged change updates the desired state in Git, and an agent in the cluster pulls it, compares it with live state and fixes drift.
+Pull request {client} [merge]> Git repo|desired state {store}
+Git repo|desired state {store} ~> GitOps agent|in cluster {svc}
+GitOps agent|in cluster {svc} [diff]> Cluster|live state {svc}
+Manual change {client} ?> Cluster|live state {svc}
+
+@586 A chaos experiment: steady state and a hypothesis come first, the fault is injected into a small scope, and an abort condition stops it if users are hurt.
+Steady state|success, p99 > Hypothesis + abort rule > Scoped fault|1 zone, 5%, 15 min {svc}
+Scoped fault|1 zone, 5%, 15 min {svc} [abort rule fires]?> Stop and restore
+Scoped fault|1 zone, 5%, 15 min {svc} [ends on schedule]> Findings|tracked fixes {store}
+
+@587 A stepped load test: an open-model generator raises the arrival rate, throughput follows until the knee, and the planning target is set below it.
+Open-model generator|fixed arrival rate {client} > Service under test {svc}
+Service under test {svc} > Measure|throughput, errors, p99 {store}
+Measure|throughput, errors, p99 {store} > Knee|1,100 req/s > Plan target|about 770 req/s
+
+@588 A service mesh: each pod's sidecar proxy handles mTLS, retries and timeouts, configured by a control plane that issues certificates and pushes policy.
+Control plane|certs + policy {svc} ~> Sidecar A {svc}
+Control plane|certs + policy {svc} ~> Sidecar B {svc}
+Service A {svc} > Sidecar A {svc} [mTLS]> Sidecar B {svc} > Service B {svc}
+
+@589 How the scheduler places a pod: nodes without enough unreserved requests or with an untolerated taint are filtered out, the rest are scored for zone balance, and the pod is bound.
+Pending pod|requests + tolerations {svc} > Filter|requests, taints, affinity {svc} > Score|zone spread {svc} > Bind to node {svc}
+Filter|requests, taints, affinity {svc} [no node fits]?> Pending|autoscaler or preemption
+
+@590 Traffic into a cluster: the cloud load balancer sends requests to a shared gateway, which routes by host to a Service, whose virtual IP forwards each connection to a ready pod; a network policy limits which pods may call it.
+Browser {client} > Cloud load balancer {ext} > Gateway|TLS + host routes {svc} > Service|virtual IP {svc} > Ready pod {svc}
+Service|virtual IP {svc} [allowed by policy]< Frontend pod {svc}
+Batch pod {svc} [no rule]?> Dropped
+
+@681 A node drain during an upgrade: the node is cordoned, each pod eviction is checked against its disruption budget, and allowed pods are recreated on new nodes.
+Control plane|upgraded first {svc} > Cordon old node {svc} > Evict pod {svc}
+Evict pod {svc} [budget allows]> Recreated on new node {svc}
+Evict pod {svc} [budget refuses]?> Retry later
+
+@682 A StatefulSet with zonal disks: each ordinal pod keeps its own claim and disk in one zone, and the database replicates between pods in different zones.
+StatefulSet|db {svc} [creates db-0, db-1 in order]> db-0|primary, zone A {svc} > Disk db-0|zone A {store}
+db-0|primary, zone A {svc} [database replication]~> db-1|replica, zone B {svc} > Disk db-1|zone B {store}
+Operator or managed service {svc} [promote on failure]?> db-1|replica, zone B {svc}
+
+@683 Joining networks: spoke networks and the data-centre link attach to a transit hub, and a private endpoint brings a managed service into a network on a private IP.
+Network A {svc} > Transit hub|route tables {svc}
+Network B {svc} > Transit hub|route tables {svc}
+Data centre {ext} [VPN or interconnect]> Transit hub|route tables {svc}
+Network A {svc} [private DNS]> Private endpoint|10.1.2.15 {svc} > Managed storage {store}
+
+@684 Quotas in a scale-up: the autoscaler requests instances, the provider checks the regional vCPU quota and subnet addresses, and launches above either ceiling fail.
+Autoscaler|max 120 {svc} > Launch request {svc} > Quota check|vCPUs per region {ext}
+Quota check|vCPUs per region {ext} [within quota]> Subnet addresses {store} [free IPs]> New instance {svc}
+Quota check|vCPUs per region {ext} [over quota]?> Launch fails
+
+@685 Landing zone: the organisation root holds guardrails, organisational units group accounts, and every workload account sends logs to a shared log archive.
+Organisation root|guardrails {ext} > Security OU {svc} > Log archive account {store}
+Organisation root|guardrails {ext} > Workloads OU {svc} > Prod account {svc}
+Workloads OU {svc} > Dev account {svc}
+Prod account {svc} [audit logs]> Log archive account {store}
+Dev account {svc} [audit logs]> Log archive account {store}
+
+@686 Admission control: a write request passes authentication, mutation and validation; a policy deny returns a message, an allow is stored.
+Client|kubectl or CI {ext} > Authn and authz {svc} > Mutating admission|defaults {svc} > Validating admission|policies {svc}
+Validating admission|policies {svc} [allow]> Stored object {store}
+Validating admission|policies {svc} [deny]?> Rejected with message
+
+@688 Image pipeline: a patched base is baked into a versioned image, tested, promoted by ID, and fleets are replaced from it.
+Patched base image {ext} > Image build|packages and agents {svc} > Scan and boot test {svc} > Versioned image|ID {store}
+Versioned image|ID {store} > Staging fleet {svc} [soak passes]> Production fleet {svc}
+Versioned image|ID {store} [past age limit]?> Retired
+
+@687 Fast CI: caches keyed on inputs skip repeated work, tests run in parallel shards, and tests that pass only on retry move to a non-blocking quarantine.
+Push {ext} > Restore cache|key = lock-file hash {store} > Lint and compile {svc} > Test shards|in parallel {svc}
+Test shards|in parallel {svc} [all pass]> Build artefact once {store}
+Test shards|in parallel {svc} [passes on retry]?> Quarantine|owner and ticket {svc}
+
+@689 Automation ladder: a manual task becomes a runbook, then a script, then self-service and automatic remediation with limits, until the cause is fixed.
+Manual task {ext} > Runbook|steps and checks {svc} > Script {svc} > Self-service {svc} > Auto-remediation|rate limit and alert {svc}
+Auto-remediation|rate limit and alert {svc} [cause fixed]> Task removed {store}
+
+@690 Alert routing: signals go to a page, a ticket or a dashboard by urgency, and every page is reviewed for action.
+Signal {ext} [user impact now]> Page|on-call {svc} > Weekly review {svc}
+Signal {ext} [needs a person within days]> Ticket queue {store}
+Signal {ext} [context only]> Dashboard {store}
+Weekly review {svc} [no action taken]?> Retune or downgrade
+
 # ---------- Frontend additions (215-220) ----------
 @215 Event propagation for one click: the event is captured from the window down through the table and row to the clicked button, runs on the button, then bubbles back up through the row to the table in the same dispatch, where one delegated listener handles clicks for every row.
 Window > Document > Table|delegated listener {client} [capture]> Row > Button|target {client}

@@ -19,7 +19,7 @@
     "id": "t321-c1",
     "kind": "text",
     "title": "A process with a fenced-off view",
-    "body": "A container is an ordinary process that the kernel gives its own view of the filesystem, process list and network (namespaces) and a resource budget (control groups). It shares the host’s kernel, which is why containers start in milliseconds and why a kernel bug can affect all of them.",
+    "body": "A container is an ordinary process that the kernel gives its own view of the filesystem, process list and network (namespaces) and a resource budget (control groups). It shares the host’s kernel, which is why containers usually start in well under a second and why a kernel bug can affect all of them.",
     "teaches": [
      "container-isolation"
     ]
@@ -95,7 +95,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Namespaces separate views; the kernel is shared."
+    "explanation": "Containers share the host kernel, and namespaces only give each one its own view. Each container gets its own network namespace and address, its own filesystem view and its own process ids, so the other options describe the isolation containers do have."
    },
    {
     "id": "t321-a2",
@@ -105,7 +105,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "So the image runs as root"
+      "label": "So the source files are left out of the final image"
      },
      {
       "id": "b",
@@ -113,17 +113,17 @@
      },
      {
       "id": "c",
-      "label": "So the build skips tests"
+      "label": "So the dependencies are pinned to exact versions"
      },
      {
       "id": "d",
-      "label": "So the source is encrypted"
+      "label": "So the build steps can run in parallel"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Source changes often; dependencies rarely. Order layers from stable to volatile."
+    "explanation": "Layers are cached in order, and the first changed layer invalidates everything after it. Source changes often and the manifest rarely, so installing first keeps the slow dependency layer cached. Leaving source out of the image is what a multi-stage build does, pinning comes from the lock file, and layer order does not make steps parallel."
    },
    {
     "id": "t321-a3",
@@ -151,7 +151,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Digests are content hashes; tags can move."
+    "explanation": "A digest is a hash of the image content, so it always names the same bytes. Tags, including latest and version tags like v2, are movable pointers that can be re-pushed, and a bare repository name resolves to the latest tag."
    },
    {
     "id": "t321-a4",
@@ -161,15 +161,15 @@
     "choices": [
      {
       "id": "a",
-      "label": "Root processes cannot open network ports in containers"
+      "label": "It gives the container its own kernel instead of the host one"
      },
      {
       "id": "b",
-      "label": "Images build faster that way"
+      "label": "It lets the image be pulled without registry credentials"
      },
      {
       "id": "c",
-      "label": "It reduces image size by half"
+      "label": "It stops the container using more memory than its limit"
      },
      {
       "id": "d",
@@ -179,7 +179,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Root in a container maps to powerful capabilities on many setups."
+    "explanation": "If an attacker escapes a non-root process, they land with an unprivileged user rather than one that may map to root on the host. The kernel is shared whatever the user, pulls depend on registry auth, and memory limits come from control groups, not the user id."
    },
    {
     "id": "t321-a5",
@@ -522,7 +522,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "None of the probes"
+      "label": "Liveness and readiness together"
      },
      {
       "id": "b",
@@ -540,7 +540,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Readiness removes it from traffic without a restart."
+    "explanation": "Readiness failing removes the pod from service endpoints without restarting it, which is right for a temporary inability to serve. Liveness failing restarts the container, which is wrong for a pod that will recover on its own, so failing both adds a needless restart. Startup probes only gate the first start."
    },
    {
     "id": "t322-a2",
@@ -550,7 +550,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "Kubernetes repairs the database"
+      "label": "Pods are marked unready and keep running"
      },
      {
       "id": "b",
@@ -568,7 +568,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Restarts cannot fix a dependency and make recovery slower."
+    "explanation": "A liveness probe that checks a dependency fails for every pod at once, so the kubelet restarts them all while the database is slow, adding cold starts and reconnect load. Unready-but-running is what a readiness probe would cause. Kubernetes does not fail over regions, and the probe failure stops cached serving by restarting the process."
    },
    {
     "id": "t322-a3",
@@ -596,7 +596,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Memory limits are enforced by killing; CPU limits by throttling."
+    "explanation": "Memory cannot be taken back from a process, so exceeding the limit gets the container OOM-killed and restarted. Slowing down is what happens at a CPU limit (throttling), swap is normally off for Kubernetes nodes, and the scheduler never moves a running pod to another node."
    },
    {
     "id": "t322-a4",
@@ -624,7 +624,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Controllers act to restore the declared replica count."
+    "explanation": "The controller compares desired with actual replicas and creates new pods, which the scheduler places on healthy nodes. It cannot touch the failed node’s kernel, needs no approval, and never lowers the desired count; only a person or an autoscaler changes that."
    },
    {
     "id": "t322-a5",
@@ -765,9 +765,9 @@
      "You submit objects (Deployments, Services) to an API server, which stores them. Nothing happens directly; controllers watch those objects and work to make reality match.",
      "The Deployment controller creates a ReplicaSet, which creates pods. The scheduler assigns each pod to a node with enough unreserved CPU and memory, based on the pod’s requests, and on the node an agent (the kubelet) starts the containers.",
      "The kubelet runs probes. A failing readiness probe removes the pod’s address from the Service’s endpoints; a failing liveness probe restarts the container; a startup probe disables the other two until it succeeds.",
-     "Requests are what the scheduler reserves; limits are what the kernel enforces. Over a memory limit the container is killed and restarted; over a CPU limit it is throttled within each scheduling period. Pods with requests equal to limits get the highest quality-of-service class and are evicted last under node pressure.",
+     "Requests are what the scheduler reserves; limits are what the kernel enforces. Over a memory limit the container is killed and restarted; over a CPU limit it is throttled within each scheduling period. A pod is in the Guaranteed quality-of-service class only when every container sets requests equal to limits for both CPU and memory. Under node memory pressure the kubelet first evicts pods using more memory than they requested, so BestEffort and over-request Burstable pods go before Guaranteed ones.",
      "Rolling updates create new pods and remove old ones as new pods become ready, governed by maxSurge and maxUnavailable. Readiness is what makes a rolling update safe; a pod that reports ready too early receives traffic it cannot serve.",
-     "When a pod is deleted, it is removed from endpoints and sent SIGTERM at about the same time, then SIGKILL after the grace period. Applications should keep serving briefly and shut down cleanly within that window.",
+     "When a pod is deleted, it is removed from endpoints and sent SIGTERM at about the same time, then SIGKILL after the grace period, 30 seconds by default. Applications should keep serving briefly and shut down cleanly within that window.",
      "Pod disruption budgets limit how many replicas voluntary actions such as node upgrades may take down at once, so maintenance cannot remove all healthy copies of a service at the same time."
     ]
    },
@@ -895,7 +895,7 @@
   "objectives": [
    "Explain continuous integration, delivery and deployment",
    "Design a pipeline that builds once and promotes the same artefact",
-   "Use the four DORA metrics to judge delivery performance"
+   "Use DORA’s software delivery metrics to judge delivery performance"
   ],
   "difficulty": 1,
   "durationMinutes": 10,
@@ -965,15 +965,15 @@
     "choices": [
      {
       "id": "a",
-      "label": "Deploys need a change board"
+      "label": "Every change must pass automated tests before merge"
      },
      {
       "id": "b",
-      "label": "Tests run only in production"
+      "label": "Artefacts are built once and promoted between environments"
      },
      {
       "id": "c",
-      "label": "Builds happen once a week"
+      "label": "Staging is a copy of production configuration"
      },
      {
       "id": "d",
@@ -983,7 +983,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Delivery keeps a releasable artefact; deployment releases it automatically."
+    "explanation": "Both practices keep main releasable with automated tests and promoted artefacts; continuous deployment also removes the manual approval and releases every passing change. Tests before merge, build-once promotion and production-like staging belong to both, so they do not tell them apart."
    },
    {
     "id": "t323-a2",
@@ -993,7 +993,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "Tests can then be skipped safely"
+      "label": "Staging tests can then run in parallel with the production deploy"
      },
      {
       "id": "b",
@@ -1005,13 +1005,13 @@
      },
      {
       "id": "d",
-      "label": "Builds become 10 times faster"
+      "label": "Each environment can build from its own branch"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Rebuilding can change dependencies or flags between environments."
+    "explanation": "Promoting one artefact means production runs the exact bytes that passed the tests; rebuilding can pull different dependencies. Configuration still differs per environment and is injected at deploy time. Running staging tests in parallel with production defeats the gate, and per-environment branches are the drift this practice prevents."
    },
    {
     "id": "t323-a3",
@@ -1039,35 +1039,35 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Long-lived branches drift apart; integration problems pile up."
+    "explanation": "Long-lived branches drift apart, so integration problems surface late as big merges and test failures. Monthly merges mean fewer builds and slower feedback, not more, and branches use little build-server disk."
    },
    {
     "id": "t323-a4",
     "concept": "dora",
     "type": "multiple_choice",
-    "prompt": "Which is one of the four DORA delivery metrics?",
+    "prompt": "Which is one of DORA’s software delivery metrics?",
     "choices": [
      {
       "id": "a",
-      "label": "Story points completed"
+      "label": "Test coverage of the main branch"
      },
      {
       "id": "b",
-      "label": "Lines of code per week"
+      "label": "Mean time between failures"
      },
      {
       "id": "c",
-      "label": "Change failure rate"
+      "label": "Change fail rate of deployments"
      },
      {
       "id": "d",
-      "label": "Number of meetings held"
+      "label": "Story points completed per sprint"
      }
     ],
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "DORA measures deployment frequency, lead time, change failure rate and recovery time."
+    "explanation": "Change fail rate is one of DORA’s software delivery metrics, with deployment frequency, change lead time, failed deployment recovery time and deployment rework rate. Coverage is a code metric, mean time between failures is a hardware-style reliability measure that DORA does not use, and story points measure planning, not delivery."
    },
    {
     "id": "t323-a5",
@@ -1174,8 +1174,8 @@
    },
    {
     "id": "t323-f3",
-    "front": "Four DORA metrics?",
-    "back": "Deployment frequency, lead time for changes, change failure rate, time to restore service."
+    "front": "DORA’s delivery metrics?",
+    "back": "Deployment frequency, change lead time, failed deployment recovery time, change fail rate and deployment rework rate."
    }
   ],
   "sources": [
@@ -1184,8 +1184,8 @@
     "url": "https://martinfowler.com/articles/continuousIntegration.html"
    },
    {
-    "title": "Google Cloud: DORA’s software delivery metrics",
-    "url": "https://cloud.google.com/devops/state-of-devops"
+    "title": "DORA: Software delivery performance metrics",
+    "url": "https://dora.dev/guides/dora-metrics/"
    },
    {
     "title": "Martin Fowler: Continuous Delivery",
@@ -1210,7 +1210,7 @@
      "Test: unit tests first, then integration and contract tests against the built artefact, then security scans of dependencies and the image. Flaky tests must be fixed or quarantined quickly, or people learn to ignore failures.",
      "Release: deploy the artefact to staging, run smoke tests, then to production with a progressive strategy (canary or rolling) and automatic rollback on bad health signals. Feature flags let code ship dark and be enabled separately from deploys.",
      "Security of the pipeline: the pipeline holds deploy credentials, so restrict who can change it, avoid giving third-party build steps secrets, and record provenance so production can verify an artefact came from it.",
-     "Measure: DORA’s four keys, deployment frequency, lead time for changes, change failure rate and time to restore, show whether changes to the pipeline actually improve delivery rather than just adding steps.",
+     "Measure: DORA’s software delivery metrics, deployment frequency, change lead time, change fail rate, failed deployment recovery time and deployment rework rate, show whether changes to the pipeline actually improve delivery rather than just adding steps.",
      "Rollback must be a routine, tested path: redeploying the previous artefact digest should take minutes and need no rebuild. Teams that practise it recover faster, which shows up directly in the time-to-restore metric."
     ]
    },
@@ -1268,9 +1268,9 @@
     "result": "Small batches do not remove defects; they make each one quick to locate and roll back."
    },
    "india": {
-    "title": "DORA’s four keys",
+    "title": "DORA’s software delivery metrics",
     "label": "Official documentation",
-    "body": "Google Cloud’s DORA research programme has surveyed thousands of technology professionals over many years. It measures software delivery performance with four metrics: deployment frequency, lead time for changes, change failure rate and time to restore service. Its reports consistently find that the highest performers do well on both speed and stability, rather than trading one for the other, and link this to practices such as continuous integration, trunk-based development and deployment automation."
+    "body": "Google Cloud’s DORA research programme has surveyed thousands of technology professionals over many years. For years it measured delivery with four keys: deployment frequency, lead time for changes, change failure rate and time to restore service. Its current guidance on dora.dev uses five metrics in two groups, throughput (change lead time, deployment frequency, failed deployment recovery time) and instability (change fail rate, deployment rework rate), where rework rate counts unplanned deployments made to fix problems in production. Its reports consistently find that the highest performers do well on both speed and stability, rather than trading one for the other, and link this to practices such as continuous integration, trunk-based development and deployment automation."
    },
    "pitfalls": [
     {
@@ -1286,7 +1286,7 @@
     "Integrate small changes daily; build and test every merge.",
     "Build once, promote the same digest.",
     "Automate deploys with progressive rollout and rollback.",
-    "Track the four DORA metrics."
+    "Track DORA’s delivery metrics for both speed and stability."
    ]
   },
   "interactive": {
@@ -1422,7 +1422,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "The old environment stays intact and ready."
+    "explanation": "Blue-green keeps the old environment running, so rollback is a traffic switch. A rolling update must roll every instance back, recreate has to restart the old version from scratch, and manual patching is slow in both directions."
    },
    {
     "id": "t324-a2",
@@ -1450,7 +1450,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Few requests mean few chances to see failures."
+    "explanation": "At 1% of a low-traffic service, ten minutes may see only a handful of requests, too few to show a bad error rate or latency. The baseline is not slowed and the canary takes little capacity; users noticing the change is not the risk the test is about."
    },
    {
     "id": "t324-a3",
@@ -1464,7 +1464,7 @@
      },
      {
       "id": "b",
-      "label": "They share one process"
+      "label": "They run in the same availability zone"
      },
      {
       "id": "c",
@@ -1472,13 +1472,13 @@
      },
      {
       "id": "d",
-      "label": "They have identical code"
+      "label": "The canary gets its own copy of the cache"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Mixed versions need backward- and forward-compatible data."
+    "explanation": "Both versions read and write the same data, so the schema must be compatible both ways during the rollout. They can run in any zones, separate databases or cache copies would split the data, and the code differs by definition."
    },
    {
     "id": "t324-a4",
@@ -1506,7 +1506,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Comparing at the same time removes traffic and time-of-day effects."
+    "explanation": "Comparing with the current version over the same minutes removes time-of-day and traffic-mix effects. Last month’s average and a yearly budget are not like-for-like, and staging results do not show production behaviour."
    },
    {
     "id": "t324-a5",
@@ -1857,7 +1857,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "The plan shows real effects such as replacements."
+    "explanation": "The plan shows what will really happen, including replacements and destroys that a small diff can hide. Commit message, author experience and diff size do not tell you whether a database will be replaced."
    },
    {
     "id": "t325-a2",
@@ -1885,7 +1885,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Reality no longer matches the declared configuration."
+    "explanation": "Drift is live infrastructure that no longer matches the declared configuration, often from console edits. Provisioning creates resources, promotion moves an artefact between environments, and rollback returns to a previous version."
    },
    {
     "id": "t325-a3",
@@ -1895,11 +1895,11 @@
     "choices": [
      {
       "id": "a",
-      "label": "To speed up resource creation"
+      "label": "To make the apply reversible if it fails halfway"
      },
      {
       "id": "b",
-      "label": "To encrypt the cloud resources"
+      "label": "To stop the provider changing resources during the apply"
      },
      {
       "id": "c",
@@ -1907,13 +1907,13 @@
      },
      {
       "id": "d",
-      "label": "To hide the plan from reviewers"
+      "label": "To keep the plan from going stale after review"
      }
     ],
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Concurrent applies can corrupt state or race on resources."
+    "explanation": "The lock stops two applies writing state or changing the same resources at once. It does not make a failed apply reversible, cannot stop the cloud provider or anyone in the console from changing things, and a plan goes stale whenever the code or real resources change."
    },
    {
     "id": "t325-a4",
@@ -1923,7 +1923,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "Applying from laptops for speed"
+      "label": "Running plan and apply in a single CI step"
      },
      {
       "id": "b",
@@ -1931,7 +1931,7 @@
      },
      {
       "id": "c",
-      "label": "Skipping the plan for small changes"
+      "label": "Pinning provider versions in every module"
      },
      {
       "id": "d",
@@ -1941,7 +1941,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Each apply then touches only one part."
+    "explanation": "Splitting state by environment and component means one apply can only touch that slice. One shared state puts everything in reach of every apply, merging plan and apply skips review, and pinning providers improves repeatability without limiting what an apply can change."
    },
    {
     "id": "t325-a5",
@@ -2301,7 +2301,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "SLIs measure user-visible outcomes."
+    "explanation": "An SLI should measure what users experience, here checkout requests that succeed fast enough. Server count, CPU and database size are internal signals that can look fine while checkouts fail."
    },
    {
     "id": "t326-a2",
@@ -2343,13 +2343,13 @@
      },
      {
       "id": "d",
-      "label": "Delete the month’s error records"
+      "label": "Lower the SLO so the budget is no longer spent"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "The budget balances feature work against reliability."
+    "explanation": "A typical policy pauses risky launches and spends effort on reliability until the budget recovers. Shipping as planned ignores the budget, raising the SLO makes it harder still, and lowering the SLO to clear the budget breaks the agreement it exists to protect."
    },
    {
     "id": "t326-a4",
@@ -2377,7 +2377,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Burn rate is consumption speed relative to the steady rate that ends the window at zero."
+    "explanation": "Burn rate is how fast the budget is spent relative to the even rate that lasts the whole window, so 10 means 30 days ÷ 10 = 3 days. It is not a percentage used, a count of incidents, or a longer-lasting budget."
    },
    {
     "id": "t326-a5",
@@ -2730,7 +2730,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Rollback stops harm; diagnosis follows."
+    "explanation": "When errors follow a deploy, rolling back is usually the fastest way to stop the harm; diagnosis can follow. Reading the diff or adding logging extends the outage, and the postmortem comes after recovery."
    },
    {
     "id": "t327-a2",
@@ -2758,7 +2758,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Commanders coordinate; others execute."
+    "explanation": "The commander coordinates the response, assigns roles and makes decisions. Fixes are done by the operations lead and others, and customer updates go through the communications lead."
    },
    {
     "id": "t327-a3",
@@ -2780,13 +2780,13 @@
      },
      {
       "id": "d",
-      "label": "Hold a meeting about staying focused"
+      "label": "Retrain the operator on the tool before they use it again"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Specific system changes prevent recurrence."
+    "explanation": "A guard in the tool prevents the same mistake by anyone. Recording an operator error, reminding people to be careful and retraining one person rely on humans never slipping, so the same failure can recur."
    },
    {
     "id": "t327-a4",
@@ -2796,15 +2796,15 @@
     "choices": [
      {
       "id": "a",
-      "label": "So incidents need no review"
+      "label": "So the postmortem can be finished within a day"
      },
      {
       "id": "b",
-      "label": "So the timeline can be skipped"
+      "label": "So the incident does not count against the error budget"
      },
      {
       "id": "c",
-      "label": "So nobody has to fix anything after the incident"
+      "label": "So no one has to own the action items afterwards"
      },
      {
       "id": "d",
@@ -2814,7 +2814,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Honest detail reveals systemic causes."
+    "explanation": "When people are not punished they share what they saw and did, which exposes the system causes. Blamelessness does not make a review faster, does not change the error budget, and action items still need named owners."
    },
    {
     "id": "t327-a5",
@@ -3175,7 +3175,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "CPU metrics are not collected"
+      "label": "The autoscaler waits for the scale-down window first"
      },
      {
       "id": "b",
@@ -3183,7 +3183,7 @@
      },
      {
       "id": "c",
-      "label": "Autoscalers only run at midnight"
+      "label": "Scale-up is limited to one new instance per minute"
      },
      {
       "id": "d",
@@ -3193,7 +3193,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Scaling lag is the gap between demand and ready capacity."
+    "explanation": "Even a fast decision needs minutes of boot, image pull and warm-up before new capacity serves. Scale-down windows only delay removing instances, scale-up rates are configurable rather than one a minute, and load balancers send traffic to new instances once their health checks pass."
    },
    {
     "id": "t328-a3",
@@ -3221,7 +3221,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Scale on the signal that reflects work waiting."
+    "explanation": "When work waits on I/O, CPU stays low while the backlog grows; queue depth per worker measures the waiting work directly. Memory and network bytes may not change with backlog, and CPU is the signal that is misleading here."
    },
    {
     "id": "t328-a4",
@@ -3235,11 +3235,11 @@
      },
      {
       "id": "b",
-      "label": "Scale-down needs manual approval"
+      "label": "Scale-down needs a manual approval in most autoscalers"
      },
      {
       "id": "c",
-      "label": "Instances cannot stop quickly"
+      "label": "The metric is only collected every few minutes when load is low"
      },
      {
       "id": "d",
@@ -3249,7 +3249,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "A stabilisation window prevents remove-then-re-add cycles."
+    "explanation": "A stabilisation window avoids removing instances on a brief dip and adding them back moments later. Scale-down is automatic, metric collection does not slow at low load, and removing instances saves money rather than costing more."
    },
    {
     "id": "t328-a5",
@@ -3528,7 +3528,7 @@
     "id": "t329-c1",
     "kind": "text",
     "title": "Your own private network in the cloud",
-    "body": "A virtual private cloud (VPC) is an isolated network with an address range you choose, such as 10.0.0.0/16. You divide it into subnets, usually per availability zone, and attach route tables that decide where traffic goes.",
+    "body": "A virtual private cloud (VPC) is an isolated network with an address range you choose, such as 10.0.0.0/16. You divide it into subnets and attach route tables that decide where traffic goes. On AWS and Azure a subnet lives in one availability zone, so you create one per zone; on Google Cloud subnets are regional and span its zones.",
     "teaches": [
      "vpc"
     ]
@@ -3590,21 +3590,21 @@
      },
      {
       "id": "b",
-      "label": "A larger address range"
+      "label": "Its network ACL allows all inbound traffic"
      },
      {
       "id": "c",
-      "label": "A public DNS name"
+      "label": "It hosts the NAT gateway"
      },
      {
       "id": "d",
-      "label": "Faster network cards"
+      "label": "Its instances get public DNS names"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Routing, not naming, decides reachability."
+    "explanation": "A subnet is public when its route table sends internet traffic to an internet gateway. An open network ACL still leaves no route out, a NAT gateway sits in a public subnet because it needs that route, and DNS names do not create reachability."
    },
    {
     "id": "t329-a2",
@@ -3614,7 +3614,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "Only when the port is above 1024"
+      "label": "Yes, unless the network ACL already allows it"
      },
      {
       "id": "b",
@@ -3626,13 +3626,13 @@
      },
      {
       "id": "d",
-      "label": "Only for IPv6 traffic"
+      "label": "Only for responses to IPv6 clients"
      }
     ],
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Return traffic for allowed connections is permitted automatically."
+    "explanation": "Security groups are stateful: return traffic for an allowed connection is permitted without an outbound rule. Network ACLs are stateless and do need return rules, but that is a separate layer, and the behaviour is the same for IPv4 and IPv6."
    },
    {
     "id": "t329-a3",
@@ -3660,7 +3660,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "NAT allows outbound connections only."
+    "explanation": "A NAT gateway in a public subnet lets private servers start outbound connections while staying unreachable from outside. Public IPs, a move to the public subnet or an open security group all expose the servers to inbound traffic."
    },
    {
     "id": "t329-a4",
@@ -3688,7 +3688,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Group references follow instances as they scale."
+    "explanation": "Referencing the app servers’ security group allows exactly those instances, even as they scale. 0.0.0.0/0 and the whole VPC range admit far more than the app tier, and the NAT gateway’s address is for outbound internet traffic, not internal calls."
    },
    {
     "id": "t329-a5",
@@ -4050,7 +4050,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "RPO is acceptable data loss in time."
+    "explanation": "The recovery point objective is the most data, measured in time, you can afford to lose. The recovery time objective is how long recovery may take, mean time between failures measures failure frequency, and an SLI measures service quality."
    },
    {
     "id": "t330-a2",
@@ -4078,7 +4078,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Replicas copy mistakes; backups let you go back."
+    "explanation": "Replicas copy every committed change, so the drop reaches the synchronous replica too; only a backup or point-in-time restore lets you go back. Replicas do not keep, reject or pause on valid statements."
    },
    {
     "id": "t330-a3",
@@ -4096,7 +4096,7 @@
      },
      {
       "id": "c",
-      "label": "Larger backup disks"
+      "label": "Encrypting the backups with a key in the production account"
      },
      {
       "id": "d",
@@ -4106,7 +4106,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Attackers cannot delete write-once copies they cannot reach."
+    "explanation": "Immutable copies in a separate account cannot be deleted with the production admin credentials an attacker holds. Compression changes nothing, and backups or keys in the same account are within the attacker’s reach."
    },
    {
     "id": "t330-a4",
@@ -4124,7 +4124,7 @@
      },
      {
       "id": "c",
-      "label": "Weekly tape copies"
+      "label": "Warm standby scaled down in a second region"
      },
      {
       "id": "d",
@@ -4134,7 +4134,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Both regions already serve traffic."
+    "explanation": "Active-active already serves traffic in both regions, so recovery is mostly shifting load. Warm standby must scale up, pilot light must start most services, and backup and restore must rebuild everything, each with a longer RTO."
    },
    {
     "id": "t330-a5",
