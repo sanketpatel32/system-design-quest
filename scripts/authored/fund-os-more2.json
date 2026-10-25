@@ -1136,9 +1136,9 @@
     "result": "Inheritance turns a 51 ms worst case into about 1 ms here; the bound depends only on the critical section, not on unrelated work."
    },
    "india": {
-    "title": "An inversion on another planet",
-    "label": "Publicly reported",
-    "body": "NASA’s Mars Pathfinder lander, which landed in 1997, suffered repeated system resets on the surface. Engineers publicly described the cause as priority inversion: a low-priority meteorological task held a mutex needed by a high-priority bus management task, while medium-priority communication tasks kept the low one from running, so a watchdog detected the missed deadline and reset the computer. The fix, uploaded from Earth, enabled priority inheritance on that mutex."
+    "title": "The real-time safety margin",
+    "label": "Official documentation",
+    "body": "The Linux kernel’s real-time group scheduling documentation explains that real-time tasks can starve everything else on a CPU, so the kernel limits them by default: the period setting is 1,000,000 microseconds and the runtime setting is 950,000 microseconds, meaning real-time tasks may use at most 0.95 s of every second, leaving 0.05 s for normal tasks. That margin lets an administrator still log in and stop a runaway real-time thread, and setting the runtime to minus one removes the limit entirely, which the documentation treats as a deliberate choice rather than a default."
    },
    "pitfalls": [
     {
@@ -1244,17 +1244,18 @@
    {
     "id": "t644-c3",
     "kind": "text",
-    "title": "Trap: the unbounded queue",
-    "body": "A pool with an unlimited queue never rejects anything, so overload shows up as tasks waiting longer and longer, memory growing, and clients timing out on work the server will still do later. Bound the queue to what you can finish within the caller’s deadline, and decide the overflow policy: reject quickly with an error, run the task on the submitting thread to slow it down, or drop the oldest work.",
+    "title": "Trap: one slow dependency takes every worker",
+    "body": "If one downstream service slows from 20 ms to 2 s, every task that calls it holds a worker a hundred times longer, and soon all workers are waiting on it. Requests that never touch that service now queue behind them too. Give each blocking dependency its own small pool or a concurrency limit (a bulkhead), and set timeouts shorter than the caller’s deadline so a stuck call frees its worker.",
     "teaches": [
-     "bounded-queue"
+     "pool-sizing",
+     "pool-deadlock"
     ]
    },
    {
     "id": "t644-c4",
     "kind": "text",
     "title": "Misconception: one big pool is simplest",
-    "body": "If a task running in a pool submits a sub-task to the same pool and waits for it, every worker can end up waiting for sub-tasks that have no free worker to run them: a deadlock. One slow dependency can also occupy every worker and stall unrelated work. Give each kind of blocking work its own bounded pool (bulkheads), and never block a worker on the pool it belongs to.",
+    "body": "If a task running in a pool submits a sub-task to the same pool and waits for it, every worker can end up waiting for sub-tasks that have no free worker to run them: a deadlock. Run sub-tasks on a separate pool, or have the waiting task run them itself, and never block a worker on the pool it belongs to.",
     "teaches": [
      "pool-deadlock"
     ]
@@ -1619,8 +1620,8 @@
     "why": "Every extra worker adds context switches"
    },
    {
-    "topicId": 642,
-    "why": "Pool queues are guarded by the locks covered here"
+    "topicId": 288,
+    "why": "Bounded queues and semaphores that pools are built from"
    }
   ]
  },
@@ -2424,6 +2425,1639 @@
    {
     "topicId": 645,
     "why": "Reclaim and compaction interact with huge pages"
+   }
+  ]
+ },
+ {
+  "id": 647,
+  "slug": "inter-process-communication-pipes-sockets-shared-memory",
+  "region": "f5-os",
+  "order": 27,
+  "title": "Inter-Process Communication: Pipes, Sockets and Shared Memory",
+  "kind": "lesson",
+  "objectives": [
+   "Choose between pipes, local sockets and shared memory for passing data between processes",
+   "Use a full pipe buffer as backpressure, and avoid the deadlock it can cause",
+   "Weigh copy and system-call costs against the synchronisation shared memory needs"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 12,
+  "prereqIds": [
+   281,
+   284
+  ],
+  "cards": [
+   {
+    "id": "t647-c1",
+    "kind": "text",
+    "title": "Three ways to talk",
+    "body": "A pipe is a one-way byte stream held in a kernel buffer: one process writes, another reads. A local (Unix domain) socket is two-way, can carry separate messages as well as streams, and can pass open file descriptors and the sender’s identity. Shared memory maps the same physical pages into both processes, so data is not copied by the kernel at all, but the processes must coordinate access themselves.",
+    "teaches": [
+     "ipc-choice"
+    ]
+   },
+   {
+    "id": "t647-c2",
+    "kind": "text",
+    "title": "A full buffer is backpressure",
+    "body": "A pipe’s buffer is limited, 64 KiB by default on Linux. When it is full, a writer blocks until the reader drains some of it, so a fast producer is slowed to the consumer’s pace without any extra code. Writes no larger than a small atomic limit, 4 KiB on Linux, are never interleaved with other writers’ data, which makes a pipe safe for several writers of short records.",
+    "teaches": [
+     "pipe-backpressure"
+    ]
+   },
+   {
+    "id": "t647-c3",
+    "kind": "diagram",
+    "title": "Trap: the two-pipe deadlock",
+    "body": "A parent feeds a child through one pipe and reads its output through another.",
+    "teaches": [
+     "pipe-backpressure"
+    ],
+    "steps": [
+     "The parent writes 1 MB of input to the child’s input pipe before reading anything",
+     "The child reads input and writes results to its output pipe as it goes",
+     "The output pipe fills at 64 KiB, so the child blocks on its write and stops reading input",
+     "The input pipe then fills, so the parent blocks on its write",
+     "Each waits for the other: read output while writing input, using a second thread or readiness polling"
+    ]
+   },
+   {
+    "id": "t647-c4",
+    "kind": "text",
+    "title": "Misconception: shared memory is the fast choice for everything",
+    "body": "Shared memory removes copies, but the reader still has to learn that new data has arrived, either by polling, which burns a core, or by sleeping on a futex or semaphore, which costs system calls much like a socket. It also needs careful memory ordering and offers no protection if one side corrupts the region. For messages of a few kilobytes, a local socket’s copy is cheap; shared memory pays off for large or very frequent transfers.",
+    "teaches": [
+     "ipc-choice"
+    ]
+   },
+   {
+    "id": "t647-c5",
+    "kind": "text",
+    "title": "Worked example: what a message costs",
+    "body": "Sending a 1 KB message over a local socket costs a write and a read system call plus two copies of the data, roughly a few microseconds in all (illustrative). At 100,000 messages a second that is a few tenths of a core; batching 50 messages per call cuts the system calls fifty-fold while the copies stay the same. Measure the message rate before reaching for shared memory.",
+    "teaches": [
+     "ipc-cost"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t647-a1",
+    "concept": "ipc-choice",
+    "type": "multiple_choice",
+    "prompt": "A supervisor must hand an already open network connection to a worker process. Which mechanism can do that?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A pipe, by writing the descriptor number into it"
+     },
+     {
+      "id": "b",
+      "label": "A shared memory region holding the descriptor number"
+     },
+     {
+      "id": "c",
+      "label": "A local socket, sending the descriptor as ancillary data"
+     },
+     {
+      "id": "d",
+      "label": "An environment variable set before the worker started"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Local sockets can carry open descriptors, and the kernel installs a matching descriptor in the receiver. A descriptor number written to a pipe or shared memory means nothing in another process’s table, and an environment variable set at start cannot carry a connection opened later."
+   },
+   {
+    "id": "t647-a2",
+    "concept": "pipe-backpressure",
+    "type": "multiple_choice",
+    "prompt": "A log shipper reads from a pipe that an application writes to. The shipper stalls for a minute. What happens to the application?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Its writes block once the pipe buffer fills up"
+     },
+     {
+      "id": "b",
+      "label": "Its writes succeed and the kernel spills data to disk"
+     },
+     {
+      "id": "c",
+      "label": "Its writes are dropped silently until the reader returns"
+     },
+     {
+      "id": "d",
+      "label": "It receives an error on the first write after the stall"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "A full pipe blocks blocking writers, which is backpressure, and can freeze an application that logs synchronously. The kernel never spills pipe data to disk, nothing is dropped silently, and errors occur only if the reading end is closed, not when it is slow."
+   },
+   {
+    "id": "t647-a3",
+    "concept": "pipe-backpressure",
+    "type": "multiple_choice",
+    "prompt": "A program writes all of a large input to a child’s input pipe, then reads the child’s output. With small inputs it works; with large ones it hangs. Why?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Large inputs exceed the maximum size of a single pipe"
+     },
+     {
+      "id": "b",
+      "label": "The child’s output pipe fills, so neither side can proceed"
+     },
+     {
+      "id": "c",
+      "label": "The kernel reorders large writes, confusing the child"
+     },
+     {
+      "id": "d",
+      "label": "Pipes close after a timeout when the input is large"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Once the output pipe is full the child blocks writing and stops reading, then the parent blocks writing input: a cycle of waits. A pipe streams any amount of data, writes are delivered in order, and pipes have no timeout."
+   },
+   {
+    "id": "t647-a4",
+    "concept": "ipc-choice",
+    "type": "tradeoff",
+    "prompt": "A video pipeline passes 8 MB decoded frames from a decoder process to an encoder process, 60 times a second, on the same machine. Which mechanism fits?",
+    "constraints": [
+     "About 480 MB a second of frame data",
+     "Both processes are trusted",
+     "Low CPU overhead matters"
+    ],
+    "approaches": [
+     {
+      "id": "a",
+      "label": "Shared memory ring of frame buffers",
+      "description": "Frames are written into shared buffers; only small notices of which buffer is ready are signalled."
+     },
+     {
+      "id": "b",
+      "label": "A local stream socket",
+      "description": "Each frame is written to and read from a socket."
+     },
+     {
+      "id": "c",
+      "label": "Files in a temporary directory",
+      "description": "The decoder writes each frame to a file and the encoder reads it."
+     }
+    ],
+    "correctApproachId": "a",
+    "rationaleOptions": [
+     {
+      "id": "r1",
+      "label": "It avoids copying 480 MB a second through the kernel twice"
+     },
+     {
+      "id": "r2",
+      "label": "Only a tiny notification crosses the kernel per frame"
+     },
+     {
+      "id": "r3",
+      "label": "It needs no synchronisation between the two processes"
+     },
+     {
+      "id": "r4",
+      "label": "It protects each process from the other’s memory bugs"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": [],
+    "explanation": "At 480 MB a second, two copies per frame through a socket cost close to a gigabyte a second of memory bandwidth, while shared buffers move only an index. Shared memory still needs synchronisation, to stop the encoder reading a frame mid-write, and it removes isolation rather than adding it."
+   },
+   {
+    "id": "t647-a5",
+    "concept": "pipe-backpressure",
+    "type": "estimation",
+    "prompt": "A pipe holds 65,536 bytes. A writer sends 512-byte records and the reader has stopped. How many records can be written before the writer blocks?",
+    "unit": "records",
+    "target": 128,
+    "assumptions": [
+     "The pipe starts empty",
+     "Records are packed with no overhead"
+    ],
+    "formula": "buffer size ÷ record size",
+    "workedAnswer": "65,536 ÷ 512 = 128 records",
+    "explanation": "Sanity check: 64 KiB is small, so a stalled reader blocks a busy writer within moments; size the reader for peak rate or put a bounded queue with an explicit drop policy in between.",
+    "tolerance": 0.1,
+    "trapAnswers": [
+     16,
+     65536
+    ]
+   },
+   {
+    "id": "t647-a6",
+    "concept": "ipc-choice",
+    "type": "drag_order",
+    "prompt": "Order the steps for one message sent from process A to process B over a local socket.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "B’s read call copies the message into B’s memory"
+     },
+     {
+      "id": "s1",
+      "label": "A’s write call copies the message into a kernel buffer"
+     },
+     {
+      "id": "s4",
+      "label": "B processes the message"
+     },
+     {
+      "id": "s2",
+      "label": "The kernel marks B’s end as readable and wakes B if it is waiting"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Copy in, wake, copy out: two copies and two system calls, which is what shared memory avoids for bulk data."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t647-f1",
+    "front": "Pipe vs local socket?",
+    "back": "A pipe is one-way bytes; a local socket is two-way, can keep message boundaries and can pass descriptors."
+   },
+   {
+    "id": "t647-f2",
+    "front": "Linux pipe capacity and atomic write size?",
+    "back": "64 KiB buffer by default; writes up to 4 KiB are not interleaved."
+   },
+   {
+    "id": "t647-f3",
+    "front": "Shared memory’s cost?",
+    "back": "No kernel copies, but you must synchronise and signal readiness yourself."
+   }
+  ],
+  "sources": [
+   {
+    "title": "pipe(7), Linux manual page",
+    "url": "https://man7.org/linux/man-pages/man7/pipe.7.html"
+   },
+   {
+    "title": "unix(7), Linux manual page",
+    "url": "https://man7.org/linux/man-pages/man7/unix.7.html"
+   },
+   {
+    "title": "shm_overview(7), Linux manual page",
+    "url": "https://man7.org/linux/man-pages/man7/shm_overview.7.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "ipc-choice",
+    "pipe-backpressure",
+    "ipc-cost"
+   ],
+   "mechanism": {
+    "title": "How data moves between processes",
+    "steps": [
+     "Processes cannot read each other’s memory, so data passes through something both can reach: a kernel buffer, a file, or pages mapped into both.",
+     "For a pipe or local socket, the writer’s system call copies bytes into a kernel buffer; the reader’s call copies them out. A full buffer blocks the writer, an empty one blocks the reader.",
+     "Local sockets add features: two directions on one descriptor, message boundaries with datagram or sequenced-packet types, the peer’s user and process IDs, and passing open descriptors between processes.",
+     "Shared memory maps one set of physical pages into both address spaces. Writes are visible to the other side directly, with no system call, once memory ordering rules are respected.",
+     "Readiness still has to be signalled: a futex or semaphore in the shared region, an event descriptor, or a byte sent over a socket, so most high-speed designs pair shared buffers with a lightweight notification.",
+     "Network sockets to localhost work too but pass through the network stack, so local sockets are usually faster for processes on one machine."
+    ]
+   },
+   "useWhen": [
+    "Use pipes for streaming output from one process to the next.",
+    "Use local sockets for request and response traffic and for passing descriptors."
+   ],
+   "avoidWhen": [
+    "Avoid shared memory for small, infrequent messages; it adds complexity without much gain.",
+    "Avoid writing all input before reading any output when talking to a child through two pipes."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Mechanism",
+     "Direction",
+     "Copies per message",
+     "Extras"
+    ],
+    "rows": [
+     [
+      "Pipe",
+      "One way",
+      "Two, via kernel",
+      "Backpressure built in"
+     ],
+     [
+      "Local socket",
+      "Two way",
+      "Two, via kernel",
+      "Message boundaries, descriptor passing, peer identity"
+     ],
+     [
+      "Localhost network socket",
+      "Two way",
+      "Two, plus network stack",
+      "Works across machines unchanged"
+     ],
+     [
+      "Shared memory",
+      "Both, by convention",
+      "None by kernel",
+      "Needs your own synchronisation"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Is the socket the bottleneck?",
+    "assumptions": [
+     "200,000 messages a second of 1 KB each; about 2 µs of system call and copy cost per message on each side (illustrative)"
+    ],
+    "steps": [
+     "Per side: 200,000 × 2 µs = 0.4 core-seconds per second.",
+     "Both sides together: 0.8 of a core spent moving messages.",
+     "Batching 50 messages per call: 4,000 calls a second; if per-call overhead is 1.5 µs of the 2 µs, cost per side falls to 4,000 × 1.5 µs + 200,000 × 0.5 µs = 0.106 core-seconds.",
+     "Both sides together: about 0.2 of a core, a four-fold saving with no change of mechanism."
+    ],
+    "result": "Batching alone cuts the cost from 0.8 to about 0.2 of a core here, which is usually simpler than moving to shared memory."
+   },
+   "india": {
+    "title": "What the manual says about pipe capacity",
+    "label": "Official documentation",
+    "body": "The pipe(7) manual page states that since Linux 2.6.11 the pipe capacity is 16 pages, 65,536 bytes on a system with 4,096-byte pages, and that it can be queried and changed per pipe. It explains that a write to a full pipe blocks until enough data has been read, and that POSIX requires writes of fewer than PIPE_BUF bytes to be atomic, so output from several writers is not interleaved; on Linux, PIPE_BUF is 4,096 bytes."
+   },
+   "pitfalls": [
+    {
+     "trap": "“Shared memory is fastest, so use it.”",
+     "say": "“For small messages a local socket is simpler; I’d batch first and use shared memory for bulk data.”"
+    },
+    {
+     "trap": "“The child process hung for no reason.”",
+     "say": "“If I write all input before reading output, a full output pipe deadlocks us; I’d read and write concurrently.”"
+    }
+   ],
+   "takeaways": [
+    "Pipes are one-way streams with built-in backpressure.",
+    "Local sockets add two-way traffic, message boundaries and descriptor passing.",
+    "Shared memory avoids copies but needs your own synchronisation.",
+    "Read and write concurrently when talking to a child through two pipes."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Will the pipeline keep up?",
+   "prompt": "Process A writes 1 MB a second of records into a pipe; process B reads them but occasionally pauses for 2 seconds to rotate a file.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "A stalls during each pause once 64 KiB is buffered",
+     "feedback": "Right: 64 KiB fills in about 65 ms at 1 MB a second, and A then blocks."
+    },
+    {
+     "id": "b",
+     "label": "Nothing is noticed, since the kernel buffers the 2 MB",
+     "feedback": "The default buffer is 64 KiB, far below 2 MB."
+    },
+    {
+     "id": "c",
+     "label": "Records written during the pause are lost",
+     "feedback": "Pipes block writers rather than dropping data."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "If A must not stall, add a bounded in-process queue sized for the longest pause, 2 MB here, or let B rotate files without pausing its reads."
+  },
+  "seeAlso": [
+   {
+    "topicId": 281,
+    "why": "Processes are separate address spaces, which is why IPC is needed"
+   },
+   {
+    "topicId": 284,
+    "why": "Each pipe or socket transfer costs system calls"
+   },
+   {
+    "topicId": 570,
+    "why": "Mapped files are another way to share pages between processes"
+   }
+  ]
+ },
+ {
+  "id": 648,
+  "slug": "file-systems-inodes-directories-links",
+  "region": "f5-os",
+  "order": 28,
+  "title": "File Systems: Inodes, Directories and Links",
+  "kind": "lesson",
+  "objectives": [
+   "Explain how inodes, directory entries and data blocks fit together",
+   "Use hard and symbolic links correctly, and know why deleting a file may not free space",
+   "Spot inode exhaustion and non-atomic moves across file systems"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 11,
+  "prereqIds": [
+   289
+  ],
+  "cards": [
+   {
+    "id": "t648-c1",
+    "kind": "text",
+    "title": "A name is not the file",
+    "body": "On Unix-style file systems, a file’s metadata (owner, permissions, size, timestamps, and where its data blocks are) lives in an inode identified by a number. A directory is a list mapping names to inode numbers. The file’s name is therefore not part of the file: the same inode can be listed under several names, and renaming within one file system just rewrites directory entries.",
+    "teaches": [
+     "inode"
+    ]
+   },
+   {
+    "id": "t648-c2",
+    "kind": "text",
+    "title": "Hard and symbolic links",
+    "body": "A hard link is another directory entry for the same inode; the inode counts its links, and every name is equally real. Hard links cannot cross file systems because inode numbers are local to one. A symbolic link is a small file containing a path; it can point anywhere, including other file systems, but it breaks if the target is moved or deleted.",
+    "teaches": [
+     "links"
+    ]
+   },
+   {
+    "id": "t648-c3",
+    "kind": "text",
+    "title": "Trap: deleting a log does not free the disk",
+    "body": "Deleting a file removes a name and lowers the link count. The data is freed only when the count is zero and no process still has the file open. A service that keeps writing to a log you deleted keeps the space in use, so the disk stays full while directory listings show nothing large. Restart or signal the writer to reopen its file, or truncate the file instead of deleting it.",
+    "teaches": [
+     "links",
+     "inode"
+    ]
+   },
+   {
+    "id": "t648-c4",
+    "kind": "diagram",
+    "title": "Worked example: running out of inodes",
+    "body": "A volume created with one inode per 16 KiB (illustrative).",
+    "teaches": [
+     "inode"
+    ],
+    "steps": [
+     "A 1 TiB volume has 1 TiB ÷ 16 KiB = 67,108,864 inodes, fixed when it was created on many file systems",
+     "A cache writes 4 KiB files: 67 million of them use only 256 GiB of data",
+     "At that point every inode is taken, and creating a file fails with “no space left on device”",
+     "Free space still shows about 75% available, which confuses whoever is paged",
+     "Check inode use alongside bytes, and store many tiny objects in fewer, larger files"
+    ]
+   },
+   {
+    "id": "t648-c5",
+    "kind": "text",
+    "title": "Misconception: moving a file is always atomic",
+    "body": "Within one file system, a rename is atomic: other processes see the old name or the new one, never a half-moved file. Across file systems, a rename fails, and move tools fall back to copying the data and deleting the original. A reader can then see a partially written file, and a crash can leave both copies. Write temporary files in the same directory as their final name.",
+    "teaches": [
+     "links"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t648-a1",
+    "concept": "inode",
+    "type": "multiple_choice",
+    "prompt": "Where is a file’s name stored on a Unix-style file system?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "In the file’s inode, next to its size and owner"
+     },
+     {
+      "id": "b",
+      "label": "In the first data block of the file"
+     },
+     {
+      "id": "c",
+      "label": "In the directory entry that points to the inode"
+     },
+     {
+      "id": "d",
+      "label": "In a global index of names kept by the kernel"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Names live in directories, which map names to inode numbers; the inode has metadata but no name, which is why one inode can have several names. Data blocks hold contents, and there is no global name index; lookups walk directories from the root."
+   },
+   {
+    "id": "t648-a2",
+    "concept": "links",
+    "type": "multiple_choice",
+    "prompt": "A disk is 100% full. You delete a 40 GB log file, but free space does not change. What is the most likely reason?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The file system frees space only on the next reboot"
+     },
+     {
+      "id": "b",
+      "label": "A running process still has the deleted file open"
+     },
+     {
+      "id": "c",
+      "label": "The file had a symbolic link pointing to it elsewhere"
+     },
+     {
+      "id": "d",
+      "label": "Deleted data stays in a trash folder for 30 days"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Data is freed when the last name and the last open descriptor are gone, so a process holding the log open keeps it alive. Space is freed without a reboot, a symbolic link does not keep its target’s data alive, and the kernel has no trash folder."
+   },
+   {
+    "id": "t648-a3",
+    "concept": "links",
+    "type": "multiple_choice",
+    "prompt": "Why can a hard link not point to a file on another file system?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Hard links are disabled by default for security reasons"
+     },
+     {
+      "id": "b",
+      "label": "Directory entries can hold only relative paths"
+     },
+     {
+      "id": "c",
+      "label": "Each file system is limited to 65,000 hard links"
+     },
+     {
+      "id": "d",
+      "label": "Inode numbers are meaningful only within one file system"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "A hard link is a directory entry holding an inode number, and the same number on another file system refers to an unrelated inode. Hard links are allowed by default, entries hold an inode number rather than a path, and link-count limits do not stop cross-device links."
+   },
+   {
+    "id": "t648-a4",
+    "concept": "inode",
+    "type": "multiple_choice",
+    "prompt": "Creating files fails with “no space left on device”, yet the disk shows 70% free space. What should you check first?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Whether the volume has run out of inodes"
+     },
+     {
+      "id": "b",
+      "label": "Whether the disk hardware is failing"
+     },
+     {
+      "id": "c",
+      "label": "Whether the file names are too long"
+     },
+     {
+      "id": "d",
+      "label": "Whether the page cache has filled memory"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "With bytes free, the usual cause is inode exhaustion from many small files. Failing disks give input/output errors, long names give a name-too-long error, and a full page cache is reclaimed rather than causing this error."
+   },
+   {
+    "id": "t648-a5",
+    "concept": "inode",
+    "type": "estimation",
+    "prompt": "A 2 TiB volume was created with one inode per 16 KiB. About how many million files can it hold?",
+    "unit": "million",
+    "target": 134,
+    "assumptions": [
+     "1 TiB = 1,073,741,824 KiB",
+     "Every file uses one inode"
+    ],
+    "formula": "volume size ÷ bytes per inode",
+    "workedAnswer": "2 × 1,073,741,824 KiB ÷ 16 KiB = 134,217,728 ≈ 134 million",
+    "explanation": "Sanity check: 134 million 4 KiB files use only 512 GiB, a quarter of the volume, so a store of tiny files hits the inode limit long before the byte limit.",
+    "tolerance": 0.05,
+    "trapAnswers": [
+     13,
+     1342
+    ]
+   },
+   {
+    "id": "t648-a6",
+    "concept": "links",
+    "type": "drag_order",
+    "prompt": "A service has its log file open. Someone deletes the log to free space. Order what happens until the space is actually released.",
+    "items": [
+     {
+      "id": "s2",
+      "label": "The service keeps writing through its open descriptor, so usage keeps growing"
+     },
+     {
+      "id": "s4",
+      "label": "It closes the old descriptor and the kernel frees the old blocks"
+     },
+     {
+      "id": "s1",
+      "label": "The name is removed and the link count drops to zero"
+     },
+     {
+      "id": "s3",
+      "label": "The service is told to reopen its log path and creates a fresh file"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "The name goes first, but the inode lives on while open; only closing the last descriptor frees the blocks."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t648-f1",
+    "front": "What does an inode hold?",
+    "back": "Metadata and block locations, but not the name; directories map names to inode numbers."
+   },
+   {
+    "id": "t648-f2",
+    "front": "When is a deleted file’s space freed?",
+    "back": "When its link count is zero and no process has it open."
+   },
+   {
+    "id": "t648-f3",
+    "front": "Hard vs symbolic link?",
+    "back": "A hard link is another name for the inode; a symbolic link stores a path and can dangle."
+   }
+  ],
+  "sources": [
+   {
+    "title": "inode(7), Linux manual page",
+    "url": "https://man7.org/linux/man-pages/man7/inode.7.html"
+   },
+   {
+    "title": "unlink(2), Linux manual page",
+    "url": "https://man7.org/linux/man-pages/man2/unlink.2.html"
+   },
+   {
+    "title": "rename(2), Linux manual page",
+    "url": "https://man7.org/linux/man-pages/man2/rename.2.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "inode",
+    "links"
+   ],
+   "mechanism": {
+    "title": "How a path becomes data",
+    "steps": [
+     "Opening a path starts at the root directory, or the current directory for a relative path, and looks up each component in turn.",
+     "Each directory maps the component name to an inode number; the kernel caches these lookups so repeated opens are cheap.",
+     "At the final component, the kernel reads the inode, checks permissions against the caller, and creates an open file description that the process refers to by descriptor.",
+     "Reads and writes use the inode’s block map, or extent list, to find data on disk, going through the page cache.",
+     "Unlinking removes a directory entry and decrements the inode’s link count; the inode and its blocks are released only when the count is zero and no open descriptions remain.",
+     "Renaming within a file system rewrites directory entries in one atomic step; across file systems it fails, and tools emulate it by copying and deleting."
+    ]
+   },
+   "useWhen": [
+    "Use hard links for cheap snapshots of files that are replaced rather than modified in place.",
+    "Use symbolic links for switching between versioned directories, updated by an atomic rename."
+   ],
+   "avoidWhen": [
+    "Avoid deleting logs that are still being written; truncate them or have the writer reopen.",
+    "Avoid millions of tiny files on volumes with a fixed inode count."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Action",
+     "What changes",
+     "Space freed?",
+     "Atomic?"
+    ],
+    "rows": [
+     [
+      "Delete a name",
+      "One directory entry, link count down by one",
+      "Only at zero links and no open descriptors",
+      "Yes"
+     ],
+     [
+      "Hard link",
+      "New directory entry, link count up by one",
+      "No new data",
+      "Yes"
+     ],
+     [
+      "Rename within a file system",
+      "Directory entries only",
+      "Not applicable",
+      "Yes"
+     ],
+     [
+      "Move across file systems",
+      "Full copy, then delete",
+      "After the delete",
+      "No"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Where did the disk go?",
+    "assumptions": [
+     "A 500 GiB volume is full; listing every file adds up to 380 GiB (illustrative)"
+    ],
+    "steps": [
+     "Unexplained usage: 500 − 380 = 120 GiB.",
+     "Listing open files whose names are deleted shows a service holding a 115 GiB rotated log.",
+     "The remaining 5 GiB is plausibly reserved blocks and file system metadata.",
+     "Having the service reopen its log frees 115 GiB at once, without a restart if it supports a reopen signal."
+    ],
+    "result": "A 120 GiB gap between listed files and used space is almost always deleted-but-open files; reopening the writer frees the space."
+   },
+   "india": {
+    "title": "What the manual says about deleting an open file",
+    "label": "Official documentation",
+    "body": "The unlink(2) manual page explains that unlink deletes a name from the file system, and if that name was the last link to a file and no processes have the file open, the file is deleted and its space made available for reuse. If the name was the last link but any processes still have the file open, the file remains in existence until the last file descriptor referring to it is closed. The inode(7) page describes the link count field as the number of hard links to the file."
+   },
+   "pitfalls": [
+    {
+     "trap": "“I deleted the log but the disk is still full; the disk must be broken.”",
+     "say": "“A process probably still holds it open; I’d find it and make it reopen its log.”"
+    },
+    {
+     "trap": "“Plenty of free space, so file creation can’t fail.”",
+     "say": "“Inodes can run out first with tiny files; I’d check inode usage too.”"
+    }
+   ],
+   "takeaways": [
+    "Directories map names to inodes; inodes hold everything else.",
+    "Space is freed only when no links and no open descriptors remain.",
+    "Inodes can run out while bytes are free.",
+    "Rename is atomic only within one file system."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "What does the reader see?",
+   "prompt": "A deploy writes a new 2 GB data file on a scratch disk, then moves it to its final path on a different disk while a service is reading that path.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Possibly a partly copied file, since the move is a copy across disks",
+     "feedback": "Right: across file systems the move copies data, and the reader can open the target mid-copy."
+    },
+    {
+     "id": "b",
+     "label": "Either the old file or the new one, as a move is atomic",
+     "feedback": "That holds only for a rename within one file system."
+    },
+    {
+     "id": "c",
+     "label": "An error, since moving across disks is not allowed",
+     "feedback": "The rename call fails, but move tools fall back to copying, so the move succeeds slowly."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Write the new file to a temporary name on the destination disk, flush it, then rename it into place; the rename within one file system is atomic."
+  },
+  "seeAlso": [
+   {
+    "topicId": 289,
+    "why": "The page cache and fsync behind every file write"
+   },
+   {
+    "topicId": 566,
+    "why": "Open descriptors keep deleted files alive"
+   },
+   {
+    "topicId": 570,
+    "why": "A mapped file depends on the inode staying put"
+   }
+  ]
+ },
+ {
+  "id": 649,
+  "slug": "namespaces-how-containers-isolate-processes",
+  "region": "f5-os",
+  "order": 29,
+  "title": "Namespaces: How Containers Isolate Processes",
+  "kind": "lesson",
+  "objectives": [
+   "Name what each kind of namespace isolates",
+   "Explain why a container shares the host kernel and what that means for security",
+   "Map user IDs inside a user namespace to IDs on the host"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 12,
+  "prereqIds": [
+   281,
+   290
+  ],
+  "cards": [
+   {
+    "id": "t649-c1",
+    "kind": "text",
+    "title": "Separate views of one kernel",
+    "body": "A namespace gives a group of processes their own instance of one global resource. Linux has namespaces for process IDs, mount points, networking, hostname, inter-process communication objects, user and group IDs, control group views and clocks. A container is ordinary processes placed in a fresh set of these, plus control groups to limit what they use and dropped privileges to limit what they may do.",
+    "teaches": [
+     "namespaces"
+    ]
+   },
+   {
+    "id": "t649-c2",
+    "kind": "diagram",
+    "title": "Worked example: one process, two views",
+    "body": "What a containerised web server sees, against what the host sees (illustrative IDs).",
+    "teaches": [
+     "namespaces",
+     "user-namespace"
+    ],
+    "steps": [
+     "Inside, it is PID 1; on the host, the same process is PID 48,213",
+     "Inside, it has its own loopback and an interface with its own address, so it can bind port 80 even if the host or other containers also use port 80",
+     "Inside, the root directory is the image’s file system; the host’s files are not visible unless mounted in",
+     "Inside, it runs as user 0; through the user namespace that maps to host user 100,000, an unprivileged account"
+    ]
+   },
+   {
+    "id": "t649-c3",
+    "kind": "text",
+    "title": "Trap: localhost inside a container is not the host",
+    "body": "In its own network namespace, a container has its own loopback interface. A service in the container that connects to localhost reaches only the container itself, not a database listening on the host’s loopback; and a server that binds only to the container’s loopback cannot be reached through published ports. Bind servers to all interfaces in the container, and reach the host through an address it exposes.",
+    "teaches": [
+     "namespaces"
+    ]
+   },
+   {
+    "id": "t649-c4",
+    "kind": "text",
+    "title": "Misconception: a container is a small virtual machine",
+    "body": "A virtual machine runs its own kernel on emulated hardware; a container’s processes make system calls straight into the host’s kernel. Namespaces change what they can see, not which kernel serves them. A kernel bug, a container given broad privileges, or a host directory mounted inside can let a process affect the host. For untrusted code, add a user namespace, drop privileges, filter system calls, or use a sandbox with its own kernel.",
+    "teaches": [
+     "container-security"
+    ]
+   },
+   {
+    "id": "t649-c5",
+    "kind": "text",
+    "title": "Root inside, nobody outside",
+    "body": "A user namespace maps a range of IDs inside to a range outside: for example, inside IDs 0 to 65,535 become host IDs 100,000 to 165,535. A process that is root inside has full privileges over resources owned by its namespaces, but on the host it is user 100,000, so files and devices it was not given stay out of reach. Without a user namespace, root in a container is host root with some privileges removed.",
+    "teaches": [
+     "user-namespace",
+     "container-security"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t649-a1",
+    "concept": "namespaces",
+    "type": "multiple_choice",
+    "prompt": "Two containers on one host both run a server listening on port 8080. Why do they not conflict?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Each container has its own network namespace and ports"
+     },
+     {
+      "id": "b",
+      "label": "The kernel renumbers the second server’s port to 8081"
+     },
+     {
+      "id": "c",
+      "label": "Control groups give each container a share of the port"
+     },
+     {
+      "id": "d",
+      "label": "Only one actually listens; the other waits for it to stop"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Each network namespace has its own interfaces and port space, so the same port can be bound in both. The kernel never renumbers ports, control groups limit resources rather than separating ports, and both servers really do listen."
+   },
+   {
+    "id": "t649-a2",
+    "concept": "container-security",
+    "type": "multiple_choice",
+    "prompt": "Which statement about containers and the host kernel is correct?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Each container boots its own copy of the kernel"
+     },
+     {
+      "id": "b",
+      "label": "Containers run on the host kernel through system calls"
+     },
+     {
+      "id": "c",
+      "label": "Containers translate system calls into hypervisor calls"
+     },
+     {
+      "id": "d",
+      "label": "The kernel is copied into the image when it is built"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Container processes are host processes in separate namespaces, so their system calls go to the host kernel. Booting a separate kernel describes a virtual machine, there is no hypervisor translation, and images contain user-space files, not a kernel the container runs."
+   },
+   {
+    "id": "t649-a3",
+    "concept": "namespaces",
+    "type": "multiple_choice",
+    "prompt": "An application in a container connects to localhost:5432 to reach a database running on the host’s loopback interface, and the connection is refused. Why?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Databases do not accept connections from containers"
+     },
+     {
+      "id": "b",
+      "label": "Port 5432 is reserved inside containers"
+     },
+     {
+      "id": "c",
+      "label": "The connection needs a user namespace to be allowed"
+     },
+     {
+      "id": "d",
+      "label": "Localhost there is the container’s own loopback"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "The container’s network namespace has its own loopback, so localhost reaches the container, where nothing listens on 5432. Databases accept any permitted client, no port is reserved inside containers, and user namespaces govern IDs and privileges, not routing."
+   },
+   {
+    "id": "t649-a4",
+    "concept": "user-namespace",
+    "type": "multiple_choice",
+    "prompt": "A process runs as root inside a container with a user namespace mapping inside ID 0 to host ID 100,000. It escapes to a host directory mounted in. What can it do there?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Whatever host user 100,000 may do with those files"
+     },
+     {
+      "id": "b",
+      "label": "Anything, because it is root inside the container"
+     },
+     {
+      "id": "c",
+      "label": "Nothing, since mounted directories are read-only"
+     },
+     {
+      "id": "d",
+      "label": "Only read files owned by host root"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "On the host the process is user 100,000, so ordinary permissions for that account apply. Root inside does not mean root on the host when a user namespace is used, mounts are writable unless made read-only, and reading root-owned files depends on their permissions, not on a special rule."
+   },
+   {
+    "id": "t649-a5",
+    "concept": "user-namespace",
+    "type": "estimation",
+    "prompt": "A user namespace maps inside IDs 0 to 65,535 to host IDs starting at 100,000. A process runs as user 1,000 inside. What is its host user ID?",
+    "unit": "host ID",
+    "target": 101000,
+    "assumptions": [
+     "The mapping is one contiguous range",
+     "IDs map in order"
+    ],
+    "formula": "host start + inside ID",
+    "workedAnswer": "100,000 + 1,000 = 101,000",
+    "explanation": "Design implication: give each container a different host range so that two containers’ user 1,000 cannot read each other’s files on a shared volume.",
+    "tolerance": 0.005,
+    "trapAnswers": [
+     1000,
+     165535
+    ]
+   },
+   {
+    "id": "t649-a6",
+    "concept": "namespaces",
+    "type": "drag_order",
+    "prompt": "Order the steps a container runtime takes to start a containerised process.",
+    "items": [
+     {
+      "id": "s2",
+      "label": "Set up its root file system and mounts"
+     },
+     {
+      "id": "s4",
+      "label": "Run the image’s program as the process"
+     },
+     {
+      "id": "s1",
+      "label": "Create new namespaces for the process"
+     },
+     {
+      "id": "s3",
+      "label": "Apply control group limits and drop privileges"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Namespaces first, so the mounts land in the new view; limits and privilege drops before the untrusted program starts."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t649-f1",
+    "front": "What does a namespace do?",
+    "back": "Gives a group of processes their own instance of one global resource, such as process IDs or the network stack."
+   },
+   {
+    "id": "t649-f2",
+    "front": "Container vs virtual machine?",
+    "back": "Containers share the host kernel; a virtual machine runs its own."
+   },
+   {
+    "id": "t649-f3",
+    "front": "User namespace?",
+    "back": "Maps IDs inside to an unprivileged range on the host, so root inside is not root outside."
+   }
+  ],
+  "sources": [
+   {
+    "title": "namespaces(7), Linux manual page",
+    "url": "https://man7.org/linux/man-pages/man7/namespaces.7.html"
+   },
+   {
+    "title": "user_namespaces(7), Linux manual page",
+    "url": "https://man7.org/linux/man-pages/man7/user_namespaces.7.html"
+   },
+   {
+    "title": "cgroups(7), Linux manual page",
+    "url": "https://man7.org/linux/man-pages/man7/cgroups.7.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "namespaces",
+    "user-namespace",
+    "container-security"
+   ],
+   "mechanism": {
+    "title": "What a runtime builds",
+    "steps": [
+     "The runtime creates a child process with flags requesting new namespaces: process IDs, mounts, network, hostname, inter-process communication, and often user IDs and control group views.",
+     "In the new mount namespace it mounts the image’s layers as the root file system, adds special file systems such as the process list, and mounts any volumes requested.",
+     "In the new network namespace it creates a virtual interface pair, puts one end inside, and connects the other to a bridge on the host with address translation for published ports.",
+     "It places the process in a control group with CPU and memory limits, drops privileges it does not need, and often installs a filter that blocks rarely needed system calls.",
+     "Finally it runs the image’s entry program, which becomes PID 1 in the new process ID namespace and must handle signals and reap children.",
+     "Every system call the program makes still runs in the host kernel; namespaces only decide which instance of each resource it sees. That is why containers start in milliseconds and share memory for common files, and also why a kernel flaw reachable from inside affects every container on the host."
+    ]
+   },
+   "useWhen": [
+    "Use user namespaces so root inside a container is unprivileged on the host.",
+    "Use separate network namespaces so services can bind standard ports without conflicts."
+   ],
+   "avoidWhen": [
+    "Avoid running untrusted code in containers with broad privileges or host mounts.",
+    "Avoid assuming localhost inside a container reaches services on the host."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Namespace",
+     "Isolates",
+     "Effect inside",
+     "Common surprise"
+    ],
+    "rows": [
+     [
+      "Process ID",
+      "Process numbers",
+      "Entry program is PID 1",
+      "Must reap orphans and handle signals"
+     ],
+     [
+      "Network",
+      "Interfaces, routes, ports",
+      "Own loopback and port space",
+      "Localhost is not the host"
+     ],
+     [
+      "Mount",
+      "Mount points",
+      "Own root file system",
+      "Host files visible only if mounted"
+     ],
+     [
+      "User",
+      "User and group IDs",
+      "Root inside maps to unprivileged outside",
+      "Volume file ownership looks shifted"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Ranges for many containers",
+    "assumptions": [
+     "Each container gets 65,536 IDs; host IDs 100,000 and up are free for this; IDs are 32-bit (illustrative policy)"
+    ],
+    "steps": [
+     "Container n starts at 100,000 + n × 65,536.",
+     "Container 10 starts at 100,000 + 655,360 = 755,360 and ends at 820,895.",
+     "Space available: about 4,294,967,295 − 100,000 ≈ 4.29 billion IDs.",
+     "Containers that fit: 4,294,867,295 ÷ 65,536 ≈ 65,534, more than any one host runs."
+    ],
+    "result": "Giving each container its own 65,536-ID range costs nothing in practice, and keeps containers from sharing host identities."
+   },
+   "india": {
+    "title": "What the manual says about privileges inside a user namespace",
+    "label": "Official documentation",
+    "body": "The user_namespaces(7) manual page explains that a process created in a new user namespace gains a full set of capabilities in that namespace, but has no capabilities in the parent namespace. Those capabilities apply only to resources governed by namespaces the user namespace owns, so a process can be root for mounting and networking inside its container while remaining an ordinary unprivileged user to the host. The namespaces(7) page lists the eight namespace types and what each isolates."
+   },
+   "pitfalls": [
+    {
+     "trap": "“It’s in a container, so it can’t touch the host.”",
+     "say": "“It shares the host kernel; I’d use a user namespace, drop privileges and avoid host mounts.”"
+    },
+    {
+     "trap": "“The app can’t reach the database on localhost; the container network is broken.”",
+     "say": "“Localhost is the container’s own loopback; I’d connect to the host’s exposed address.”"
+    }
+   ],
+   "takeaways": [
+    "Namespaces change what processes see, not which kernel they use.",
+    "Containers are namespaces plus control groups plus dropped privileges.",
+    "Each network namespace has its own loopback and ports.",
+    "User namespaces map root inside to an unprivileged host ID."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Which container is the riskier host neighbour?",
+   "prompt": "Container A runs as root with no user namespace and the container runtime’s control socket mounted in. Container B runs as root inside a user namespace mapped to host ID 200,000, with no host mounts.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "A: the control socket lets it start privileged containers on the host",
+     "feedback": "Right: control of the runtime is control of the host, and A’s root is host root."
+    },
+    {
+     "id": "b",
+     "label": "B: root inside a user namespace has more powers than plain root",
+     "feedback": "Its powers apply only within its own namespaces; on the host it is user 200,000."
+    },
+    {
+     "id": "c",
+     "label": "Neither: namespaces isolate both from the host entirely",
+     "feedback": "Namespaces limit views, not kernel access, and a mounted control socket bypasses them."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Treat mounting the runtime’s control socket as giving host root. B’s design, a user namespace and no host mounts, is how to run code you trust less."
+  },
+  "seeAlso": [
+   {
+    "topicId": 290,
+    "why": "PID 1 inside a container must handle signals and reap children"
+   },
+   {
+    "topicId": 565,
+    "why": "Control groups limit what namespaced processes can use"
+   },
+   {
+    "topicId": 281,
+    "why": "Containers are ordinary processes with a different view"
+   }
+  ]
+ },
+ {
+  "id": 650,
+  "slug": "profiling-sampling-flame-graphs-off-cpu",
+  "region": "f5-os",
+  "order": 30,
+  "title": "Profiling a Running Process: Sampling, Flame Graphs and Off-CPU Time",
+  "kind": "lesson",
+  "objectives": [
+   "Explain how a sampling profiler estimates where CPU time goes",
+   "Read a flame graph correctly",
+   "Find time spent waiting, which on-CPU profiles cannot show"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 12,
+  "prereqIds": [
+   569,
+   282
+  ],
+  "cards": [
+   {
+    "id": "t650-c1",
+    "kind": "text",
+    "title": "Sampling instead of measuring everything",
+    "body": "A sampling profiler interrupts each CPU at a fixed rate, often 99 times a second, and records the stack of whatever is running. A function that appears in 10% of samples used about 10% of CPU time. Overhead stays low because nothing is recorded between samples, so it is safe in production, unlike instrumenting every function call, which can distort the program it measures.",
+    "teaches": [
+     "sampling-profiler"
+    ]
+   },
+   {
+    "id": "t650-c2",
+    "kind": "text",
+    "title": "Reading a flame graph",
+    "body": "A flame graph merges sampled stacks: each box is a function, its width is the share of samples in which it was on the stack, and boxes above it are what it called. The horizontal order is alphabetical, chosen to merge identical stacks, and does not show time. Look for wide boxes, and especially wide tops of towers, which are where CPU is actually burned.",
+    "teaches": [
+     "flame-graph"
+    ]
+   },
+   {
+    "id": "t650-c3",
+    "kind": "diagram",
+    "title": "Worked example: from samples to cores",
+    "body": "A 30 second profile on an 8-CPU host (illustrative).",
+    "teaches": [
+     "sampling-profiler"
+    ],
+    "steps": [
+     "Sampling at 99 per second on each CPU gives up to 99 × 8 × 30 = 23,760 samples",
+     "A compression function appears in 4,752 samples",
+     "Per second of wall time that is 4,752 ÷ (99 × 30) = 1.6 samples-worth of a CPU, so it uses about 1.6 cores",
+     "Removing it entirely could free at most those 1.6 cores",
+     "A function in only 30 samples has a sampling error near 1 ÷ √30, about 18%, so treat small boxes as rough"
+    ]
+   },
+   {
+    "id": "t650-c4",
+    "kind": "text",
+    "title": "Trap: the slow request that does not show up",
+    "body": "An on-CPU profile records only threads that are running. A request that spends 900 ms waiting on a lock, a disk or another service and 10 ms computing appears as a thin sliver, if at all. When latency is high but CPU is low, profile off-CPU time instead: record where threads block and for how long, using scheduler events, and look at those stacks.",
+    "teaches": [
+     "off-cpu"
+    ]
+   },
+   {
+    "id": "t650-c5",
+    "kind": "text",
+    "title": "Misconception: the profile shows what happened in order",
+    "body": "A flame graph aggregates; it throws away time order, so it cannot show that a pause happened at 3:02 or that one slow request was unusual. Missing names or truncated stacks usually mean the profiler could not walk the stack, because frame pointers were omitted or code was generated at run time without symbol maps. For sequences, use a timeline trace; for stacks, build with frame pointers or provide symbol maps.",
+    "teaches": [
+     "flame-graph"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t650-a1",
+    "concept": "flame-graph",
+    "type": "multiple_choice",
+    "prompt": "In a flame graph, one function’s box spans 40% of the width at the second level. What does that tell you?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "It ran during the first 40% of the profiling window"
+     },
+     {
+      "id": "b",
+      "label": "It was on the stack in about 40% of the samples"
+     },
+     {
+      "id": "c",
+      "label": "It was called 40% of the total number of calls"
+     },
+     {
+      "id": "d",
+      "label": "It used 40% of the memory allocated by the program"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Width is the share of samples whose stack contained the function, including time in what it called. Horizontal position is not time, sampling does not count calls, and an on-CPU flame graph says nothing about memory."
+   },
+   {
+    "id": "t650-a2",
+    "concept": "off-cpu",
+    "type": "multiple_choice",
+    "prompt": "A service’s p99 latency is 2 s while its CPU use is 15%. An on-CPU flame graph looks ordinary. What should you profile next?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Instructions per cycle, to look for cache misses"
+     },
+     {
+      "id": "b",
+      "label": "A higher sampling rate on the same CPU profile"
+     },
+     {
+      "id": "c",
+      "label": "Time threads spend blocked, with stacks"
+     },
+     {
+      "id": "d",
+      "label": "Heap allocation counts per function"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Low CPU with high latency means requests mostly wait, and only off-CPU analysis shows where. Cache-miss and finer CPU sampling still look only at running time, and allocation counts measure memory churn, which is unlikely to explain 2 s at 15% CPU."
+   },
+   {
+    "id": "t650-a3",
+    "concept": "sampling-profiler",
+    "type": "multiple_choice",
+    "prompt": "Why do many profilers sample at 99 per second rather than 100?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "To stay below a kernel limit of 100 samples per second"
+     },
+     {
+      "id": "b",
+      "label": "To leave one sample slot for the profiler itself"
+     },
+     {
+      "id": "c",
+      "label": "To avoid lining up with work that runs at round rates"
+     },
+     {
+      "id": "d",
+      "label": "Because sample counts must be odd for the statistics"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Timers and periodic tasks often run at 100 Hz or multiples, and sampling in step with them would over- or under-count them. The kernel allows far higher rates, the profiler does not need a slot, and the statistics do not require odd counts."
+   },
+   {
+    "id": "t650-a4",
+    "concept": "flame-graph",
+    "type": "multiple_choice",
+    "prompt": "A flame graph shows many stacks ending in boxes labelled only with hexadecimal addresses. What is the likely cause?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The program spends that time inside the kernel"
+     },
+     {
+      "id": "b",
+      "label": "The profiler cannot map addresses to function names"
+     },
+     {
+      "id": "c",
+      "label": "Those functions were inlined by the compiler"
+     },
+     {
+      "id": "d",
+      "label": "The samples were taken while the CPU was idle"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Raw addresses mean symbols were missing, as with stripped binaries or code generated at run time without a symbol map. Kernel functions are named when kernel symbols are available, inlined functions vanish into their caller rather than becoming addresses, and idle time shows as an idle stack."
+   },
+   {
+    "id": "t650-a5",
+    "concept": "sampling-profiler",
+    "type": "estimation",
+    "prompt": "A profile samples each of 8 CPUs 99 times a second for 30 s. One function appears in 4,752 samples. About how many cores does it keep busy?",
+    "unit": "cores",
+    "target": 1.6,
+    "assumptions": [
+     "Samples are spread evenly over time",
+     "Each sample represents 1/99 s of one CPU"
+    ],
+    "formula": "samples ÷ (rate × duration)",
+    "workedAnswer": "4,752 ÷ (99 × 30) = 4,752 ÷ 2,970 = 1.6 cores",
+    "explanation": "Sanity check: the total possible is 8 cores, or 23,760 samples, so this function is 20% of the machine; dividing by all samples instead gives 0.2, a fraction rather than a core count.",
+    "tolerance": 0.1,
+    "trapAnswers": [
+     0.2,
+     16
+    ]
+   },
+   {
+    "id": "t650-a6",
+    "concept": "off-cpu",
+    "type": "drag_order",
+    "prompt": "Order the steps of investigating a service whose latency is high but CPU use is low.",
+    "items": [
+     {
+      "id": "s2",
+      "label": "Record where threads block and how long they stay off the CPU"
+     },
+     {
+      "id": "s4",
+      "label": "Fix that wait, then re-measure latency"
+     },
+     {
+      "id": "s1",
+      "label": "Confirm from metrics that CPU is not saturated"
+     },
+     {
+      "id": "s3",
+      "label": "Group the blocked time by stack to find the main wait"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4"
+    ],
+    "explanation": "Rule out CPU first, measure waiting with stacks, attribute it, then change one thing and measure again."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t650-f1",
+    "front": "Sampling profiler?",
+    "back": "Records the running stack at a fixed rate; sample share approximates CPU share."
+   },
+   {
+    "id": "t650-f2",
+    "front": "Flame graph width?",
+    "back": "Share of samples containing that function; horizontal order is not time."
+   },
+   {
+    "id": "t650-f3",
+    "front": "Off-CPU analysis?",
+    "back": "Measures where and how long threads block, for latency that CPU profiles miss."
+   }
+  ],
+  "sources": [
+   {
+    "title": "perf-record(1), Linux manual page",
+    "url": "https://man7.org/linux/man-pages/man1/perf-record.1.html"
+   },
+   {
+    "title": "perf-report(1), Linux manual page",
+    "url": "https://man7.org/linux/man-pages/man1/perf-report.1.html"
+   },
+   {
+    "title": "perf-sched(1), Linux manual page",
+    "url": "https://man7.org/linux/man-pages/man1/perf-sched.1.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "sampling-profiler",
+    "flame-graph",
+    "off-cpu"
+   ],
+   "mechanism": {
+    "title": "How a sampling profile is built",
+    "steps": [
+     "The profiler asks the kernel for a timer or hardware counter event on each CPU at a chosen rate, such as 99 per second.",
+     "At each event the kernel interrupts the running thread and records its instruction address and, if asked, its call stack, walking frame pointers or copying part of the stack to unwind later.",
+     "Samples go into a buffer that the profiler drains; afterwards addresses are mapped to function names using symbol tables or maps written by run-time compilers.",
+     "Identical stacks are counted. A flame graph draws each stack as a tower of boxes, merging common prefixes, with width proportional to count.",
+     "Off-CPU profiling instead records scheduler switch-out and wake-up events with stacks; time between them is attributed to the blocking stack, showing locks, I/O and sleeps.",
+     "Accuracy grows with sample count: the relative error of a function’s share is roughly one divided by the square root of its samples. Short bursts of work between samples can be missed or over-counted by chance, so profiles of rare events need longer windows or tracing."
+    ]
+   },
+   "useWhen": [
+    "Use sampling profiles in production when CPU is high.",
+    "Use off-CPU profiles when latency is high but CPU is low."
+   ],
+   "avoidWhen": [
+    "Avoid instrumenting every function on hot paths; overhead distorts the result.",
+    "Avoid drawing conclusions from boxes with only a few dozen samples."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Tool",
+     "Answers",
+     "Overhead",
+     "Blind spot"
+    ],
+    "rows": [
+     [
+      "On-CPU sampling",
+      "Where CPU time goes",
+      "Low",
+      "Waiting time"
+     ],
+     [
+      "Off-CPU analysis",
+      "Where threads wait",
+      "Moderate, depends on switch rate",
+      "Pure CPU work"
+     ],
+     [
+      "Timeline tracing",
+      "What happened, in order",
+      "Higher",
+      "Long periods produce huge files"
+     ],
+     [
+      "Instrumentation",
+      "Exact call counts and durations",
+      "High on hot paths",
+      "Changes timing it measures"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "How long to profile",
+    "assumptions": [
+     "A function is suspected of using about 2% of CPU on a 4-CPU host; you want its share within about ±10% relative error; sampling at 99 per second (illustrative)"
+    ],
+    "steps": [
+     "Relative error ≈ 1 ÷ √n, so ±10% needs n ≈ 100 samples of that function.",
+     "At 2% share, total samples needed: 100 ÷ 0.02 = 5,000.",
+     "Samples per second across the host: 99 × 4 = 396.",
+     "Duration: 5,000 ÷ 396 ≈ 13 s; profile for 30 s to allow for uneven load."
+    ],
+    "result": "About 13 seconds of sampling pins down a 2% function to within roughly 10%, which is why 30 to 60 second profiles are a common default."
+   },
+   "india": {
+    "title": "What the manual says about sampling options",
+    "label": "Official documentation",
+    "body": "The perf-record(1) manual page describes the frequency option as profiling at a chosen frequency, throttled down if it exceeds the kernel’s maximum allowed sample rate, and the -g option as enabling call-graph recording, the stack backtrace, for both kernel space and user space. It lists frame-pointer, debugging-information and branch-record methods for walking the stack, which is why missing frame pointers produce truncated stacks. The perf-sched(1) page covers recording scheduler events, the raw material for off-CPU analysis."
+   },
+   "pitfalls": [
+    {
+     "trap": "“The flame graph shows the slow part started at the left.”",
+     "say": "“The x-axis isn’t time; wide boxes are where CPU goes, and for order I’d use a trace.”"
+    },
+    {
+     "trap": "“CPU profile looks fine, so the code isn’t slow.”",
+     "say": "“If latency is high and CPU is low, requests are waiting; I’d profile off-CPU time.”"
+    }
+   ],
+   "takeaways": [
+    "Sampling estimates CPU share with low overhead.",
+    "Flame graph width is sample share; horizontal order is not time.",
+    "Off-CPU profiling finds waits that CPU profiles miss.",
+    "More samples mean smaller error; ignore tiny boxes."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Where will the slow requests show up?",
+   "prompt": "Requests take 800 ms: 20 ms of computation and 780 ms waiting for a lock held by a background job. You capture an on-CPU flame graph.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Barely: the request path is a thin slice, and the lock wait is absent",
+     "feedback": "Right: waiting threads are not running, so they are not sampled."
+    },
+    {
+     "id": "b",
+     "label": "As a wide box for the lock function, since that is where time goes",
+     "feedback": "A sleeping waiter is off the CPU; the lock appears only if waiters spin."
+    },
+    {
+     "id": "c",
+     "label": "As the widest tower, because slow requests dominate the profile",
+     "feedback": "Width reflects CPU samples, and these requests use little CPU."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "An off-CPU profile would show the 780 ms under the lock-wait stack, and an on-CPU profile of the background job would show what it does while holding the lock."
+  },
+  "seeAlso": [
+   {
+    "topicId": 569,
+    "why": "Load, CPU time and iowait come before profiling"
+   },
+   {
+    "topicId": 642,
+    "why": "Lock waits are a common off-CPU cause"
+   },
+   {
+    "topicId": 282,
+    "why": "Scheduler switches are what off-CPU analysis records"
    }
   ]
  }
