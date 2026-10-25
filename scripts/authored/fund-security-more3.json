@@ -1758,6 +1758,15 @@
     ]
    },
    {
+    "id": "t575-c6",
+    "kind": "text",
+    "title": "Edge case: changes that skip the application",
+    "body": "Audit records written by application code miss changes made straight in the database, such as a migration, a support script or an attacker with a database login. A trigger on the sensitive tables can insert an audit row in the same transaction as each change, so the change and its audit row commit or roll back together. Record the database role, and the acting user when the application sets one, for example with SET LOCAL app.actor_id in PostgreSQL. A table owner can still disable the trigger or edit the audit table, so the application role should only be able to insert into it, and its rows should be shipped off the database like other security events.",
+    "teaches": [
+     "audit-integrity"
+    ]
+   },
+   {
     "id": "t575-c5",
     "kind": "text",
     "title": "Trap: logs nobody reads",
@@ -2098,6 +2107,14 @@
    {
     "topicId": 668,
     "why": "Security incident response uses these logs to scope a compromise"
+   },
+   {
+    "topicId": 539,
+    "why": "Product audit trails in code: actor context, impersonation and customer activity logs"
+   },
+   {
+    "topicId": 555,
+    "why": "History tables and the triggers that record row changes inside the database"
    }
   ]
  },
@@ -2508,6 +2525,14 @@
    {
     "topicId": 670,
     "why": "Tenant boundaries are the outermost authorisation rule"
+   },
+   {
+    "topicId": 508,
+    "why": "Noisy neighbours: the performance side of sharing infrastructure between tenants"
+   },
+   {
+    "topicId": 557,
+    "why": "Tenant ids in the schema and row-level security policies that enforce them in the database"
    }
   ]
  },
@@ -2951,6 +2976,10 @@
    {
     "topicId": 663,
     "why": "APIs expose business flows to the same automation"
+   },
+   {
+    "topicId": 547,
+    "why": "Network-level floods and amplification, which bot defences at the application layer sit behind"
    }
   ]
  },
@@ -3807,6 +3836,10 @@
    {
     "topicId": 301,
     "why": "Threat modelling maps the data flows a minimisation review covers"
+   },
+   {
+    "topicId": 537,
+    "why": "Deleting personal data across a service: cascades, tombstones and deletion workflows"
    }
   ]
  },
@@ -4947,6 +4980,10 @@
    {
     "title": "RFC 8659: DNS Certification Authority Authorization (CAA)",
     "url": "https://www.rfc-editor.org/rfc/rfc8659"
+   },
+   {
+    "title": "CA/Browser Forum Ballot SC-081v3: Introduce Schedule of Reducing Validity and Data Reuse Periods",
+    "url": "https://cabforum.org/2025/04/11/ballot-sc081v3-introduce-schedule-of-reducing-validity-and-data-reuse-periods/"
    }
   ],
   "deep": {
@@ -5081,6 +5118,10 @@
    {
     "topicId": 302,
     "why": "Signatures are what make a certificate trustworthy"
+   },
+   {
+    "topicId": 603,
+    "why": "DNSSEC and CAA records, which decide who may issue certificates for a domain"
    }
   ]
  },
@@ -5524,6 +5565,10 @@
    {
     "topicId": 233,
     "why": "Rate limits bound how fast one caller can consume resources"
+   },
+   {
+    "topicId": 713,
+    "why": "Mass assignment and over-exposed response fields, the field-level side of object authorisation"
    }
   ]
  },
@@ -6636,29 +6681,29 @@
     "id": "t666-a6",
     "concept": "policy-scoping",
     "type": "multiple_choice",
-    "prompt": "One policy allows storage reads on all buckets, and another explicitly denies reads on the payroll bucket. In most cloud IAM systems, what happens when the role reads payroll?",
+    "prompt": "An internal support tool’s role can read customer records, and its credentials could leak from a support laptop. Which policy condition most limits what a thief could do with them?",
     "choices": [
      {
       "id": "a",
-      "label": "The read is allowed, because an allow exists"
+      "label": "Allow requests only from the tool’s private network"
      },
      {
       "id": "b",
-      "label": "The more specific rule wins, whichever it is"
+      "label": "Allow requests only when they are sent over HTTPS"
      },
      {
       "id": "c",
-      "label": "The read is denied, because explicit deny wins"
+      "label": "Allow requests only during the support team’s hours"
      },
      {
       "id": "d",
-      "label": "The read is allowed unless MFA is missing"
+      "label": "Allow requests only when the user agent is the tool’s"
      }
     ],
     "correctChoiceIds": [
-     "c"
+     "a"
     ],
-    "explanation": "Explicit deny overrides allow, which makes deny rules a reliable guardrail. A single allow is not enough when a deny matches. Specificity does not decide the outcome in these systems. MFA only matters if a condition asks for it."
+    "explanation": "A network condition means a copied credential fails when it is used from the thief’s own machine. HTTPS is expected anyway and says nothing about who is sending. Office hours still leave the thief hours every day. The user agent is a header the caller chooses, so anyone can copy it."
    }
   ],
   "flashcards": [
@@ -6824,6 +6869,10 @@
    {
     "topicId": 571,
     "why": "Workload identity replaces long-lived service keys"
+   },
+   {
+    "topicId": 582,
+    "why": "Roles, trust policies, federation and explicit deny in cloud IAM"
    }
   ]
  },
@@ -7752,27 +7801,27 @@
    {
     "id": "t669-c3",
     "kind": "diagram",
-    "title": "Worked example: replacing a stored cloud key with federation",
-    "body": "A deploy job currently uses a long-lived cloud access key stored as a pipeline secret.",
+    "title": "Worked example: a third-party step whose tag moved",
+    "body": "A build job pulls in a popular third-party step to list the files a pull request changed.",
     "teaches": [
-     "oidc-federation",
-     "pipeline-privilege"
+     "step-pinning"
     ],
     "steps": [
-     "The job asks the pipeline platform for a signed identity token (OpenID Connect)",
-     "The token carries claims such as repository, branch and target environment",
-     "The cloud trust policy accepts it only from that issuer, repository and protected branch",
-     "The cloud returns credentials that expire after about 15 minutes",
-     "The job deploys, the credentials expire, and the stored key is deleted"
+     "The workflow refers to the step by a version tag, such as v45",
+     "A tag is a movable pointer: whoever controls that repository can point it at new code",
+     "In March 2025 the tags of tj-actions/changed-files were moved to a commit that printed runner secrets into build logs",
+     "Fix: refer to the step by its full commit hash, which cannot be moved, and review each proposed update",
+     "Give the job only the token permissions it needs, so a step that turns malicious has little to steal"
     ]
    },
    {
     "id": "t669-c4",
     "kind": "text",
     "title": "Misconception: secrets are safe because logs mask them",
-    "body": "Pipeline platforms replace known secret values with asterisks in logs, but masking matches exact strings. Code in the job can print the secret encoded, reversed or split in two, or simply send it over the network, and masking sees nothing. Masking prevents accidents, not attacks. What protects a secret is never giving it to a job that runs code you have not reviewed, and making it short-lived so a stolen copy expires.",
+    "body": "Pipeline platforms replace known secret values with asterisks in logs, but masking matches exact strings. Code in the job can print the secret encoded, reversed or split in two, or simply send it over the network, and masking sees nothing. Masking prevents accidents, not attacks. What protects a secret is never giving it to a job that runs code you have not reviewed, and making it short-lived, by federating the job to the cloud for credentials that expire within minutes, so a stolen copy soon stops working.",
     "teaches": [
-     "untrusted-builds"
+     "untrusted-builds",
+     "oidc-federation"
     ]
    },
    {
@@ -7817,31 +7866,31 @@
    },
    {
     "id": "t669-a2",
-    "concept": "oidc-federation",
+    "concept": "step-pinning",
     "type": "multiple_choice",
-    "prompt": "Why is federated, short-lived cloud access better than a long-lived key stored as a pipeline secret?",
+    "prompt": "A workflow uses a third-party step as some-org/scan@v2, and the job holds a registry write token. Which change best stops a hijacked release of that step from stealing the token?",
     "choices": [
      {
       "id": "a",
-      "label": "There is nothing long-lived to steal, and the cloud can limit the branch"
+      "label": "Refer to the step by its full commit hash, and review updates"
      },
      {
       "id": "b",
-      "label": "The issued credentials work only from inside the pipeline’s own runners"
+      "label": "Refer to the step by its latest tag, so fixes arrive sooner"
      },
      {
       "id": "c",
-      "label": "The token is encrypted end to end, so job logs can never reveal it"
+      "label": "Turn on log masking for the registry token in that job"
      },
      {
       "id": "d",
-      "label": "Federation removes the need for a narrowly scoped cloud role policy"
+      "label": "Run the step only after the unit tests have passed in the job"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "A stolen 15-minute credential soon expires, and the trust policy can require a specific repository, branch and environment. Issued credentials can be used from anywhere until they expire, so a job can still leak them. Encryption in transit does not stop code in the job from printing a token. The role still needs least-privilege permissions; federation changes how it is reached, not what it may do."
+    "explanation": "A commit hash names exact code that cannot be swapped later, so a moved tag changes nothing until someone reviews an update. The latest tag pulls in whatever the tag now points at. Masking hides exact strings in logs, not network calls. Running after the tests does not change what the step’s code can do."
    },
    {
     "id": "t669-a3",
@@ -8023,6 +8072,10 @@
    {
     "title": "SLSA: Security levels",
     "url": "https://slsa.dev/spec/v1.0/levels"
+   },
+   {
+    "title": "GitHub Docs: Secure use reference for GitHub Actions",
+    "url": "https://docs.github.com/en/actions/reference/security/secure-use"
    }
   ],
   "deep": {
@@ -8031,7 +8084,8 @@
     "untrusted-builds",
     "oidc-federation",
     "branch-protection",
-    "build-deploy-separation"
+    "build-deploy-separation",
+    "step-pinning"
    ],
    "mechanism": {
     "title": "How to secure a delivery pipeline",
@@ -8158,6 +8212,10 @@
    {
     "topicId": 661,
     "why": "Security tests run inside the same pipeline"
+   },
+   {
+    "topicId": 582,
+    "why": "Federating CI jobs to the cloud for short-lived credentials, step by step"
    }
   ]
  },
