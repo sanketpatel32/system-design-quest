@@ -119785,7 +119785,7 @@
           },
           {
             "id": "c",
-            "label": "A credential or mistake in development cannot reach production by default"
+            "label": "A credential or mistake in development cannot reach production"
           },
           {
             "id": "d",
@@ -119809,7 +119809,7 @@
           },
           {
             "id": "b",
-            "label": "Yes, because the guardrail allows every storage action"
+            "label": "Yes, because the guardrail lists storage among its allowed actions"
           },
           {
             "id": "c",
@@ -119841,7 +119841,7 @@
           },
           {
             "id": "c",
-            "label": "A naming rule that puts the region in every resource name"
+            "label": "A naming rule that puts the region in each resource name"
           },
           {
             "id": "d",
@@ -119861,7 +119861,7 @@
         "choices": [
           {
             "id": "a",
-            "label": "Logs are cheaper to store in an account with no workloads"
+            "label": "Logs are cheaper to store in an account that runs no workloads"
           },
           {
             "id": "b",
@@ -120194,7 +120194,7 @@
           },
           {
             "id": "c",
-            "label": "The policy language cannot express rules about privileged mode"
+            "label": "The policy language has no way to express rules about privileged mode"
           },
           {
             "id": "d",
@@ -120214,7 +120214,7 @@
         "choices": [
           {
             "id": "a",
-            "label": "Enforce at once, so that violations stop from day one"
+            "label": "Enforce at once, so that new violations stop from the very first day"
           },
           {
             "id": "b",
@@ -120270,7 +120270,7 @@
         "choices": [
           {
             "id": "a",
-            "label": "Turn the rule off for the cluster until the workload is fixed"
+            "label": "Turn the rule off across the cluster until the workload is fixed"
           },
           {
             "id": "b",
@@ -120282,7 +120282,7 @@
           },
           {
             "id": "d",
-            "label": "An exception in the policy repo, scoped to the workload, with an owner and expiry"
+            "label": "A scoped exception in the policy repo, with an owner and expiry"
           }
         ],
         "correctChoiceIds": [
@@ -120531,6 +120531,403 @@
     ]
   },
   {
+    "id": 687,
+    "slug": "fast-reliable-ci",
+    "region": "f7-cloud",
+    "order": 26,
+    "title": "Fast, Reliable CI: Caching, Parallelism and Flaky Tests",
+    "kind": "lesson",
+    "objectives": [
+      "Explain why CI speed and trust decide whether people integrate often",
+      "Speed up a pipeline with caching, sharding and running only what a change affects",
+      "Find, quarantine and fix flaky tests before they teach everyone to click retry"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [
+      323
+    ],
+    "cards": [
+      {
+        "id": "t687-c1",
+        "kind": "text",
+        "title": "Speed and trust are the product",
+        "body": "Continuous integration only works if people run it on every small change and believe its answer. A pipeline that takes an hour gets batched changes and context switches; one that fails at random gets retried until green, so real failures slip through. Two numbers describe CI health: how long a typical run takes from push to result, and how often a failure is real. Aim for minutes, not hours, and for red to mean broken.",
+        "teaches": [
+          "ci-feedback"
+        ]
+      },
+      {
+        "id": "t687-c2",
+        "kind": "text",
+        "title": "Caching: do not redo work that has not changed",
+        "body": "Most CI time goes on repeating identical work: downloading dependencies, rebuilding unchanged modules and image layers. A cache stores the output under a key built from the inputs, such as a hash of the dependency lock file. Same inputs, same key, so the step is skipped. The key must include every input that matters, or a stale cache produces builds that pass in CI and fail elsewhere. Order image build steps so rarely changing layers come first.",
+        "teaches": [
+          "build-caching"
+        ]
+      },
+      {
+        "id": "t687-c3",
+        "kind": "text",
+        "title": "Worked example: sharding a slow suite",
+        "body": "A test suite takes 40 minutes on one runner. Split into 8 shards that run at the same time, each does about 40 ÷ 8 = 5 minutes of tests plus 2 minutes of setup, so the run finishes in about 7 minutes. Total machine time rises from 42 to 8 × 7 = 56 machine-minutes, a cost for a much faster answer. Balance shards by recorded test durations, not test counts, or one slow shard sets the pace.",
+        "teaches": [
+          "test-parallelism"
+        ]
+      },
+      {
+        "id": "t687-c4",
+        "kind": "diagram",
+        "title": "Handling a flaky test",
+        "body": "A flaky test is a bug to fix, not a reason to retry.",
+        "teaches": [
+          "flaky-tests"
+        ],
+        "steps": [
+          "A test fails, then passes on rerun with no code change",
+          "CI records it as flaky in a test history",
+          "It moves to a quarantine suite that runs but does not block merges",
+          "A ticket goes to the owning team with the failure logs",
+          "The cause is fixed: timing, ordering, shared state or an external call",
+          "The test returns to the blocking suite, or is deleted"
+        ]
+      },
+      {
+        "id": "t687-c5",
+        "kind": "text",
+        "title": "Trap: automatic retries on every failure",
+        "body": "Retrying every failed test three times makes the pipeline green again, and hides two problems. Real intermittent bugs, such as race conditions, now pass if they fail only some of the time, and flaky tests pile up because nothing forces a fix. If you retry, record every pass-after-retry as flaky, report it, and cap how long a test may stay in quarantine.",
+        "teaches": [
+          "flaky-tests"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t687-a1",
+        "concept": "ci-feedback",
+        "type": "multiple_choice",
+        "prompt": "Developers start batching a week of work into each merge. Which CI problem most likely caused it?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Runs take about an hour and often fail for no clear reason"
+          },
+          {
+            "id": "b",
+            "label": "The pipeline runs on each push rather than nightly"
+          },
+          {
+            "id": "c",
+            "label": "Branch protection requires a passing build to merge"
+          },
+          {
+            "id": "d",
+            "label": "Each run posts a full test report as a comment on the pull request"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Slow, untrusted runs make each merge expensive, so people merge less often. Running on every push is what CI should do, requiring green builds is normal protection, and posting a report only changes where results appear."
+      },
+      {
+        "id": "t687-a2",
+        "concept": "build-caching",
+        "type": "multiple_choice",
+        "prompt": "A dependency cache is keyed only on the operating system. What goes wrong?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The cache misses on each run, so all dependencies download again"
+          },
+          {
+            "id": "b",
+            "label": "A lock-file change can reuse old dependencies from the cache"
+          },
+          {
+            "id": "c",
+            "label": "The cache grows without limit and fills the runner disk"
+          },
+          {
+            "id": "d",
+            "label": "Parallel jobs cannot read the cache at the same time"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "The key must include the inputs, such as a hash of the lock file; without it, a new dependency version can be skipped and the build tests the wrong code. A missing key part causes stale hits, not misses, cache storage is bounded by the CI system, and parallel reads are normal."
+      },
+      {
+        "id": "t687-a3",
+        "concept": "flaky-tests",
+        "type": "multiple_choice",
+        "prompt": "A test fails about once in 50 runs on unchanged code. What should the team do first?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Delete it, because a test that fails at random has no value"
+          },
+          {
+            "id": "b",
+            "label": "Add three automatic retries so it stops blocking merges"
+          },
+          {
+            "id": "c",
+            "label": "Quarantine it as non-blocking, and ticket its owner to fix it"
+          },
+          {
+            "id": "d",
+            "label": "Raise the timeouts across the suite so that it passes more reliably"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Quarantine stops it blocking merges while keeping it running and visible, and an owner fixes the cause. Deleting it loses coverage that may catch a real race, silent retries hide the flake, and raising timeouts across the suite slows the suite without fixing whatever is non-deterministic."
+      },
+      {
+        "id": "t687-a4",
+        "concept": "test-parallelism",
+        "type": "multiple_choice",
+        "prompt": "A suite is split into 8 shards by test count, but one shard always finishes last by 10 minutes. Why?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Shards are balanced by count, so one holds the slowest tests"
+          },
+          {
+            "id": "b",
+            "label": "Runners are slower when more than four run at the same time"
+          },
+          {
+            "id": "c",
+            "label": "The last shard waits for the others to free the cache"
+          },
+          {
+            "id": "d",
+            "label": "Tests inside each shard run in a different random order on each run"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Equal counts are not equal durations; balance shards by recorded timings. Running several runners does not by itself slow each one, caches are read in parallel, and order within a shard does not change its total time."
+      },
+      {
+        "id": "t687-a5",
+        "concept": "flaky-tests",
+        "type": "estimation",
+        "prompt": "A suite has 50 flaky tests, each failing on its own 1% of the time. Roughly what percentage of runs on unchanged code pass every test?",
+        "unit": "% of runs",
+        "target": 60,
+        "assumptions": [
+          "Failures are independent",
+          "Every other test is reliable"
+        ],
+        "formula": "0.99 to the power 50",
+        "workedAnswer": "0.99⁵⁰ ≈ 0.61, so about 60% of runs pass",
+        "explanation": "Sanity check: small flake rates compound, so 40% of runs fail with nothing broken, which is why people learn to ignore red builds.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          99,
+          50
+        ]
+      },
+      {
+        "id": "t687-a6",
+        "concept": "ci-feedback",
+        "type": "drag_order",
+        "prompt": "Order the stages of a pipeline that gives the fastest useful feedback.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Run unit tests in parallel shards"
+          },
+          {
+            "id": "s1",
+            "label": "Restore caches keyed on the inputs"
+          },
+          {
+            "id": "s5",
+            "label": "Run slower integration tests against it"
+          },
+          {
+            "id": "s2",
+            "label": "Lint and compile"
+          },
+          {
+            "id": "s4",
+            "label": "Build the artefact once"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Cheap checks that fail most often run first, so most broken changes fail within minutes; slower tests run against the one artefact that will ship."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t687-f1",
+        "front": "Two numbers for CI health?",
+        "back": "Time from push to result, and how often a failure is real."
+      },
+      {
+        "id": "t687-f2",
+        "front": "A good cache key?",
+        "back": "A hash of every input that affects the output, such as the lock file."
+      },
+      {
+        "id": "t687-f3",
+        "front": "Flaky test policy?",
+        "back": "Record, quarantine as non-blocking, ticket the owner, fix or delete within a time limit."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Martin Fowler: Continuous Integration",
+        "url": "https://martinfowler.com/articles/continuousIntegration.html"
+      },
+      {
+        "title": "Martin Fowler: Eradicating Non-Determinism in Tests",
+        "url": "https://martinfowler.com/articles/nonDeterminism.html"
+      },
+      {
+        "title": "Docker Docs: Optimize cache usage in builds",
+        "url": "https://docs.docker.com/build/cache/optimize/"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "ci-feedback",
+        "build-caching",
+        "test-parallelism",
+        "flaky-tests"
+      ],
+      "mechanism": {
+        "title": "How fast, trustworthy CI is built",
+        "steps": [
+          "A CI run is valuable only if it arrives quickly and tells the truth. Slow feedback pushes people to batch work and switch tasks while they wait, which makes merges larger and failures harder to trace. False failures teach people to retry until green, and once that habit forms, real failures are retried away too. Track the typical and slowest run times, the share of failures that were real, and how often runs are retried.",
+          "Caching removes repeated work. Dependency caches are keyed on a hash of the lock file and the platform, so they are reused until the dependencies change. Build caches store compiled outputs by a hash of their inputs, so only changed modules rebuild. Image builds reuse layers when earlier steps are unchanged, so dependency installation goes before copying source code. A wrong key causes stale results, which is worse than a slow build.",
+          "Parallelism cuts wall-clock time. Independent stages run at the same time, and large test suites split into shards across runners. Shards should be balanced using recorded durations, and each shard pays the setup cost, so there is a point where more shards add machine time without saving much. Running only the tests affected by a change, using the build’s dependency graph, helps large repositories, with a full run on a schedule as a safety net.",
+          "Ordering matters. Fast, likely-to-fail checks such as formatting, linting, compiling and unit tests run first, so most broken changes fail in minutes. The artefact is built once and the slower integration and end-to-end tests run against it, which keeps what was tested identical to what ships. Expensive suites can run after merge or nightly, as long as failures there are owned and fixed quickly.",
+          "Flaky tests are bugs in tests or code. Common causes are timing assumptions, order dependence, shared state between tests, and calls to real external services. CI should record which tests pass only on retry, move them to a non-blocking quarantine with an owner, and limit how long they stay there. Fixing the cause, by controlling time, isolating state or replacing external calls with fakes, is what restores trust."
+        ]
+      },
+      "useWhen": [
+        "Teams that merge many small changes a day and need answers in minutes.",
+        "Large suites where caching and sharding turn hours into minutes."
+      ],
+      "avoidWhen": [
+        "Avoid blanket automatic retries that hide flaky tests and real races.",
+        "Avoid cache keys that leave out inputs, which produce stale builds."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Technique",
+          "Saves",
+          "Risk if done badly"
+        ],
+        "rows": [
+          [
+            "Dependency and build caching",
+            "Repeated downloads and rebuilds",
+            "Stale results from a bad key"
+          ],
+          [
+            "Sharding tests",
+            "Wall-clock time",
+            "Unbalanced shards, more machine time"
+          ],
+          [
+            "Running only affected tests",
+            "Work on large repositories",
+            "Missed tests if the graph is wrong"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "A pipeline before and after",
+        "assumptions": [
+          "Dependency install takes 4 minutes, 30 s with a warm cache",
+          "A 40-minute serial test suite, 8 shards with 2 minutes of setup each",
+          "About 5 minutes of lint, compile and build, illustrative"
+        ],
+        "steps": [
+          "Before: 4 + 40 + 5 = 49 minutes per run.",
+          "Tests in shards: 40 ÷ 8 = 5 minutes, plus 2 minutes setup, so about 7 minutes.",
+          "After: about 0.5 + 7 + 5 = 12.5 minutes, roughly four times faster."
+        ],
+        "result": "Caching and sharding cut an illustrative 49-minute run to about 13 minutes, which is the difference between waiting and batching."
+      },
+      "india": {
+        "title": "Non-determinism in tests",
+        "label": "Publicly reported",
+        "body": "Martin Fowler’s article on eradicating non-determinism in tests describes how flaky tests destroy trust in a suite, recommends quarantining them so they do not block the build, and warns that quarantined tests must be fixed quickly. His continuous integration article argues that a fast build, around ten minutes, is part of what makes integrating often practical, and Docker’s documentation explains ordering build steps so cached layers are reused."
+      },
+      "pitfalls": [
+        {
+          "trap": "“The build is red again, just rerun it.”",
+          "say": "“I’d check whether that test is flaky, quarantine it with an owner, and fix the cause.”"
+        },
+        {
+          "trap": "“CI takes an hour, so I’ll merge once at the end of the week.”",
+          "say": "“I’d cache dependencies and shard the tests so each small change gets an answer in minutes.”"
+        }
+      ],
+      "takeaways": [
+        "CI must be fast and trustworthy, or people batch work and ignore red.",
+        "Cache by a hash of the inputs; a wrong key gives stale builds.",
+        "Shard by recorded durations and run cheap checks first.",
+        "Quarantine flaky tests with an owner and a time limit; fix the cause."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Retries for everything",
+      "prompt": "To stop random failures, a team configures every test to retry up to 3 times. Months later a race condition is introduced that makes one test fail about 30% of the time.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The race reaches production, because a retry usually passes",
+          "feedback": "Right: with three retries, a 30% failure passes almost every time, so the bug ships."
+        },
+        {
+          "id": "b",
+          "label": "The test fails every run, so the race is caught at once",
+          "feedback": "A 30% failure is intermittent; retries turn most of those failures into passes."
+        },
+        {
+          "id": "c",
+          "label": "CI marks the change as flaky and blocks the merge for review",
+          "feedback": "Only if it records passes-after-retry; plain retries just report green."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Record every pass-after-retry as flaky, report it, and treat a newly flaky test after a change as a likely real bug."
+    },
+    "seeAlso": [
+      {
+        "topicId": 323,
+        "why": "The pipeline stages and build-once rule this lesson speeds up"
+      },
+      {
+        "topicId": 321,
+        "why": "Image layers and why their order decides cache reuse"
+      },
+      {
+        "topicId": 324,
+        "why": "Progressive delivery that relies on trustworthy test results"
+      }
+    ]
+  },
+  {
     "id": 688,
     "slug": "immutable-infrastructure-machine-images",
     "region": "f7-cloud",
@@ -120612,7 +121009,7 @@
         "choices": [
           {
             "id": "a",
-            "label": "Runs the package manager on every live server overnight"
+            "label": "Runs the package manager on each live server overnight"
           },
           {
             "id": "b",
@@ -120668,11 +121065,11 @@
         "choices": [
           {
             "id": "a",
-            "label": "The server was replaced from an image that never had the fix"
+            "label": "The server was replaced from an image that lacked the fix"
           },
           {
             "id": "b",
-            "label": "The fix was rolled back by a scheduled package update"
+            "label": "The fix was rolled back by a scheduled overnight package update"
           },
           {
             "id": "c",
@@ -120696,7 +121093,7 @@
         "choices": [
           {
             "id": "a",
-            "label": "Old images cost more to store than new ones"
+            "label": "Old images cost more to store the longer they are kept"
           },
           {
             "id": "b",
@@ -120933,6 +121330,832 @@
       {
         "topicId": 324,
         "why": "Rolling replacement and rollback strategies for a new image"
+      }
+    ]
+  },
+  {
+    "id": 689,
+    "slug": "toil-runbooks-automation",
+    "region": "f7-cloud",
+    "order": 28,
+    "title": "Toil, Runbooks and Automation",
+    "kind": "lesson",
+    "objectives": [
+      "Recognise toil and measure how much of a team’s time it takes",
+      "Decide which manual tasks to automate first, using frequency and payback",
+      "Move a task from runbook to script to self-service to automatic, safely"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [
+      327,
+      325
+    ],
+    "cards": [
+      {
+        "id": "t689-c1",
+        "kind": "text",
+        "title": "What toil is",
+        "body": "Google’s SRE book defines toil as operational work that is manual, repetitive, automatable, tactical, without enduring value, and that grows as the service grows. Restarting a stuck job by hand every week, resizing disks on request or copying config between environments are toil. Designing a fix, writing a postmortem or attending a planning meeting are not toil, even if they feel like chores. The test is whether a machine could do it and whether it comes back.",
+        "teaches": [
+          "toil"
+        ]
+      },
+      {
+        "id": "t689-c2",
+        "kind": "text",
+        "title": "Misconception: all operations work is toil",
+        "body": "Responding to a novel incident needs judgement and teaches the team something, so it is not toil; responding to the same alert for the fiftieth time with the same steps is. Overhead such as meetings and reviews is not toil either. Measuring toil means logging repeatable, automatable tasks and their time. Google’s SRE teams aim to keep toil below 50% of each engineer’s time, so at least half goes into engineering that removes future toil.",
+        "teaches": [
+          "toil"
+        ]
+      },
+      {
+        "id": "t689-c3",
+        "kind": "diagram",
+        "title": "From runbook to automation",
+        "body": "Each step removes a human from part of the loop.",
+        "teaches": [
+          "automation-ladder"
+        ],
+        "steps": [
+          "A task is done by hand from memory",
+          "A runbook writes down the steps and the checks",
+          "A script runs the steps, started by a person",
+          "Self-service lets the requesting team run it with guardrails",
+          "Automation runs it on a trigger, with limits and logging",
+          "The underlying cause is fixed so the task is not needed"
+        ]
+      },
+      {
+        "id": "t689-c4",
+        "kind": "text",
+        "title": "Worked example: is it worth automating?",
+        "body": "A manual task takes 15 minutes and happens 40 times a month: 15 × 40 = 600 minutes, or 10 hours a month. Automating it takes an estimated 30 hours, so it pays back in 30 ÷ 10 = 3 months, and keeps paying as the service grows. A task done twice a year for 10 minutes would never pay back 30 hours; a good runbook is enough for that one.",
+        "teaches": [
+          "automation-payback"
+        ]
+      },
+      {
+        "id": "t689-c5",
+        "kind": "text",
+        "title": "Trap: automation that hides the problem",
+        "body": "A service leaks memory, so someone automates a restart whenever memory is high. Pages stop, and the leak grows unnoticed until restarts happen every few minutes and a release makes it worse. Automatic fixes need limits, such as a maximum number of actions an hour, a log of every action and an alert when they run more often than expected. Automate the response, but keep fixing the cause.",
+        "teaches": [
+          "runbooks",
+          "automation-ladder"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t689-a1",
+        "concept": "toil",
+        "type": "multiple_choice",
+        "prompt": "Which of these is toil?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Writing the postmortem for a new kind of outage"
+          },
+          {
+            "id": "b",
+            "label": "Rotating the same credentials by hand every month"
+          },
+          {
+            "id": "c",
+            "label": "Designing a migration plan for the main customer database"
+          },
+          {
+            "id": "d",
+            "label": "Reviewing a teammate’s change to an alert rule"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Manual, repetitive, automatable work that returns every month is toil. A postmortem for a new outage produces lasting learning, migration design is engineering, and reviewing changes is valuable overhead rather than toil."
+      },
+      {
+        "id": "t689-a2",
+        "concept": "automation-payback",
+        "type": "multiple_choice",
+        "prompt": "Which task should a team automate first?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A 2-hour task done once a year, during the annual security audit"
+          },
+          {
+            "id": "b",
+            "label": "A 5-minute task done twice a quarter by one person"
+          },
+          {
+            "id": "c",
+            "label": "A 1-hour task done once, during a planned migration"
+          },
+          {
+            "id": "d",
+            "label": "A 20-minute task done 30 times a month, growing with users"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "At about 10 hours a month and growing, the frequent task pays back fastest. The yearly task totals 2 hours a year, the twice-a-quarter one under an hour, and a one-off task has nothing to repeat, so a runbook is enough for each."
+      },
+      {
+        "id": "t689-a3",
+        "concept": "runbooks",
+        "type": "multiple_choice",
+        "prompt": "What makes a runbook useful at 3 a.m.?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A history of how the system was designed and why"
+          },
+          {
+            "id": "b",
+            "label": "Exact steps with checks, linked from the alert itself"
+          },
+          {
+            "id": "c",
+            "label": "A complete list of the metrics and dashboards the service exposes"
+          },
+          {
+            "id": "d",
+            "label": "The names of the engineers who built the service"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Responders need concrete steps, how to verify each one, and to find the runbook from the page. Design history belongs in architecture docs, a full metric list is too much to scan, and names help only if those people are awake and still on the team."
+      },
+      {
+        "id": "t689-a4",
+        "concept": "automation-ladder",
+        "type": "multiple_choice",
+        "prompt": "An auto-remediation restarts a service whenever memory is high. What safeguard matters most?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A cap on restarts per hour, with an alert when it is hit"
+          },
+          {
+            "id": "b",
+            "label": "Running it only during working hours"
+          },
+          {
+            "id": "c",
+            "label": "Restarting all instances together so the fix takes less time"
+          },
+          {
+            "id": "d",
+            "label": "Hiding the restarts from dashboards to reduce noise"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "A rate limit stops runaway loops, and alerting when it triggers often makes the hidden cause visible. Working-hours-only defeats the purpose, restarting everything at once causes an outage, and hiding actions removes the evidence of a growing problem."
+      },
+      {
+        "id": "t689-a5",
+        "concept": "automation-payback",
+        "type": "estimation",
+        "prompt": "A 15-minute manual task happens 40 times a month. Automating it takes about 30 hours. After how many months does the automation pay for itself?",
+        "unit": "months",
+        "target": 3,
+        "assumptions": [
+          "The task rate stays steady",
+          "Automation needs no upkeep"
+        ],
+        "formula": "30 hours ÷ (15 min × 40 per month)",
+        "workedAnswer": "15 × 40 = 600 minutes, 10 hours a month; 30 ÷ 10 = 3 months",
+        "explanation": "Sanity check: if the service doubles, so does the task count, and the payback halves, which is why toil that grows with the service is the first to automate.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          30,
+          10
+        ]
+      },
+      {
+        "id": "t689-a6",
+        "concept": "automation-ladder",
+        "type": "drag_order",
+        "prompt": "Order the usual path from manual task to no task.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Scripted and started by a person"
+          },
+          {
+            "id": "s1",
+            "label": "Done by hand from memory"
+          },
+          {
+            "id": "s5",
+            "label": "Root cause fixed, so the task disappears"
+          },
+          {
+            "id": "s2",
+            "label": "Written down as a runbook with checks"
+          },
+          {
+            "id": "s4",
+            "label": "Run automatically on a trigger, with limits"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Each step removes human effort; writing it down first makes the script correct, and fixing the cause is the final goal."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t689-f1",
+        "front": "Toil?",
+        "back": "Manual, repetitive, automatable, tactical work with no enduring value that grows with the service."
+      },
+      {
+        "id": "t689-f2",
+        "front": "Google SRE toil target?",
+        "back": "Below 50% of each engineer’s time."
+      },
+      {
+        "id": "t689-f3",
+        "front": "Automation payback?",
+        "back": "Build time ÷ hours saved per month."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Google SRE book: Eliminating Toil",
+        "url": "https://sre.google/sre-book/eliminating-toil/"
+      },
+      {
+        "title": "Google SRE workbook: Eliminating Toil",
+        "url": "https://sre.google/workbook/eliminating-toil/"
+      },
+      {
+        "title": "Google SRE book: The Evolution of Automation at Google",
+        "url": "https://sre.google/sre-book/automation-at-google/"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "toil",
+        "automation-payback",
+        "runbooks",
+        "automation-ladder"
+      ],
+      "mechanism": {
+        "title": "How teams measure and remove toil",
+        "steps": [
+          "Toil is the operational work that scales with the service rather than with the team’s ideas: tasks that are manual, repetitive, automatable, tactical and leave nothing lasting behind. A little is unavoidable, but too much crowds out engineering, makes on-call miserable and causes mistakes, because people doing the same steps by hand eventually skip one. Google’s SRE teams set a goal of keeping toil below 50% of each engineer’s time.",
+          "Measuring comes first. Teams log interrupts, tickets and on-call tasks for a few weeks, tagging each as toil or not, with its duration and frequency. The totals show where time goes and which few tasks make up most of it. Trends matter more than a single number: toil that grows with traffic or customers will take the whole team eventually unless removed.",
+          "Prioritise by payback and risk. Time saved per month is the task duration times its frequency; payback is the build time divided by that. Tasks that are frequent, growing, error-prone or done under pressure at night go first. Rare tasks may only need a clear runbook. Include upkeep: a script nobody maintains becomes the next source of incidents.",
+          "Automation is a ladder. A runbook captures the steps and checks, which also documents what a script must do. A script turns the runbook into one command. Self-service lets the team that needs the task run it, with guardrails, instead of filing a ticket. Full automation triggers on events, with rate limits, logging and an alert when it acts more than expected. The top rung is removing the need altogether by fixing the cause.",
+          "Automation changes failure modes. Automatic actions can amplify a mistake across a whole fleet in seconds, so they need limits on scope and rate, a dry-run mode, and a clear way to stop them. They also hide symptoms, so their activity must be visible. Reviewing automation actions alongside pages keeps the team aware of what the system is doing on its behalf."
+        ]
+      },
+      "useWhen": [
+        "Teams whose time goes to repeated tickets, manual deploys or the same pages each week.",
+        "Services that are growing, where manual work grows with them."
+      ],
+      "avoidWhen": [
+        "Avoid automating a rare task where a runbook would do.",
+        "Avoid auto-remediation without rate limits, logging and an alert on repeated use."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Rung",
+          "Human effort",
+          "Main risk"
+        ],
+        "rows": [
+          [
+            "Runbook",
+            "Full, but guided",
+            "Steps skipped under pressure"
+          ],
+          [
+            "Script or self-service",
+            "Starting it and checking",
+            "Script drifts from the system"
+          ],
+          [
+            "Automatic remediation",
+            "Review only",
+            "Hides causes or amplifies mistakes"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Finding the toil worth removing",
+        "assumptions": [
+          "A team of 6 logs its work for a month",
+          "Each person works about 160 hours, illustrative",
+          "Logged toil totals 400 hours"
+        ],
+        "steps": [
+          "Team hours: 6 × 160 = 960 hours.",
+          "Toil share: 400 ÷ 960 ≈ 42%, under the 50% cap but close to it.",
+          "If the top three tasks are 250 of those hours, automating them alone brings toil to about 150 ÷ 960 ≈ 16%."
+        ],
+        "result": "A month of logging shows that a few repeated tasks make up most of the toil, so automating three of them frees about a quarter of the team’s time."
+      },
+      "india": {
+        "title": "Toil in Google’s SRE books",
+        "label": "Publicly reported",
+        "body": "Google’s SRE book defines toil as work tied to running a production service that tends to be manual, repetitive, automatable, tactical, devoid of enduring value, and that scales linearly as a service grows. It describes an advertised goal of keeping toil below 50% of each SRE’s time. The SRE workbook gives practical steps to measure, prioritise and eliminate toil, and its automation chapter describes moving from manual work to fully automatic systems."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Ops work is all toil, so let’s automate everything.”",
+          "say": "“I’d log the repeated tasks, then automate the frequent ones with the best payback.”"
+        },
+        {
+          "trap": "“Pages stopped since we auto-restart it.”",
+          "say": "“I’d cap the restarts, alert when they rise, and fix the leak behind them.”"
+        }
+      ],
+      "takeaways": [
+        "Toil is manual, repetitive, automatable work that grows with the service.",
+        "Measure it, and keep it below about half of the team’s time.",
+        "Automate by payback: build time ÷ hours saved per month.",
+        "Climb from runbook to script to self-service to automation, with limits."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The helpful restart",
+      "prompt": "An automation restarts any instance whose memory passes 90%, with no limit and no alert. It runs about twice a day at first. A new release doubles the leak rate.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Restarts become frequent and capacity drops, unnoticed until users see errors",
+          "feedback": "Right: restarts hide the leak, so the first visible signal is user impact."
+        },
+        {
+          "id": "b",
+          "label": "The automation pages on-call once restarts become frequent",
+          "feedback": "It was built with no alert, so nothing tells anyone it is busy."
+        },
+        {
+          "id": "c",
+          "label": "Memory stops leaking, because restarts reclaim it each time",
+          "feedback": "Restarts free the memory but leave the leak in the code, so it grows back."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Give remediations a rate limit, alert when it is reached, and keep a ticket open for the cause."
+    },
+    "seeAlso": [
+      {
+        "topicId": 327,
+        "why": "Incidents and postmortems that reveal repeated manual work"
+      },
+      {
+        "topicId": 690,
+        "why": "Alert reviews that find pages worth automating"
+      },
+      {
+        "topicId": 325,
+        "why": "Infrastructure as code, which removes many manual changes"
+      }
+    ]
+  },
+  {
+    "id": 690,
+    "slug": "alerting-on-call-health",
+    "region": "f7-cloud",
+    "order": 27,
+    "title": "Alerting and Healthy On-Call",
+    "kind": "lesson",
+    "objectives": [
+      "Write alerts on user-facing symptoms that a person must act on now",
+      "Route each signal to a page, a ticket or a dashboard by urgency",
+      "Keep on-call load sustainable with alert reviews, rotations and handoffs"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [
+      326,
+      327
+    ],
+    "cards": [
+      {
+        "id": "t690-c1",
+        "kind": "text",
+        "title": "Every page should need a human, now",
+        "body": "A page interrupts sleep and focus, so it must be urgent, actionable and about something users feel. Alert on symptoms such as errors, latency and failed jobs, measured against the SLO, rather than on causes such as high CPU on one host, which may or may not matter. Causes belong on dashboards to help diagnose a symptom once it pages. If the right response to an alert is to wait and see, it should not page.",
+        "teaches": [
+          "symptom-alerts"
+        ]
+      },
+      {
+        "id": "t690-c2",
+        "kind": "text",
+        "title": "Page, ticket or dashboard",
+        "body": "Urgency decides where a signal goes. A page is for user impact now or within the hour. A ticket is for problems that need a person within days, such as a disk that will fill in two weeks or a certificate that expires next month. A dashboard or log is for information that helps diagnose but needs no action. Many noisy setups page on what should be tickets, and train people to ignore pages.",
+        "teaches": [
+          "page-vs-ticket"
+        ]
+      },
+      {
+        "id": "t690-c3",
+        "kind": "diagram",
+        "title": "Reviewing an alert",
+        "body": "Each page earns its place or is changed.",
+        "teaches": [
+          "alert-hygiene"
+        ],
+        "steps": [
+          "A page fires and on-call responds",
+          "The response is logged: real impact, action taken, or no action",
+          "A weekly review looks at every page from the rotation",
+          "Pages with no action are removed, retuned or downgraded to tickets",
+          "Repeated causes get a fix or automation",
+          "Alert count and pages per shift are tracked over time"
+        ]
+      },
+      {
+        "id": "t690-c4",
+        "kind": "text",
+        "title": "Worked example: sizing a rotation",
+        "body": "Google’s SRE book caps on-call at 25% of an engineer’s time. A rotation that always has a primary and a secondary, in week-long shifts, has 2 people on call at any moment. To keep each person at 25%, you need 2 ÷ 0.25 = 8 engineers, so each one is on call one week in four. A team of 4 can cover the same rota only at 50% each, which leaves little time to fix what pages them.",
+        "teaches": [
+          "oncall-load"
+        ]
+      },
+      {
+        "id": "t690-c5",
+        "kind": "text",
+        "title": "Trap: adding an alert after every incident",
+        "body": "After each incident someone adds an alert for its exact cause. A year later there are hundreds, most for causes that never recur, many firing together for one problem. Prefer one symptom alert that would have caught the incident, group related alerts into one notification, and delete alerts that have not led to action in months. The SRE book suggests no more than about two incidents per 12-hour shift, so there is time to handle each one properly.",
+        "teaches": [
+          "alert-hygiene",
+          "oncall-load"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t690-a1",
+        "concept": "symptom-alerts",
+        "type": "multiple_choice",
+        "prompt": "Which alert is best suited to paging someone at 3 a.m.?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "CPU on one web server has been above 90% for 10 minutes"
+          },
+          {
+            "id": "b",
+            "label": "A database replica is two seconds behind its primary"
+          },
+          {
+            "id": "c",
+            "label": "Checkout errors are burning the monthly budget fast"
+          },
+          {
+            "id": "d",
+            "label": "Disk use on the log volume reached 75% today"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Checkout errors are a user-facing symptom tied to the SLO, so someone must act. High CPU on one host may cause no user impact, two seconds of replica lag is often within normal bounds, and a disk at 75% is a ticket for working hours."
+      },
+      {
+        "id": "t690-a2",
+        "concept": "page-vs-ticket",
+        "type": "multiple_choice",
+        "prompt": "A TLS certificate expires in 21 days and renewal is manual. How should this be signalled?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A page now, so nobody can forget about it"
+          },
+          {
+            "id": "b",
+            "label": "A ticket to the owning team, paging only if it is days away"
+          },
+          {
+            "id": "c",
+            "label": "A dashboard panel showing the days left until the certificate expires"
+          },
+          {
+            "id": "d",
+            "label": "No signal, since renewal will happen before it expires"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Three weeks out it needs a person within days, which is a ticket, with a page as a last-resort backstop. A page now interrupts someone for something that can wait, a dashboard needs someone to look, and assuming renewal will happen is how certificates expire."
+      },
+      {
+        "id": "t690-a3",
+        "concept": "alert-hygiene",
+        "type": "multiple_choice",
+        "prompt": "A review shows most pages last month needed no action. What should change?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Retune, downgrade to tickets or delete those alerts"
+          },
+          {
+            "id": "b",
+            "label": "Add a second on-call person to share the extra pages"
+          },
+          {
+            "id": "c",
+            "label": "Raise the paging threshold on all of the alerts by 20%"
+          },
+          {
+            "id": "d",
+            "label": "Mute the alerting system outside business hours"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Each non-actionable page should be fixed individually, which is what the review is for. A second person shares the noise rather than removing it, a blanket threshold change also delays real alerts, and muting at night stops all pages, including real ones."
+      },
+      {
+        "id": "t690-a4",
+        "concept": "oncall-load",
+        "type": "multiple_choice",
+        "prompt": "A database failure triggers 120 alerts in two minutes, all paging the same engineer. What helps most?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Raising the paging rate limit so none of them are dropped"
+          },
+          {
+            "id": "b",
+            "label": "Paging a different engineer for each group of alerts"
+          },
+          {
+            "id": "c",
+            "label": "Turning those alerts off until the database is stable"
+          },
+          {
+            "id": "d",
+            "label": "Grouping related alerts so the incident sends one page"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "Grouping and dependency-aware suppression turn one cause into one page with the details attached. More pages, or more engineers paged, add noise to the same incident, and turning alerts off removes the signal you need to see it recover."
+      },
+      {
+        "id": "t690-a5",
+        "concept": "oncall-load",
+        "type": "estimation",
+        "prompt": "A rotation always has a primary and a secondary on call, in week-long shifts. With on-call capped at 25% of each person’s time, how many engineers does the rotation need?",
+        "unit": "engineers",
+        "target": 8,
+        "assumptions": [
+          "Both roles count as on-call time",
+          "Shifts are shared evenly"
+        ],
+        "formula": "2 people on call ÷ 0.25",
+        "workedAnswer": "2 ÷ 0.25 = 8 engineers",
+        "explanation": "Sanity check: with 8, each person is on call one week in four, which matches the 25% cap; forgetting the secondary gives 4, which doubles everyone’s load.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          4,
+          2
+        ]
+      },
+      {
+        "id": "t690-a6",
+        "concept": "page-vs-ticket",
+        "type": "tradeoff",
+        "prompt": "A batch export that users read each morning sometimes fails overnight; a rerun takes 20 minutes.",
+        "constraints": [
+          "Users read the export from 8 a.m.",
+          "Failures happen about twice a month",
+          "The team wants fewer night pages"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "Page on-call the moment any export run fails",
+            "description": "Page at once"
+          },
+          {
+            "id": "p2",
+            "label": "Retry it automatically, and page only if it is still failing close to its deadline",
+            "description": "Auto-retry, page near deadline"
+          },
+          {
+            "id": "p3",
+            "label": "Open a ticket for the morning and let users wait",
+            "description": "Ticket only"
+          }
+        ],
+        "correctApproachId": "p2",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "An automatic retry fixes many transient failures with no human"
+          },
+          {
+            "id": "r3",
+            "label": "Paging at once is needed because every failure is urgent"
+          },
+          {
+            "id": "r2",
+            "label": "Paging near the deadline still protects the 8 a.m. readers"
+          },
+          {
+            "id": "r4",
+            "label": "A ticket is enough because users can wait for the export"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "A failure at 1 a.m. with a 20-minute rerun is not urgent until the deadline is close.",
+          "r4": "Users rely on it at 8 a.m., so a morning ticket means they start the day without it."
+        },
+        "explanation": "Page on the user-facing deadline, not on the first failure: automate the retry and wake someone only when the symptom is about to reach users."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t690-f1",
+        "front": "What should page?",
+        "back": "Urgent, actionable, user-facing symptoms, usually tied to the SLO."
+      },
+      {
+        "id": "t690-f2",
+        "front": "Page vs ticket?",
+        "back": "Page for impact now; ticket for things that need a person within days."
+      },
+      {
+        "id": "t690-f3",
+        "front": "A healthy on-call load?",
+        "back": "At most about 25% of time on call and about two incidents per 12-hour shift."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Google SRE book: Monitoring Distributed Systems",
+        "url": "https://sre.google/sre-book/monitoring-distributed-systems/"
+      },
+      {
+        "title": "Google SRE book: Being On-Call",
+        "url": "https://sre.google/sre-book/being-on-call/"
+      },
+      {
+        "title": "Google SRE workbook: On-Call",
+        "url": "https://sre.google/workbook/on-call/"
+      },
+      {
+        "title": "Google SRE workbook: Alerting on SLOs",
+        "url": "https://sre.google/workbook/alerting-on-slos/"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "symptom-alerts",
+        "page-vs-ticket",
+        "alert-hygiene",
+        "oncall-load"
+      ],
+      "mechanism": {
+        "title": "How alerting and on-call stay sustainable",
+        "steps": [
+          "Good alerting starts from what users experience. Symptom alerts fire when a user-facing signal, such as error rate, latency, freshness or throughput, threatens the SLO. Cause-based signals, such as CPU, memory, queue depth or replica lag, are kept for diagnosis on dashboards, because the same cause can be harmless one day and critical the next. Alerts on the SLO with burn-rate windows give pages that are both early and rare.",
+          "Each signal gets a destination by urgency. Pages are for impact now or imminent. Tickets go to a queue that the team works through in normal hours, for slow trends and upcoming expiries. Dashboards and logs hold everything else. The same condition can have both: a ticket when a disk will be full in two weeks, and a page if it will be full in two hours.",
+          "Alerts decay unless they are reviewed. Each page is logged with what was done; a regular review removes or changes pages that needed no action, merges duplicates, and turns repeated manual fixes into automation. Grouping and inhibition send one notification per incident rather than one per failing component. Every alert has an owner and a linked runbook that says what to check first.",
+          "On-call load is a capacity question. Google’s SRE book suggests no more than 25% of an engineer’s time on call, and no more than about two incidents per 12-hour shift, so each one can be handled, followed up and written up. With a primary and a secondary, that means about 8 people for a single-site rotation of week-long shifts, or two sites splitting the day so nobody is paged at night.",
+          "People need support as well as tools. Clear escalation paths, a secondary who can take over, handoff notes at the end of each shift, compensation or time off after a hard night, and blameless postmortems keep on-call humane. Tracking pages per shift, night-time pages and time to acknowledge shows whether load is going up, and is the evidence for fixing noisy alerts or adding people."
+        ]
+      },
+      "useWhen": [
+        "Services with an SLO and a rotation that should be paged only for real user impact.",
+        "Teams whose on-call has become noisy and needs a review process."
+      ],
+      "avoidWhen": [
+        "Avoid paging on causes such as CPU or memory that may not affect users.",
+        "Avoid adding a new page for the exact cause of every past incident."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Destination",
+          "Use for",
+          "Response time"
+        ],
+        "rows": [
+          [
+            "Page",
+            "User impact now or within the hour",
+            "Minutes"
+          ],
+          [
+            "Ticket",
+            "Slow trends, expiries, follow-ups",
+            "Days"
+          ],
+          [
+            "Dashboard or log",
+            "Diagnosis and context",
+            "When someone looks"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Cutting pages after a review",
+        "assumptions": [
+          "A rotation gets 30 pages a week",
+          "The review finds 18 needed no action",
+          "Week-long shifts with one primary, illustrative"
+        ],
+        "steps": [
+          "Actionable pages: 30 − 18 = 12 a week.",
+          "Per day: 12 ÷ 7 ≈ 1.7 pages, against roughly 4.3 before.",
+          "Fixing the 18 removes 60% of interruptions without losing a real signal."
+        ],
+        "result": "One review that removes non-actionable pages cuts an illustrative rotation’s load by more than half and brings it under two pages a day."
+      },
+      "india": {
+        "title": "On-call guidance from Google’s SRE books",
+        "label": "Publicly reported",
+        "body": "Google’s SRE book recommends alerting on symptoms rather than causes and keeping pages actionable. Its Being On-Call chapter describes keeping on-call to at most 25% of SRE time, a maximum of about two incidents per 12-hour shift, and a minimum of eight engineers for a single-site rotation with a primary and secondary on week-long shifts. The SRE workbook adds practical guidance on reducing pager load."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Let’s page on CPU over 90% so we catch problems early.”",
+          "say": "“I’d page on the user-facing symptom and keep CPU on the dashboard for diagnosis.”"
+        },
+        {
+          "trap": "“We had an outage, so let’s add an alert for that exact cause.”",
+          "say": "“I’d check whether a symptom alert would have caught it, and only add one if not.”"
+        }
+      ],
+      "takeaways": [
+        "Page only for urgent, actionable, user-facing symptoms.",
+        "Route by urgency: page now, ticket within days, dashboard for context.",
+        "Review every page; remove, retune or downgrade the ones with no action.",
+        "Cap on-call near 25% of time and about two incidents per shift."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The alert for everything",
+      "prompt": "A service has 400 alerts, most added after past incidents. On-call gets about 50 pages a week, and engineers have started to acknowledge pages without looking.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "A real outage is acknowledged and missed among the noise",
+          "feedback": "Right: alert fatigue makes every page look like the usual noise, including the real one."
+        },
+        {
+          "id": "b",
+          "label": "Coverage is complete, so the next outage is caught at once",
+          "feedback": "More alerts do not help if nobody reads them; coverage on paper is not attention."
+        },
+        {
+          "id": "c",
+          "label": "The paging system starts dropping pages above its rate limit",
+          "feedback": "Paging tools handle this volume; the failure is human attention, not the system."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Cut pages to actionable symptoms, review them weekly, and track pages per shift so the noise cannot creep back."
+    },
+    "seeAlso": [
+      {
+        "topicId": 326,
+        "why": "SLOs and burn rates that symptom alerts are built on"
+      },
+      {
+        "topicId": 327,
+        "why": "Incident response that starts when a page fires"
+      },
+      {
+        "topicId": 689,
+        "why": "Turning repeated alert fixes into automation and runbooks"
       }
     ]
   }
