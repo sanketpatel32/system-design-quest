@@ -23,7 +23,8 @@ export function checkFundamentals(topics) {
     slugs.set(t.slug, t.id)
   }
   for (const t of topics) {
-    if (t.id > 120 && !FUND_AREAS.includes(t.region)) errors.push(`Topic ${t.id}: IDs above 120 are reserved for the Fundamentals track`)
+    // System Design lessons added after the original 120 use 501-599 so they never collide with Fundamentals (200+)
+    if (t.id > 120 && !(t.id >= 501 && t.id <= 599) && !FUND_AREAS.includes(t.region)) errors.push(`Topic ${t.id}: IDs above 120 are reserved for the Fundamentals track (System Design extras use 501-599)`)
   }
   const counts = {}
   for (const t of fund) {

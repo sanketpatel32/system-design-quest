@@ -1,7 +1,7 @@
 import type { Topic } from './types'
 import { orderedTopicsInRegion, regions, topicsById } from './catalog'
 
-/** One numbering scheme for the whole app: Lesson 1-79 in Units 1-10, the Interview Playbook, then Boss 1-40. */
+/** One numbering scheme for the whole app: Lesson 1-87 in Units 1-10, the Interview Playbook, then Boss 1-40. */
 export const learningRegions = regions.filter((r) => r.id !== 'boss-arena' && r.track !== 'fundamentals')
 /** Fundamentals areas that have content, in map order */
 export const fundamentalRegions = regions.filter((r) => r.track === 'fundamentals' && orderedTopicsInRegion(r.id).length > 0)

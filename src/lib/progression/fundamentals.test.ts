@@ -6,8 +6,8 @@ import { computeUnlocksAfterClear, getUnlockHint, isTopicUnlocked } from './unlo
 
 describe('Fundamentals track', () => {
   it('leaves System Design numbering and IDs untouched', () => {
-    expect(LESSON_COUNT).toBe(79)
-    for (const id of LESSON_N.keys()) expect(id).toBeLessThanOrEqual(120)
+    expect(LESSON_COUNT).toBe(87)
+    for (const id of LESSON_N.keys()) expect(id <= 120 || (id >= 501 && id <= 599)).toBe(true)
     for (const id of FUND_N.keys()) expect(id).toBeGreaterThanOrEqual(200)
   })
 

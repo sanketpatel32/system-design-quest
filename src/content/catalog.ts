@@ -13,7 +13,7 @@ export const regions: RegionMeta[] = [
     name: 'Foundations',
     subtitle: 'Launchpad',
     theme: 'cyan',
-    topicIds: [1, 2, 3],
+    topicIds: [1, 2, 507, 3],
   },
   {
     id: 'r2-networking',
@@ -41,14 +41,14 @@ export const regions: RegionMeta[] = [
     name: 'Databases',
     subtitle: 'Data Citadel',
     theme: 'emerald',
-    topicIds: [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35],
+    topicIds: [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 502, 32, 33, 34, 35],
   },
   {
     id: 'r6-messaging',
     name: 'Messaging & Reliability',
     subtitle: 'Queue Railways',
     theme: 'orange',
-    topicIds: [36, 37, 38, 39, 40, 41, 42, 43, 44],
+    topicIds: [36, 37, 38, 39, 40, 504, 41, 42, 43, 44, 503],
   },
   {
     id: 'r7-coordination',
@@ -62,7 +62,7 @@ export const regions: RegionMeta[] = [
     name: 'Microservices & Ops',
     subtitle: 'Operations Spaceport',
     theme: 'indigo',
-    topicIds: [50, 51, 52, 53, 54, 55, 56, 69, 70],
+    topicIds: [50, 51, 52, 53, 54, 501, 55, 56, 69, 505, 506, 508, 70],
   },
   {
     id: 'r9-security-storage',

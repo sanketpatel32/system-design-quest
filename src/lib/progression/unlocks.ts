@@ -31,6 +31,12 @@ export function isTopicUnlocked(topicId: number, unlockedIds: number[], complete
   // cleared (or that has none) is open too, so revision does not force a strict line. No stored unlock is needed,
   // so old saves just work.
   if (devUnlockAll() || unlockedIds.includes(topicId) || FUND_FIRST.has(topicId)) return true
+  // System Design lessons added later (501+) sit mid-unit; open them once their prerequisites are cleared so
+  // players who already passed that point in the unit are not locked out (no stored unlock needed).
+  if (topicId >= 501 && LESSON_N.has(topicId)) {
+    const pre = topicsById.get(topicId)?.prereqIds ?? []
+    if (pre.length > 0 && pre.every((id) => completed?.has(id))) return true
+  }
   return FUND_N.has(topicId) && missingFundPrereqs(topicId, completed).length === 0
 }
 
