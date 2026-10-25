@@ -871,6 +871,54 @@ Production database {store} [snapshots + log archive]> Backup vault|same region 
 Backup vault|same region {store} [copy]> Immutable vault|other account and region {store}
 Immutable vault|other account and region {store} [scheduled test]> Restore check|measure RTO
 
+@581 Static stability across zones: each zone runs enough capacity to carry the peak with one zone lost, so a zone failure needs no new launches from the control plane.
+Users {client} > Regional load balancer {svc}
+Regional load balancer {svc} [1/3]> Zone A|105 per zone at 67% {svc}
+Regional load balancer {svc} [1/3]> Zone B|105 per zone at 67% {svc}
+Regional load balancer {svc} [zone lost]?> Zone C|out {svc}
+Control plane|launch API {ext} ?> Not needed to recover
+
+@582 Cloud IAM evaluation: a workload gets short-lived credentials from its role, and each request is checked against identity and resource policies, where an explicit deny wins.
+Workload {svc} [assume role]> Token service|short-lived credentials {ext}
+Workload {svc} [signed request]> Policy evaluation {svc}
+Policy evaluation {svc} [explicit deny?]> Denied
+Policy evaluation {svc} [allowed by a policy]> Resource|bucket, queue, key {store}
+
+@583 Serverless invocation: a request is routed to a warm instance when one is free, or a new instance cold-starts, within the account's concurrency limit.
+Request {client} > Function router {svc}
+Function router {svc} [warm instance free]> Warm instance {svc}
+Function router {svc} [none free]> Cold start|init runtime + code {svc}
+Function router {svc} [concurrency limit hit]?> Throttled|429 or retry
+
+@584 Where a cloud bill comes from: on-demand, committed and spot compute, storage, and data transfer between zones, regions and the internet.
+%concept
+Compute {svc} > On-demand|flexible
+Compute {svc} > Committed|discount for 1–3 years
+Compute {svc} > Spot|cheap, can be reclaimed
+App in zone A {svc} [cross-zone GB]> App in zone B {svc}
+App in zone B {svc} [egress GB]> Internet {ext}
+
+@585 GitOps reconciliation: a merged change updates the desired state in Git, and an agent in the cluster pulls it, compares it with live state and fixes drift.
+Pull request {client} [merge]> Git repo|desired state {store}
+Git repo|desired state {store} ~> GitOps agent|in cluster {svc}
+GitOps agent|in cluster {svc} [diff]> Cluster|live state {svc}
+Manual change {client} ?> Cluster|live state {svc}
+
+@586 A chaos experiment: steady state and a hypothesis come first, the fault is injected into a small scope, and an abort condition stops it if users are hurt.
+Steady state|success, p99 > Hypothesis + abort rule > Scoped fault|1 zone, 5%, 15 min {svc}
+Scoped fault|1 zone, 5%, 15 min {svc} [abort rule fires]?> Stop and restore
+Scoped fault|1 zone, 5%, 15 min {svc} [ends on schedule]> Findings|tracked fixes {store}
+
+@587 A stepped load test: an open-model generator raises the arrival rate, throughput follows until the knee, and the planning target is set below it.
+Open-model generator|fixed arrival rate {client} > Service under test {svc}
+Service under test {svc} > Measure|throughput, errors, p99 {store}
+Measure|throughput, errors, p99 {store} > Knee|1,100 req/s > Plan target|about 770 req/s
+
+@588 A service mesh: each pod's sidecar proxy handles mTLS, retries and timeouts, configured by a control plane that issues certificates and pushes policy.
+Control plane|certs + policy {svc} ~> Sidecar A {svc}
+Control plane|certs + policy {svc} ~> Sidecar B {svc}
+Service A {svc} > Sidecar A {svc} [mTLS]> Sidecar B {svc} > Service B {svc}
+
 # ---------- Frontend additions (215-220) ----------
 @215 Event propagation for one click: the event is captured from the window down through the table and row to the clicked button, runs on the button, then bubbles back up through the row to the table in the same dispatch, where one delegated listener handles clicks for every row.
 Window > Document > Table|delegated listener {client} [capture]> Row > Button|target {client}

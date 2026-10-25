@@ -113859,5 +113859,3306 @@
         "why": "Rate limiting, which caps load per client"
       }
     ]
+  },
+  {
+    "id": 581,
+    "slug": "regions-zones-static-stability",
+    "region": "f7-cloud",
+    "order": 11,
+    "title": "Regions, Zones and Static Stability",
+    "kind": "lesson",
+    "objectives": [
+      "Explain regions and availability zones as nested fault domains",
+      "Size capacity per zone so losing one zone does not overload the rest",
+      "Design for static stability: survive a failure without calling the control plane"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [
+      328,
+      329
+    ],
+    "cards": [
+      {
+        "id": "t581-c1",
+        "kind": "text",
+        "title": "Fault domains nest: host, zone, region",
+        "body": "A cloud region is a geographic area that contains several availability zones. A zone is one or more data centres with its own power, cooling and network, a few kilometres or more from the others but linked to them with low-latency fibre. A failure usually stays inside one box: a host, a rack, a zone or, rarely, a whole region. Spreading replicas across zones turns a zone loss into a capacity problem instead of an outage.",
+        "teaches": [
+          "fault-domains"
+        ]
+      },
+      {
+        "id": "t581-c2",
+        "kind": "diagram",
+        "title": "What happens when a zone goes dark",
+        "body": "The healthy zones must already hold enough capacity, because the first minutes are the hardest.",
+        "teaches": [
+          "fault-domains",
+          "static-stability"
+        ],
+        "steps": [
+          "Instances in the failed zone stop answering health checks",
+          "The load balancer stops sending them traffic, usually within seconds",
+          "The surviving zones receive the whole load at once",
+          "If they were sized for it, users see a short blip and nothing more",
+          "Replacement capacity is added later, once the provider’s APIs are healthy"
+        ]
+      },
+      {
+        "id": "t581-c3",
+        "kind": "text",
+        "title": "Worked example: three zones at 70% is not redundant",
+        "body": "A service needs 210 units of capacity at peak and runs 100 units in each of three zones, so each zone is 70% busy. Lose one zone and 210 units of load land on 200 units of capacity: 105%, overloaded. To survive, each zone needs 210 ÷ 2 = 105 units, which means running at 210 ÷ 315 ≈ 67% at peak. With four zones each needs only 210 ÷ 3 = 70 units, so the total spare drops from 50% to 33%.",
+        "teaches": [
+          "zonal-capacity"
+        ]
+      },
+      {
+        "id": "t581-c4",
+        "kind": "text",
+        "title": "Static stability: keep working without making changes",
+        "body": "A statically stable design survives a failure with what is already running. It does not need to launch instances, change DNS, push config or promote anything during the event. This matters because the control plane, the APIs that create and change resources, is more complex than the data plane that serves traffic, and it is often slow or throttled during the same large failure.",
+        "teaches": [
+          "static-stability",
+          "control-plane-dependency"
+        ]
+      },
+      {
+        "id": "t581-c5",
+        "kind": "text",
+        "title": "Trap: autoscaling will replace the lost zone",
+        "body": "Autoscaling reacts after the overload has begun. During a zone event every customer in the region asks for capacity at the same moment, launch APIs may be throttled, and each new instance still has to boot and warm up. Treat autoscaling as a way to restore spare capacity afterwards, not as the plan for surviving the first ten minutes.",
+        "teaches": [
+          "static-stability",
+          "control-plane-dependency"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t581-a1",
+        "concept": "fault-domains",
+        "type": "multiple_choice",
+        "prompt": "What makes two availability zones useful as separate fault domains?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "They sit in different countries, so one regulator or outage cannot touch both"
+          },
+          {
+            "id": "b",
+            "label": "They have independent power, cooling and network, with low-latency links"
+          },
+          {
+            "id": "c",
+            "label": "They run on different cloud providers, so a software bug cannot hit both"
+          },
+          {
+            "id": "d",
+            "label": "They are in separate regions, so traffic between them costs nothing"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Zones are in the same region, close enough for fast links but isolated in power, cooling and network. They are not in different countries or regions, they belong to one provider, and traffic between zones is often billed."
+      },
+      {
+        "id": "t581-a2",
+        "concept": "static-stability",
+        "type": "multiple_choice",
+        "prompt": "Which design is statically stable against losing one zone?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Autoscaling launches replacements in the surviving zones when health checks fail"
+          },
+          {
+            "id": "b",
+            "label": "A runbook tells on-call to update DNS and remove the failed zone’s addresses"
+          },
+          {
+            "id": "c",
+            "label": "Each zone already runs enough capacity to absorb a lost zone’s share"
+          },
+          {
+            "id": "d",
+            "label": "A standby region is started from the latest backups when a zone fails"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Static stability means nothing has to change during the failure. Autoscaling and DNS edits both depend on control-plane calls and take time; restoring a standby region is a disaster-recovery plan for a much larger event."
+      },
+      {
+        "id": "t581-a3",
+        "concept": "control-plane-dependency",
+        "type": "multiple_choice",
+        "prompt": "During a zone outage the provider’s API for launching instances is slow and throttled. Which recovery step is most at risk?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Load balancer health checks marking the failed zone’s instances down"
+          },
+          {
+            "id": "b",
+            "label": "Launching replacement instances in the two healthy zones"
+          },
+          {
+            "id": "c",
+            "label": "Instances already running in healthy zones serving requests"
+          },
+          {
+            "id": "d",
+            "label": "Clients retrying a failed request against another healthy instance"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Launching is a control-plane action. Health checks, already-running instances and client retries are all data-plane paths that keep working without the launch API."
+      },
+      {
+        "id": "t581-a4",
+        "concept": "fault-domains",
+        "type": "multiple_choice",
+        "prompt": "Six app replicas are spread over three zones, but all of them use one database primary in zone A. What happens when zone A fails?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Two-thirds of the replicas keep serving, so about a third of requests fail"
+          },
+          {
+            "id": "b",
+            "label": "Every replica loses its database until a primary is promoted elsewhere"
+          },
+          {
+            "id": "c",
+            "label": "Requests keep working because replicas in zones B and C cache all reads"
+          },
+          {
+            "id": "d",
+            "label": "The load balancer moves the database primary to zone B with the traffic"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "A single dependency in one zone makes the whole service zonal. The surviving app replicas are healthy but useless without a database; a load balancer does not move databases, and caches rarely hold everything."
+      },
+      {
+        "id": "t581-a5",
+        "concept": "static-stability",
+        "type": "drag_order",
+        "prompt": "Order what a statically stable service does when zone C fails.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Zones A and B carry the load with capacity already running"
+          },
+          {
+            "id": "s1",
+            "label": "Health checks for zone C’s instances start failing"
+          },
+          {
+            "id": "s4",
+            "label": "Spare capacity is rebuilt once launch APIs recover"
+          },
+          {
+            "id": "s2",
+            "label": "The load balancer stops sending traffic to zone C"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Detect, drain, absorb with what is running, and only then rebuild the spare."
+      },
+      {
+        "id": "t581-a6",
+        "concept": "zonal-capacity",
+        "type": "estimation",
+        "prompt": "A service peaks at 240 units of load and runs in 4 zones. How many units must each zone hold so losing any one zone causes no overload?",
+        "unit": "units",
+        "target": 80,
+        "assumptions": [
+          "Load spreads evenly over the surviving zones",
+          "No autoscaling during the event"
+        ],
+        "formula": "240 ÷ (4 − 1)",
+        "workedAnswer": "240 ÷ 3 = 80 units per zone",
+        "explanation": "Sanity check: 4 × 80 = 320 units in total, about 33% more than the peak. Sizing at 240 ÷ 4 = 60 would overload the remaining three zones at 133%.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          60,
+          120
+        ]
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t581-f1",
+        "front": "Region vs zone?",
+        "back": "A region is an area with several zones; a zone is isolated power, cooling and network with fast links to its neighbours."
+      },
+      {
+        "id": "t581-f2",
+        "front": "Capacity per zone to survive one zone loss?",
+        "back": "Peak ÷ (zones − 1)."
+      },
+      {
+        "id": "t581-f3",
+        "front": "Static stability?",
+        "back": "Surviving a failure with what is already running, without control-plane calls such as launches or DNS changes."
+      }
+    ],
+    "sources": [
+      {
+        "title": "AWS Fault Isolation Boundaries: Static stability",
+        "url": "https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/static-stability.html"
+      },
+      {
+        "title": "AWS Fault Isolation Boundaries: Availability Zones",
+        "url": "https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/availability-zones.html"
+      },
+      {
+        "title": "Microsoft Learn: What are availability zones?",
+        "url": "https://learn.microsoft.com/en-us/azure/reliability/availability-zones-overview"
+      },
+      {
+        "title": "Google Cloud: Design reliable infrastructure",
+        "url": "https://cloud.google.com/architecture/infra-reliability-guide/design"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "fault-domains",
+        "zonal-capacity",
+        "static-stability",
+        "control-plane-dependency"
+      ],
+      "mechanism": {
+        "title": "How zone failures are contained and survived",
+        "steps": [
+          "Providers build each zone with separate power feeds, cooling and network paths so that a fire, flood, power cut or bad network change in one zone does not take down its neighbours. Zones in a region are far enough apart to fail independently and close enough, usually a few milliseconds of round trip, to replicate data synchronously. Regions are much further apart and share far less, which is why cross-region replication is usually asynchronous.",
+          "A service becomes zone-resilient only if every part of its request path is spread across zones: load balancers, app instances, caches, queues and the database. One component pinned to a single zone, such as a database primary with no standby, or a NAT gateway that every private subnet routes through, quietly makes the whole service as fragile as that zone.",
+          "Capacity has to be spread too. With N zones and a peak load P, each zone must be able to carry P ÷ (N − 1) for the service to survive a zone loss without overload. The spare is then P ÷ (N − 1) in total, so it shrinks as zones are added: 50% extra for three zones, 33% for four. Check the other limits as well: connection pools, database replicas and per-zone quotas must also handle the extra share.",
+          "Cloud systems split into a control plane, which creates, changes and deletes resources, and a data plane, which serves traffic on resources that already exist. Data planes are simpler and designed to keep running on their last known configuration. Control planes depend on more systems and are the first to struggle during a large event, when many customers call them at once.",
+          "Static stability uses that difference. Pre-provision the capacity needed for a zone loss, keep health checks and load balancers removing bad targets on their own, and avoid recovery steps that need new resources or config changes. Autoscaling and replacement still matter, but they rebuild the spare capacity after the event instead of carrying the service through it."
+        ]
+      },
+      "useWhen": [
+        "Any production service that must survive a zone failure without a visible outage.",
+        "Services whose recovery would otherwise depend on launching capacity during a regional event."
+      ],
+      "avoidWhen": [
+        "Avoid paying for N − 1 sizing on dev and test environments where an outage is acceptable.",
+        "Avoid treating zones as a substitute for backups or for a second region; a bad deploy or deleted data hits every zone."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Design",
+          "Zone loss",
+          "Cost"
+        ],
+        "rows": [
+          [
+            "3 zones sized for the peak only",
+            "Survivors overloaded at 150%",
+            "Lowest"
+          ],
+          [
+            "3 zones sized for N − 1",
+            "Absorbed with what is running",
+            "50% spare"
+          ],
+          [
+            "4 zones sized for N − 1",
+            "Absorbed with what is running",
+            "33% spare"
+          ],
+          [
+            "Rely on autoscaling",
+            "Overload until launches succeed",
+            "Low, but risky"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Sizing a checkout service for one zone loss",
+        "assumptions": [
+          "Peak load of 210 units",
+          "Load spreads evenly across healthy zones",
+          "Illustrative numbers, not a real company’s"
+        ],
+        "steps": [
+          "Three zones sized for the peak: 70 units each; losing one puts 210 on 140, which is 150%.",
+          "Three zones sized for N − 1: 210 ÷ 2 = 105 units each, 315 in total, so 67% busy at peak.",
+          "Four zones sized for N − 1: 210 ÷ 3 = 70 units each, 280 in total, so 75% busy at peak.",
+          "Moving from three zones to four cuts the spare from 105 units to 70 with the same protection."
+        ],
+        "result": "Size each zone for peak ÷ (zones − 1); more zones make the insurance cheaper, if the region has them."
+      },
+      "india": {
+        "title": "Static stability in the AWS fault isolation guidance",
+        "label": "Official documentation",
+        "body": "The AWS fault isolation boundaries whitepaper describes static stability as a workload continuing to operate during an impairment without needing to make changes. It recommends pre-provisioning enough capacity across Availability Zones that losing one does not require launching new resources, and explains that data planes are designed for higher availability than control planes. Microsoft and Google publish similar guidance on spreading workloads over zones."
+      },
+      "pitfalls": [
+        {
+          "trap": "“We have three zones, so we are redundant.”",
+          "say": "“Three zones help only if each holds peak ÷ 2, so a zone loss does not overload the other two.”"
+        },
+        {
+          "trap": "“Autoscaling will replace the lost zone.”",
+          "say": "“I’d pre-provision for a zone loss and let autoscaling rebuild the spare afterwards, because launch APIs can be slow during the event.”"
+        }
+      ],
+      "takeaways": [
+        "Zones isolate power, cooling and network inside one region.",
+        "Every dependency in the request path needs to be spread, not just the app servers.",
+        "Hold peak ÷ (zones − 1) per zone to survive one zone loss.",
+        "Static stability means surviving on what is already running, without control-plane calls."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Three zones at 70%",
+      "prompt": "A service runs in three zones, each 70% busy at peak. Zone B loses power. Autoscaling adds instances when CPU passes 80%. What do users see in the first ten minutes?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Errors and slow pages: the two healthy zones are asked for 105% of what they can do",
+          "feedback": "Right: 3 × 70% of one zone’s capacity lands on two zones, 105% each, before any new instance is ready."
+        },
+        {
+          "id": "b",
+          "label": "Nothing: autoscaling adds the missing capacity before anyone notices",
+          "feedback": "Launches, boot and warm-up take minutes, and launch APIs can be throttled during a zone event."
+        },
+        {
+          "id": "c",
+          "label": "A short blip while the load balancer drains zone B, then normal service",
+          "feedback": "Draining is fast, but the remaining zones do not have enough capacity for the whole load."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Size each zone for the peak divided by the number of surviving zones: here no zone should be more than about 67% busy at peak. Autoscaling then restores spare capacity instead of being the plan."
+    },
+    "seeAlso": [
+      {
+        "topicId": 56,
+        "why": "Regional failover and disaster recovery go one fault domain further"
+      },
+      {
+        "topicId": 55,
+        "why": "How redundancy turns into availability numbers"
+      },
+      {
+        "topicId": 328,
+        "why": "Why autoscaling restores spare capacity rather than carrying a failure"
+      }
+    ]
+  },
+  {
+    "id": 582,
+    "slug": "cloud-iam-least-privilege",
+    "region": "f7-cloud",
+    "order": 12,
+    "title": "Cloud IAM: Least Privilege and Short-Lived Credentials",
+    "kind": "lesson",
+    "objectives": [
+      "Read a cloud permission as principal, action, resource and condition",
+      "Explain default deny and why an explicit deny wins",
+      "Replace long-lived keys with workload identity and federated, short-lived credentials"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [
+      325,
+      323
+    ],
+    "cards": [
+      {
+        "id": "t582-c1",
+        "kind": "text",
+        "title": "Who can do what, to which resource, when",
+        "body": "Every cloud permission answers four questions: which principal (a person, a role or a workload identity), which action (read an object, start an instance), on which resource, and under which conditions (from this network, with MFA, before a date). Policies attach to identities, to resources such as a bucket, or to the whole organisation as guardrails. Grant to roles that people and workloads assume, not to individual long-lived users.",
+        "teaches": [
+          "iam-model"
+        ]
+      },
+      {
+        "id": "t582-c2",
+        "kind": "diagram",
+        "title": "How a request is decided",
+        "body": "Most clouds follow the same order: deny unless allowed, and an explicit deny beats any allow.",
+        "teaches": [
+          "policy-evaluation"
+        ],
+        "steps": [
+          "The caller is authenticated and its principal is known",
+          "All policies that apply are gathered: identity, resource and organisation guardrails",
+          "If any applicable policy explicitly denies the action, the request is denied",
+          "Otherwise, if a policy allows this action on this resource and its conditions match, it is allowed",
+          "If nothing allows it, the default answer is deny"
+        ]
+      },
+      {
+        "id": "t582-c3",
+        "kind": "text",
+        "title": "Worked example: a CI deploy with no stored key",
+        "body": "A pipeline used to keep a cloud access key as a CI secret; anyone who could read the secret could deploy for as long as the key lived. With federation, the CI system issues each run a signed identity token that says which repository and branch it came from. The cloud trusts that issuer, checks the claims (only the main branch of this repository), and returns credentials that expire in about an hour. There is nothing long-lived left to leak.",
+        "teaches": [
+          "short-lived-credentials"
+        ]
+      },
+      {
+        "id": "t582-c4",
+        "kind": "text",
+        "title": "Least privilege, in practice",
+        "body": "Give each workload its own identity with only the actions and resources it uses: this service reads one queue and writes one bucket. Keep the deploy role separate from the runtime role, so the running app cannot change its own infrastructure. Use access logs and the provider’s unused-permission reports to trim grants over time, and keep a monitored break-glass role for emergencies instead of standing admin access.",
+        "teaches": [
+          "least-privilege"
+        ]
+      },
+      {
+        "id": "t582-c5",
+        "kind": "text",
+        "title": "Trap: one admin role for every service",
+        "body": "A shared wildcard role is quick to set up and turns every bug into an account-wide incident. A server-side request forgery, a leaked token or a bad script in any one service can then delete databases or read every secret. The blast radius of a credential is whatever its policy allows, so narrow the policy before you need to.",
+        "teaches": [
+          "least-privilege"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t582-a1",
+        "concept": "policy-evaluation",
+        "type": "multiple_choice",
+        "prompt": "A role may delete objects in a bucket, and an organisation guardrail explicitly denies deletes in production. The role tries to delete a production object. What happens?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "It succeeds, because the allow names this bucket and is more specific"
+          },
+          {
+            "id": "b",
+            "label": "It succeeds once, and the guardrail applies from the next call onwards"
+          },
+          {
+            "id": "c",
+            "label": "It depends on which of the two policies was attached most recently"
+          },
+          {
+            "id": "d",
+            "label": "It is denied, because an explicit deny overrides any allow"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "An explicit deny in any applicable policy wins. Specificity and attachment order do not matter, and guardrails apply to every call, including the first."
+      },
+      {
+        "id": "t582-a2",
+        "concept": "policy-evaluation",
+        "type": "multiple_choice",
+        "prompt": "No policy mentions the action a workload is trying to call. What is the result?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Denied, because access is refused unless some policy allows it"
+          },
+          {
+            "id": "b",
+            "label": "Allowed, because nothing explicitly denies it"
+          },
+          {
+            "id": "c",
+            "label": "Allowed for read actions and denied for write actions"
+          },
+          {
+            "id": "d",
+            "label": "Allowed if the caller and the resource are in the same account"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Cloud IAM starts from default deny. The absence of a deny is not an allow, reads are not special, and sharing an account still needs a policy that grants the action."
+      },
+      {
+        "id": "t582-a3",
+        "concept": "short-lived-credentials",
+        "type": "multiple_choice",
+        "prompt": "Why is federating CI to the cloud with signed identity tokens safer than storing an access key as a CI secret?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Identity tokens are encrypted, while access keys travel in plain text"
+          },
+          {
+            "id": "b",
+            "label": "Each run gets credentials that expire soon and only one repo can get them"
+          },
+          {
+            "id": "c",
+            "label": "Federated roles cannot be given more permissions than an access key"
+          },
+          {
+            "id": "d",
+            "label": "The cloud provider skips policy checks for federated callers"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "The gain is short life and narrow trust: credentials last about an hour and the trust policy only accepts tokens from the named repository and branch. Both methods use TLS, federated roles can be over-granted too, and policies still apply."
+      },
+      {
+        "id": "t582-a4",
+        "concept": "least-privilege",
+        "type": "multiple_choice",
+        "prompt": "A service only reads one queue and writes one bucket, but it runs with an admin role. What is the main risk?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Calls get slower, because large policies take longer to evaluate"
+          },
+          {
+            "id": "b",
+            "label": "The bill rises, because calls made with admin roles cost more"
+          },
+          {
+            "id": "c",
+            "label": "A bug or stolen credential in it can change anything in the account"
+          },
+          {
+            "id": "d",
+            "label": "Audit logs stop recording the calls that admin roles make"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "The blast radius of a credential is what its policy allows. Policy size does not noticeably change latency or price, and admin calls are still logged."
+      },
+      {
+        "id": "t582-a5",
+        "concept": "policy-evaluation",
+        "type": "drag_order",
+        "prompt": "Order how a cloud decides whether to allow a request.",
+        "items": [
+          {
+            "id": "s4",
+            "label": "Allow if a policy allows and its conditions match"
+          },
+          {
+            "id": "s2",
+            "label": "Collect every policy that applies"
+          },
+          {
+            "id": "s5",
+            "label": "Otherwise deny by default"
+          },
+          {
+            "id": "s1",
+            "label": "Authenticate the caller"
+          },
+          {
+            "id": "s3",
+            "label": "Deny if any policy explicitly denies"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Identity first, then the deny check, then allows, with deny as the fallback."
+      },
+      {
+        "id": "t582-a6",
+        "concept": "short-lived-credentials",
+        "type": "tradeoff",
+        "prompt": "A nightly job on a cloud VM must write reports to object storage.",
+        "constraints": [
+          "Runs unattended",
+          "Only needs write access to one bucket",
+          "Security review bans long-lived keys"
+        ],
+        "approaches": [
+          {
+            "id": "p2",
+            "label": "An access key saved in a config file on the VM",
+            "description": "Static key"
+          },
+          {
+            "id": "p1",
+            "label": "A workload identity attached to the VM, scoped to that bucket",
+            "description": "Attached identity"
+          },
+          {
+            "id": "p3",
+            "label": "An engineer’s personal credentials copied to the VM",
+            "description": "Personal login"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r3",
+            "label": "A key in a config file is fine once the disk is encrypted"
+          },
+          {
+            "id": "r1",
+            "label": "The platform rotates the VM’s credentials and they expire on their own"
+          },
+          {
+            "id": "r4",
+            "label": "A personal login is easier to audit than a role"
+          },
+          {
+            "id": "r2",
+            "label": "The grant can be limited to writes on one bucket"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "Anyone with access to the running VM or a copy of its disk can still read the key.",
+          "r4": "Personal credentials mix the job’s actions with the engineer’s and break when they leave."
+        },
+        "explanation": "Attach an identity to the workload: credentials are short-lived and rotated by the platform, and the role is scoped to exactly what the job does."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t582-f1",
+        "front": "Four parts of a permission?",
+        "back": "Principal, action, resource, condition."
+      },
+      {
+        "id": "t582-f2",
+        "front": "Deny vs allow?",
+        "back": "Default deny; an explicit deny anywhere overrides any allow."
+      },
+      {
+        "id": "t582-f3",
+        "front": "Why federate CI?",
+        "back": "Each run gets short-lived credentials tied to one repo and branch, so there is no stored key to leak."
+      }
+    ],
+    "sources": [
+      {
+        "title": "AWS IAM: Security best practices",
+        "url": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html"
+      },
+      {
+        "title": "AWS IAM: Policy evaluation logic",
+        "url": "https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic.html"
+      },
+      {
+        "title": "Google Cloud: Workload Identity Federation",
+        "url": "https://cloud.google.com/iam/docs/workload-identity-federation"
+      },
+      {
+        "title": "Google Cloud: IAM overview",
+        "url": "https://cloud.google.com/iam/docs/overview"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "iam-model",
+        "policy-evaluation",
+        "short-lived-credentials",
+        "least-privilege"
+      ],
+      "mechanism": {
+        "title": "How cloud authorization works end to end",
+        "steps": [
+          "Every call to a cloud API is signed with credentials that identify a principal: a human signed in through single sign-on, a role assumed by a service, or a workload identity attached to a VM, container or function. The provider authenticates the signature first; nothing about permissions is decided until it knows who is asking.",
+          "It then collects every policy that could apply: policies on the identity, policies on the target resource such as a bucket or key, and organisation-level guardrails that cap what any account may do. Details differ between providers, but the shared rules are default deny and explicit deny wins. A request is allowed only if some policy grants the action on the resource with matching conditions and no policy denies it.",
+          "Conditions narrow grants further: only from the corporate network, only with MFA, only for resources tagged with the team’s name, only for tokens whose subject is the main branch of one repository. Conditions are how a single role can be safely shared across environments or restricted to one CI pipeline.",
+          "Credentials should be short-lived. A workload identity attached to a VM or pod gets credentials from a local metadata endpoint, and the platform rotates them. External systems such as CI or another cloud use federation: they present a signed token from a trusted issuer, the cloud checks its claims, and returns credentials that expire in minutes to hours. Leaked long-lived access keys remain one of the most common ways cloud accounts are breached.",
+          "Least privilege is a process rather than a one-off design. Start each workload with a narrow role, separate deploy permissions from runtime permissions, put dangerous actions such as deleting backups behind guardrails, and review access logs and unused-permission reports to remove grants nobody uses. Keep an audited break-glass path for emergencies so engineers do not need standing admin rights."
+        ]
+      },
+      "useWhen": [
+        "Any workload that calls cloud APIs, including CI pipelines and scheduled jobs.",
+        "Multi-team accounts where one service’s bug must not reach another’s data."
+      ],
+      "avoidWhen": [
+        "Avoid hand-writing huge per-user policies; grant to roles and groups.",
+        "Avoid treating network location alone as authorization; check identity too."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Credential",
+          "Lifetime",
+          "Leak impact"
+        ],
+        "rows": [
+          [
+            "Long-lived access key",
+            "Until someone rotates it",
+            "Usable from anywhere until revoked"
+          ],
+          [
+            "Workload identity on a VM or pod",
+            "Minutes to hours, rotated by the platform",
+            "Limited to its role and a short window"
+          ],
+          [
+            "Federated CI token",
+            "About one run",
+            "Tied to one repo, branch and role"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How long a leaked credential stays useful",
+        "assumptions": [
+          "A key or token is leaked in a public log",
+          "It takes the team 3 days to notice",
+          "Illustrative timings"
+        ],
+        "steps": [
+          "Long-lived key: usable for the full 3 days, 72 hours, and beyond until revoked.",
+          "Federated credentials with a 1-hour lifetime: usable for at most 1 hour after they were issued.",
+          "72 ÷ 1 = 72 times shorter exposure, before counting the narrower scope of the federated role."
+        ],
+        "result": "Short lifetimes shrink exposure from “until noticed” to “at most one hour”, and narrow roles shrink what that hour can do."
+      },
+      "india": {
+        "title": "Provider guidance on temporary credentials",
+        "label": "Official documentation",
+        "body": "The AWS IAM best practices page recommends requiring workloads to use temporary credentials through roles, using federation for human access, applying least-privilege permissions and using guardrails across accounts. Google Cloud’s Workload Identity Federation documentation describes letting external workloads such as CI pipelines exchange their own signed tokens for short-lived Google Cloud credentials instead of downloading service account keys."
+      },
+      "pitfalls": [
+        {
+          "trap": "“The service needs admin because it touches several things.”",
+          "say": "“I’d list the exact actions and resources it uses and grant only those, with deletes behind a guardrail.”"
+        },
+        {
+          "trap": "“We rotate the CI key every 90 days.”",
+          "say": "“I’d federate CI so each run gets credentials that expire in an hour, with no key stored at all.”"
+        }
+      ],
+      "takeaways": [
+        "Read a permission as principal, action, resource and condition.",
+        "Default deny; an explicit deny overrides any allow.",
+        "Prefer workload identity and federation over stored keys.",
+        "Scope each workload’s role to what it uses and keep deploy and runtime roles apart."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Which leak hurts more?",
+      "prompt": "Two leaks are found in a public log today. One is a developer’s long-lived access key with admin rights, posted three days ago. The other is a CI token that was exchanged for 1-hour deploy credentials, posted yesterday.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The admin key: it still works now and can change anything in the account",
+          "feedback": "Right: long-lived keys work until revoked, and admin rights make the blast radius the whole account."
+        },
+        {
+          "id": "b",
+          "label": "The CI token: deploy credentials can push code to production",
+          "feedback": "They could, but they expired an hour after the run, long before anyone found them."
+        },
+        {
+          "id": "c",
+          "label": "Both are equally dangerous, because each one grants cloud access",
+          "feedback": "Lifetime and scope differ by orders of magnitude."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Revoke the key now, check the audit logs for its use over the three days, and replace it with role-based, short-lived access."
+    },
+    "seeAlso": [
+      {
+        "topicId": 306,
+        "why": "Authorization bugs inside the application, the same idea one layer up"
+      },
+      {
+        "topicId": 307,
+        "why": "Where secrets live when a key cannot be avoided"
+      },
+      {
+        "topicId": 309,
+        "why": "Why CI credentials are a supply-chain target"
+      }
+    ]
+  },
+  {
+    "id": 583,
+    "slug": "serverless-functions",
+    "region": "f7-cloud",
+    "order": 18,
+    "title": "Serverless Functions: Cold Starts, Concurrency and Cost",
+    "kind": "lesson",
+    "objectives": [
+      "Explain how a function platform creates, reuses and scales execution environments",
+      "Estimate concurrency as request rate × duration and protect downstream systems",
+      "Decide when per-request pricing beats an always-on service"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [
+      321,
+      328
+    ],
+    "cards": [
+      {
+        "id": "t583-c1",
+        "kind": "text",
+        "title": "What the platform does for you",
+        "body": "You upload a function and a trigger: an HTTP route, a queue, a file upload. The platform creates execution environments on demand, runs your handler, reuses warm environments for later events, and removes idle ones, scaling to zero when nothing happens. Some platforms run one request per environment at a time; others let one instance handle several. You pay per request and per unit of compute time, not for idle servers.",
+        "teaches": [
+          "serverless-model"
+        ]
+      },
+      {
+        "id": "t583-c2",
+        "kind": "diagram",
+        "title": "A cold start, then warm reuse",
+        "body": "Only the first request into a new environment pays for setting it up.",
+        "teaches": [
+          "cold-start"
+        ],
+        "steps": [
+          "An event arrives and no idle environment is free",
+          "The platform creates one: fetches the code and starts the runtime",
+          "Initialisation code outside the handler runs: config, clients, connections",
+          "The handler runs for this event",
+          "The environment stays warm for a while; the next event skips straight to the handler"
+        ]
+      },
+      {
+        "id": "t583-c3",
+        "kind": "text",
+        "title": "Worked example: concurrency is rate × duration",
+        "body": "At 500 requests per second and 200 ms per request, about 500 × 0.2 = 100 environments are busy at once. If a downstream API slows to 2 s, the same traffic needs 1,000. Accounts have a concurrency limit per region, by default 1,000 on AWS Lambda, so one slow dependency can use up the whole account and throttle unrelated functions.",
+        "teaches": [
+          "function-concurrency"
+        ]
+      },
+      {
+        "id": "t583-c4",
+        "kind": "text",
+        "title": "Pay per use is cheapest when use is uneven",
+        "body": "Per-request pricing wins for spiky or low traffic: a webhook that fires a few thousand times a day costs almost nothing and needs no capacity planning. For high, steady load the per-unit price is higher than a reserved container or VM kept busy all day, so the bill can cross over. Compare with measured traffic and include the operations work each option saves.",
+        "teaches": [
+          "serverless-cost"
+        ]
+      },
+      {
+        "id": "t583-c5",
+        "kind": "text",
+        "title": "Trap: a thousand functions, one database",
+        "body": "Each environment opens its own database connections. A spike that scales a function to 900 environments can open 900 or more connections to a database that allows 200, and the database falls over before the function does. Cap the function’s concurrency, put a connection pooler or proxy in front of the database, or move the writes onto a queue.",
+        "teaches": [
+          "function-concurrency"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t583-a1",
+        "concept": "function-concurrency",
+        "type": "estimation",
+        "prompt": "A function receives 800 requests per second and each takes 250 ms. About how many environments are busy at once?",
+        "unit": "environments",
+        "target": 200,
+        "assumptions": [
+          "One request per environment at a time",
+          "Steady traffic"
+        ],
+        "formula": "800 × 0.25",
+        "workedAnswer": "800 × 0.25 s = 200 concurrent environments",
+        "explanation": "Sanity check: if latency doubles to 500 ms, concurrency doubles to 400 with no extra traffic, which is how slow dependencies hit concurrency limits.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          800,
+          3200
+        ]
+      },
+      {
+        "id": "t583-a2",
+        "concept": "cold-start",
+        "type": "multiple_choice",
+        "prompt": "Where should a function create its database client?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Inside the handler, so each event gets a fresh client"
+          },
+          {
+            "id": "b",
+            "label": "In initialisation code outside the handler, so warm events reuse it"
+          },
+          {
+            "id": "c",
+            "label": "In a second function that the handler calls before each query"
+          },
+          {
+            "id": "d",
+            "label": "In the caller, which passes the open client along with each event"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Initialisation code runs once per environment and is reused by every warm event. Creating the client per event repeats the setup cost, a second function adds a network hop and its own cold starts, and open connections cannot be passed inside an event."
+      },
+      {
+        "id": "t583-a3",
+        "concept": "cold-start",
+        "type": "multiple_choice",
+        "prompt": "A checkout endpoint must not show cold-start delays at the morning peak. Which change helps most?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Raising the function timeout from 30 seconds to 15 minutes"
+          },
+          {
+            "id": "b",
+            "label": "Splitting the function into several smaller ones that call each other"
+          },
+          {
+            "id": "c",
+            "label": "Logging less inside the handler so each event finishes sooner"
+          },
+          {
+            "id": "d",
+            "label": "Keeping a pool of pre-initialised environments ready before the peak"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "Provisioned or minimum instances are created ahead of time, so requests land on warm environments. A longer timeout does not affect start-up, chaining functions adds more cold starts, and less logging only trims handler time."
+      },
+      {
+        "id": "t583-a4",
+        "concept": "function-concurrency",
+        "type": "multiple_choice",
+        "prompt": "A function’s database allows 200 connections. A traffic spike scales the function to 900 environments and the database starts refusing connections. What is the best first fix?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Cap the function’s concurrency and send connections through a pooler"
+          },
+          {
+            "id": "b",
+            "label": "Give each environment more memory so that it finishes faster"
+          },
+          {
+            "id": "c",
+            "label": "Retry failed connections straight away in a tight loop"
+          },
+          {
+            "id": "d",
+            "label": "Raise the timeout so requests wait longer for a connection"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The fix is to bound how many connections the function can open. More memory helps a little but does not bound concurrency, tight retries add load, and longer waits keep environments busy and raise concurrency further."
+      },
+      {
+        "id": "t583-a5",
+        "concept": "serverless-cost",
+        "type": "multiple_choice",
+        "prompt": "When does a function usually cost more than an always-on container doing the same work?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "When traffic is low and arrives in rare bursts"
+          },
+          {
+            "id": "b",
+            "label": "When the service is only used during office hours"
+          },
+          {
+            "id": "c",
+            "label": "When load is high and steady around the clock"
+          },
+          {
+            "id": "d",
+            "label": "When each request finishes in well under a second"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Per-unit serverless compute is priced above a busy reserved instance, so high steady load is where the crossover happens. Bursty traffic, office-hours use and short requests all favour paying per use."
+      },
+      {
+        "id": "t583-a6",
+        "concept": "cold-start",
+        "type": "drag_order",
+        "prompt": "Order what happens on a cold invocation.",
+        "items": [
+          {
+            "id": "s2",
+            "label": "Run initialisation code outside the handler"
+          },
+          {
+            "id": "s4",
+            "label": "Keep the environment warm for reuse"
+          },
+          {
+            "id": "s1",
+            "label": "Create an environment and start the runtime"
+          },
+          {
+            "id": "s3",
+            "label": "Run the handler for the event"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Environment, init, handler, then reuse; warm events skip the first two steps."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t583-f1",
+        "front": "Concurrency for a function?",
+        "back": "Requests per second × seconds per request."
+      },
+      {
+        "id": "t583-f2",
+        "front": "What is a cold start?",
+        "back": "Creating an environment and running init code before the first event in it."
+      },
+      {
+        "id": "t583-f3",
+        "front": "Function + database at scale?",
+        "back": "Cap concurrency and use a pooler or proxy, or the database runs out of connections."
+      }
+    ],
+    "sources": [
+      {
+        "title": "AWS Lambda: Understanding concurrency",
+        "url": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-concurrency.html"
+      },
+      {
+        "title": "AWS Lambda: Execution environment lifecycle",
+        "url": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtime-environment.html"
+      },
+      {
+        "title": "Microsoft Learn: Event-driven scaling in Azure Functions",
+        "url": "https://learn.microsoft.com/en-us/azure/azure-functions/event-driven-scaling"
+      },
+      {
+        "title": "Google Cloud Run: Instance autoscaling",
+        "url": "https://cloud.google.com/run/docs/about-instance-autoscaling"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "serverless-model",
+        "cold-start",
+        "function-concurrency",
+        "serverless-cost"
+      ],
+      "mechanism": {
+        "title": "How function platforms run and scale your code",
+        "steps": [
+          "A function platform keeps a fleet of isolated execution environments, often lightweight virtual machines, that it can start in a fraction of a second. When an event arrives and no warm environment is free, the platform creates one, downloads the code package or image, starts the language runtime and runs your initialisation code. That whole setup is the cold start, and its length depends on the package size, the runtime and what the init code does.",
+          "After the handler returns, the environment is frozen but kept for a while. The next event can reuse it and skip all setup, so anything created in initialisation, such as configuration, SDK clients and database connections, is reused across events. Environments are recycled without notice, so nothing important may live only in local memory or on local disk.",
+          "Scaling follows concurrency, the number of events in flight. By Little’s law it is the arrival rate times the duration: 500 requests per second at 200 ms needs about 100 environments. Platforms that run one event per environment scale environments with that number; platforms that allow several requests per instance need fewer instances but share memory and CPU between them. Regional account limits and per-function caps bound the total, and requests beyond them are throttled.",
+          "Because scaling is fast and wide, the risk moves downstream. A function can scale from ten to a thousand environments in a minute while the database it calls was sized for a hundred connections. Reserved or maximum concurrency per function, a connection pooler, and queues between functions and fragile systems keep a spike from turning into an outage somewhere else.",
+          "Billing is per request plus compute time, usually measured as memory allocated times duration. That makes idle time free and spiky workloads cheap, but busy steady services can pay more than they would on a container kept 70% busy. Time limits per invocation, up to 15 minutes on AWS Lambda, and the lack of long-lived local state also rule out some workloads such as long video encodes or large in-memory caches."
+        ]
+      },
+      "useWhen": [
+        "Event handlers, webhooks, file processing and APIs with spiky or low traffic.",
+        "Glue between managed services where running servers would mostly sit idle."
+      ],
+      "avoidWhen": [
+        "Avoid for high, steady load where a busy container is cheaper.",
+        "Avoid for long-running jobs or anything needing large in-memory state between requests."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Option",
+          "Scaling",
+          "Cost shape"
+        ],
+        "rows": [
+          [
+            "Functions",
+            "Per event, to zero, in seconds",
+            "Per request and duration; idle is free"
+          ],
+          [
+            "Containers with autoscaling",
+            "Per instance, in tens of seconds",
+            "Per instance-hour; some idle cost"
+          ],
+          [
+            "Reserved VMs",
+            "Manual or slow",
+            "Lowest per unit when kept busy"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Concurrency and connections during a spike",
+        "assumptions": [
+          "Normal: 300 requests/s at 150 ms",
+          "Spike: 1,200 requests/s while a dependency slows to 600 ms",
+          "Each environment holds one database connection"
+        ],
+        "steps": [
+          "Normal concurrency: 300 × 0.15 = 45 environments, 45 connections.",
+          "Spike concurrency: 1,200 × 0.6 = 720 environments, 720 connections.",
+          "Traffic grew 4×, but concurrency grew 720 ÷ 45 = 16× because latency also grew 4×."
+        ],
+        "result": "Concurrency multiplies rate and latency, so cap it and pool connections before the spike, not after."
+      },
+      "india": {
+        "title": "Published platform behaviour",
+        "label": "Official documentation",
+        "body": "The AWS Lambda documentation explains concurrency as the number of in-flight requests, gives the rate × duration formula, and describes a default regional account limit and reserved concurrency for individual functions. Its execution environment page describes the init, invoke and shutdown phases and environment reuse. Azure Functions and Cloud Run document how their own instances scale and how many requests one instance can serve."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Serverless scales without limit, so capacity is not my problem.”",
+          "say": "“The function scales, but its database and the account limit do not, so I’d cap concurrency and pool connections.”"
+        },
+        {
+          "trap": "“Cold starts make serverless unusable for APIs.”",
+          "say": "“They only hit new environments; for a latency-critical route I’d keep a few pre-initialised instances and keep init code light.”"
+        }
+      ],
+      "takeaways": [
+        "Concurrency = request rate × duration; slow dependencies raise it.",
+        "Cold starts hit only new environments; reuse clients created in init code.",
+        "Protect downstream systems with concurrency caps, pools and queues.",
+        "Pay per use wins for spiky load; steady high load can be cheaper on containers."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The slow payment provider",
+      "prompt": "A function handles 400 requests per second at 100 ms each, about 40 environments. The payment provider it calls slows to 3 s per call. The account’s regional limit is 1,000 concurrent environments, shared with every other function.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Concurrency heads for about 1,200, hits the limit, and other functions start being throttled too",
+          "feedback": "Right: 400 × 3 s = 1,200 in flight, above the shared limit of 1,000."
+        },
+        {
+          "id": "b",
+          "label": "Concurrency stays near 40, because traffic has not changed",
+          "feedback": "Concurrency is rate × duration, so it grows with latency even at the same traffic."
+        },
+        {
+          "id": "c",
+          "label": "The platform raises the account limit by itself and nothing is throttled",
+          "feedback": "Account limits are quotas; requests beyond them are throttled until the quota is raised."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Give the function a reserved concurrency cap and a short timeout on the provider call, so one slow dependency cannot use up the whole account."
+    },
+    "seeAlso": [
+      {
+        "topicId": 328,
+        "why": "How always-on services scale, for comparison"
+      },
+      {
+        "topicId": 53,
+        "why": "Timeouts that stop slow dependencies inflating concurrency"
+      },
+      {
+        "topicId": 321,
+        "why": "Function images are containers underneath"
+      }
+    ]
+  },
+  {
+    "id": 584,
+    "slug": "cloud-cost-pricing-spot-transfer",
+    "region": "f7-cloud",
+    "order": 21,
+    "title": "Cloud Cost: Pricing Models, Spot Capacity and Data Transfer",
+    "kind": "lesson",
+    "objectives": [
+      "Choose between on-demand, committed and spot capacity for each part of the load",
+      "Design workloads that tolerate spot interruptions",
+      "Find and reduce data transfer charges between zones, regions and the internet"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [
+      328,
+      329
+    ],
+    "cards": [
+      {
+        "id": "t584-c1",
+        "kind": "text",
+        "title": "Three ways to pay for the same machine",
+        "body": "On-demand capacity is billed by the second or hour with no commitment. Commitments, such as reserved instances, savings plans or committed-use discounts, trade a one- or three-year promise for a lower rate. Spot or preemptible capacity is spare capacity sold at a deep discount that the provider can take back at short notice: two minutes on AWS, about 30 seconds on Google Cloud.",
+        "teaches": [
+          "pricing-models",
+          "spot-capacity"
+        ]
+      },
+      {
+        "id": "t584-c2",
+        "kind": "text",
+        "title": "Worked example: commit to the floor, burst on spot",
+        "body": "Illustrative prices: on-demand 1.00 per instance-hour, committed 0.60, spot 0.30. Load holds at 20 instances all day and rises to 50 for 6 hours. All on-demand: 20 × 24 = 480 baseline instance-hours, plus 30 × 6 = 180 burst instance-hours, 660 in total, cost 660. Commit to the 20 baseline: 480 × 0.60 = 288, plus 180 on-demand = 468. Put the 30 burst instances on spot: 180 × 0.30 = 54, so 288 + 54 = 342, about 48% less than all on-demand.",
+        "teaches": [
+          "pricing-models"
+        ]
+      },
+      {
+        "id": "t584-c3",
+        "kind": "text",
+        "title": "Data transfer: the line nobody drew on the diagram",
+        "body": "Inbound traffic is usually free; traffic out to the internet, between regions and often between zones is billed per GB. Managed NAT gateways and load balancers can add a processing charge per GB too. A chatty service that calls a peer in another zone on every request pays for bytes in both directions, so routing calls to a replica in the same zone can cut a large, invisible bill without losing redundancy.",
+        "teaches": [
+          "data-transfer-cost"
+        ]
+      },
+      {
+        "id": "t584-c4",
+        "kind": "text",
+        "title": "Spot needs work that can be interrupted",
+        "body": "Spot suits stateless web workers behind a load balancer, batch jobs that checkpoint, CI runners and rendering farms. Handle the interruption notice: stop taking new work, checkpoint or hand back the current job, and exit. Spread across several instance types and zones so one pool running dry does not take everything, and keep the baseline that must stay up on on-demand or committed capacity.",
+        "teaches": [
+          "spot-capacity"
+        ]
+      },
+      {
+        "id": "t584-c5",
+        "kind": "text",
+        "title": "Trap: committing to the peak",
+        "body": "A commitment is billed whether or not you use it. Committing to the peak means paying the discounted rate for machines that sit idle most of the day, which can cost more than on-demand. Commit to the floor you are confident will run for the whole term, measure the usage, and add commitments in steps as the floor rises.",
+        "teaches": [
+          "pricing-models"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t584-a1",
+        "concept": "pricing-models",
+        "type": "multiple_choice",
+        "prompt": "Load stays at 40 instances all day and rises to 100 for a few hours each afternoon. What should a one-year commitment cover?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "100 instances, so the afternoon peak also runs at the discount"
+          },
+          {
+            "id": "b",
+            "label": "About 40 instances, the level that runs around the clock"
+          },
+          {
+            "id": "c",
+            "label": "70 instances, halfway between the floor and the peak"
+          },
+          {
+            "id": "d",
+            "label": "None, because commitments cost more than on-demand over a year"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Commit to the floor that runs all day. Committing to 100 or 70 pays for idle capacity most hours, and a commitment that is fully used is cheaper than on-demand, not more expensive."
+      },
+      {
+        "id": "t584-a2",
+        "concept": "spot-capacity",
+        "type": "multiple_choice",
+        "prompt": "Which workload suits spot capacity best?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The only primary database, storing data on local instance disks"
+          },
+          {
+            "id": "b",
+            "label": "A stateful game server holding players in hour-long sessions"
+          },
+          {
+            "id": "c",
+            "label": "A licensing server that clients reach at one fixed address"
+          },
+          {
+            "id": "d",
+            "label": "A video-transcoding queue whose jobs checkpoint as they go"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "Checkpointed queue work can resume elsewhere after an interruption. Losing a single primary database, ending live game sessions, or moving a fixed-address server all hurt users when the instance is reclaimed."
+      },
+      {
+        "id": "t584-a3",
+        "concept": "data-transfer-cost",
+        "type": "estimation",
+        "prompt": "A service sends a steady 50 MB/s to a peer in another zone. At an illustrative 0.02 per GB for cross-zone traffic, about what does that cost in a 30-day month?",
+        "unit": "per month",
+        "target": 2592,
+        "assumptions": [
+          "1 GB = 1,000 MB",
+          "30 days = 2,592,000 seconds",
+          "Illustrative price, not a quoted list price"
+        ],
+        "formula": "50 MB/s × 2,592,000 s ÷ 1,000 × 0.02",
+        "workedAnswer": "129,600 GB × 0.02 ≈ 2,590 a month",
+        "explanation": "Sanity check: 50 MB/s is about 4.3 TB a day, roughly 86 a day. Per-GB prices look tiny until they meet a constant stream.",
+        "tolerance": 0.15,
+        "trapAnswers": [
+          86,
+          259
+        ]
+      },
+      {
+        "id": "t584-a4",
+        "concept": "data-transfer-cost",
+        "type": "multiple_choice",
+        "prompt": "Every request to a service in zone A also calls a cache node in zone B. What is the cheapest fix that keeps zone redundancy?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Move all of the service’s instances into zone B"
+          },
+          {
+            "id": "b",
+            "label": "Switch the cache to a larger instance type"
+          },
+          {
+            "id": "c",
+            "label": "Route each instance to a cache replica in its own zone"
+          },
+          {
+            "id": "d",
+            "label": "Move the cache into a second region for safety"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Zone-local reads remove the cross-zone traffic and keep a replica in every zone. Moving everything into zone B loses zone redundancy, a larger cache does not change the traffic path, and another region makes transfer more expensive."
+      },
+      {
+        "id": "t584-a5",
+        "concept": "spot-capacity",
+        "type": "multiple_choice",
+        "prompt": "A worker running on spot capacity receives an interruption notice. What should it do?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Keep working; the provider moves its running job to a new instance"
+          },
+          {
+            "id": "b",
+            "label": "Start a bigger job so more work finishes before the deadline"
+          },
+          {
+            "id": "c",
+            "label": "Stop taking jobs, checkpoint or return the current one, and exit"
+          },
+          {
+            "id": "d",
+            "label": "Ask the provider to extend the notice by another two minutes"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "The notice is the only warning before the instance is reclaimed. Providers do not migrate your job or extend the notice, and starting new work raises the amount that will be lost."
+      },
+      {
+        "id": "t584-a6",
+        "concept": "spot-capacity",
+        "type": "tradeoff",
+        "prompt": "A team runs CI builds: about 300 jobs a day, each under 20 minutes, all safe to retry.",
+        "constraints": [
+          "Jobs can be retried",
+          "Load swings through the day",
+          "Cost matters more than a rare delay"
+        ],
+        "approaches": [
+          {
+            "id": "p3",
+            "label": "A fleet of committed instances sized for the busiest hour",
+            "description": "Committed fleet"
+          },
+          {
+            "id": "p1",
+            "label": "Spot runners across several types, with on-demand as a fallback",
+            "description": "Spot with fallback"
+          },
+          {
+            "id": "p2",
+            "label": "On-demand runners only, started per job",
+            "description": "On-demand only"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "An interrupted job is retried and costs a few minutes"
+          },
+          {
+            "id": "r4",
+            "label": "Committed capacity is cheapest even when idle at night"
+          },
+          {
+            "id": "r2",
+            "label": "Several instance types make it unlikely all pools run dry"
+          },
+          {
+            "id": "r3",
+            "label": "Spot capacity cannot be used for CI work"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r4": "A commitment sized for the busiest hour is paid for all night while it sits idle.",
+          "r3": "Short, retryable jobs are one of the best fits for spot."
+        },
+        "explanation": "Retryable, bursty work suits spot; spreading across pools and keeping an on-demand fallback limits the damage of a reclaim."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t584-f1",
+        "front": "What to commit to?",
+        "back": "The floor of load that runs for the whole term, not the peak."
+      },
+      {
+        "id": "t584-f2",
+        "front": "Spot interruption notice?",
+        "back": "About 2 minutes on AWS, about 30 seconds on Google Cloud: checkpoint and exit."
+      },
+      {
+        "id": "t584-f3",
+        "front": "Hidden network charges?",
+        "back": "Internet egress, cross-region and cross-zone transfer, NAT and load balancer processing per GB."
+      }
+    ],
+    "sources": [
+      {
+        "title": "AWS EC2: Spot Instance interruptions",
+        "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-interruptions.html"
+      },
+      {
+        "title": "Google Cloud: Spot VMs",
+        "url": "https://cloud.google.com/compute/docs/instances/spot"
+      },
+      {
+        "title": "AWS Well-Architected: Cost Optimization Pillar",
+        "url": "https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html"
+      },
+      {
+        "title": "Microsoft Learn: Cost Optimization in the Well-Architected Framework",
+        "url": "https://learn.microsoft.com/en-us/azure/well-architected/cost-optimization/"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "pricing-models",
+        "spot-capacity",
+        "data-transfer-cost"
+      ],
+      "mechanism": {
+        "title": "Where a cloud bill comes from and how to shape it",
+        "steps": [
+          "Compute is usually the largest line. On-demand pricing is the flexible default: no promise, billed per second or hour. Commitments lower the rate in exchange for paying for a fixed amount of usage for one or three years, whether or not you use it. They are the right tool for the steady floor of load, and the wrong one for peaks that last a few hours.",
+          "Spot or preemptible capacity is the provider’s spare capacity at a large discount. The provider can reclaim it when it needs the capacity back, with a short notice delivered through the instance metadata or an event. Prices and availability differ per instance type and zone, so fleets that accept several types and zones are interrupted less often than fleets that insist on one.",
+          "Workloads earn spot discounts by tolerating loss. Stateless web servers behind a load balancer drain on notice. Queue workers checkpoint progress so another worker resumes the job. Batch and CI jobs are retried. A sensible fleet keeps the must-run baseline on committed or on-demand capacity and puts the elastic, interruptible part on spot.",
+          "Data transfer is the quiet second bill. Traffic into the cloud is usually free, but traffic to the internet, between regions and often between zones is charged per GB, and managed NAT gateways and load balancers can add processing charges. Architecture decides it: a service that reads a cache in another zone on every request, or that sends logs out through a NAT gateway, pays for every byte. Zone-aware routing, compression, private endpoints for provider services and a CDN for public downloads cut it down.",
+          "Cost work needs visibility first. Tag or label resources by team and service, review a cost report each month next to usage metrics, and look for idle resources, oversized instances, unattached disks and old snapshots. Treat cost like latency: a number with an owner, a budget and alerts, reviewed before launches rather than discovered on an invoice."
+        ]
+      },
+      "useWhen": [
+        "Any production account with steady baseline load and daily or weekly peaks.",
+        "Batch, CI and stateless fleets that can survive an instance disappearing."
+      ],
+      "avoidWhen": [
+        "Avoid spot for single stateful nodes such as a lone database primary.",
+        "Avoid long commitments for a service whose size or architecture is about to change."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Model",
+          "Price",
+          "Risk"
+        ],
+        "rows": [
+          [
+            "On-demand",
+            "Highest per hour",
+            "None beyond the price"
+          ],
+          [
+            "Commitment",
+            "Lower, paid even when idle",
+            "Paying for unused capacity"
+          ],
+          [
+            "Spot",
+            "Lowest",
+            "Reclaimed at short notice"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Blending pricing models for one service",
+        "assumptions": [
+          "Illustrative prices: on-demand 1.00, committed 0.60, spot 0.30 per instance-hour",
+          "20 instances all day, 50 for 6 hours"
+        ],
+        "steps": [
+          "Usage: baseline 20 × 24 = 480 instance-hours; burst 30 × 6 = 180; total 660.",
+          "All on-demand: 660 × 1.00 = 660 a day.",
+          "Commit to the baseline: 480 × 0.60 = 288, plus burst on-demand 180 = 468.",
+          "Commit to the baseline and burst on spot: 180 × 0.30 = 54 for the burst, so 288 + 54 = 342, about 48% below 660."
+        ],
+        "result": "Commit to the floor and put interruptible burst on spot; committing to the peak would pay for 30 idle machines 18 hours a day."
+      },
+      "india": {
+        "title": "Published interruption behaviour",
+        "label": "Official documentation",
+        "body": "The AWS EC2 documentation says Spot Instances receive an interruption notice two minutes before they are stopped or terminated, delivered through instance metadata and events. Google Cloud’s Spot VM documentation describes preemption with a notice of about 30 seconds and recommends designing workloads to be fault-tolerant. Both providers’ cost optimisation guidance recommends matching pricing models to usage patterns."
+      },
+      "pitfalls": [
+        {
+          "trap": "“We’ll buy a three-year commitment for our peak to get the best discount.”",
+          "say": "“I’d commit only to the floor that runs all day and cover peaks with on-demand or spot.”"
+        },
+        {
+          "trap": "“Network is free inside the cloud.”",
+          "say": "“Cross-zone and cross-region traffic is billed per GB, so I’d keep chatty calls inside one zone.”"
+        }
+      ],
+      "takeaways": [
+        "Commit to the steady floor, not to a short-lived peak.",
+        "Spot suits work that can checkpoint, drain or retry.",
+        "Spread spot over several instance types and zones.",
+        "Cross-zone, cross-region and internet transfer are billed per GB; design the traffic path with that in mind."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The bill after going multi-zone",
+      "prompt": "A team spreads its services over three zones. The compute bill rises by the expected 10%, but the total bill rises by 40%. Each request now crosses zones twice on average, between the service and its cache.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Cross-zone data transfer: every request now pays for bytes crossing zones",
+          "feedback": "Right: zone redundancy is worth keeping, but chatty calls between zones are billed per GB."
+        },
+        {
+          "id": "b",
+          "label": "Zone storage: each zone keeps its own copy of the disks",
+          "feedback": "Possible in some designs, but this one sends every request across zones."
+        },
+        {
+          "id": "c",
+          "label": "Load balancer hours: there is now one load balancer per zone",
+          "feedback": "A load balancer spans zones; its hourly charge does not jump like this."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Keep three zones, but route each instance to a cache replica in its own zone so requests stay inside one zone."
+    },
+    "seeAlso": [
+      {
+        "topicId": 328,
+        "why": "Autoscaling decides how much on-demand or spot capacity runs at each hour"
+      },
+      {
+        "topicId": 329,
+        "why": "Where NAT gateways and subnets add transfer charges"
+      },
+      {
+        "topicId": 581,
+        "why": "Zone redundancy is what creates cross-zone traffic in the first place"
+      }
+    ]
+  },
+  {
+    "id": 585,
+    "slug": "gitops-reconciliation",
+    "region": "f7-cloud",
+    "order": 25,
+    "title": "GitOps: Pull-Based Delivery and Reconciliation",
+    "kind": "lesson",
+    "objectives": [
+      "Describe Git as the declared desired state and an in-cluster agent as the deployer",
+      "Explain how continuous reconciliation detects and reverts drift",
+      "Promote changes between environments and roll back safely, including data"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [
+      322,
+      323,
+      325
+    ],
+    "cards": [
+      {
+        "id": "t585-c1",
+        "kind": "text",
+        "title": "Git holds the desired state",
+        "body": "In GitOps the declared configuration of each environment, such as deployments, services and policies, lives in a Git repository. Changes arrive as reviewed pull requests, so the history of production is the history of the repository. An agent running next to the system reads that repository and makes the live state match it, again and again, instead of a pipeline running commands once.",
+        "teaches": [
+          "gitops-model"
+        ]
+      },
+      {
+        "id": "t585-c2",
+        "kind": "diagram",
+        "title": "The reconcile loop",
+        "body": "The agent compares two states on every cycle, not just when someone merges.",
+        "teaches": [
+          "reconciliation"
+        ],
+        "steps": [
+          "A pull request changes the image tag in the config repository and is merged",
+          "The agent notices the new commit, by polling or through a webhook",
+          "It renders the manifests and compares them with the live state",
+          "It applies only the differences and waits for the workloads to become healthy",
+          "It reports whether each app is in sync, then repeats the comparison on an interval"
+        ]
+      },
+      {
+        "id": "t585-c3",
+        "kind": "text",
+        "title": "Push vs pull: where the credentials live",
+        "body": "In a push pipeline, CI holds credentials for every cluster and runs the deploy commands, so a compromised CI system can change production. In a pull setup, CI only builds images and updates the config repository; the agent inside each cluster holds the cluster credentials and pulls. The cluster never has to accept inbound connections from CI.",
+        "teaches": [
+          "gitops-model"
+        ]
+      },
+      {
+        "id": "t585-c4",
+        "kind": "text",
+        "title": "Worked example: a hand-made hotfix disappears",
+        "body": "During an incident an engineer scales a deployment from 10 to 20 replicas by hand. A few minutes later it is back at 10: the agent saw that the live state had drifted from Git and reverted it. The fix is to make the change as a commit, or to pause self-heal for that app during the incident and record why. Drift reports also reveal hand-made changes that nobody wrote down.",
+        "teaches": [
+          "drift"
+        ]
+      },
+      {
+        "id": "t585-c5",
+        "kind": "text",
+        "title": "Trap: a git revert is a full rollback",
+        "body": "Reverting a commit restores the old manifests and the old image, but not the database. If the release ran a migration that dropped a column, the old code may fail against the new schema. Keep migrations backwards-compatible: add first, switch the code, drop later. That way a manifest revert really is safe.",
+        "teaches": [
+          "gitops-rollback"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t585-a1",
+        "concept": "gitops-model",
+        "type": "multiple_choice",
+        "prompt": "In a pull-based GitOps setup, which component needs credentials that can change the production cluster?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The CI pipeline that builds and tests the images"
+          },
+          {
+            "id": "b",
+            "label": "The agent running inside the production cluster"
+          },
+          {
+            "id": "c",
+            "label": "Every developer who can merge to the config repository"
+          },
+          {
+            "id": "d",
+            "label": "The container registry that stores the built images"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Only the in-cluster agent applies changes. CI writes images and commits, developers change Git through reviewed merges, and the registry only stores images."
+      },
+      {
+        "id": "t585-a2",
+        "concept": "drift",
+        "type": "multiple_choice",
+        "prompt": "An engineer edits a live deployment by hand while self-heal is on. What happens?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The edit stays until someone commits a matching change"
+          },
+          {
+            "id": "b",
+            "label": "The agent commits the hand-made change back into Git"
+          },
+          {
+            "id": "c",
+            "label": "The cluster rejects the edit because Git owns the object"
+          },
+          {
+            "id": "d",
+            "label": "The agent reverts it to the Git version on its next sync"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "With self-heal, live state that differs from Git is drift and is put back. Agents do not write manual edits into Git, and the cluster API itself accepts the edit; the agent undoes it afterwards."
+      },
+      {
+        "id": "t585-a3",
+        "concept": "reconciliation",
+        "type": "multiple_choice",
+        "prompt": "Git has not changed for a week, yet the agent keeps comparing live state with Git every few minutes. Why?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "To find and correct drift from changes made outside Git"
+          },
+          {
+            "id": "b",
+            "label": "To rebuild container images from the newest source code"
+          },
+          {
+            "id": "c",
+            "label": "To renew the certificates that the cluster nodes use"
+          },
+          {
+            "id": "d",
+            "label": "To stop its connection to the repository timing out"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Reconciliation runs on an interval so hand edits, deleted objects and failed applies are noticed. Building images is CI’s job, certificate renewal is separate, and keeping a connection alive needs no full comparison."
+      },
+      {
+        "id": "t585-a4",
+        "concept": "gitops-rollback",
+        "type": "multiple_choice",
+        "prompt": "A release ran a migration that dropped a column. You git-revert the release commit. What is still broken?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Nothing, because the revert restores the earlier state of the whole system"
+          },
+          {
+            "id": "b",
+            "label": "The schema: the old code expects a column that the revert did not restore"
+          },
+          {
+            "id": "c",
+            "label": "The image tag, because Git cannot revert changes to tags"
+          },
+          {
+            "id": "d",
+            "label": "The agent, which stops syncing after a revert commit"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Git versions the manifests, not the data. Image tags in manifests revert normally, and agents sync revert commits like any other commit."
+      },
+      {
+        "id": "t585-a5",
+        "concept": "reconciliation",
+        "type": "drag_order",
+        "prompt": "Order one GitOps reconcile cycle after a merge.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Compare the rendered manifests with live state"
+          },
+          {
+            "id": "s5",
+            "label": "Report sync and health status"
+          },
+          {
+            "id": "s1",
+            "label": "Merge the change to the config repository"
+          },
+          {
+            "id": "s4",
+            "label": "Apply only the differences"
+          },
+          {
+            "id": "s2",
+            "label": "The agent sees the new commit"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Commit, detect, diff, apply, report, and then the loop starts again."
+      },
+      {
+        "id": "t585-a6",
+        "concept": "gitops-model",
+        "type": "tradeoff",
+        "prompt": "A team must deploy the same app to five clusters, staging first and then production.",
+        "constraints": [
+          "Production changes need review",
+          "Security wants no cluster credentials in CI",
+          "Every change must be auditable"
+        ],
+        "approaches": [
+          {
+            "id": "p2",
+            "label": "CI runs the deploy commands against each cluster with stored admin credentials",
+            "description": "Push from CI"
+          },
+          {
+            "id": "p3",
+            "label": "An engineer applies the manifests from a laptop after testing",
+            "description": "Manual apply"
+          },
+          {
+            "id": "p1",
+            "label": "A folder per environment in Git; promotion is a reviewed PR; an agent in each cluster pulls",
+            "description": "GitOps promotion"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "Cluster credentials stay inside the clusters"
+          },
+          {
+            "id": "r3",
+            "label": "CI credentials are safe because the CI system is private"
+          },
+          {
+            "id": "r2",
+            "label": "Every production change is a reviewed commit with history"
+          },
+          {
+            "id": "r4",
+            "label": "A laptop apply is the easiest way to audit who changed what"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "Private CI systems still get compromised, and then they hold the keys to every cluster.",
+          "r4": "Laptop applies leave no reviewed record and depend on one person’s local setup."
+        },
+        "explanation": "Pull-based promotion keeps credentials in the clusters and makes the repository the audit log."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t585-f1",
+        "front": "GitOps in one line?",
+        "back": "Git holds the desired state; an agent in the cluster pulls it and reconciles continuously."
+      },
+      {
+        "id": "t585-f2",
+        "front": "What is drift?",
+        "back": "Live state that differs from Git, for example a hand-made edit; self-heal reverts it."
+      },
+      {
+        "id": "t585-f3",
+        "front": "Why is a revert not a full rollback?",
+        "back": "Git restores manifests, not data; schema changes must be backwards-compatible."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Microsoft Learn: GitOps for Azure Kubernetes Service",
+        "url": "https://learn.microsoft.com/en-us/azure/architecture/example-scenario/gitops-aks/gitops-blueprint-aks"
+      },
+      {
+        "title": "Google Cloud: Config Sync overview",
+        "url": "https://cloud.google.com/kubernetes-engine/enterprise/config-sync/docs/overview"
+      },
+      {
+        "title": "AWS Prescriptive Guidance: GitOps tools for Amazon EKS",
+        "url": "https://docs.aws.amazon.com/prescriptive-guidance/latest/eks-gitops-tools/introduction.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "gitops-model",
+        "reconciliation",
+        "drift",
+        "gitops-rollback"
+      ],
+      "mechanism": {
+        "title": "How a GitOps agent keeps clusters in line with Git",
+        "steps": [
+          "GitOps rests on four ideas: the desired state is declarative, it is versioned and immutable in Git, an agent pulls it automatically, and the agent reconciles continuously. The repository becomes the single place to read what should be running, and its commit history doubles as the deployment log, with author, reviewer and time for every change.",
+          "The agent runs in or next to each cluster. On each cycle it fetches the repository, renders templates or overlays into plain manifests, and asks the cluster for the live objects. It computes the difference, applies only what changed, waits for health checks, and records the result as in sync, out of sync or degraded. Webhooks make it react quickly to merges; the interval loop catches everything else.",
+          "Drift is any difference that did not come from Git: a hand-scaled deployment, a deleted service, a config edited during an incident. With self-heal on, the agent puts it back; with self-heal off, it reports the drift and waits. Either way the team learns about changes that would otherwise surprise the next deploy. Fields that a controller owns, such as replica counts set by an autoscaler, should be excluded so the agent and the autoscaler do not fight.",
+          "Promotion between environments is a change to Git. Common layouts keep a folder or overlay per environment and promote by updating the image digest in the next folder through a pull request, often opened by CI after tests pass. Long-lived branches per environment tend to drift apart and make merges painful. Secrets do not go into the repository in plain text; store references to a secret manager or encrypted values that only the cluster can decrypt.",
+          "Rollback is a revert commit, which the agent applies like any change. That covers code and configuration but not data. Database migrations should follow expand and contract: add new columns or tables, deploy code that uses them, and remove old ones only in a later release. Then any single release can be reverted without breaking the schema it runs against."
+        ]
+      },
+      "useWhen": [
+        "Teams running several clusters or environments that need audited, reviewed changes.",
+        "Platforms that want deploy credentials kept out of CI."
+      ],
+      "avoidWhen": [
+        "Avoid for one small service where a simple pipeline is enough and adds less machinery.",
+        "Avoid managing fast-changing runtime values, such as autoscaled replica counts, in Git."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Approach",
+          "Credentials",
+          "Drift handling"
+        ],
+        "rows": [
+          [
+            "Push from CI",
+            "CI holds cluster credentials",
+            "None between deploys"
+          ],
+          [
+            "GitOps, self-heal on",
+            "Agent in the cluster",
+            "Reverted by the agent"
+          ],
+          [
+            "GitOps, self-heal off",
+            "Agent in the cluster",
+            "Reported, fixed by a commit"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How long drift survives",
+        "assumptions": [
+          "Reconcile interval of 3 minutes",
+          "Self-heal on",
+          "A hand edit made at a random moment",
+          "Illustrative interval; tools let you choose it"
+        ],
+        "steps": [
+          "The edit lands somewhere inside a 3-minute interval, on average halfway through.",
+          "Average time until the next comparison: 3 ÷ 2 = 1.5 minutes; worst case 3 minutes.",
+          "After that cycle the edit is reverted, so manual changes last minutes at most."
+        ],
+        "result": "With a short interval and self-heal on, live state cannot stay different from Git for long, which is why incident changes must go through Git or a deliberate pause."
+      },
+      "india": {
+        "title": "Cloud providers’ GitOps guidance",
+        "label": "Official documentation",
+        "body": "Microsoft’s architecture guide for GitOps on Azure Kubernetes Service describes a pull-based setup where an in-cluster operator reconciles cluster state with a Git repository. Google Cloud’s Config Sync overview describes syncing clusters from a Git repository and detecting and correcting drift, and AWS prescriptive guidance compares GitOps tools for Amazon EKS. All three treat Git as the source of truth and the agent as the deployer."
+      },
+      "pitfalls": [
+        {
+          "trap": "“GitOps means we run deploy commands from a Git hook.”",
+          "say": "“GitOps means an agent in the cluster pulls the declared state from Git and keeps reconciling it.”"
+        },
+        {
+          "trap": "“If a release goes wrong we just revert the commit.”",
+          "say": "“Reverting restores manifests; I’d keep migrations expand-and-contract so the revert also works against the schema.”"
+        }
+      ],
+      "takeaways": [
+        "Git holds the desired state; an in-cluster agent pulls and applies it.",
+        "Reconciliation runs on an interval, so drift is found and reverted.",
+        "Promotion is a reviewed commit per environment, with credentials kept in the clusters.",
+        "A revert restores manifests, not data; keep schema changes backwards-compatible."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The agent goes down",
+      "prompt": "The GitOps agent in a production cluster crashes and stays down for an hour. During that hour two pull requests are merged into the config repository.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Running apps keep serving; the two merges are not deployed until the agent is back",
+          "feedback": "Right: the agent only applies changes. The workloads it deployed keep running without it."
+        },
+        {
+          "id": "b",
+          "label": "Every app in the cluster stops, because nothing is reconciling it",
+          "feedback": "Workloads are run by the cluster itself; the agent only changes what should run."
+        },
+        {
+          "id": "c",
+          "label": "CI notices the agent is down and pushes the merges directly",
+          "feedback": "In a pull setup CI has no cluster credentials, so it cannot push."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Alert on the agent’s health and on apps that stay out of sync, so a stuck agent is noticed before someone wonders why a fix never shipped."
+    },
+    "seeAlso": [
+      {
+        "topicId": 323,
+        "why": "The build-once pipeline that produces the images GitOps deploys"
+      },
+      {
+        "topicId": 325,
+        "why": "Declarative infrastructure, the same idea applied to cloud resources"
+      },
+      {
+        "topicId": 324,
+        "why": "Canary rollouts that a GitOps agent can drive step by step"
+      }
+    ]
+  },
+  {
+    "id": 586,
+    "slug": "chaos-engineering-game-days",
+    "region": "f7-cloud",
+    "order": 29,
+    "title": "Chaos Engineering and Game Days",
+    "kind": "lesson",
+    "objectives": [
+      "Write a chaos experiment as a steady-state hypothesis with a measured result",
+      "Limit blast radius and define abort conditions before injecting a fault",
+      "Run a game day that tests people, runbooks and access as well as systems"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 13,
+    "prereqIds": [
+      326,
+      327
+    ],
+    "cards": [
+      {
+        "id": "t586-c1",
+        "kind": "text",
+        "title": "An experiment, not random breakage",
+        "body": "Chaos engineering is running controlled experiments to learn how a system behaves under failure. Pick a steady state you can measure, such as checkout success rate and p99 latency. State a hypothesis that it holds when a fault happens. Inject the fault into a small, controlled part of the system, compare it with a control group, and either gain confidence or find a weakness to fix.",
+        "teaches": [
+          "steady-state-hypothesis"
+        ]
+      },
+      {
+        "id": "t586-c2",
+        "kind": "diagram",
+        "title": "Running one experiment",
+        "body": "Safety checks come before the fault, not after.",
+        "teaches": [
+          "steady-state-hypothesis",
+          "abort-conditions"
+        ],
+        "steps": [
+          "Define steady state with metrics that users feel",
+          "Write the hypothesis and the abort conditions",
+          "Limit the scope: one zone, a small share of traffic, a fixed time",
+          "Inject the fault and watch the steady-state metrics",
+          "Stop at once if an abort condition fires; otherwise end on schedule",
+          "Record what was learned and file the fixes"
+        ]
+      },
+      {
+        "id": "t586-c3",
+        "kind": "text",
+        "title": "Worked example: losing a cache node",
+        "body": "Hypothesis: if one of three cache nodes is terminated, checkout success stays at or above 99.9% and p99 below 400 ms. Scope: one zone, 5% of traffic, 15 minutes. Abort: success below 99.5% for 2 minutes. Result (illustrative): success held, but p99 rose to 2 s because clients had no timeout on cache calls and waited on the dead node. The fix was a 50 ms cache timeout with a fallback to the database.",
+        "teaches": [
+          "blast-radius",
+          "abort-conditions"
+        ]
+      },
+      {
+        "id": "t586-c4",
+        "kind": "text",
+        "title": "Game days rehearse the people too",
+        "body": "A game day is a scheduled exercise where a team practises a realistic failure together: a zone loss, an expired certificate, a bad deploy. Beyond the system’s behaviour it tests whether alerts fire and reach the right person, whether dashboards answer the questions asked, whether the runbook still matches reality, and whether on-call has the access the runbook assumes. Observers write findings down as they happen.",
+        "teaches": [
+          "game-days"
+        ]
+      },
+      {
+        "id": "t586-c5",
+        "kind": "text",
+        "title": "Trap: starting with production and the whole fleet",
+        "body": "An experiment with no scope limit and no stop button is an outage you chose to cause. Start in a test environment, then move to production with a small blast radius once monitoring and an abort switch are proven. Widen the scope step by step, and avoid peak hours and active incidents.",
+        "teaches": [
+          "blast-radius"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t586-a1",
+        "concept": "steady-state-hypothesis",
+        "type": "multiple_choice",
+        "prompt": "Which is a well-formed chaos hypothesis?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Killing a cache node in production will show us which parts break"
+          },
+          {
+            "id": "b",
+            "label": "With one of three cache nodes gone, checkout success stays at 99.9% or more"
+          },
+          {
+            "id": "c",
+            "label": "The system will keep working through any failure we can think of"
+          },
+          {
+            "id": "d",
+            "label": "Terminating random servers every hour will make the whole team more careful"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "A hypothesis names a fault and a measurable steady state that should hold. “Show us what breaks” has no success criterion, “any failure” cannot be tested, and team behaviour is not a hypothesis about the system."
+      },
+      {
+        "id": "t586-a2",
+        "concept": "abort-conditions",
+        "type": "multiple_choice",
+        "prompt": "During an experiment the error rate crosses the agreed abort threshold. What should happen?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Keep going to gather more data, and roll back when the window ends"
+          },
+          {
+            "id": "b",
+            "label": "Widen the blast radius to confirm that the result is real"
+          },
+          {
+            "id": "c",
+            "label": "Stop injecting the fault, restore normal service, then analyse"
+          },
+          {
+            "id": "d",
+            "label": "Raise the threshold a little so the experiment can finish"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Abort conditions exist to protect users; when one fires, stop and recover first. Continuing, widening or moving the threshold turns an experiment into an incident."
+      },
+      {
+        "id": "t586-a3",
+        "concept": "blast-radius",
+        "type": "multiple_choice",
+        "prompt": "What is a sensible first production experiment for a new chaos programme?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Add 200 ms of latency to one dependency for 1% of traffic, with an abort switch"
+          },
+          {
+            "id": "b",
+            "label": "Shut down a whole region during peak hours to test failover end to end"
+          },
+          {
+            "id": "c",
+            "label": "Terminate half of the database replicas at once to test the quorum"
+          },
+          {
+            "id": "d",
+            "label": "Inject faults into every service at once to find all the weak spots together"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Start small, reversible and observable. A region shutdown at peak or half the replicas at once risks a real outage, and faults everywhere at once make it impossible to tell which fault caused what."
+      },
+      {
+        "id": "t586-a4",
+        "concept": "game-days",
+        "type": "multiple_choice",
+        "prompt": "Which finding is a game day better at surfacing than an automated fault-injection run?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "p99 latency rises when a dependency slows down"
+          },
+          {
+            "id": "b",
+            "label": "A retry loop multiplies load during an outage"
+          },
+          {
+            "id": "c",
+            "label": "A health check misses a hung process"
+          },
+          {
+            "id": "d",
+            "label": "A runbook step needs access nobody on call has"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "Missing access is about people and process, which only shows up when humans run the response. The other three are system behaviours that automated experiments measure well."
+      },
+      {
+        "id": "t586-a5",
+        "concept": "steady-state-hypothesis",
+        "type": "drag_order",
+        "prompt": "Order the steps of a chaos experiment.",
+        "items": [
+          {
+            "id": "s2",
+            "label": "Write the hypothesis and abort conditions"
+          },
+          {
+            "id": "s4",
+            "label": "Inject the fault and observe"
+          },
+          {
+            "id": "s1",
+            "label": "Define the steady-state metrics"
+          },
+          {
+            "id": "s5",
+            "label": "Record findings and file fixes"
+          },
+          {
+            "id": "s3",
+            "label": "Limit the scope and schedule it"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Measure normal first, decide what success and failure look like, limit the risk, then inject and learn."
+      },
+      {
+        "id": "t586-a6",
+        "concept": "blast-radius",
+        "type": "estimation",
+        "prompt": "A service handles 5,000 requests per second. An experiment affects 2% of traffic for 10 minutes. If every affected request failed, how many failures is that at most?",
+        "unit": "requests",
+        "target": 60000,
+        "assumptions": [
+          "Traffic is steady",
+          "Worst case: every affected request fails"
+        ],
+        "formula": "5,000 × 0.02 × 600 s",
+        "workedAnswer": "100 per second × 600 s = 60,000 requests",
+        "explanation": "Sanity check: against the 3,000,000 requests in those 10 minutes that is 2%, which is why scope and an abort rule should be agreed with the error budget in mind.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          3000000,
+          6000
+        ]
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t586-f1",
+        "front": "Chaos experiment parts?",
+        "back": "Steady state, hypothesis, scoped fault, abort conditions, findings."
+      },
+      {
+        "id": "t586-f2",
+        "front": "Blast radius?",
+        "back": "How much traffic, how many hosts and how long an experiment can affect."
+      },
+      {
+        "id": "t586-f3",
+        "front": "What does a game day test beyond the system?",
+        "back": "Alerts, paging, dashboards, runbooks and on-call access."
+      }
+    ],
+    "sources": [
+      {
+        "title": "AWS Fault Injection Service: What is it?",
+        "url": "https://docs.aws.amazon.com/fis/latest/userguide/what-is.html"
+      },
+      {
+        "title": "Microsoft Learn: What is Azure Chaos Studio?",
+        "url": "https://learn.microsoft.com/en-us/azure/chaos-studio/chaos-studio-overview"
+      },
+      {
+        "title": "AWS Well-Architected: Test reliability",
+        "url": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/test-reliability.html"
+      },
+      {
+        "title": "Google SRE book: Testing for Reliability",
+        "url": "https://sre.google/sre-book/testing-reliability/"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "steady-state-hypothesis",
+        "blast-radius",
+        "abort-conditions",
+        "game-days"
+      ],
+      "mechanism": {
+        "title": "How a safe chaos programme works",
+        "steps": [
+          "Start from steady state: a small set of metrics that describe the system working for users, such as request success rate, p99 latency and orders per minute. Internal signals like CPU are useful context but are not the hypothesis, because users do not feel CPU. If you cannot measure steady state reliably, you are not ready to inject faults.",
+          "Write the hypothesis before the experiment: under this fault, these metrics stay within these bounds. Faults come from real incidents and known risks: an instance or zone lost, a dependency slowed or returning errors, a full disk, clock skew, a certificate expiring, a DNS failure. Running the experiment against a control group, the same traffic without the fault, separates the fault’s effect from normal noise.",
+          "Blast radius is the share of traffic, hosts and time that can be affected. Start with a test environment, then a small slice of production: one zone, one percent of requests, fifteen minutes. Define abort conditions, usually the same steady-state metrics with a hard limit, and wire them to stop the fault without waiting for a human. Managed fault-injection services support stop conditions tied to alarms for this reason.",
+          "Most experiments find something: a missing timeout, a retry storm, an alert that never fired, a fallback that was never deployed. Each finding becomes a tracked fix, and the experiment is rerun after the fix to confirm it. Over time, passing experiments move into regular scheduled runs so regressions are caught, much like tests in a pipeline.",
+          "Game days add people to the experiment. A facilitator runs a realistic scenario while the on-call team responds with their normal tools. Observers note where alerts were late, dashboards were missing, runbooks were wrong or access was missing. The result is a list of fixes to systems and processes, and a team that has practised the response before a real incident demands it."
+        ]
+      },
+      "useWhen": [
+        "Services with SLOs, monitoring and on-call, where unknown failure behaviour is the main risk.",
+        "Before launches, migrations and region or zone changes."
+      ],
+      "avoidWhen": [
+        "Avoid while steady state cannot be measured or there is no reliable way to stop the fault.",
+        "Avoid during active incidents, change freezes or peak events."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Exercise",
+          "Finds",
+          "Cost"
+        ],
+        "rows": [
+          [
+            "Automated fault injection",
+            "System behaviour under one fault",
+            "Low once set up"
+          ],
+          [
+            "Game day",
+            "People, runbooks, access and alerts",
+            "A team’s afternoon"
+          ],
+          [
+            "Production incident",
+            "Everything, at the worst moment",
+            "Users and trust"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Fitting an experiment inside the error budget",
+        "assumptions": [
+          "99.9% SLO over 30 days on 5,000 requests per second",
+          "Experiment: 2% of traffic for 10 minutes",
+          "Worst case: every affected request fails"
+        ],
+        "steps": [
+          "Monthly requests: 5,000 × 2,592,000 ≈ 13 billion; error budget 0.1% ≈ 13 million.",
+          "Worst-case experiment cost: 5,000 × 0.02 = 100 affected requests per second, and 100 × 600 s = 60,000 failed requests.",
+          "60,000 ÷ 13,000,000 ≈ 0.5% of the monthly budget, even if everything goes wrong."
+        ],
+        "result": "A tightly scoped experiment with an abort rule risks a sliver of the error budget, far less than finding the same weakness in a real incident."
+      },
+      "india": {
+        "title": "Chaos at Netflix and in managed services",
+        "label": "Publicly reported",
+        "body": "Netflix publicly described Chaos Monkey, a tool that randomly terminated production instances during business hours so engineers built services that survive instance loss, and later open-sourced it. Cloud providers now offer managed fault injection: AWS Fault Injection Service and Azure Chaos Studio both let teams define experiments with targets, actions and stop conditions tied to alarms, so an experiment halts when a metric crosses a limit."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Chaos engineering means breaking production at random.”",
+          "say": "“It is a scoped experiment with a hypothesis and abort conditions, starting small and widening as confidence grows.”"
+        },
+        {
+          "trap": "“Our failover works; we tested it once two years ago.”",
+          "say": "“I’d run it as a regular game day, because systems, runbooks and people change.”"
+        }
+      ],
+      "takeaways": [
+        "Write a hypothesis about user-facing steady-state metrics.",
+        "Limit blast radius and wire abort conditions before injecting.",
+        "Turn every finding into a tracked fix and rerun the experiment.",
+        "Game days test alerts, runbooks and access, not only the system."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The cache node experiment",
+      "prompt": "You terminate one of three cache nodes for 5% of traffic. The hypothesis was success ≥ 99.9% and p99 < 400 ms. Checkout success stays at 99.95%, but p99 latency jumps from 300 ms to 2 s. No alert fires.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The hypothesis failed on latency, and the missing alert is a second finding",
+          "feedback": "Right: one steady-state metric broke its bound, and nobody would have been paged for it."
+        },
+        {
+          "id": "b",
+          "label": "The experiment passed, because the success rate stayed above 99.9%",
+          "feedback": "The hypothesis covered p99 too; success alone hides a slow, frustrating checkout."
+        },
+        {
+          "id": "c",
+          "label": "The experiment was invalid, because the latency spike came from the experiment",
+          "feedback": "Showing the effect of the fault is the point of the experiment."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Add a short timeout with a fallback on cache calls, add a latency alert for checkout p99, and rerun the same experiment to confirm both fixes."
+    },
+    "seeAlso": [
+      {
+        "topicId": 327,
+        "why": "How the response is run when a real failure happens"
+      },
+      {
+        "topicId": 326,
+        "why": "Error budgets that bound how much risk an experiment may take"
+      },
+      {
+        "topicId": 581,
+        "why": "The zone-loss scenario many game days start with"
+      }
+    ]
+  },
+  {
+    "id": 587,
+    "slug": "load-testing-finding-the-knee",
+    "region": "f7-cloud",
+    "order": 30,
+    "title": "Load Testing: Finding the Knee Before Users Do",
+    "kind": "lesson",
+    "objectives": [
+      "Pick load, stress, soak or spike tests for the question you are asking",
+      "Explain why open-model load generation reveals overload that closed-model tools hide",
+      "Find the throughput knee and turn it into a per-instance capacity target"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 13,
+    "prereqIds": [
+      328,
+      326
+    ],
+    "cards": [
+      {
+        "id": "t587-c1",
+        "kind": "text",
+        "title": "Four questions, four test shapes",
+        "body": "A load test checks the expected peak with some margin. A stress test raises load until something breaks, to find the limit and how it fails. A soak test holds normal load for hours to expose leaks, growing queues and log disks filling up. A spike test jumps load suddenly to check autoscaling, cold caches and connection limits. Pick the shape from the question, not from habit.",
+        "teaches": [
+          "load-test-types"
+        ]
+      },
+      {
+        "id": "t587-c2",
+        "kind": "text",
+        "title": "Open vs closed load models",
+        "body": "A closed model runs a fixed number of virtual users, and each waits for its response before sending the next request. When the server slows down, the users send less, so the test quietly reduces the load it is meant to apply. An open model sends requests at a fixed arrival rate whatever happens, like real users on the internet, so overload shows up as growing queues and latency.",
+        "teaches": [
+          "open-closed-load"
+        ]
+      },
+      {
+        "id": "t587-c3",
+        "kind": "diagram",
+        "title": "Finding the knee",
+        "body": "Step the arrival rate and watch where throughput stops following it.",
+        "teaches": [
+          "latency-knee"
+        ],
+        "steps": [
+          "Ramp the arrival rate in steps against one instance or a small fleet",
+          "Hold each step long enough for latency and queues to settle",
+          "Record throughput, error rate and p50 and p99 latency at each step",
+          "Throughput follows the offered load, then flattens at the knee",
+          "Past the knee, p99 shoots up and errors start as queues grow",
+          "Set the planning target well below the knee"
+        ]
+      },
+      {
+        "id": "t587-c4",
+        "kind": "text",
+        "title": "Worked example: a knee at 1,100 requests per second",
+        "body": "Illustrative results for one instance: p99 is 120 ms up to 800 requests per second, 250 ms at 1,000, and 2 s at 1,100, where throughput stops rising. Plan for 750 to 800 per instance, not 1,100, so normal noise and a slow dependency do not push it over. For a 6,000 requests per second peak at 750 each, that is 8 instances, plus spares for losing an instance or a zone.",
+        "teaches": [
+          "latency-knee"
+        ]
+      },
+      {
+        "id": "t587-c5",
+        "kind": "text",
+        "title": "Trap: a closed-loop tool hides the stall",
+        "body": "If the server freezes for 5 seconds, a closed-loop tool records one slow response per virtual user and then carries on. The thousands of requests real users would have sent during the freeze are never sent, so they are missing from the percentiles. This is called coordinated omission. Use open-model generators, or measure latency from when each request was scheduled to go out, not when it was actually sent.",
+        "teaches": [
+          "coordinated-omission"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t587-a1",
+        "concept": "load-test-types",
+        "type": "multiple_choice",
+        "prompt": "Memory climbs slowly and the service crashes after about nine hours of normal traffic. Which test would have caught it?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A spike test"
+          },
+          {
+            "id": "b",
+            "label": "A stress test"
+          },
+          {
+            "id": "c",
+            "label": "A soak test"
+          },
+          {
+            "id": "d",
+            "label": "A smoke test"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Soak tests hold normal load for hours, which is what exposes slow leaks. Spike and stress tests are short and push load up; a smoke test only checks that the basics work."
+      },
+      {
+        "id": "t587-a2",
+        "concept": "open-closed-load",
+        "type": "multiple_choice",
+        "prompt": "Why can a closed-loop load test understate overload?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Its virtual users wait for each response, so a slow server gets fewer requests"
+          },
+          {
+            "id": "b",
+            "label": "It sends requests much faster than real users would"
+          },
+          {
+            "id": "c",
+            "label": "It skips TLS, so each request is cheaper than in production"
+          },
+          {
+            "id": "d",
+            "label": "It reports only the median and drops the slow tail"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Waiting users self-throttle as the server slows. Sending too fast would overstate load, and TLS and reporting depend on how the tool is configured, not on the closed model."
+      },
+      {
+        "id": "t587-a3",
+        "concept": "latency-knee",
+        "type": "multiple_choice",
+        "prompt": "Throughput stops rising at 1,100 requests per second, while p99 jumps from 250 ms to 2 s. What per-instance planning target makes sense?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "1,100 requests per second, the highest rate measured"
+          },
+          {
+            "id": "b",
+            "label": "About 800 requests per second, well below the knee"
+          },
+          {
+            "id": "c",
+            "label": "1,500 requests per second, since autoscaling covers the rest"
+          },
+          {
+            "id": "d",
+            "label": "The average of every rate that was tested"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Plan below the knee so noise and slow dependencies leave headroom. At 1,100 the instance is already saturated, 1,500 is beyond what it can serve at all, and the average of the tested rates says nothing about the system."
+      },
+      {
+        "id": "t587-a4",
+        "concept": "coordinated-omission",
+        "type": "multiple_choice",
+        "prompt": "A service freezes for 5 seconds once, and a closed-loop tool records a single 5 s sample per virtual user. Why does that understate the damage?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The tool rounds long samples down to its configured timeout"
+          },
+          {
+            "id": "b",
+            "label": "Requests real users would have sent during the freeze are missing"
+          },
+          {
+            "id": "c",
+            "label": "A few slow samples among many cannot move any percentile"
+          },
+          {
+            "id": "d",
+            "label": "Freezes are filtered out by the tool as network noise"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "The tool stopped sending while it waited, so the freeze looks like a few slow requests rather than thousands. Rounding and filtering depend on settings, and enough slow samples do move the tail percentiles."
+      },
+      {
+        "id": "t587-a5",
+        "concept": "latency-knee",
+        "type": "estimation",
+        "prompt": "Peak traffic is 6,000 requests per second. Each instance is planned at 750 requests per second, below its knee, and you keep 2 spare instances. How many instances in total?",
+        "unit": "instances",
+        "target": 10,
+        "assumptions": [
+          "Load spreads evenly",
+          "Spares are on top of the peak need"
+        ],
+        "formula": "6,000 ÷ 750 + 2",
+        "workedAnswer": "8 + 2 = 10 instances",
+        "explanation": "Sanity check: sizing at the knee of 1,100 would give 6 instances, which leaves no room for a slow dependency or a lost instance.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          8,
+          6
+        ]
+      },
+      {
+        "id": "t587-a6",
+        "concept": "latency-knee",
+        "type": "drag_order",
+        "prompt": "Order a stepped load test that finds the knee.",
+        "items": [
+          {
+            "id": "s4",
+            "label": "Find where throughput flattens and p99 climbs"
+          },
+          {
+            "id": "s1",
+            "label": "Pick the arrival-rate steps"
+          },
+          {
+            "id": "s5",
+            "label": "Set the planning target below that point"
+          },
+          {
+            "id": "s3",
+            "label": "Record throughput, errors and p99 per step"
+          },
+          {
+            "id": "s2",
+            "label": "Hold each step until latency settles"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Plan, hold, measure, locate the knee, and leave headroom under it."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t587-f1",
+        "front": "Soak vs spike test?",
+        "back": "Soak: normal load for hours, finds leaks. Spike: a sudden jump, tests scaling and limits."
+      },
+      {
+        "id": "t587-f2",
+        "front": "Open vs closed model?",
+        "back": "Open sends at a fixed arrival rate; closed users wait for responses and self-throttle."
+      },
+      {
+        "id": "t587-f3",
+        "front": "Coordinated omission?",
+        "back": "Missing samples during a stall because the tool waited; measure from the scheduled send time."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Google SRE book: Handling Overload",
+        "url": "https://sre.google/sre-book/handling-overload/"
+      },
+      {
+        "title": "Google SRE book: Testing for Reliability",
+        "url": "https://sre.google/sre-book/testing-reliability/"
+      },
+      {
+        "title": "Microsoft Learn: What is Azure Load Testing?",
+        "url": "https://learn.microsoft.com/en-us/azure/load-testing/overview-what-is-azure-load-testing"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "load-test-types",
+        "open-closed-load",
+        "latency-knee",
+        "coordinated-omission"
+      ],
+      "mechanism": {
+        "title": "How to run a load test you can trust",
+        "steps": [
+          "Start from the question. “Can we handle the festival-sale peak?” needs a load test at the forecast peak plus margin. “Where do we break, and how?” needs a stress test. “Do we leak over a day?” needs a soak test. “Do autoscaling, cold caches and connection limits survive a sudden jump?” needs a spike test. Each has a different shape, duration and success criterion.",
+          "Generate load the way users do. Real users arrive independently of how fast your server is, so an open model, a fixed arrival rate, reproduces overload honestly. A closed model with a fixed number of virtual users is useful for modelling a known pool of clients, such as a batch of workers, but it reduces its own load as latency rises and can make a saturated system look healthy.",
+          "Measure at each step after it settles: throughput actually served, error rate, and latency percentiles, especially p99. Throughput tracks offered load until a resource saturates, such as CPU, a thread or connection pool, a database or a lock, and then flattens. That bend is the knee. Past it, queues grow, p99 climbs steeply and timeouts begin. Record which resource saturated, because that is the next thing to fix or scale.",
+          "Measure latency from when each request was meant to be sent. If the generator waits during a stall and sends late, the stall’s full effect is lost: coordinated omission. Check that the load generator itself is not the bottleneck by watching its CPU and network, and run it close enough to the system that its own latency does not dominate. Use production-like data sizes, caches that start cold as they would after a deploy, and realistic request mixes.",
+          "Turn the knee into planning numbers. A per-instance target well below the knee, often 60 to 75% of it, leaves room for noise, slow dependencies and uneven load balancing. Divide the forecast peak by the target, add spares for instance or zone loss, and rerun the test after significant changes, because the knee moves when code, dependencies or instance types change."
+        ]
+      },
+      "useWhen": [
+        "Before launches, big sales or marketing events, and after major architecture changes.",
+        "To set autoscaling thresholds and per-instance capacity targets from evidence."
+      ],
+      "avoidWhen": [
+        "Avoid testing against shared production dependencies without their owners’ agreement.",
+        "Avoid trusting results when the load generator was saturated or the data set was tiny."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Test",
+          "Question",
+          "Shape"
+        ],
+        "rows": [
+          [
+            "Load",
+            "Do we meet the SLO at peak?",
+            "Forecast peak plus margin, 30–60 min"
+          ],
+          [
+            "Stress",
+            "Where and how do we break?",
+            "Rising steps until failure"
+          ],
+          [
+            "Soak",
+            "Do we degrade over time?",
+            "Normal load for hours"
+          ],
+          [
+            "Spike",
+            "Do we survive a sudden jump?",
+            "Low, then a sharp step up"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "From a knee to a fleet size",
+        "assumptions": [
+          "Knee measured at 1,100 requests per second per instance",
+          "Planning target 70% of the knee",
+          "Forecast peak 7,000 requests per second; illustrative numbers"
+        ],
+        "steps": [
+          "Target per instance: 1,100 × 0.7 = 770 requests per second.",
+          "Instances for the peak: 7,000 ÷ 770 ≈ 9.1, round up to 10.",
+          "Survive a zone loss in a three-zone fleet: 10 ÷ 2 = 5 per zone, 15 instances in total."
+        ],
+        "result": "Plan from the knee with headroom, then add the spare that a zone loss needs, the same arithmetic as the zone lesson."
+      },
+      "india": {
+        "title": "Overload guidance from Google SRE",
+        "label": "Official documentation",
+        "body": "The Google SRE book’s chapter on handling overload explains that queries per second is a poor capacity measure when request cost varies, and recommends measuring capacity in terms of the resource that actually limits the service and degrading gracefully past it. Its chapter on testing for reliability covers load and stress testing as part of release confidence. Azure Load Testing documents running scripted tests at scale with server-side metrics."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Our test ran 500 users and latency looked fine.”",
+          "say": "“I’d check whether it was an open model; closed users slow down with the server and hide the overload.”"
+        },
+        {
+          "trap": "“The instance maxed out at 1,100, so we plan for 1,100.”",
+          "say": "“I’d plan around 70–75% of the knee and add spares for losing a zone.”"
+        }
+      ],
+      "takeaways": [
+        "Pick load, stress, soak or spike from the question you need answered.",
+        "Use an open arrival-rate model; closed users self-throttle.",
+        "Find the knee where throughput flattens and p99 climbs; plan well below it.",
+        "Measure latency from the scheduled send time to avoid coordinated omission."
+      ]
+    },
+    "interactive": {
+      "kind": "slider",
+      "title": "Push one instance past its knee",
+      "prompt": "One instance serves at most 1,100 requests per second, and clients give up after 2 s. Slide the offered load of an open-model test and watch the queue after 30 seconds.",
+      "model": "load-shed",
+      "params": {
+        "capacity": 1100,
+        "timeoutS": 2,
+        "seconds": 30
+      },
+      "control": {
+        "label": "Offered load",
+        "min": 600,
+        "max": 1600,
+        "step": 50,
+        "initial": 800,
+        "unit": "req/s"
+      },
+      "takeaway": "Below 1,100 nothing queues. At 1,200 the queue grows by 100 a second, waits pass the 2 s timeout after about 22 s, and the instance ends up working on answers nobody reads. A closed-model test would hide this, because its users would have slowed down."
+    },
+    "seeAlso": [
+      {
+        "topicId": 356,
+        "why": "What a service should do once load passes the knee"
+      },
+      {
+        "topicId": 328,
+        "why": "Autoscaling thresholds come from the knee you measure"
+      },
+      {
+        "topicId": 326,
+        "why": "The SLO decides what “fine” means at each step"
+      }
+    ]
+  },
+  {
+    "id": 588,
+    "slug": "service-mesh-and-sidecars",
+    "region": "f7-cloud",
+    "order": 15,
+    "title": "Service Mesh: Sidecars, mTLS and When It Pays Off",
+    "kind": "lesson",
+    "objectives": [
+      "Describe the data plane and control plane of a service mesh",
+      "Explain how mesh mTLS gives each call a verifiable workload identity",
+      "Spot retry and timeout conflicts between the app and the mesh, and judge when a mesh is worth its cost"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 12,
+    "prereqIds": [
+      322,
+      329
+    ],
+    "cards": [
+      {
+        "id": "t588-c1",
+        "kind": "text",
+        "title": "Networking moved out of the app",
+        "body": "A service mesh puts a proxy in the path of every call between services: a sidecar container next to each workload, or a shared proxy per node. The proxies form the data plane and handle encryption, retries, timeouts, traffic splitting and metrics the same way for every language. A control plane sends them configuration and certificates. Proxies keep using their last configuration if the control plane is briefly unavailable.",
+        "teaches": [
+          "mesh-data-plane"
+        ]
+      },
+      {
+        "id": "t588-c2",
+        "kind": "diagram",
+        "title": "One call through the mesh",
+        "body": "The app sends a plain request; both proxies do the rest.",
+        "teaches": [
+          "mesh-mtls",
+          "mesh-traffic-policy"
+        ],
+        "steps": [
+          "The app calls another service by name over a plain local connection",
+          "Its proxy picks a healthy endpoint and applies the timeout and retry policy",
+          "The proxy opens mutual TLS to the destination proxy with a short-lived workload certificate",
+          "The destination proxy checks the caller’s identity against the authorisation policy",
+          "It forwards the request to the destination app on the local host",
+          "Both proxies emit metrics and trace spans for the call"
+        ]
+      },
+      {
+        "id": "t588-c3",
+        "kind": "text",
+        "title": "Worked example: retries in two layers multiply",
+        "body": "The app retries a failed call twice, and the mesh is also set to retry twice. One user request can now reach the downstream service (1 + 2) × (1 + 2) = 9 times. During an outage that becomes nine times the load on a struggling dependency. Decide which layer owns retries, make the inner layer’s total time fit inside the outer deadline, and cap retries with a budget.",
+        "teaches": [
+          "mesh-traffic-policy"
+        ]
+      },
+      {
+        "id": "t588-c4",
+        "kind": "text",
+        "title": "What mTLS adds over a firewall rule",
+        "body": "A network rule says which addresses may connect. Mesh mTLS says which workload is calling: each proxy holds a certificate naming its service identity, issued and rotated by the control plane, often every few hours. Policies can then allow “orders may call payments” whatever pod addresses either side has, and every connection inside the cluster is encrypted.",
+        "teaches": [
+          "mesh-mtls"
+        ]
+      },
+      {
+        "id": "t588-c5",
+        "kind": "text",
+        "title": "Trap: a mesh for three services",
+        "body": "Every sidecar costs CPU and memory, adds a hop of latency, and the mesh brings its own upgrades and failure modes. For a handful of services in one language, a shared client library and platform-level TLS may do the job. A mesh pays off with many services, several languages, and a requirement for uniform mTLS, traffic control and telemetry.",
+        "teaches": [
+          "mesh-cost"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t588-a1",
+        "concept": "mesh-data-plane",
+        "type": "multiple_choice",
+        "prompt": "In a sidecar mesh, what actually carries a request from one service to another?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The control plane, which forwards each request"
+          },
+          {
+            "id": "b",
+            "label": "The cluster DNS server, which relays the call"
+          },
+          {
+            "id": "c",
+            "label": "The proxies running next to each workload"
+          },
+          {
+            "id": "d",
+            "label": "The ingress gateway at the edge of the cluster"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "The sidecar proxies are the data plane. The control plane only configures them, DNS only resolves names, and the ingress gateway handles traffic entering the cluster."
+      },
+      {
+        "id": "t588-a2",
+        "concept": "mesh-data-plane",
+        "type": "multiple_choice",
+        "prompt": "The mesh control plane is down for ten minutes. What happens to calls between running services?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "They stop, because each call needs control-plane approval"
+          },
+          {
+            "id": "b",
+            "label": "They keep flowing with the last configuration the proxies received"
+          },
+          {
+            "id": "c",
+            "label": "They fall back to plain text with no encryption"
+          },
+          {
+            "id": "d",
+            "label": "They are rerouted through the ingress gateway"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Proxies are statically stable on their last config; new config, new workloads and certificate rotation wait until the control plane returns. Calls are not approved one by one, not downgraded, and not sent through the gateway."
+      },
+      {
+        "id": "t588-a3",
+        "concept": "mesh-mtls",
+        "type": "multiple_choice",
+        "prompt": "What does mesh mTLS give that a network firewall rule alone does not?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Faster connections, because encryption is moved to hardware"
+          },
+          {
+            "id": "b",
+            "label": "Each call carries a verified workload identity that policy can check"
+          },
+          {
+            "id": "c",
+            "label": "Protection against bugs in the application’s own business logic"
+          },
+          {
+            "id": "d",
+            "label": "Validation of every request body against a published schema"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "mTLS proves which workload is calling, so policy can use identities instead of addresses. It adds some cost rather than speed, and it does not inspect business logic or request bodies."
+      },
+      {
+        "id": "t588-a4",
+        "concept": "mesh-traffic-policy",
+        "type": "estimation",
+        "prompt": "The app gives each call a 2,000 ms deadline. The mesh may make up to 3 tries in total for that call. What is the longest per-try timeout that keeps all three tries inside the app deadline?",
+        "unit": "ms",
+        "target": 667,
+        "assumptions": [
+          "Retries start immediately, with no backoff",
+          "Every try runs to its full timeout"
+        ],
+        "formula": "2,000 ms ÷ 3 tries",
+        "workedAnswer": "2,000 ÷ 3 ≈ 667 ms per try",
+        "explanation": "Design implication: a 1,000 ms per-try timeout would need 3,000 ms, so the app abandons the call during the third try, and a 2,000 ms per-try timeout makes the mesh retries pointless.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          1000,
+          2000
+        ]
+      },
+      {
+        "id": "t588-a5",
+        "concept": "mesh-cost",
+        "type": "multiple_choice",
+        "prompt": "Which situation most justifies adopting a service mesh?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Three services in one language that already share a client library"
+          },
+          {
+            "id": "b",
+            "label": "Hundreds of services in several languages that all need mTLS"
+          },
+          {
+            "id": "c",
+            "label": "A single monolith behind one external load balancer"
+          },
+          {
+            "id": "d",
+            "label": "A nightly batch job that reads files and writes a report"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Uniform mTLS and telemetry across many services and languages is where a mesh saves the most work. A few same-language services can share a library, and a monolith or a batch job has few service-to-service calls to manage."
+      },
+      {
+        "id": "t588-a6",
+        "concept": "mesh-mtls",
+        "type": "drag_order",
+        "prompt": "Order what happens when one service calls another through the mesh.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Proxies set up mutual TLS with workload certificates"
+          },
+          {
+            "id": "s5",
+            "label": "The request reaches the destination app"
+          },
+          {
+            "id": "s1",
+            "label": "The app sends a plain request to the service name"
+          },
+          {
+            "id": "s4",
+            "label": "The destination proxy authorises the caller"
+          },
+          {
+            "id": "s2",
+            "label": "The local proxy picks an endpoint and applies policy"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Plain locally, policy at the source proxy, mTLS between proxies, authorisation at the destination, then the app."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t588-f1",
+        "front": "Data plane vs control plane?",
+        "back": "Proxies carry traffic; the control plane configures them and issues certificates."
+      },
+      {
+        "id": "t588-f2",
+        "front": "Retries in app and mesh?",
+        "back": "They multiply: (1 + app retries) × (1 + mesh retries). Let one layer own retries."
+      },
+      {
+        "id": "t588-f3",
+        "front": "When is a mesh worth it?",
+        "back": "Many services, several languages, and a need for uniform mTLS, traffic control and telemetry."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Microsoft Learn: About service meshes",
+        "url": "https://learn.microsoft.com/en-us/azure/aks/servicemesh-about"
+      },
+      {
+        "title": "Google Cloud: Cloud Service Mesh overview",
+        "url": "https://cloud.google.com/service-mesh/docs/overview"
+      },
+      {
+        "title": "Kubernetes: Gateway API",
+        "url": "https://kubernetes.io/docs/concepts/services-networking/gateway/"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "mesh-data-plane",
+        "mesh-mtls",
+        "mesh-traffic-policy",
+        "mesh-cost"
+      ],
+      "mechanism": {
+        "title": "How a service mesh handles each call",
+        "steps": [
+          "In the classic design, each pod gets a sidecar proxy, and traffic in and out of the app is redirected through it, usually by network rules set up when the pod starts. Newer designs move some work to a shared proxy per node and add per-service proxies only where layer-7 features are needed, which cuts the per-pod cost. Either way the app speaks plain HTTP or gRPC to a local proxy and needs no mesh library.",
+          "The control plane watches the cluster for services and endpoints, turns routing, retry and security policies into proxy configuration, and pushes it out. It also acts as a certificate authority: each workload gets a short-lived certificate that encodes its service identity, rotated on a schedule. Proxies cache their configuration, so a control-plane outage stops changes and the setup of new workloads, but existing traffic keeps flowing.",
+          "Between proxies, connections use mutual TLS. Both sides present certificates, so the destination proxy knows which workload is calling and can enforce policies such as “only the orders service may call payments, and only with POST”. That moves service-to-service authorisation from IP-based firewall rules, which break as pods move, to identities that follow the workload.",
+          "Traffic policy is where meshes help and hurt. Timeouts, retries with budgets, outlier detection that ejects failing endpoints, and weighted traffic splits for canaries are applied the same way for every service. But they stack with whatever the application already does: two layers of retries multiply attempts, and mesh retries that need longer than the app’s overall deadline are retries nobody waits for. Decide which layer owns each behaviour.",
+          "The costs are real. Every proxy reserves CPU and memory, which across hundreds of pods adds up to whole machines. Each call takes extra hops through two proxies, adding latency that should be measured rather than assumed. The mesh itself must be upgraded, monitored and debugged, and a bad policy push can break many services at once. Adopt it when uniform security, traffic control and telemetry are worth that operating load."
+        ]
+      },
+      "useWhen": [
+        "Many services in several languages that need mTLS, consistent telemetry and traffic control.",
+        "Zero-trust requirements where calls must be authorised by workload identity."
+      ],
+      "avoidWhen": [
+        "Avoid for a few services or a monolith, where a shared library or platform TLS is simpler.",
+        "Avoid adopting it only for metrics that existing instrumentation already provides."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Option",
+          "Gives",
+          "Costs"
+        ],
+        "rows": [
+          [
+            "Shared client library",
+            "Retries and metrics in one language",
+            "Rebuild every service to update"
+          ],
+          [
+            "Sidecar mesh",
+            "Uniform mTLS, policy, telemetry",
+            "Proxy per pod, extra hops"
+          ],
+          [
+            "Per-node proxy mesh",
+            "The same core features",
+            "Less per-pod cost; one proxy shared per node"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "What the sidecars cost",
+        "assumptions": [
+          "400 pods, each with a sidecar requesting 0.1 vCPU and 64 MiB",
+          "Illustrative request sizes; measure your own proxies"
+        ],
+        "steps": [
+          "CPU: 400 × 0.1 = 40 vCPU reserved for proxies.",
+          "Memory: 400 × 64 MiB = 25,600 MiB, which is 25 GiB.",
+          "With 8-vCPU nodes, 40 ÷ 8 = 5 whole nodes’ worth of CPU goes to the mesh."
+        ],
+        "result": "At scale the mesh costs several machines; that is fine if it replaces work every team would otherwise do, and wasteful if it does not."
+      },
+      "india": {
+        "title": "Provider guidance on meshes",
+        "label": "Official documentation",
+        "body": "Microsoft’s AKS documentation describes a service mesh as adding capabilities such as traffic management, mTLS-based security and observability, and suggests evaluating your requirements before adopting one. Google Cloud Service Mesh documentation describes a managed control plane that configures proxies for traffic management, mutual TLS and telemetry. Both present the mesh as an option with an operating cost, not a default."
+      },
+      "pitfalls": [
+        {
+          "trap": "“A mesh makes services reliable because it retries everything.”",
+          "say": "“I’d let one layer own retries with a budget, because app and mesh retries multiply load during an outage.”"
+        },
+        {
+          "trap": "“We need a mesh for our three services.”",
+          "say": "“For three services in one language I’d start with a shared client and platform TLS, and revisit a mesh as we grow.”"
+        }
+      ],
+      "takeaways": [
+        "Proxies are the data plane; the control plane configures them and issues certificates.",
+        "Mesh mTLS gives each call a verified workload identity for policy.",
+        "App and mesh retries multiply; one layer should own them.",
+        "A mesh pays off with many services and languages, not with a few."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Two timeouts, one hung dependency",
+      "prompt": "The app gives each call to the inventory service a 2 s deadline. The mesh retries a failed or slow call up to 3 times in total, with 1 s per try. Inventory hangs completely.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The app gives up at 2 s while the mesh starts its third try, which adds load nobody waits for",
+          "feedback": "Right: the mesh needs up to 3 s, the app waits only 2 s, so the outer deadline ends first."
+        },
+        {
+          "id": "b",
+          "label": "The user waits about 3 s while the mesh finishes all three tries",
+          "feedback": "The app’s own 2 s deadline ends the request before the mesh is done."
+        },
+        {
+          "id": "c",
+          "label": "The user gets an error after 1 s, when the first mesh try times out",
+          "feedback": "The mesh retries after the first try instead of returning the error."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Make the inner layer’s total time fit inside the outer deadline, for example 2 tries of 0.8 s, or let only one layer retry."
+    },
+    "seeAlso": [
+      {
+        "topicId": 52,
+        "why": "How services find each other before a mesh routes the call"
+      },
+      {
+        "topicId": 53,
+        "why": "Retry and timeout rules the mesh applies for you"
+      },
+      {
+        "topicId": 57,
+        "why": "Authentication and authorisation, the ideas behind workload identity"
+      }
+    ]
   }
 ]
