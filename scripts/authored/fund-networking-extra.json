@@ -3535,5 +3535,1352 @@
     "why": "Why latency, not bandwidth, dominates small request and reply messages"
    }
   ]
+ },
+ {
+  "id": 549,
+  "slug": "vpns-tunnels-and-overlays",
+  "region": "f3-networking",
+  "order": 23,
+  "title": "VPNs and Tunnels: IPsec, WireGuard and Overlays",
+  "kind": "lesson",
+  "objectives": [
+   "Explain how a tunnel wraps one packet inside another and what the outer header buys",
+   "Work out how much each tunnel header takes from the inner MTU",
+   "Choose between full and split tunnelling, and between site-to-site and per-user VPNs"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 12,
+  "prereqIds": [
+   241,
+   244
+  ],
+  "cards": [
+   {
+    "id": "t549-c1",
+    "kind": "text",
+    "title": "A packet inside a packet",
+    "body": "A tunnel takes a whole IP packet and carries it as the payload of another one. The outer header is addressed between the two tunnel endpoints, so the network in between only sees traffic between them; the inner header still names the real source and destination. IPsec in tunnel mode and WireGuard also encrypt and authenticate the inner packet, which is what makes them VPNs. GRE and VXLAN only encapsulate: they join networks without hiding anything.",
+    "teaches": [
+     "encapsulation-tunnel",
+     "vpn-encryption"
+    ]
+   },
+   {
+    "id": "t549-c2",
+    "kind": "diagram",
+    "title": "One packet through a site-to-site VPN",
+    "body": "The office router and the cloud gateway are the only machines that see the outer header.",
+    "teaches": [
+     "encapsulation-tunnel"
+    ],
+    "steps": [
+     "A laptop in the office sends a packet to 10.20.0.15, a server in the cloud network",
+     "The office router’s route table says 10.20.0.0/16 goes through the tunnel",
+     "The router encrypts the packet and wraps it in a new IP header addressed to the cloud gateway’s public address",
+     "The internet routes the outer packet like any other between two public addresses",
+     "The gateway checks the authentication tag, decrypts, strips the outer header and forwards the original packet"
+    ]
+   },
+   {
+    "id": "t549-c3",
+    "kind": "diagram",
+    "title": "Worked example: what each wrapper costs the MTU",
+    "body": "Every outer header comes out of the 1,500 bytes the physical link carries.",
+    "teaches": [
+     "tunnel-overhead"
+    ],
+    "steps": [
+     "WireGuard over IPv4: outer IP 20 + UDP 8 + WireGuard header 16 + authentication tag 16 = 60 bytes, leaving 1,440",
+     "WireGuard over IPv6: the outer IP header is 40 bytes, so 80 bytes of overhead and 1,420 left, which is why 1,420 is a common default",
+     "VXLAN carries a whole Ethernet frame: inner Ethernet header 14 + outer IP 20 + UDP 8 + VXLAN 8 = 50 bytes, so the inner IP MTU is 1,450 unless the underlay carries larger frames",
+     "IPsec ESP in tunnel mode: the overhead depends on the cipher and padding, commonly 50 to 80 bytes; check the vendor figure",
+     "TCP inside the tunnel: MSS = inner MTU − 40, so 1,400 for a 1,440-byte WireGuard tunnel over IPv4"
+    ],
+    "note": "Result. A tunnel shrinks the largest packet by 50 to 80 bytes, so the interface MTU or the MSS has to shrink with it; otherwise large packets need fragmenting or vanish, as the layers lesson describes."
+   },
+   {
+    "id": "t549-c4",
+    "kind": "text",
+    "title": "Full tunnel or split tunnel",
+    "body": "A full tunnel sends all of a user’s traffic, internet included, through the VPN, so the company’s filters and logging see everything, at the price of hauling video calls and downloads through its gateway. A split tunnel sends only company prefixes through the VPN and the rest straight out, which saves gateway capacity and latency but leaves internet traffic outside company controls. Decide per prefix, and remember DNS: a split tunnel must still send internal names to the internal resolver.",
+    "teaches": [
+     "split-tunnel"
+    ]
+   },
+   {
+    "id": "t549-c5",
+    "kind": "text",
+    "title": "Trap: overlapping private address ranges",
+    "body": "Tunnels join networks that were numbered separately. If the office uses 10.0.0.0/16 and the cloud network also uses 10.0.0.0/16, the router cannot tell which side an address belongs to, and the tunnel comes up but traffic goes nowhere. Plan non-overlapping ranges before connecting networks; when that is too late, NAT on one side is a workaround that makes logs and allow-lists harder to read.",
+    "teaches": [
+     "overlapping-ranges"
+    ]
+   },
+   {
+    "id": "t549-c6",
+    "kind": "text",
+    "title": "Overlays: tunnels as the data-centre fabric",
+    "body": "Cloud and container networks often run an overlay: every host wraps its virtual machines’ packets in VXLAN or a similar header, addressed to the destination host. The physical network, the underlay, only routes between hosts, while each tenant gets its own virtual network with its own addresses. VXLAN’s 24-bit network identifier allows about 16.8 million segments, against 4,094 VLAN IDs on one Ethernet network.",
+    "teaches": [
+     "overlay-network"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t549-a1",
+    "concept": "encapsulation-tunnel",
+    "type": "multiple_choice",
+    "prompt": "A packet crosses the internet inside a site-to-site tunnel. What does a router in the middle of the internet see?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The laptop’s private address as the source"
+     },
+     {
+      "id": "b",
+      "label": "The two tunnel endpoints’ public addresses"
+     },
+     {
+      "id": "c",
+      "label": "The private server address, with the payload encrypted"
+     },
+     {
+      "id": "d",
+      "label": "The office router’s address and the server’s private address"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "The outer header names only the tunnel endpoints. The laptop and server addresses are in the inner header, which a VPN encrypts; and no header mixes the router’s public address with a private destination, which the internet could not route."
+   },
+   {
+    "id": "t549-a2",
+    "concept": "vpn-encryption",
+    "type": "multiple_choice",
+    "prompt": "Which of these only encapsulates traffic and does not encrypt it?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "WireGuard"
+     },
+     {
+      "id": "b",
+      "label": "IPsec ESP in tunnel mode"
+     },
+     {
+      "id": "c",
+      "label": "VXLAN"
+     },
+     {
+      "id": "d",
+      "label": "A TLS-based remote-access VPN"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "VXLAN wraps Ethernet frames in UDP to build overlay networks and has no encryption of its own. WireGuard, IPsec ESP and TLS-based VPNs all encrypt and authenticate the inner traffic."
+   },
+   {
+    "id": "t549-a3",
+    "concept": "tunnel-overhead",
+    "type": "multiple_choice",
+    "prompt": "A WireGuard tunnel runs over IPv4 on a 1,500-byte path. What is the largest inner packet that fits without fragmenting the outer one?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "1,500 bytes"
+     },
+     {
+      "id": "b",
+      "label": "1,460 bytes"
+     },
+     {
+      "id": "c",
+      "label": "1,440 bytes"
+     },
+     {
+      "id": "d",
+      "label": "1,420 bytes"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Outer IPv4 (20), UDP (8) and WireGuard (32) take 60 bytes, leaving 1,440. 1,500 ignores the wrapper; 1,460 is the ordinary TCP MSS with no tunnel; and 1,420 is what is left when the outer header is IPv6."
+   },
+   {
+    "id": "t549-a4",
+    "concept": "split-tunnel",
+    "type": "multiple_choice",
+    "prompt": "A company wants staff video calls to stop crossing its VPN gateway while internal apps stay private. What should it configure?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A split tunnel carrying only the company prefixes"
+     },
+     {
+      "id": "b",
+      "label": "A full tunnel with a larger gateway"
+     },
+     {
+      "id": "c",
+      "label": "A second VPN dedicated to video traffic"
+     },
+     {
+      "id": "d",
+      "label": "A VXLAN overlay from each laptop to the office"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "A split tunnel routes company prefixes through the VPN and everything else directly. A full tunnel keeps hauling video through the gateway; a second VPN still sends it through company equipment; and VXLAN is for joining hosts in a fabric, not for remote users."
+   },
+   {
+    "id": "t549-a5",
+    "concept": "overlapping-ranges",
+    "type": "multiple_choice",
+    "prompt": "A new tunnel between an office and a cloud network is up, but nothing gets through. Both sides number their hosts from 10.0.0.0/16. What is wrong?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The tunnel is missing a certificate"
+     },
+     {
+      "id": "b",
+      "label": "The routers cannot tell which side owns an address"
+     },
+     {
+      "id": "c",
+      "label": "Private addresses are not allowed inside tunnels"
+     },
+     {
+      "id": "d",
+      "label": "The tunnel needs a larger MTU to carry 10.x traffic"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "With the same range on both sides, the local route wins and tunnel traffic never leaves. A missing certificate stops the tunnel coming up at all; private addresses inside tunnels are the normal case; and MTU affects large packets, not every packet."
+   },
+   {
+    "id": "t549-a6",
+    "concept": "encapsulation-tunnel",
+    "type": "drag_order",
+    "prompt": "Order what happens to a packet sent through a site-to-site VPN.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "The router encrypts the packet and adds an outer header"
+     },
+     {
+      "id": "s5",
+      "label": "The far gateway verifies, decrypts and forwards the inner packet"
+     },
+     {
+      "id": "s1",
+      "label": "The host sends a packet to a private address in the other network"
+     },
+     {
+      "id": "s4",
+      "label": "The internet routes the outer packet between the endpoints"
+     },
+     {
+      "id": "s2",
+      "label": "The local router matches the route that points into the tunnel"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Route, wrap, cross the internet, unwrap. Only the two gateways ever see both headers."
+   },
+   {
+    "id": "t549-a7",
+    "concept": "overlay-network",
+    "type": "estimation",
+    "prompt": "VXLAN identifies each virtual network with a 24-bit number. About how many million segments does that allow?",
+    "unit": "million",
+    "target": 16.8,
+    "assumptions": [
+     "All 2^24 values counted",
+     "Reserved values ignored"
+    ],
+    "formula": "2^24 ÷ 1,000,000",
+    "workedAnswer": "16,777,216 ÷ 1,000,000 ≈ 16.8 million",
+    "explanation": "Design implication: about 4,000 times the 4,094 usable VLAN IDs, which is why multi-tenant clouds build tenant networks as overlays rather than VLANs.",
+    "tolerance": 0.05,
+    "trapAnswers": [
+     4.1,
+     8.4,
+     33.6
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t549-f1",
+    "front": "Tunnel?",
+    "back": "A whole packet carried as the payload of another, addressed between the two endpoints."
+   },
+   {
+    "id": "t549-f2",
+    "front": "WireGuard over IPv4 overhead?",
+    "back": "60 bytes (IP 20, UDP 8, WireGuard 32), leaving 1,440 of 1,500."
+   },
+   {
+    "id": "t549-f3",
+    "front": "Split tunnel?",
+    "back": "Only company prefixes go through the VPN; the rest goes straight out."
+   }
+  ],
+  "sources": [
+   {
+    "title": "RFC 4301: Security Architecture for the Internet Protocol",
+    "url": "https://www.rfc-editor.org/rfc/rfc4301"
+   },
+   {
+    "title": "RFC 4303: IP Encapsulating Security Payload (ESP)",
+    "url": "https://www.rfc-editor.org/rfc/rfc4303"
+   },
+   {
+    "title": "RFC 7348: Virtual eXtensible Local Area Network (VXLAN)",
+    "url": "https://www.rfc-editor.org/rfc/rfc7348"
+   },
+   {
+    "title": "AWS Site-to-Site VPN: customer gateway devices",
+    "url": "https://docs.aws.amazon.com/vpn/latest/s2svpn/your-cgw.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "encapsulation-tunnel",
+    "tunnel-overhead",
+    "split-tunnel"
+   ],
+   "mechanism": {
+    "title": "How a tunnel carries one network across another",
+    "steps": [
+     "A tunnel has two endpoints, each with an address the network between them can route, usually a public address on the internet or a host address in a data centre. Each endpoint has a route table entry saying which inner destinations belong on the far side.",
+     "When a packet matches such a route, the endpoint adds a new outer header addressed to the other endpoint. Plain encapsulations such as GRE or VXLAN stop there. VPN protocols first encrypt the inner packet and add an authentication tag, so the network in between cannot read or alter it without detection.",
+     "The outer packet travels like any other. Routers and firewalls on the way see only the endpoints, a protocol number or a UDP port, and the outer size. Running over UDP, as WireGuard and VXLAN do, lets the tunnel cross NAT devices and spreads flows across equal-cost paths using the UDP source port.",
+     "The far endpoint checks the tag, decrypts, removes the outer header and forwards the original packet on its own network. Replies take the reverse route through the same pair, so both ends need routes for each other’s ranges, and those ranges must not overlap.",
+     "Every outer header consumes part of the link’s MTU, so the inner interface gets a smaller one. Endpoints either advertise the smaller MTU, clamp the TCP MSS in passing SYNs, or rely on path MTU discovery inside the tunnel. Site-to-site services commonly offer two tunnels to different gateways so maintenance on one does not cut the link."
+    ]
+   },
+   "useWhen": [
+    "Joining an office or data centre to a cloud network over the internet.",
+    "Giving remote staff access to private applications.",
+    "Building per-tenant virtual networks on a shared physical fabric."
+   ],
+   "avoidWhen": [
+    "Avoid a full tunnel when most traffic is internet video and the gateway is small.",
+    "Avoid connecting networks whose address ranges overlap without a plan."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Option",
+     "Encrypts",
+     "Typical use"
+    ],
+    "rows": [
+     [
+      "IPsec tunnel mode",
+      "Yes",
+      "Site-to-site links between routers and cloud gateways"
+     ],
+     [
+      "WireGuard",
+      "Yes",
+      "Remote access and simple site links"
+     ],
+     [
+      "GRE",
+      "No",
+      "Carrying routing between sites, often inside IPsec"
+     ],
+     [
+      "VXLAN",
+      "No",
+      "Overlay networks between hosts in a data centre"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Sizing a remote-access gateway",
+    "assumptions": [
+     "1,000 staff on a full tunnel, each averaging 2 Mbit/s in working hours (illustrative)",
+     "Video calls are 70% of that traffic (illustrative)",
+     "Gateway capacity 1 Gbit/s"
+    ],
+    "steps": [
+     "Full tunnel load: 1,000 × 2 Mbit/s = 2,000 Mbit/s = 2 Gbit/s.",
+     "That is twice the 1 Gbit/s gateway, so calls and apps suffer together.",
+     "Split tunnel: video goes direct, so 30% stays: 0.3 × 2 Gbit/s = 0.6 Gbit/s.",
+     "Utilisation: 0.6 ÷ 1 = 60%, which leaves headroom for growth and for busy days."
+    ],
+    "result": "Moving the 70% of traffic that is internet video off the tunnel cuts gateway load from 2 Gbit/s to 0.6 Gbit/s under these illustrative figures."
+   },
+   "india": {
+    "title": "A branch office joined to a cloud network",
+    "label": "Illustrative example",
+    "body": "A lending company in Pune runs its loan system in a cloud network numbered 10.20.0.0/16 and its branch offices in Nashik and Kolhapur on 192.168.10.0/24 and 192.168.20.0/24. Each branch router keeps two IPsec tunnels to two cloud gateways, with routes for 10.20.0.0/16 through both, so one gateway can be patched without cutting the branch off. Staff internet traffic leaves locally, so a branch’s 50 Mbit/s line is not spent on video calls through the cloud, and the tunnel interface MTU is lowered so loan documents uploaded from scanners do not stall."
+   },
+   "pitfalls": [
+    {
+     "trap": "“The tunnel is up, so routing is fine.”",
+     "say": "“An up tunnel only proves the endpoints agree; I’d check routes on both sides and that the address ranges do not overlap.”"
+    },
+    {
+     "trap": "“Put everyone on a full tunnel for security.”",
+     "say": "“A full tunnel adds inspection but hauls all internet traffic through the gateway; I’d size it or split company prefixes from the rest.”"
+    }
+   ],
+   "takeaways": [
+    "A tunnel carries a whole packet inside another, addressed between two endpoints.",
+    "VPNs encrypt the inner packet; GRE and VXLAN only encapsulate.",
+    "Each wrapper costs 50 to 80 bytes of MTU, so lower the inner MTU or clamp the MSS.",
+    "Plan non-overlapping address ranges before joining networks."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Full tunnel or split?",
+   "prompt": "A 600-person company moves its internal apps to a cloud network and gives staff a VPN. Most traffic during the day is video calls on a public service. Security wants internal apps reachable only over the VPN. What setup fits?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "A full tunnel for everyone",
+     "feedback": "This works for security but sends every video call through the company gateway, adding latency and cost for traffic that never needed the VPN."
+    },
+    {
+     "id": "b",
+     "label": "A split tunnel with company prefixes and internal DNS through the VPN",
+     "feedback": "Right: internal apps stay private behind the tunnel, internal names still resolve, and video calls go directly to the public service."
+    },
+    {
+     "id": "c",
+     "label": "No VPN; expose internal apps on public addresses with a firewall",
+     "feedback": "This breaks the requirement that internal apps are reachable only over the VPN, and puts them in front of internet scanning."
+    },
+    {
+     "id": "d",
+     "label": "A VXLAN overlay from every laptop",
+     "feedback": "VXLAN builds overlay networks between hosts and does not encrypt, so it is neither a remote-access VPN nor private over the internet."
+    }
+   ],
+   "correctId": "b",
+   "reveal": "Split tunnelling keeps the VPN for what needs it. The detail people forget is DNS: internal names must still go to the internal resolver over the tunnel, or apps fail to resolve even though routes are correct."
+  },
+  "seeAlso": [
+   {
+    "topicId": 241,
+    "why": "Encapsulation and MTU, which every tunnel header eats into"
+   },
+   {
+    "topicId": 329,
+    "why": "Cloud networks that site-to-site VPNs connect to"
+   },
+   {
+    "topicId": 244,
+    "why": "Routing and NAT, which decide what enters the tunnel and how it crosses home routers"
+   }
+  ]
+ },
+ {
+  "id": 550,
+  "slug": "switches-vlans-and-broadcast-domains",
+  "region": "f3-networking",
+  "order": 24,
+  "title": "Switches, VLANs and Broadcast Domains",
+  "kind": "lesson",
+  "objectives": [
+   "Explain what a broadcast domain is and why its size matters",
+   "Explain how 802.1Q tags split one switch into several networks",
+   "Decide when traffic between VLANs needs a router and why loops are dangerous"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 11,
+  "prereqIds": [
+   245
+  ],
+  "cards": [
+   {
+    "id": "t550-c1",
+    "kind": "text",
+    "title": "One switch, several networks",
+    "body": "A switch forwards frames by hardware address, and a broadcast, such as an ARP request, goes out of every port. Everything a broadcast reaches is one broadcast domain, which usually matches one IP subnet. A VLAN (virtual LAN) splits a switch into separate broadcast domains: ports in VLAN 10 never see frames from VLAN 20, as if they were on different switches. To get from one VLAN to another, traffic has to be routed.",
+    "teaches": [
+     "broadcast-domain",
+     "vlan"
+    ]
+   },
+   {
+    "id": "t550-c2",
+    "kind": "diagram",
+    "title": "How a tagged frame crosses a trunk",
+    "body": "Access ports belong to one VLAN; trunk ports carry many and label each frame.",
+    "teaches": [
+     "vlan-trunk"
+    ],
+    "steps": [
+     "A printer on an access port in VLAN 20 sends an ordinary, untagged frame",
+     "The switch notes that the port belongs to VLAN 20",
+     "To reach a second switch it sends the frame on a trunk port with a 4-byte 802.1Q tag holding VLAN ID 20",
+     "The second switch reads the tag and forwards the frame only to ports in VLAN 20",
+     "It strips the tag before sending it out of an access port, so the end host never sees it"
+    ]
+   },
+   {
+    "id": "t550-c3",
+    "kind": "diagram",
+    "title": "Worked example: splitting a flat office network",
+    "body": "Broadcasts reach every host in a domain, so their cost grows with its size.",
+    "teaches": [
+     "broadcast-domain"
+    ],
+    "steps": [
+     "Assume 1,200 devices on one flat network, each sending 1 broadcast a second on average (ARP, discovery protocols; illustrative)",
+     "Every device receives every broadcast: 1,200 frames a second, each woken by traffic meant for someone else",
+     "Split into 6 VLANs of 200 devices, one per floor or role",
+     "Each device now receives about 200 broadcasts a second, a sixth of before",
+     "Separately, a broadcast loop or a misbehaving device now disturbs 200 devices instead of 1,200"
+    ],
+    "note": "Result. Splitting by VLAN cuts each host’s broadcast load and the blast radius of a fault by the same factor, at the cost of a router hop between groups that need to talk."
+   },
+   {
+    "id": "t550-c4",
+    "kind": "text",
+    "title": "Routing between VLANs",
+    "body": "Each VLAN gets its own subnet and gateway. A layer 3 switch or a router owns a gateway address in each VLAN and routes between them, which is also the natural place for access rules: guests may reach the internet but not the accounts VLAN. A common mistake is to put two VLANs on the same subnet: hosts then try to reach each other directly with ARP, which cannot cross the VLAN boundary, so they fail without any error.",
+    "teaches": [
+     "inter-vlan-routing"
+    ]
+   },
+   {
+    "id": "t550-c5",
+    "kind": "text",
+    "title": "Trap: a loop in a switched network",
+    "body": "Ethernet frames have no hop limit, unlike IP packets with their TTL. If two switch ports are connected in a loop, a single broadcast circles forever and multiplies at every switch, a broadcast storm that can saturate links within seconds. The Spanning Tree Protocol (STP) prevents this by blocking redundant links until they are needed. Keep it on, and take care when someone plugs a small unmanaged switch into two wall ports.",
+    "teaches": [
+     "switching-loop"
+    ]
+   },
+   {
+    "id": "t550-c6",
+    "kind": "text",
+    "title": "Misconception: VLANs are a security boundary on their own",
+    "body": "VLANs separate traffic, but they rely on switch configuration being right. A trunk port accidentally left on a desk, or a host allowed to send tagged frames, can reach other VLANs. Treat VLANs as segmentation that makes rules possible, then enforce access with routing rules or firewalls between them, and set unused ports to an unused VLAN.",
+    "teaches": [
+     "vlan",
+     "inter-vlan-routing"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t550-a1",
+    "concept": "broadcast-domain",
+    "type": "multiple_choice",
+    "prompt": "An ARP request goes out from a laptop in VLAN 10. Which devices receive it?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Every device on the switch"
+     },
+     {
+      "id": "b",
+      "label": "Only the default gateway"
+     },
+     {
+      "id": "c",
+      "label": "Every device in VLAN 10"
+     },
+     {
+      "id": "d",
+      "label": "Devices in VLAN 10 and the router’s other VLANs"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "A broadcast stays inside its VLAN, which is its broadcast domain. Other VLANs on the same switch do not see it; the gateway is one recipient among many; and routers do not forward broadcasts between VLANs."
+   },
+   {
+    "id": "t550-a2",
+    "concept": "vlan-trunk",
+    "type": "multiple_choice",
+    "prompt": "What does a switch add to a frame it sends on a trunk port?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A new IP header with the VLAN as the destination"
+     },
+     {
+      "id": "b",
+      "label": "A 4-byte tag holding the VLAN ID"
+     },
+     {
+      "id": "c",
+      "label": "The MAC address of the next switch"
+     },
+     {
+      "id": "d",
+      "label": "A checksum covering the VLAN membership"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "An 802.1Q tag inserts the VLAN ID into the Ethernet header. No IP header is added, since this is layer 2; the destination MAC stays the end host’s; and the frame’s existing checksum is recalculated rather than a new one added."
+   },
+   {
+    "id": "t550-a3",
+    "concept": "inter-vlan-routing",
+    "type": "multiple_choice",
+    "prompt": "A laptop in VLAN 10 must reach a file server in VLAN 20. What has to exist?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A trunk link that carries both VLANs to the server’s switch"
+     },
+     {
+      "id": "b",
+      "label": "The same IP subnet in both VLANs"
+     },
+     {
+      "id": "c",
+      "label": "A larger broadcast domain covering both"
+     },
+     {
+      "id": "d",
+      "label": "A router or layer 3 switch with a gateway in each VLAN"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Traffic between VLANs is routed. A trunk carries both VLANs between switches but keeps them apart rather than joining them; one subnet across two VLANs breaks ARP; and merging the domains removes the separation rather than routing across it."
+   },
+   {
+    "id": "t550-a4",
+    "concept": "switching-loop",
+    "type": "multiple_choice",
+    "prompt": "Someone connects two wall ports with a spare cable and the office network collapses within seconds. What happened?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A broadcast storm from a layer 2 loop"
+     },
+     {
+      "id": "b",
+      "label": "Two DHCP servers giving out the same addresses"
+     },
+     {
+      "id": "c",
+      "label": "An IP routing loop until TTLs expired"
+     },
+     {
+      "id": "d",
+      "label": "The switch ran out of ports for new hosts"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Ethernet frames have no hop limit, so a broadcast circles and multiplies around the loop. Duplicate DHCP servers cause address conflicts, not a collapse in seconds; IP loops end when the TTL runs out; and a full switch refuses new links rather than flooding."
+   },
+   {
+    "id": "t550-a5",
+    "concept": "vlan",
+    "type": "multiple_choice",
+    "prompt": "Why split a 1,200-device office network into several VLANs?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "To raise the speed each switch port can carry"
+     },
+     {
+      "id": "b",
+      "label": "To let devices on the same floor skip ARP lookups"
+     },
+     {
+      "id": "c",
+      "label": "To cut broadcast load and the reach of faults"
+     },
+     {
+      "id": "d",
+      "label": "To give each device its own public address"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Smaller broadcast domains mean fewer broadcasts per host and a smaller blast radius, plus a place to enforce rules. Port speed is unchanged; ARP is still needed within each VLAN; and VLANs have nothing to do with public addressing."
+   },
+   {
+    "id": "t550-a6",
+    "concept": "vlan-trunk",
+    "type": "drag_order",
+    "prompt": "Order the journey of a frame from an access port, over a trunk, to a host on another switch.",
+    "items": [
+     {
+      "id": "s4",
+      "label": "The second switch reads the tag and picks ports in that VLAN"
+     },
+     {
+      "id": "s2",
+      "label": "The switch assigns it to the port’s VLAN"
+     },
+     {
+      "id": "s5",
+      "label": "The tag is removed and the frame leaves an access port"
+     },
+     {
+      "id": "s1",
+      "label": "The host sends an untagged frame on an access port"
+     },
+     {
+      "id": "s3",
+      "label": "The switch adds an 802.1Q tag and sends it on the trunk"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Tags exist only on trunks; end hosts send and receive ordinary frames."
+   },
+   {
+    "id": "t550-a7",
+    "concept": "vlan",
+    "type": "estimation",
+    "prompt": "An 802.1Q VLAN ID has 12 bits, and the values 0 and 4095 are reserved. How many VLAN IDs can be used?",
+    "unit": "VLANs",
+    "target": 4094,
+    "assumptions": [
+     "Both reserved values excluded"
+    ],
+    "formula": "2^12 − 2",
+    "workedAnswer": "4,096 − 2 = 4,094",
+    "explanation": "Sanity check: about four thousand is plenty for one campus but far too few for a cloud with millions of tenant networks, which is why clouds use 24-bit overlay IDs.",
+    "tolerance": 0.0002,
+    "trapAnswers": [
+     4096,
+     2048,
+     1024
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t550-f1",
+    "front": "Broadcast domain?",
+    "back": "Everything one broadcast frame reaches; usually one VLAN and one subnet."
+   },
+   {
+    "id": "t550-f2",
+    "front": "Trunk port?",
+    "back": "A port that carries many VLANs, each frame tagged with its 12-bit VLAN ID."
+   },
+   {
+    "id": "t550-f3",
+    "front": "Why STP?",
+    "back": "Ethernet has no hop limit, so it blocks redundant links to stop broadcast storms."
+   }
+  ],
+  "sources": [
+   {
+    "title": "RFC 7348: VXLAN, section 3 on the limits of VLANs",
+    "url": "https://www.rfc-editor.org/rfc/rfc7348#section-3"
+   },
+   {
+    "title": "man7: ip-link(8), VLAN type",
+    "url": "https://man7.org/linux/man-pages/man8/ip-link.8.html"
+   },
+   {
+    "title": "RFC 826: An Ethernet Address Resolution Protocol",
+    "url": "https://www.rfc-editor.org/rfc/rfc826"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "broadcast-domain",
+    "vlan",
+    "switching-loop"
+   ],
+   "mechanism": {
+    "title": "How a switch keeps networks apart",
+    "steps": [
+     "A switch learns which hardware address lives behind which port by reading the source of each frame. Frames for a known address go out of one port; broadcasts and frames for unknown addresses are flooded out of every port in the same broadcast domain.",
+     "With VLANs configured, the switch keeps a separate address table and flood set per VLAN. An access port belongs to one VLAN, and frames arriving on it are treated as members of that VLAN, so a printer and a laptop on the same switch can be in different networks without knowing it.",
+     "When a VLAN spans several switches, the links between them are trunks. On a trunk each frame carries a 4-byte 802.1Q tag with a 12-bit VLAN ID, so the receiving switch knows which VLAN’s ports to forward it to. One VLAN on a trunk may be sent untagged, the native VLAN, which is a common source of mistakes.",
+     "Each VLAN normally has its own IP subnet and a gateway address on a router or layer 3 switch. Traffic between VLANs goes through that gateway, which can apply access rules. Hosts in different VLANs cannot reach each other by ARP, because the request never crosses into the other VLAN.",
+     "Redundant links make a network resilient but create loops, and Ethernet frames have no TTL to end them. The Spanning Tree Protocol elects a root switch and blocks enough ports to leave a loop-free tree, unblocking a backup path when an active link fails; newer designs avoid layer 2 loops by routing between switches instead."
+    ]
+   },
+   "useWhen": [
+    "Separating guests, staff, phones and devices that should not see each other’s broadcasts.",
+    "Shrinking a large flat network whose broadcast load or fault reach has grown."
+   ],
+   "avoidWhen": [
+    "Avoid relying on VLANs alone as an access control between sensitive groups.",
+    "Avoid stretching one VLAN across many sites; route between them instead."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Design",
+     "Broadcast reach",
+     "Fault reach"
+    ],
+    "rows": [
+     [
+      "One flat network",
+      "Every device",
+      "Every device"
+     ],
+     [
+      "VLAN per floor or role",
+      "One group",
+      "One group"
+     ],
+     [
+      "Routed access, small subnets per switch",
+      "One switch",
+      "One switch"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Broadcast load before and after splitting",
+    "assumptions": [
+     "1,200 devices, 1 broadcast per device per second (illustrative)",
+     "Split into 6 equal VLANs"
+    ],
+    "steps": [
+     "Flat: each device receives 1,200 × 1 = 1,200 broadcasts per second.",
+     "Split: each VLAN has 1,200 ÷ 6 = 200 devices, so each receives 200 per second.",
+     "Total broadcast frames on the network drop from 1,200 × 1,200 = 1.44 million deliveries per second to 6 × 200 × 200 = 240,000.",
+     "A fault in one VLAN reaches 200 devices instead of 1,200."
+    ],
+    "result": "Six VLANs cut per-host broadcast load and fault reach by six, and total broadcast deliveries by six as well."
+   },
+   "india": {
+    "title": "Separating a college campus network",
+    "label": "Illustrative example",
+    "body": "A college in Coimbatore has one flat network for 1,500 student laptops, 200 staff machines, CCTV cameras and the fee-payment counter. A student laptop running a discovery tool floods the network and the fee counter stops working during admissions week. The fix puts students, staff, cameras and the payment counter in separate VLANs, each with its own subnet. The core switch routes between them and allows the payment counter to reach only the bank gateway, while unused wall ports are put in an empty VLAN so a stray cable cannot join anything."
+   },
+   "pitfalls": [
+    {
+     "trap": "“VLANs make the network secure.”",
+     "say": "“VLANs separate broadcast domains; I’d still enforce access with rules on the router between them.”"
+    },
+    {
+     "trap": "“Give both VLANs the same subnet so they can talk.”",
+     "say": "“Hosts on one subnet expect ARP to work, which cannot cross VLANs; each VLAN needs its own subnet and a gateway.”"
+    }
+   ],
+   "takeaways": [
+    "A VLAN is a separate broadcast domain on shared switches, usually one subnet each.",
+    "Trunks carry many VLANs with a 4-byte tag holding a 12-bit ID; access ports carry one.",
+    "Traffic between VLANs must be routed, which is where access rules belong.",
+    "Ethernet has no hop limit, so loops become broadcast storms unless spanning tree blocks them."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Will they talk?",
+   "prompt": "An engineer puts the cameras in VLAN 30 and the video recorder in VLAN 40 on the same switch, and to “keep it simple” gives both the subnet 10.5.0.0/24 with no router between them. What happens when a camera sends to the recorder?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "It works, since they are on one switch and one subnet",
+     "feedback": "Being on one switch does not matter: the VLANs are separate broadcast domains, so the camera’s ARP request never reaches the recorder."
+    },
+    {
+     "id": "b",
+     "label": "It fails silently: the ARP request stays in VLAN 30",
+     "feedback": "Right: the camera believes the recorder is local, sends ARP, and nothing in VLAN 30 answers, so the frames are never sent."
+    },
+    {
+     "id": "c",
+     "label": "It works through the default gateway",
+     "feedback": "The camera only uses its gateway for addresses outside its subnet, and here the recorder looks local, so the gateway is never asked."
+    }
+   ],
+   "correctId": "b",
+   "reveal": "A VLAN and a subnet should match one to one. Give VLAN 40 its own subnet and a gateway on a layer 3 switch, then allow only camera-to-recorder traffic in the rules between them."
+  },
+  "seeAlso": [
+   {
+    "topicId": 245,
+    "why": "ARP and switch learning, which VLANs divide into separate domains"
+   },
+   {
+    "topicId": 243,
+    "why": "Subnets, which should match VLANs one to one"
+   },
+   {
+    "topicId": 549,
+    "why": "Overlays, which replace VLANs when millions of networks are needed"
+   }
+  ]
+ },
+ {
+  "id": 601,
+  "slug": "dhcp-and-slaac",
+  "region": "f3-networking",
+  "order": 25,
+  "title": "DHCP and SLAAC: How a Host Gets Its Address",
+  "kind": "lesson",
+  "objectives": [
+   "Trace the four DHCP messages that give a new device its address and settings",
+   "Size an address pool from lease length and how many devices come and go",
+   "Explain how IPv6 hosts form their own addresses with SLAAC"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 11,
+  "prereqIds": [
+   242,
+   245
+  ],
+  "cards": [
+   {
+    "id": "t601-c1",
+    "kind": "text",
+    "title": "A device with no address asks for one",
+    "body": "A device that joins a network has no address yet, so it cannot unicast to anyone. With DHCP (RFC 2131) it broadcasts a Discover from address 0.0.0.0 over UDP; a server answers with an Offer of an address, subnet mask, gateway and DNS servers; the device broadcasts a Request for that offer; and the server confirms with an Acknowledgement. The address is a lease: it is the device’s only for the time the server grants.",
+    "teaches": [
+     "dhcp-dora"
+    ]
+   },
+   {
+    "id": "t601-c2",
+    "kind": "diagram",
+    "title": "Discover, Offer, Request, Acknowledge",
+    "body": "Four messages, two from each side, often remembered as DORA.",
+    "teaches": [
+     "dhcp-dora",
+     "dhcp-relay"
+    ],
+    "steps": [
+     "A phone joins the Wi-Fi and broadcasts DHCPDISCOVER to UDP port 67",
+     "The router, acting as a relay, forwards it as unicast to the central DHCP server, stamping its own address so the server knows which subnet to choose from",
+     "The server replies with DHCPOFFER: 10.8.4.57/22, gateway 10.8.4.1, DNS servers and a lease of 8 hours",
+     "The phone broadcasts DHCPREQUEST naming that server, which also tells any other server their offers were declined",
+     "The server commits the lease and sends DHCPACK; the phone may check by ARP that no one else uses the address"
+    ]
+   },
+   {
+    "id": "t601-c3",
+    "kind": "diagram",
+    "title": "Worked example: why a guest network ran out of addresses",
+    "body": "A pool must cover every device holding a lease, including ones that left hours ago.",
+    "teaches": [
+     "lease-sizing"
+    ],
+    "steps": [
+     "Guest Wi-Fi in a hotel lobby uses a /24: 254 usable addresses, minus the gateway, so 253 for guests",
+     "About 60 new devices join every hour; most stay 30 minutes but keep their lease until it expires (illustrative)",
+     "With 24-hour leases, addresses stay held for a day: 60 × 24 = 1,440 leases needed, far above 253",
+     "With 2-hour leases: 60 × 2 = 120 held, plus devices still present, comfortably under 253",
+     "Alternatively keep 24 hours and widen to a /21 (2,046 usable), if the address plan allows"
+    ],
+    "note": "Result. Held leases ≈ arrivals per hour × lease hours, so short leases for transient devices or a larger pool fix exhaustion; a long lease only suits devices that stay."
+   },
+   {
+    "id": "t601-c4",
+    "kind": "text",
+    "title": "Renewing before the lease runs out",
+    "body": "A client does not wait until the end. At T1, by default half the lease, it asks the same server directly to extend. If that server does not answer, at T2, by default 87.5% of the lease, it broadcasts to any server. If the lease expires with no answer, it must stop using the address. This is why a DHCP outage is invisible for hours: devices keep working until their leases end, and new arrivals fail first.",
+    "teaches": [
+     "lease-renewal"
+    ]
+   },
+   {
+    "id": "t601-c5",
+    "kind": "text",
+    "title": "IPv6 hosts can number themselves",
+    "body": "On IPv6, routers send Router Advertisements announcing the network’s prefix, normally a /64. With SLAAC (RFC 4862) a host combines that prefix with a 64-bit identifier it generates itself, checks that no neighbour uses the result, and starts using it, with no server holding state. Privacy extensions (RFC 8981) add temporary addresses that change regularly, so a device is harder to track across networks. DHCPv6 (RFC 8415) still exists for networks that want a server to hand out and record addresses.",
+    "teaches": [
+     "slaac"
+    ]
+   },
+   {
+    "id": "t601-c6",
+    "kind": "text",
+    "title": "Trap: a rogue DHCP server on the network",
+    "body": "Clients accept the first suitable offer, and DHCP has no built-in authentication. A home router plugged into an office port, or an attacker’s laptop, can hand out wrong gateways and DNS servers, sending traffic to the wrong place or nowhere. Managed switches offer DHCP snooping: only ports marked as trusted, towards the real servers, may send offers and acknowledgements.",
+    "teaches": [
+     "rogue-dhcp"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t601-a1",
+    "concept": "dhcp-dora",
+    "type": "multiple_choice",
+    "prompt": "Why does a new device broadcast its first DHCP message instead of sending it to a server?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Broadcasts are faster than unicast messages"
+     },
+     {
+      "id": "b",
+      "label": "DHCP servers listen only for broadcasts"
+     },
+     {
+      "id": "c",
+      "label": "It has no address and does not know the server’s"
+     },
+     {
+      "id": "d",
+      "label": "The switch requires a broadcast before learning its port"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Before DHCP finishes it has neither its own address nor the server’s. Broadcasts are not faster; servers also receive unicast renewals; and switches learn ports from any frame, not only broadcasts."
+   },
+   {
+    "id": "t601-a2",
+    "concept": "dhcp-relay",
+    "type": "multiple_choice",
+    "prompt": "The DHCP server sits in a data centre, but phones join Wi-Fi in a branch subnet. How do their broadcasts reach it?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The branch router relays them as unicast, noting the subnet they came from"
+     },
+     {
+      "id": "b",
+      "label": "Routers forward broadcasts to every connected network"
+     },
+     {
+      "id": "c",
+      "label": "The phones learn the server address from DNS first"
+     },
+     {
+      "id": "d",
+      "label": "The server sends offers to the branch every few seconds unasked"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "A relay agent turns the local broadcast into a unicast and fills in its own address, which tells the server which pool to use. Routers do not forward broadcasts; phones cannot use DNS before they have an address; and servers do not push offers unasked."
+   },
+   {
+    "id": "t601-a3",
+    "concept": "lease-renewal",
+    "type": "multiple_choice",
+    "prompt": "A device holds an 8-hour lease. When does it first try to renew, by default?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "After 1 hour"
+     },
+     {
+      "id": "b",
+      "label": "After 4 hours"
+     },
+     {
+      "id": "c",
+      "label": "After 7 hours"
+     },
+     {
+      "id": "d",
+      "label": "When the 8 hours run out"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "T1 defaults to half the lease, 4 hours, when it asks the same server. 7 hours is T2 (87.5%), when it broadcasts to any server; 1 hour is not a protocol timer; and waiting for expiry would leave it without an address."
+   },
+   {
+    "id": "t601-a4",
+    "concept": "lease-sizing",
+    "type": "multiple_choice",
+    "prompt": "A café’s guest network keeps running out of addresses at lunchtime though only 40 people are inside. What is the likely fix?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Shorter leases, so departed devices free addresses sooner"
+     },
+     {
+      "id": "b",
+      "label": "A second DHCP server handing out the same pool"
+     },
+     {
+      "id": "c",
+      "label": "Longer leases, so devices renew less often"
+     },
+     {
+      "id": "d",
+      "label": "Turning off the ARP check on offered addresses"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Leases held by people who already left fill the pool, so shorter leases free them sooner. Two servers sharing one pool can hand out duplicates; longer leases make exhaustion worse; and ARP checks only catch conflicts."
+   },
+   {
+    "id": "t601-a5",
+    "concept": "slaac",
+    "type": "multiple_choice",
+    "prompt": "How does an IPv6 host using SLAAC get its address?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A DHCPv6 server assigns one from a pool"
+     },
+     {
+      "id": "b",
+      "label": "The router assigns one in its advertisement"
+     },
+     {
+      "id": "c",
+      "label": "It uses its MAC address as the full address"
+     },
+     {
+      "id": "d",
+      "label": "It combines the advertised prefix with an identifier it makes"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "The router announces the /64 prefix and the host builds the last 64 bits itself, then checks for duplicates. DHCPv6 is a separate, stateful option; the router announces a prefix, not a host address; and a MAC address is 48 bits, not a full 128-bit address (modern hosts avoid embedding it for privacy)."
+   },
+   {
+    "id": "t601-a6",
+    "concept": "dhcp-dora",
+    "type": "drag_order",
+    "prompt": "Order the messages when a laptop first gets an address by DHCP.",
+    "items": [
+     {
+      "id": "s2",
+      "label": "A server sends an Offer"
+     },
+     {
+      "id": "s4",
+      "label": "The server sends an Acknowledgement"
+     },
+     {
+      "id": "s1",
+      "label": "The laptop broadcasts a Discover"
+     },
+     {
+      "id": "s5",
+      "label": "The laptop starts using the address until T1"
+     },
+     {
+      "id": "s3",
+      "label": "The laptop broadcasts a Request naming that server"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Discover, Offer, Request, Acknowledge; the Request is broadcast so other servers know their offers were declined."
+   },
+   {
+    "id": "t601-a7",
+    "concept": "lease-sizing",
+    "type": "estimation",
+    "prompt": "About 45 new devices join a network each hour and each keeps its lease for its full 12 hours. How many leases are held at once?",
+    "unit": "leases",
+    "target": 540,
+    "assumptions": [
+     "Steady arrivals",
+     "Every device keeps its lease until expiry"
+    ],
+    "formula": "arrivals per hour × lease hours",
+    "workedAnswer": "45 × 12 = 540",
+    "explanation": "Design implication: a /24 with 253 usable addresses would run out; halve the lease to 6 hours (270 held) and it is still too small, so either shorten to about 4 hours or use a /22.",
+    "tolerance": 0.05,
+    "trapAnswers": [
+     45,
+     270,
+     1080
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t601-f1",
+    "front": "DORA?",
+    "back": "Discover, Offer, Request, Acknowledge: the four DHCP messages that grant a lease."
+   },
+   {
+    "id": "t601-f2",
+    "front": "T1 and T2?",
+    "back": "Renew with the same server at 50% of the lease; broadcast to any server at 87.5%."
+   },
+   {
+    "id": "t601-f3",
+    "front": "SLAAC?",
+    "back": "An IPv6 host forms its own address from the advertised /64 prefix, with no server state."
+   }
+  ],
+  "sources": [
+   {
+    "title": "RFC 2131: Dynamic Host Configuration Protocol",
+    "url": "https://www.rfc-editor.org/rfc/rfc2131"
+   },
+   {
+    "title": "RFC 4862: IPv6 Stateless Address Autoconfiguration",
+    "url": "https://www.rfc-editor.org/rfc/rfc4862"
+   },
+   {
+    "title": "RFC 8981: Temporary Address Extensions for Stateless Address Autoconfiguration in IPv6",
+    "url": "https://www.rfc-editor.org/rfc/rfc8981"
+   },
+   {
+    "title": "RFC 8415: Dynamic Host Configuration Protocol for IPv6 (DHCPv6)",
+    "url": "https://www.rfc-editor.org/rfc/rfc8415"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "dhcp-dora",
+    "lease-renewal",
+    "slaac"
+   ],
+   "mechanism": {
+    "title": "How a host goes from no address to a working one",
+    "steps": [
+     "A host joining an IPv4 network starts with no address. It sends DHCPDISCOVER from 0.0.0.0 to the broadcast address on UDP port 67, with a random transaction ID so it can match replies, and its hardware address so a server can reach it.",
+     "Each server that can serve the subnet sends DHCPOFFER with an address and options: mask, default gateway, DNS servers, lease time. If the server sits on another subnet, a relay agent on the local router forwards the broadcast as unicast and records its own address in the message, which the server uses to choose a pool for that subnet.",
+     "The host picks one offer and broadcasts DHCPREQUEST naming the chosen server. The chosen server records the lease and replies with DHCPACK; the others treat the request as a polite no. The host may send an ARP probe for the address and, if someone answers, declines it and starts over.",
+     "The lease starts a clock. At T1, by default half the lease, the host unicasts a renewal to its server; at T2, by default seven-eighths of the lease, it broadcasts to any server; at expiry it must stop using the address. When the host leaves, it may send DHCPRELEASE, but phones that walk out of range usually do not, so their leases simply run out.",
+     "IPv6 networks usually work differently. Routers multicast Router Advertisements with the prefix and flags. With SLAAC, the host appends its own 64-bit interface identifier, runs duplicate address detection with its neighbours, and starts using the address; privacy extensions add short-lived temporary addresses. Flags in the advertisement can tell hosts to use DHCPv6 instead, or as well, for addresses or for options such as DNS servers."
+    ]
+   },
+   "useWhen": [
+    "Any network where devices join and leave without manual configuration.",
+    "Giving each subnet the right gateway and DNS servers from one central place."
+   ],
+   "avoidWhen": [
+    "Avoid DHCP for core infrastructure such as routers and DNS servers themselves; give them static addresses.",
+    "Avoid long leases on networks full of short visits."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Approach",
+     "Server keeps state",
+     "Typical use"
+    ],
+    "rows": [
+     [
+      "DHCPv4",
+      "Yes, every lease",
+      "Almost every IPv4 network"
+     ],
+     [
+      "SLAAC",
+      "No",
+      "Most IPv6 client networks"
+     ],
+     [
+      "DHCPv6 (stateful)",
+      "Yes",
+      "IPv6 networks that must record who had which address"
+     ],
+     [
+      "Static addressing",
+      "No (manual records)",
+      "Routers, DNS and other infrastructure"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Sizing a guest pool from arrivals and lease time",
+    "assumptions": [
+     "A railway waiting hall: about 400 new devices per hour at peak (illustrative)",
+     "Lease length L hours; visits mostly under an hour"
+    ],
+    "steps": [
+     "Held leases ≈ arrivals per hour × L.",
+     "With L = 24: 400 × 24 = 9,600 leases, which needs a /18 (16,382 usable) or larger.",
+     "With L = 1: 400 × 1 = 400 leases, plus margin for bursts: a /22 (1,022 usable) has room.",
+     "Renewals at T1 = 30 minutes: devices still present renew about 2 times an hour, a small load for a DHCP server."
+    ],
+    "result": "Cutting the lease from a day to an hour shrinks the pool needed from about 9,600 addresses to about 400 under these assumptions."
+   },
+   "india": {
+    "title": "Wi-Fi at a busy railway station",
+    "label": "Illustrative example",
+    "body": "A station Wi-Fi in a city such as Lucknow sees hundreds of phones arrive and leave every hour, most staying under an hour. If the network hands out day-long leases, its pool fills by mid-morning and new arrivals connect to Wi-Fi but get no address, which users see as “connected, no internet”. Short leases keep the number of held addresses close to the number of phones actually present, and DHCP snooping on the access switches stops a passenger’s portable router from handing out its own addresses."
+   },
+   "pitfalls": [
+    {
+     "trap": "“The DHCP server is down but everything still works, so it is fine.”",
+     "say": "“Existing devices keep their leases until T1 and T2 fail; new arrivals break first and the rest follow as leases expire.”"
+    },
+    {
+     "trap": "“Make leases longer to reduce load.”",
+     "say": "“Renewals are cheap; long leases on a busy guest network exhaust the pool. I’d size the pool from arrivals × lease time.”"
+    }
+   ],
+   "takeaways": [
+    "DHCP grants a lease in four messages: Discover, Offer, Request, Acknowledge.",
+    "Relay agents carry broadcasts to a central server and tell it which subnet to serve.",
+    "Held leases ≈ arrivals per hour × lease hours; size pools and leases together.",
+    "IPv6 hosts usually form their own addresses with SLAAC from the router’s /64 prefix."
+   ]
+  },
+  "interactive": {
+   "kind": "slider",
+   "title": "Size the guest pool",
+   "prompt": "About 60 devices join a guest network each hour and keep 8-hour leases, so about 480 leases are held at once. Slide the prefix length and find the smallest subnet that fits.",
+   "model": "cidr-hosts",
+   "params": {
+    "need": 480
+   },
+   "control": {
+    "label": "Prefix length",
+    "min": 20,
+    "max": 28,
+    "step": 1,
+    "initial": 24,
+    "unit": "/"
+   },
+   "takeaway": "A /24 holds 254 hosts and runs out; a /23 holds 510, just enough with little margin. Shortening the lease to 2 hours would bring the need down to about 120 and let the /24 work."
+  },
+  "seeAlso": [
+   {
+    "topicId": 242,
+    "why": "IPv4 and IPv6 addresses, which DHCP and SLAAC hand out"
+   },
+   {
+    "topicId": 245,
+    "why": "ARP, which DHCP clients use to check that an offered address is free"
+   },
+   {
+    "topicId": 243,
+    "why": "Subnet sizing, which sets how many leases a pool can hold"
+   }
+  ]
  }
 ]
