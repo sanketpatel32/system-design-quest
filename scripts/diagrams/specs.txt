@@ -1058,3 +1058,79 @@ Vendor script [inventory with owner and budget]~> Review each quarter
 Idle [submit]> Loading [response ok]> Success
 Loading [failure]> Error [retry]> Loading
 Loading [submit again: ignored]~> Loading
+@531 Money from request to storage: the API checks the idempotency key against the request body, parses the decimal string into integer minor units using the currency's ISO 4217 digits, rounds once at a named step and stores the amount with its currency.
+Request|"499.99" INR + key {client} > Idempotency check|key + body hash {svc}
+Idempotency check|key + body hash [same key, new amount]?> Rejected|client bug {concept}
+ISO 4217 table|INR = 2 digits {store} > Parse|49999 paise {svc}
+Idempotency check|key + body hash > Parse|49999 paise
+Parse|49999 paise > Tax and splits|round once, allocate rest {svc}
+Tax and splits|round once, allocate rest > Payments table|49999 + INR {store}
+
+@711 Scheduling a local-time job: the service stores 09:00 with the IANA zone, looks up that date's UTC offset in the time-zone database, converts it to a UTC instant and enqueues the job, then repeats from the next calendar date.
+Schedule|09:00 America/New_York {store} > Scheduler {svc}
+Time zone database|tzdata {store} > Scheduler
+Scheduler [9 Mar: UTC-4, so 13:00 UTC]> Job queue {queue}
+Job queue > Worker {svc}
+Worker [next calendar day, not +24 h]~> Scheduler
+
+@712 Text through a service: the API decodes UTF-8 and rejects bad bytes, normalises to NFC, builds a case-folded key for identifiers, checks limits in a named unit and stores UTF-8 with a unique index on the key.
+Request body|UTF-8 bytes {client} > Decode|reject invalid bytes {svc}
+Decode|reject invalid bytes > Normalise|NFC {svc}
+Normalise|NFC > Username key|NFKC + case fold {svc}
+Username key|NFKC + case fold > Users table|unique index on key {store}
+Normalise|NFC [limit in visible characters]> Users table|unique index on key
+
+@713 Explicit field shapes: a request body is parsed into the endpoint's input type, unknown fields are rejected, allowed fields are applied to the model, and the response is mapped to a per-role shape instead of the whole row.
+Client {client} [name + role]> Input type|name, avatar, bio {svc}
+Input type|name, avatar, bio [unknown field: role]?> 400 Bad Request {concept}
+Input type|name, avatar, bio [allowed fields]> Users table|all columns, incl. role {store}
+Users table|all columns, incl. role > Response type|public profile {svc}
+Response type|public profile [name + avatar only]> Client
+
+@535 A long-running operation: the API replies 202 with a status URL, a worker runs the job and updates its status, and the client polls with Retry-After until done, then downloads the result.
+Client {client} [POST + Idempotency-Key]> API {svc}
+API [202 + Location]> Client
+API > Job queue {queue} > Worker {svc}
+Worker > Operation status|queued, running, done {store}
+Client [poll, Retry-After]~> Operation status|queued, running, done
+Worker > Result file|expires in 7 days {store}
+
+@536 Test levels for a service: unit tests cover pure logic, integration tests run against a real database, contract tests check consumers' expectations, and a few end-to-end tests cover key journeys.
+Unit tests|pure logic {concept} > Service code {svc}
+Integration tests {concept} > Real database|fresh, migrated {store}
+Service code > Real database|fresh, migrated
+Consumer contracts {client} [replayed in provider build]> Service code
+End-to-end|a few journeys {concept} ~> Service code
+
+@537 Deleting an account across services: the API marks the account deleting and writes an event to the outbox, each owning service deletes its data and acknowledges to a tracker that retries stragglers, and a tombstone blocks late writes.
+Delete account {client} > Accounts API|mark deleting {svc}
+Accounts API|mark deleting [UserDeleted via outbox]> Event bus {queue}
+Event bus > Orders service {svc}
+Event bus > Search service {svc}
+Orders service [ack]~> Deletion tracker|status per service {store}
+Search service [ack]~> Deletion tracker|status per service
+Late retried update {ext} [tombstone: dropped]?> Accounts API|mark deleting
+
+@538 A resumable batch job: it reads a checkpoint, fetches the next chunk by key, writes it in a short transaction with the new checkpoint, and pauses when replica lag passes its limit.
+Checkpoint|last id 1,240,000 {store} > Batch job {svc}
+Batch job [id > last, LIMIT 2000]> Primary database {store}
+Batch job [write chunk + checkpoint]> Primary database
+Primary database ~> Replica {store}
+Replica [lag over 1 s, pause]?> Batch job
+
+@539 Carrying the actor through a refund: the API builds an actor context from the agent's session, the job payload carries it, the worker passes it to the payments service with its own credentials, and every hop records both the actor and the caller.
+Support agent|ticket SUP-4410 {client} > API|actor context {svc}
+API|actor context [actor = agent 17]> Job queue {queue}
+Job queue > Refund worker {svc}
+Refund worker [caller + original actor]> Payments service {svc}
+Payments service > Audit records|actor, on behalf of, caller {store}
+Customer activity log {client} [own tenant only]> Audit records|actor, on behalf of, caller
+
+@540 A connection gateway fleet: clients hold long-lived connections to gateways, gateways subscribe to user channels in pub/sub, and services publish messages after storing them with sequence numbers.
+Phone {client} [WebSocket]> Gateway A {svc}
+Laptop {client} [SSE stream]> Gateway B {svc}
+Chat service {svc} [store with seq]> Message store {store}
+Chat service [publish user channel]> Pub/sub {queue}
+Pub/sub ~> Gateway A
+Pub/sub ~> Gateway B
+Gateway A [reconnect: replay after seq 41]?> Message store
