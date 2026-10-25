@@ -431,6 +431,10 @@
    {
     "topicId": 19,
     "why": "How CDNs deliver the HTML and CSS this pipeline starts from"
+   },
+   {
+    "topicId": 528,
+    "why": "How the cascade, specificity and layers decide which rule wins"
    }
   ]
  },
@@ -877,7 +881,7 @@
     "id": "t203-c2",
     "kind": "text",
     "title": "Misconception: a zero-delay timer runs immediately",
-    "body": "A timer with a 0 ms delay only queues a task. It runs after the current script finishes and after all microtasks, such as resolved promise callbacks, so it is the last of the three in the example below.",
+    "body": "A timer with a 0 ms delay only queues a task. It runs after the current script finishes and after all microtasks, such as resolved promise callbacks. So a script that logs a line, schedules a zero-delay timer and then resolves a promise prints: the log line, then the promise callback, then the timer.",
     "teaches": [
      "tasks-microtasks",
      "callback-order"
@@ -920,10 +924,10 @@
    {
     "id": "t203-c6",
     "kind": "text",
-    "title": "Edge case: microtasks can starve rendering",
-    "body": "All microtasks queued during a task run before the browser may render, including microtasks queued by other microtasks. A promise chain that keeps scheduling more promise callbacks never gives the browser a chance to paint, even though no single callback is long. Break such loops into separate tasks so rendering can happen between them.",
+    "title": "Edge case: timers in background tabs",
+    "body": "Browsers throttle timers in hidden tabs to save battery, typically to at most about one run per second. Chromium goes further for pages hidden for around five minutes, batching chained timers to about once a minute. A countdown or clock that adds one second per timer tick therefore drifts badly in a background tab. Compute elapsed time from the clock on each tick instead of counting ticks, and refresh the display when the page becomes visible again.",
     "teaches": [
-     "tasks-microtasks"
+     "callback-order"
     ]
    }
   ],
@@ -1367,10 +1371,10 @@
    {
     "id": "t204-c6",
     "kind": "text",
-    "title": "Edge case: hydration mismatches",
-    "body": "Hydration expects the browser’s first render to produce the same markup as the server. Values that differ between the two, such as the current time, a random id, the user’s locale or anything read from browser storage, make the markup disagree. Frameworks then warn and re-render that part, losing the benefit of server rendering. Render such values after hydration or pass them from the server.",
+    "title": "Edge case: the hidden cost of hydration",
+    "body": "Server rendering with hydration sends the content twice: once as HTML, and again as serialised data the script needs to rebuild the same state. The page also looks ready before it can respond. A click in the gap between first paint and hydration may do nothing, or be replayed later, depending on the framework. Measure that gap on a mid-range phone, keep the serialised state small, and make key links and forms work as plain HTML so early clicks still go somewhere.",
     "teaches": [
-     "models"
+     "hydration"
     ]
    }
   ],
@@ -1439,7 +1443,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "Hydration with no server and no script"
+      "label": "Static generation with pages rebuilt each hour"
      },
      {
       "id": "b",
@@ -1457,7 +1461,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Per-user, frequently changing data cannot be built once for everyone."
+    "explanation": "Per-user data that changes every few seconds cannot be built once for everyone, so it needs rendering at request time, on the server or in the browser. Build-time generation, hourly rebuilds and a weekly file all serve the same stale page to every visitor."
    },
    {
     "id": "t204-a4",
@@ -1727,6 +1731,10 @@
    {
     "topicId": 19,
     "why": "CDNs serve statically generated pages close to readers"
+   },
+   {
+    "topicId": 523,
+    "why": "Client-side routing for the pages rendered here"
    }
   ]
  },
@@ -2232,7 +2240,7 @@
     "id": "t206-c4",
     "kind": "text",
     "title": "Sizes and lifetimes",
-    "body": "Browsers keep at least 4 KB per cookie (RFC 6265 sets that as a minimum to support). Web storage is usually limited to about 5 MiB per origin. IndexedDB can use far more, subject to the browser’s storage quota. sessionStorage ends with the tab; the others persist until cleared or expired.",
+    "body": "Each cookie is limited to about 4 KB: RFC 6265 asks browsers to support at least 4,096 bytes per cookie, and most cap it close to that. Web storage is usually limited to about 5 MiB per origin. IndexedDB can use far more, subject to the browser’s storage quota. sessionStorage ends with the tab; the others persist until cleared or expired.",
     "teaches": [
      "storage-options"
     ]
@@ -2517,7 +2525,7 @@
     "rows": [
      [
       "Cookie",
-      "At least 4 KB each",
+      "About 4 KB each",
       "Yes, every matching request",
       "Unless HttpOnly",
       "Header / string"
@@ -3248,7 +3256,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "CSP limits which scripts execute, reducing the impact of an injection."
+    "explanation": "CSP limits which scripts the page will execute, which reduces the impact of an injection that slips past encoding. It does not encrypt anything and cannot replace server-side validation, and any limits it places on where the page sends requests are secondary to stopping the injected script from running."
    },
    {
     "id": "t208-a5",
@@ -3504,6 +3512,10 @@
    {
     "topicId": 234,
     "why": "Injection in the browser: the same mistake in HTML instead of SQL"
+   },
+   {
+    "topicId": 521,
+    "why": "Content Security Policy and Subresource Integrity in depth"
    }
   ]
  },
@@ -3934,7 +3946,17 @@
    ],
    "correctId": "a",
    "reveal": "Use a button element with an accessible name, such as visually hidden text or aria-label=\"Close\". It becomes focusable, is announced as “Close, button” and works with Enter and Space."
-  }
+  },
+  "seeAlso": [
+   {
+    "topicId": 526,
+    "why": "Focus management for dialogs, menus and live regions"
+   },
+   {
+    "topicId": 524,
+    "why": "Right-to-left layouts and locale-aware text for all users"
+   }
+  ]
  },
  {
   "id": 210,
@@ -4321,6 +4343,10 @@
    {
     "topicId": 119,
     "why": "Latency numbers worth remembering"
+   },
+   {
+    "topicId": 525,
+    "why": "Measuring these metrics from real users in the field"
    }
   ]
  },
@@ -4764,6 +4790,14 @@
    {
     "topicId": 19,
     "why": "CDNs that serve and resize images at the edge"
+   },
+   {
+    "topicId": 522,
+    "why": "Loading web fonts without blocking or shifting text"
+   },
+   {
+    "topicId": 529,
+    "why": "Third-party scripts, often the biggest source of extra bytes"
    }
   ]
  },
@@ -5198,6 +5232,10 @@
    {
     "topicId": 40,
     "why": "Idempotency keys across services"
+   },
+   {
+    "topicId": 524,
+    "why": "Locale formats, plural rules and dates in messages"
    }
   ]
  },
@@ -5628,6 +5666,10 @@
    {
     "topicId": 16,
     "why": "Cache invalidation strategies on the server side"
+   },
+   {
+    "topicId": 530,
+    "why": "State machines that make UI states explicit"
    }
   ]
  },
