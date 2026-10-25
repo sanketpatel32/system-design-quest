@@ -87,7 +87,7 @@ export const regions: RegionMeta[] = [
   },
   // Fundamentals track: language-agnostic foundations, IDs 200+ so system-design progress (1–120) never moves
   { id: 'f1-frontend', name: 'Frontend', subtitle: 'How the browser works', theme: 'sky', topicIds: [...range(201, 220), ...range(341, 346)], track: 'fundamentals' },
-  { id: 'f2-backend', name: 'Backend', subtitle: 'How servers handle work', theme: 'green', topicIds: [...range(221, 240), ...range(351, 356), ...range(531, 540)], track: 'fundamentals' },
+  { id: 'f2-backend', name: 'Backend', subtitle: 'How servers handle work', theme: 'green', topicIds: [...range(221, 240), ...range(351, 356), 531, 711, 712, 713, ...range(535, 540)], track: 'fundamentals' },
   { id: 'f3-networking', name: 'Networking', subtitle: 'How packets get there', theme: 'violet', topicIds: range(241, 260), track: 'fundamentals' },
   { id: 'f4-databases', name: 'Databases', subtitle: 'How data is stored and queried', theme: 'emerald', topicIds: range(261, 280), track: 'fundamentals' },
   { id: 'f5-os', name: 'Operating Systems & Concurrency', subtitle: 'How programs share one machine', theme: 'teal', topicIds: range(281, 300), track: 'fundamentals' },

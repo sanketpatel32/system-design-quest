@@ -1010,33 +1010,34 @@ Admission check|in-flight limit [over limit]?> 503|Retry-After {client}
 Producer stage {svc} > Bounded queue {queue} > Workers
 Bounded queue [full, slow down]~> Producer stage
 
-@531 Money in a double-entry ledger: an amount is parsed into integer paise with a currency code, posted as two rows that sum to zero under a unique transfer id, and balances are sums of rows.
-Request|"499.99 INR" {client} > Parse|49999 paise + INR {svc}
-Parse|49999 paise + INR > Journal entry|transfer id unique {svc}
-Journal entry|transfer id unique > Ledger rows|A -50000, B +50000 {store}
-Journal entry|transfer id unique [retry, same id]?> Rejected|return first result {concept}
-Ledger rows|A -50000, B +50000 [sum of rows]> Balances {store}
+@531 Money from request to storage: the API checks the idempotency key against the request body, parses the decimal string into integer minor units using the currency's ISO 4217 digits, rounds once at a named step and stores the amount with its currency.
+Request|"499.99" INR + key {client} > Idempotency check|key + body hash {svc}
+Idempotency check|key + body hash [same key, new amount]?> Rejected|client bug {concept}
+ISO 4217 table|INR = 2 digits {store} > Parse|49999 paise {svc}
+Idempotency check|key + body hash > Parse|49999 paise
+Parse|49999 paise > Tax and splits|round once, allocate rest {svc}
+Tax and splits|round once, allocate rest > Payments table|49999 + INR {store}
 
-@532 Event sourcing with CQRS: a command loads an entity by replaying its events, appends a new event with an expected version, and projections update read models that queries use.
-Command|withdraw 200 {client} > Write model|replay + check rules {svc}
-Write model|replay + check rules [append, expect v42]> Event store {store}
-Write model|replay + check rules [stream moved on]?> Conflict|reload and retry {concept}
-Event store ~> Projection {svc} > Read model|balances {store}
-Query {client} > Read model|balances
+@711 Scheduling a local-time job: the service stores 09:00 with the IANA zone, looks up that date's UTC offset in the time-zone database, converts it to a UTC instant and enqueues the job, then repeats from the next calendar date.
+Schedule|09:00 America/New_York {store} > Scheduler {svc}
+Time zone database|tzdata {store} > Scheduler
+Scheduler [9 Mar: UTC-4, so 13:00 UTC]> Job queue {queue}
+Job queue > Worker {svc}
+Worker [next calendar day, not +24 h]~> Scheduler
 
-@533 Multi-tenant request flow: the server resolves the tenant from the session, scopes every query, cache key and file path by it, and caps each tenant's share of shared workers.
-Request|session token {client} > Auth|resolve tenant {svc}
-Auth|resolve tenant > Query|WHERE tenant_id = T {svc} > Shared tables|row-level security {store}
-Auth|resolve tenant > Cache key|T:report {store}
-Auth|resolve tenant > Job queue|cap per tenant {queue}
-Body says tenant B {ext} [ignored]?> Auth|resolve tenant
+@712 Text through a service: the API decodes UTF-8 and rejects bad bytes, normalises to NFC, builds a case-folded key for identifiers, checks limits in a named unit and stores UTF-8 with a unique index on the key.
+Request body|UTF-8 bytes {client} > Decode|reject invalid bytes {svc}
+Decode|reject invalid bytes > Normalise|NFC {svc}
+Normalise|NFC > Username key|NFKC + case fold {svc}
+Username key|NFKC + case fold > Users table|unique index on key {store}
+Normalise|NFC [limit in visible characters]> Users table|unique index on key
 
-@534 Fan-out and hedging: a request waits for every shard, so one slow shard sets its latency; a hedged read sends a second copy after the p95 delay and takes the first reply.
-Search request {client} > Shard 1 {svc}
-Search request > Shard 2 {svc}
-Search request [waits for all]> Shard 100|slow 1% of calls {ext}
-Read {client} > Replica A {store}
-Read [after p95, hedge]~> Replica B {store}
+@713 Explicit field shapes: a request body is parsed into the endpoint's input type, unknown fields are rejected, allowed fields are applied to the model, and the response is mapped to a per-role shape instead of the whole row.
+Client {client} [name + role]> Input type|name, avatar, bio {svc}
+Input type|name, avatar, bio [unknown field: role]?> 400 Bad Request {concept}
+Input type|name, avatar, bio [allowed fields]> Users table|all columns, incl. role {store}
+Users table|all columns, incl. role > Response type|public profile {svc}
+Response type|public profile [name + avatar only]> Client
 
 @535 A long-running operation: the API replies 202 with a status URL, a worker runs the job and updates its status, and the client polls with Retry-After until done, then downloads the result.
 Client {client} [POST + Idempotency-Key]> API {svc}
@@ -1053,13 +1054,14 @@ Service code > Real database|fresh, migrated
 Consumer contracts {client} [replayed in provider build]> Service code
 End-to-end|a few journeys {concept} ~> Service code
 
-@537 Data deletion paths: a soft delete gives a grace period, then a scheduled job erases or anonymises the data across the main tables, caches, search index and logs, and deleting a per-person key covers backups.
-Delete account {client} > Soft delete|deleted_at set {store}
-Soft delete|deleted_at set [after 30 days]~> Erasure job {svc}
-Erasure job > Main tables|erase or anonymise {store}
-Erasure job > Cache + search index {store}
-Erasure job > Per-person key {store}
-Per-person key [deleted]?> Backups unreadable {concept}
+@537 Deleting an account across services: the API marks the account deleting and writes an event to the outbox, each owning service deletes its data and acknowledges to a tracker that retries stragglers, and a tombstone blocks late writes.
+Delete account {client} > Accounts API|mark deleting {svc}
+Accounts API|mark deleting [UserDeleted via outbox]> Event bus {queue}
+Event bus > Orders service {svc}
+Event bus > Search service {svc}
+Orders service [ack]~> Deletion tracker|status per service {store}
+Search service [ack]~> Deletion tracker|status per service
+Late retried update {ext} [tombstone: dropped]?> Accounts API|mark deleting
 
 @538 A resumable batch job: it reads a checkpoint, fetches the next chunk by key, writes it in a short transaction with the new checkpoint, and pauses when replica lag passes its limit.
 Checkpoint|last id 1,240,000 {store} > Batch job {svc}
@@ -1068,12 +1070,13 @@ Batch job [write chunk + checkpoint]> Primary database
 Primary database ~> Replica {store}
 Replica [lag over 1 s, pause]?> Batch job
 
-@539 An audited change: the service writes the order update and the audit row in one transaction, a relay copies committed audit rows to an append-only store, and investigators search that store.
-Support agent {client} [refund order 81]> Refund service {svc}
-Refund service [one transaction]> Orders + audit table {store}
-Orders + audit table ~> Audit relay {svc}
-Audit relay [hash-chained rows]> Append-only audit store {store}
-Investigator {client} [search by actor, target, time]> Append-only audit store
+@539 Carrying the actor through a refund: the API builds an actor context from the agent's session, the job payload carries it, the worker passes it to the payments service with its own credentials, and every hop records both the actor and the caller.
+Support agent|ticket SUP-4410 {client} > API|actor context {svc}
+API|actor context [actor = agent 17]> Job queue {queue}
+Job queue > Refund worker {svc}
+Refund worker [caller + original actor]> Payments service {svc}
+Payments service > Audit records|actor, on behalf of, caller {store}
+Customer activity log {client} [own tenant only]> Audit records|actor, on behalf of, caller
 
 @540 A connection gateway fleet: clients hold long-lived connections to gateways, gateways subscribe to user channels in pub/sub, and services publish messages after storing them with sequence numbers.
 Phone {client} [WebSocket]> Gateway A {svc}
