@@ -130,6 +130,31 @@ for tid, path, old, new in TEXT:
     put(BY[tid], path, cur.replace(old, new))
     LOG.append(f'{tid} {".".join(map(str, path))}: {old[:50]!r} -> {new[:60]!r}')
 
+# Review fixes (review/cloud): the correct choice of t323-a4 was the shortest option by far, and the DORA
+# source pointed at the State of DevOps landing page rather than the metrics definition.
+REVIEW_CORRECT_LABELS = {'t323-a4': ('c', 'Change fail rate of deployments')}
+for qid, (cid, label) in REVIEW_CORRECT_LABELS.items():
+    q = next(x for x in BY[int(qid[1:4])]['questions'] if x['id'] == qid)
+    c = next(x for x in q['choices'] if x['id'] == cid)
+    if c['label'] != label:
+        LOG.append(f'{qid} correct choice {cid}: {c["label"]!r} -> {label!r}')
+        c['label'] = label
+for s in BY[323]['sources']:
+    if s['url'] == 'https://cloud.google.com/devops/state-of-devops':
+        s['title'] = 'DORA: Software delivery performance metrics'
+        s['url'] = 'https://dora.dev/guides/dora-metrics/'
+        LOG.append('323 DORA source -> dora.dev metrics guide')
+TEXT_REVIEW = [
+ (323, ['deep', 'india', 'body'], 'It now uses five metrics in two groups,', 'Its current guidance on dora.dev uses five metrics in two groups,'),
+]
+for tid, path, old, new in TEXT_REVIEW:
+    cur = get(BY[tid], path)
+    if new in cur:
+        continue
+    assert old in cur, (tid, path, old)
+    put(BY[tid], path, cur.replace(old, new))
+    LOG.append(f'{tid} {".".join(map(str, path))}: {old[:50]!r} -> {new[:60]!r}')
+
 with open(P, 'w') as f:
     json.dump(T, f, ensure_ascii=False, indent=1)
     f.write('\n')

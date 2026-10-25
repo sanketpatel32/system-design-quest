@@ -100,7 +100,7 @@ T.append(topic(685, 'multi-account-landing-zones', R, 22, 'Multi-Account Landing
    ('c', 'The request succeeds, and a detective rule reports it afterwards',
     'That is how a detective guardrail behaves; this one is preventive.')], 'a',
   'Preventive guardrails are why administrators in member accounts still cannot turn off audit logs or use unapproved regions; only administrators of the organisation itself can change them.'),
- see([(582, 'Roles and policies inside an account, which guardrails cap'), (683, 'The transit hub that the network account owns'), (684, 'Quotas, which are counted per account and region')])))
+ see([(582, 'Roles that people and pipelines assume inside each account'), (683, 'The transit hub that the network account owns'), (684, 'Quotas, which are counted per account and region')])))
 
 # ---------------------------------------------------------------- 686 policy as code
 T.append(topic(686, 'policy-as-code-admission-control', R, 23, 'Policy as Code and Admission Control',
@@ -239,7 +239,7 @@ T.append(topic(688, 'immutable-infrastructure-machine-images', R, 24, 'Immutable
    'Immutable servers are replaced, not modified: a new image is built, tested and rolled out. In-place patching makes servers diverge when some updates fail, copying a hand-patched disk spreads an untested snowflake, and waiting leaves a known hole open.'),
   mc('t688-a2', 'image-baking', 'Which item belongs in the image rather than being fetched at boot?',
    [('a', 'The database password for this environment'),
-    ('b', 'The monitoring and logging agents'),
+    ('b', 'The monitoring and log-shipping agents it runs'),
     ('c', 'The name of the environment the server runs in'),
     ('d', 'The endpoint of this region’s message queue')], 'b',
    'Agents are slow to install and the same everywhere, so they are baked. Secrets, environment names and regional endpoints differ by deployment and should be injected at boot, and baking a secret into an image leaks it to everyone who can launch it.'),

@@ -105882,7 +105882,7 @@
           },
           {
             "id": "c",
-            "label": "Change failure rate"
+            "label": "Change fail rate of deployments"
           },
           {
             "id": "d",
@@ -106009,8 +106009,8 @@
         "url": "https://martinfowler.com/articles/continuousIntegration.html"
       },
       {
-        "title": "Google Cloud: DORA’s software delivery metrics",
-        "url": "https://cloud.google.com/devops/state-of-devops"
+        "title": "DORA: Software delivery performance metrics",
+        "url": "https://dora.dev/guides/dora-metrics/"
       },
       {
         "title": "Martin Fowler: Continuous Delivery",
@@ -106095,7 +106095,7 @@
       "india": {
         "title": "DORA’s software delivery metrics",
         "label": "Official documentation",
-        "body": "Google Cloud’s DORA research programme has surveyed thousands of technology professionals over many years. For years it measured delivery with four keys: deployment frequency, lead time for changes, change failure rate and time to restore service. It now uses five metrics in two groups, throughput (change lead time, deployment frequency, failed deployment recovery time) and instability (change fail rate, deployment rework rate), where rework rate counts unplanned deployments made to fix problems in production. Its reports consistently find that the highest performers do well on both speed and stability, rather than trading one for the other, and link this to practices such as continuous integration, trunk-based development and deployment automation."
+        "body": "Google Cloud’s DORA research programme has surveyed thousands of technology professionals over many years. For years it measured delivery with four keys: deployment frequency, lead time for changes, change failure rate and time to restore service. Its current guidance on dora.dev uses five metrics in two groups, throughput (change lead time, deployment frequency, failed deployment recovery time) and instability (change fail rate, deployment rework rate), where rework rate counts unplanned deployments made to fix problems in production. Its reports consistently find that the highest performers do well on both speed and stability, rather than trading one for the other, and link this to practices such as continuous integration, trunk-based development and deployment automation."
       },
       "pitfalls": [
         {
@@ -114267,15 +114267,15 @@
   },
   {
     "id": 582,
-    "slug": "cloud-iam-least-privilege",
+    "slug": "cloud-identities-roles-federation",
     "region": "f7-cloud",
     "order": 12,
-    "title": "Cloud IAM: Least Privilege and Short-Lived Credentials",
+    "title": "Cloud Identities: Roles, Federation and Short-Lived Credentials",
     "kind": "lesson",
     "objectives": [
-      "Read a cloud permission as principal, action, resource and condition",
-      "Explain default deny and why an explicit deny wins",
-      "Replace long-lived keys with workload identity and federated, short-lived credentials"
+      "Tell a role, which hands out expiring sessions, from a user with a long-lived key, and read a role’s trust and permission policies",
+      "Trace how workload identity and OIDC federation turn a platform-signed token into short-lived cloud credentials",
+      "Set up cross-account role assumption and predict which credential the SDK’s credential chain will pick"
     ],
     "difficulty": 2,
     "durationMinutes": 12,
@@ -114287,116 +114287,120 @@
       {
         "id": "t582-c1",
         "kind": "text",
-        "title": "Who can do what, to which resource, when",
-        "body": "Every cloud permission answers four questions: which principal (a person, a role or a workload identity), which action (read an object, start an instance), on which resource, and under which conditions (from this network, with MFA, before a date). Policies attach to identities, to resources such as a bucket, or to the whole organisation as guardrails. Grant to roles that people and workloads assume, not to individual long-lived users.",
+        "title": "Users hold keys; roles hand out sessions",
+        "body": "A cloud user or a service-account key carries a long-lived secret that works until someone revokes it. A role has no secret of its own. A trusted caller assumes it and receives a session: a temporary key, secret and token that expire, typically after an hour. Every role therefore has two policies. The trust policy says who may assume it; the permission policy says what the session may do. On Google Cloud the same split appears as permission to impersonate a service account, and Azure uses managed identities and federated credentials.",
         "teaches": [
-          "iam-model"
+          "roles-vs-users",
+          "trust-policy"
         ]
       },
       {
         "id": "t582-c2",
         "kind": "diagram",
-        "title": "How a request is decided",
-        "body": "Most clouds follow the same order: deny unless allowed, and an explicit deny beats any allow.",
+        "title": "Exchanging a CI token for cloud credentials",
+        "body": "No key is stored anywhere; each run proves who it is and gets a session that dies with it.",
         "teaches": [
-          "policy-evaluation"
+          "federation",
+          "trust-policy"
         ],
         "steps": [
-          "The caller is authenticated and its principal is known",
-          "All policies that apply are gathered: identity, resource and organisation guardrails",
-          "If any applicable policy explicitly denies the action, the request is denied",
-          "Otherwise, if a policy allows this action on this resource and its conditions match, it is allowed",
-          "If nothing allows it, the default answer is deny"
+          "The CI job asks its platform for a signed OIDC token for this run",
+          "The token names the issuer, the audience and a subject such as repo, branch or environment",
+          "The job sends the token to the cloud’s token service and names the role it wants",
+          "The token service checks the signature against the issuer’s published keys",
+          "The role’s trust policy checks the audience and the subject claim",
+          "The job receives credentials that expire in about an hour and calls the cloud APIs"
         ]
       },
       {
         "id": "t582-c3",
         "kind": "text",
-        "title": "Worked example: a CI deploy with no stored key",
-        "body": "A pipeline used to keep a cloud access key as a CI secret; anyone who could read the secret could deploy for as long as the key lived. With federation, the CI system issues each run a signed identity token that says which repository and branch it came from. The cloud trusts that issuer, checks the claims (only the main branch of this repository), and returns credentials that expire in about an hour. There is nothing long-lived left to leak.",
+        "title": "Worked example: deploying across accounts",
+        "body": "Pipelines run in a tooling account; production lives in its own account. The production account has a deploy role whose trust policy names the tooling account’s CI role. The CI role’s own permission policy allows it to call AssumeRole on exactly that deploy role. Both sides must agree: if either policy is missing, the call is denied. The CI job gets a one-hour production session, and production never holds a credential that belongs to the tooling account. When a third-party vendor assumes your role, also require an external ID so another of its customers cannot trick it into using yours.",
         "teaches": [
-          "short-lived-credentials"
+          "cross-account"
         ]
       },
       {
         "id": "t582-c4",
         "kind": "text",
-        "title": "Least privilege, in practice",
-        "body": "Give each workload its own identity with only the actions and resources it uses: this service reads one queue and writes one bucket. Keep the deploy role separate from the runtime role, so the running app cannot change its own infrastructure. Use access logs and the provider’s unused-permission reports to trim grants over time, and keep a monitored break-glass role for emergencies instead of standing admin access.",
+        "title": "Trap: trusting the issuer instead of the repository",
+        "body": "GitHub Actions signs tokens for every repository on github.com with one issuer. A trust policy that checks only the issuer and the audience therefore accepts a workflow from anyone’s repository that asks for your role. GitHub’s and AWS’s guidance is to condition on the subject claim, such as repo:your-org/your-repo:environment:prod, and Google Cloud recommends an attribute condition on the organisation or repository for shared issuers like GitHub. The issuer proves the token is from GitHub, not that it is from you.",
         "teaches": [
-          "least-privilege"
+          "federation",
+          "trust-policy"
         ]
       },
       {
         "id": "t582-c5",
         "kind": "text",
-        "title": "Trap: one admin role for every service",
-        "body": "A shared wildcard role is quick to set up and turns every bug into an account-wide incident. A server-side request forgery, a leaked token or a bad script in any one service can then delete databases or read every secret. The blast radius of a credential is whatever its policy allows, so narrow the policy before you need to.",
+        "title": "The credential chain: which identity is your code using?",
+        "body": "Cloud SDKs look for credentials in a fixed order and stop at the first they find. A typical AWS order is environment variables, shared config and credentials files, a web identity token file, the container credentials endpoint and finally the instance metadata service; Google’s Application Default Credentials check a key-file variable, then local gcloud credentials, then the attached service account. The exact order varies by SDK. The trap: an old access key left in an environment variable silently wins over the workload identity you carefully scoped.",
         "teaches": [
-          "least-privilege"
+          "credential-chain"
         ]
       }
     ],
     "questions": [
       {
         "id": "t582-a1",
-        "concept": "policy-evaluation",
+        "concept": "trust-policy",
         "type": "multiple_choice",
-        "prompt": "A role may delete objects in a bucket, and an organisation guardrail explicitly denies deletes in production. The role tries to delete a production object. What happens?",
+        "prompt": "A deploy role trusts GitHub’s OIDC issuer and checks the audience claim, but not the subject. Who can assume it?",
         "choices": [
           {
             "id": "a",
-            "label": "It succeeds, because the allow names this bucket and is more specific"
+            "label": "Only workflows in repositories owned by the role’s own organisation"
           },
           {
             "id": "b",
-            "label": "It succeeds once, and the guardrail applies from the next call onwards"
+            "label": "A workflow in any GitHub repository that requests a token for it"
           },
           {
             "id": "c",
-            "label": "It depends on which of the two policies was attached most recently"
+            "label": "Only workflows on the default branch of repositories you own"
           },
           {
             "id": "d",
-            "label": "It is denied, because an explicit deny overrides any allow"
+            "label": "Nobody, because the provider rejects roles with no subject condition"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "One issuer signs tokens for every GitHub repository, so without a subject condition any repository can assume the role. Nothing in the policy checks the organisation or the branch; those live in the subject claim, which is exactly what is missing. The cloud does not reject the policy, which is why GitHub and the providers warn you to add the condition."
+      },
+      {
+        "id": "t582-a2",
+        "concept": "cross-account",
+        "type": "multiple_choice",
+        "prompt": "A CI role in account A calls AssumeRole on a deploy role in account B. B’s trust policy names A’s CI role, yet the call is denied. What is most likely missing?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A long-lived access key in account B for the CI role to sign with"
+          },
+          {
+            "id": "b",
+            "label": "A network peering link between the two accounts’ private networks"
+          },
+          {
+            "id": "c",
+            "label": "A copy of the CI role created inside account B with the same name"
+          },
+          {
+            "id": "d",
+            "label": "A permission in the CI role’s own policy to assume B’s deploy role"
           }
         ],
         "correctChoiceIds": [
           "d"
         ],
-        "explanation": "An explicit deny in any applicable policy wins. Specificity and attachment order do not matter, and guardrails apply to every call, including the first."
-      },
-      {
-        "id": "t582-a2",
-        "concept": "policy-evaluation",
-        "type": "multiple_choice",
-        "prompt": "No policy mentions the action a workload is trying to call. What is the result?",
-        "choices": [
-          {
-            "id": "a",
-            "label": "Denied, because access is refused unless some policy allows it"
-          },
-          {
-            "id": "b",
-            "label": "Allowed, because nothing explicitly denies it"
-          },
-          {
-            "id": "c",
-            "label": "Allowed for read actions and denied for write actions"
-          },
-          {
-            "id": "d",
-            "label": "Allowed if the caller and the resource are in the same account"
-          }
-        ],
-        "correctChoiceIds": [
-          "a"
-        ],
-        "explanation": "Cloud IAM starts from default deny. The absence of a deny is not an allow, reads are not special, and sharing an account still needs a policy that grants the action."
+        "explanation": "Cross-account assumption needs both sides: B’s trust policy must name the caller, and the caller’s permission policy must allow AssumeRole on that role. No key is needed, because the session is the credential; role assumption is an API call, not network traffic between private networks; and duplicating the role in B adds nothing the trust policy does not already say."
       },
       {
         "id": "t582-a3",
-        "concept": "short-lived-credentials",
+        "concept": "federation",
         "type": "multiple_choice",
         "prompt": "Why is federating CI to the cloud with signed identity tokens safer than storing an access key as a CI secret?",
         "choices": [
@@ -114414,67 +114418,67 @@
           },
           {
             "id": "d",
-            "label": "The cloud provider skips policy checks for federated callers"
+            "label": "The cloud provider skips its usual policy checks for federated callers"
           }
         ],
         "correctChoiceIds": [
           "b"
         ],
-        "explanation": "The gain is short life and narrow trust: credentials last about an hour and the trust policy only accepts tokens from the named repository and branch. Both methods use TLS, federated roles can be over-granted too, and policies still apply."
+        "explanation": "The gain is short life and narrow trust: credentials last about an hour and the trust policy only accepts tokens whose subject names the repository and branch or environment. Both methods travel over TLS, a federated role can be over-granted just like a key, and permission policies still apply to every call."
       },
       {
         "id": "t582-a4",
-        "concept": "least-privilege",
+        "concept": "credential-chain",
         "type": "multiple_choice",
-        "prompt": "A service only reads one queue and writes one bucket, but it runs with an admin role. What is the main risk?",
+        "prompt": "A pod’s workload identity can only write one bucket, yet its calls also reach other buckets and audit logs show a former engineer’s user. Why?",
         "choices": [
           {
             "id": "a",
-            "label": "Calls get slower, because large policies take longer to evaluate"
+            "label": "The workload identity inherits the permissions of whoever deployed it"
           },
           {
             "id": "b",
-            "label": "The bill rises, because calls made with admin roles cost more"
+            "label": "The metadata endpoint falls back to the account owner’s credentials"
           },
           {
             "id": "c",
-            "label": "A bug or stolen credential in it can change anything in the account"
+            "label": "An access key in its environment variables is found first by the SDK"
           },
           {
             "id": "d",
-            "label": "Audit logs stop recording the calls that admin roles make"
+            "label": "Audit logs record the user who created the pod, not the actual caller"
           }
         ],
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "The blast radius of a credential is what its policy allows. Policy size does not noticeably change latency or price, and admin calls are still logged."
+        "explanation": "SDKs take the first credentials in their chain, and environment variables come before the workload identity, so a leftover key silently wins. A workload identity does not inherit the deployer’s rights, the metadata endpoint never hands out the owner’s credentials, and audit logs record the principal that signed each call."
       },
       {
         "id": "t582-a5",
-        "concept": "policy-evaluation",
+        "concept": "federation",
         "type": "drag_order",
-        "prompt": "Order how a cloud decides whether to allow a request.",
+        "prompt": "Order how a CI job turns its identity into cloud credentials.",
         "items": [
           {
             "id": "s4",
-            "label": "Allow if a policy allows and its conditions match"
+            "label": "The role’s trust policy checks the audience and subject claims"
           },
           {
             "id": "s2",
-            "label": "Collect every policy that applies"
+            "label": "It sends the token to the cloud token service and names a role"
           },
           {
             "id": "s5",
-            "label": "Otherwise deny by default"
+            "label": "Credentials that expire in about an hour are returned"
           },
           {
             "id": "s1",
-            "label": "Authenticate the caller"
+            "label": "The job requests a signed OIDC token from its CI platform"
           },
           {
             "id": "s3",
-            "label": "Deny if any policy explicitly denies"
+            "label": "The service verifies the signature with the issuer’s public keys"
           }
         ],
         "correctOrder": [
@@ -114484,11 +114488,11 @@
           "s4",
           "s5"
         ],
-        "explanation": "Identity first, then the deny check, then allows, with deny as the fallback."
+        "explanation": "Token from the platform, exchange at the cloud, signature check, trust-policy check on the claims, then a short-lived session."
       },
       {
         "id": "t582-a6",
-        "concept": "short-lived-credentials",
+        "concept": "workload-identity",
         "type": "tradeoff",
         "prompt": "A nightly job on a cloud VM must write reports to object storage.",
         "constraints": [
@@ -114529,7 +114533,7 @@
           },
           {
             "id": "r2",
-            "label": "The grant can be limited to writes on one bucket"
+            "label": "The SDK finds it through the metadata endpoint, so no secret is stored"
           }
         ],
         "correctRationaleIds": [
@@ -114544,68 +114548,74 @@
           "r3": "Anyone with access to the running VM or a copy of its disk can still read the key.",
           "r4": "Personal credentials mix the job’s actions with the engineer’s and break when they leave."
         },
-        "explanation": "Attach an identity to the workload: credentials are short-lived and rotated by the platform, and the role is scoped to exactly what the job does."
+        "explanation": "Attach an identity to the workload: the SDK picks it up from the metadata endpoint, and the platform issues and rotates short-lived credentials, so nothing secret sits on disk."
       }
     ],
     "flashcards": [
       {
         "id": "t582-f1",
-        "front": "Four parts of a permission?",
-        "back": "Principal, action, resource, condition."
+        "front": "Trust policy vs permission policy?",
+        "back": "Trust: who may assume the role. Permission: what the resulting session may do."
       },
       {
         "id": "t582-f2",
-        "front": "Deny vs allow?",
-        "back": "Default deny; an explicit deny anywhere overrides any allow."
+        "front": "Why condition on the OIDC subject claim?",
+        "back": "Shared issuers such as GitHub sign tokens for every repository; the subject names your repo and branch or environment."
       },
       {
         "id": "t582-f3",
-        "front": "Why federate CI?",
-        "back": "Each run gets short-lived credentials tied to one repo and branch, so there is no stored key to leak."
+        "front": "Credential chain rule?",
+        "back": "The SDK uses the first credentials it finds, so a stray key in an environment variable beats the workload identity."
       }
     ],
     "sources": [
       {
-        "title": "AWS IAM: Security best practices",
-        "url": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html"
+        "title": "AWS IAM: Roles terms and concepts",
+        "url": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html"
       },
       {
-        "title": "AWS IAM: Policy evaluation logic",
-        "url": "https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic.html"
+        "title": "AWS IAM tutorial: Delegate access across accounts using roles",
+        "url": "https://docs.aws.amazon.com/IAM/latest/UserGuide/tutorial_cross-account-with-roles.html"
       },
       {
-        "title": "Google Cloud: Workload Identity Federation",
-        "url": "https://cloud.google.com/iam/docs/workload-identity-federation"
+        "title": "GitHub Docs: Configuring OpenID Connect in Amazon Web Services",
+        "url": "https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services"
       },
       {
-        "title": "Google Cloud: IAM overview",
-        "url": "https://cloud.google.com/iam/docs/overview"
+        "title": "Google Cloud: Best practices for using Workload Identity Federation",
+        "url": "https://cloud.google.com/iam/docs/best-practices-for-using-workload-identity-federation"
+      },
+      {
+        "title": "AWS SDKs and Tools: Standardized credential providers",
+        "url": "https://docs.aws.amazon.com/sdkref/latest/guide/standardized-credentials.html"
       }
     ],
     "deep": {
       "teaches": [
-        "iam-model",
-        "policy-evaluation",
-        "short-lived-credentials",
-        "least-privilege"
+        "roles-vs-users",
+        "trust-policy",
+        "workload-identity",
+        "federation",
+        "cross-account",
+        "credential-chain"
       ],
       "mechanism": {
-        "title": "How cloud authorization works end to end",
+        "title": "How a workload gets a cloud identity",
         "steps": [
-          "Every call to a cloud API is signed with credentials that identify a principal: a human signed in through single sign-on, a role assumed by a service, or a workload identity attached to a VM, container or function. The provider authenticates the signature first; nothing about permissions is decided until it knows who is asking.",
-          "It then collects every policy that could apply: policies on the identity, policies on the target resource such as a bucket or key, and organisation-level guardrails that cap what any account may do. Details differ between providers, but the shared rules are default deny and explicit deny wins. A request is allowed only if some policy grants the action on the resource with matching conditions and no policy denies it.",
-          "Conditions narrow grants further: only from the corporate network, only with MFA, only for resources tagged with the team’s name, only for tokens whose subject is the main branch of one repository. Conditions are how a single role can be safely shared across environments or restricted to one CI pipeline.",
-          "Credentials should be short-lived. A workload identity attached to a VM or pod gets credentials from a local metadata endpoint, and the platform rotates them. External systems such as CI or another cloud use federation: they present a signed token from a trusted issuer, the cloud checks its claims, and returns credentials that expire in minutes to hours. Leaked long-lived access keys remain one of the most common ways cloud accounts are breached.",
-          "Least privilege is a process rather than a one-off design. Start each workload with a narrow role, separate deploy permissions from runtime permissions, put dangerous actions such as deleting backups behind guardrails, and review access logs and unused-permission reports to remove grants nobody uses. Keep an audited break-glass path for emergencies so engineers do not need standing admin rights."
+          "Every call to a cloud API is signed with credentials that identify a principal. Long-lived principals, such as a cloud user with an access key or a downloaded service-account key, carry a secret that works from anywhere until revoked. Roles carry no secret; callers assume them through the provider’s token service and receive a session that expires. Deciding what any principal may do is policy design, covered in the security track; this lesson is about how the identity is obtained.",
+          "A role is guarded by its trust policy. It names the principals allowed to assume it: another role, an account, a cloud service such as the VM platform, or an external identity provider with conditions on the token’s claims. The permission policy then limits what the session can do. A session can be shortened, tagged with the caller’s details for audit, and narrowed further by a session policy when it is requested.",
+          "Workload identity removes the secret from compute. A VM, container or function is attached to a role or service account, and the platform exposes short-lived credentials through a local metadata or credentials endpoint, refreshing them before they expire. In Kubernetes, a pod’s service account token can be exchanged for the cloud role mapped to it. Because the metadata endpoint hands credentials to anything that can reach it, protect it from request forgery, for example with session-token versions of the endpoint and hop limits.",
+          "Federation extends the same idea to workloads outside the cloud. A CI platform, another cloud or an on-premises identity provider signs a token whose claims say who the workload is. The cloud verifies the signature against the issuer’s published keys, checks the audience, and lets the trust policy match the subject or other claims before issuing a session. For shared issuers, the subject condition is the only thing that separates your workflows from everyone else’s.",
+          "Cross-account access is role assumption with two sides that must agree: the target role trusts the caller, and the caller is allowed to assume the target. Code finds its credentials through the SDK’s credential chain, which stops at the first source it finds, so environment variables, config files, web identity tokens, container endpoints and instance metadata are checked in a fixed order that varies by SDK. Knowing that order explains most “why is it using that identity?” incidents."
         ]
       },
       "useWhen": [
-        "Any workload that calls cloud APIs, including CI pipelines and scheduled jobs.",
-        "Multi-team accounts where one service’s bug must not reach another’s data."
+        "Any workload that calls cloud APIs, including CI pipelines, scheduled jobs and pods.",
+        "Organisations with separate tooling and production accounts or projects."
       ],
       "avoidWhen": [
-        "Avoid hand-writing huge per-user policies; grant to roles and groups.",
-        "Avoid treating network location alone as authorization; check identity too."
+        "Avoid downloading service-account keys or creating cloud users for machines.",
+        "Avoid OIDC trust policies that check only the issuer and audience."
       ],
       "tradeoffs": {
         "columns": [
@@ -114621,13 +114631,13 @@
           ],
           [
             "Workload identity on a VM or pod",
-            "Minutes to hours, rotated by the platform",
+            "Minutes to hours, refreshed by the platform",
             "Limited to its role and a short window"
           ],
           [
-            "Federated CI token",
+            "Federated CI session",
             "About one run",
-            "Tied to one repo, branch and role"
+            "Tied to one repo, branch or environment and role"
           ]
         ]
       },
@@ -114641,19 +114651,19 @@
         "steps": [
           "Long-lived key: usable for the full 3 days, 72 hours, and beyond until revoked.",
           "Federated credentials with a 1-hour lifetime: usable for at most 1 hour after they were issued.",
-          "72 ÷ 1 = 72 times shorter exposure, before counting the narrower scope of the federated role."
+          "72 ÷ 1 = 72 times shorter exposure, before counting the narrower trust of the federated role."
         ],
-        "result": "Short lifetimes shrink exposure from “until noticed” to “at most one hour”, and narrow roles shrink what that hour can do."
+        "result": "Short lifetimes shrink exposure from “until noticed” to “at most one hour”."
       },
       "india": {
-        "title": "Provider guidance on temporary credentials",
+        "title": "Provider guidance on federated CI",
         "label": "Official documentation",
-        "body": "The AWS IAM best practices page recommends requiring workloads to use temporary credentials through roles, using federation for human access, applying least-privilege permissions and using guardrails across accounts. Google Cloud’s Workload Identity Federation documentation describes letting external workloads such as CI pipelines exchange their own signed tokens for short-lived Google Cloud credentials instead of downloading service account keys."
+        "body": "GitHub’s guide to OpenID Connect with AWS tells you to define at least one condition so untrusted repositories cannot request your cloud credentials, and AWS recommends evaluating the subject claim in any role that trusts GitHub’s issuer. Google Cloud’s Workload Identity Federation best practices note that GitHub uses one issuer URL for all its tenants and recommend an attribute condition on the trusted organisation. AWS documents cross-account access as a trust policy on the target role plus permission for the caller to assume it."
       },
       "pitfalls": [
         {
-          "trap": "“The service needs admin because it touches several things.”",
-          "say": "“I’d list the exact actions and resources it uses and grant only those, with deletes behind a guardrail.”"
+          "trap": "“Our OIDC role checks the issuer, so only our CI can use it.”",
+          "say": "“I’d condition on the subject claim, our repo and environment, because that issuer signs tokens for every GitHub repository.”"
         },
         {
           "trap": "“We rotate the CI key every 90 days.”",
@@ -114661,41 +114671,37 @@
         }
       ],
       "takeaways": [
-        "Read a permission as principal, action, resource and condition.",
-        "Default deny; an explicit deny overrides any allow.",
-        "Prefer workload identity and federation over stored keys.",
-        "Scope each workload’s role to what it uses and keep deploy and runtime roles apart."
+        "A role has no secret; assuming it gives a session that expires.",
+        "Trust policy says who may assume a role; permission policy says what it can do.",
+        "Federated trust must check the subject, not just the issuer.",
+        "The SDK uses the first credentials in its chain; a stray key wins."
       ]
     },
     "interactive": {
       "kind": "predict",
-      "title": "Which leak hurts more?",
-      "prompt": "Two leaks are found in a public log today. One is a developer’s long-lived access key with admin rights, posted three days ago. The other is a CI token that was exchanged for 1-hour deploy credentials, posted yesterday.",
+      "title": "A role that trusts all of GitHub",
+      "prompt": "Your production deploy role trusts GitHub’s OIDC issuer with the audience sts.amazonaws.com and no other condition. A stranger finds the role’s name in your public workflow file and runs a workflow in their own repository that asks for it.",
       "choices": [
         {
           "id": "a",
-          "label": "The admin key: it still works now and can change anything in the account",
-          "feedback": "Right: long-lived keys work until revoked, and admin rights make the blast radius the whole account."
+          "label": "They receive deploy credentials for your production account",
+          "feedback": "Right: their token is genuinely signed by GitHub with the expected audience, which is all the policy checks."
         },
         {
           "id": "b",
-          "label": "The CI token: deploy credentials can push code to production",
-          "feedback": "They could, but they expired an hour after the run, long before anyone found them."
+          "label": "They are refused, because their token comes from another organisation",
+          "feedback": "Nothing in this trust policy looks at the organisation; that information is in the subject claim it ignores."
         },
         {
           "id": "c",
-          "label": "Both are equally dangerous, because each one grants cloud access",
-          "feedback": "Lifetime and scope differ by orders of magnitude."
+          "label": "They are refused, because they do not hold your account’s access key",
+          "feedback": "Federation needs no key; the signed token is the proof, which is why the trust conditions matter."
         }
       ],
       "correctId": "a",
-      "reveal": "Revoke the key now, check the audit logs for its use over the three days, and replace it with role-based, short-lived access."
+      "reveal": "Add a subject condition such as repo:your-org/your-repo:environment:prod, protect that environment with review rules, and check the audit logs for sessions from unexpected repositories."
     },
     "seeAlso": [
-      {
-        "topicId": 306,
-        "why": "Authorization bugs inside the application, the same idea one layer up"
-      },
       {
         "topicId": 307,
         "why": "Where secrets live when a key cannot be avoided"
@@ -114703,6 +114709,14 @@
       {
         "topicId": 309,
         "why": "Why CI credentials are a supply-chain target"
+      },
+      {
+        "topicId": 685,
+        "why": "Separate accounts, which cross-account roles connect"
+      },
+      {
+        "topicId": 308,
+        "why": "Request forgery against the metadata endpoint"
       }
     ]
   },
@@ -116474,11 +116488,11 @@
         "choices": [
           {
             "id": "a",
-            "label": "Its virtual users wait for each response, so a slow server gets fewer requests"
+            "label": "Each user waits for a reply, so a slow server is sent less"
           },
           {
             "id": "b",
-            "label": "It sends requests much faster than real users would"
+            "label": "It sends requests much faster than real users ever would"
           },
           {
             "id": "c",
@@ -116486,7 +116500,7 @@
           },
           {
             "id": "d",
-            "label": "It reports only the median and drops the slow tail"
+            "label": "It reports only the median and drops the slow tail of results"
           }
         ],
         "correctChoiceIds": [
@@ -116718,7 +116732,7 @@
         },
         {
           "trap": "“The instance maxed out at 1,100, so we plan for 1,100.”",
-          "say": "“I’d plan around 70–75% of the knee and add spares for losing a zone.”"
+          "say": "“I’d plan around 60–75% of the knee and add spares for losing a zone.”"
         }
       ],
       "takeaways": [
@@ -116754,6 +116768,10 @@
         "why": "What a service should do once load passes the knee"
       },
       {
+        "topicId": 351,
+        "why": "Capacity planning that uses the per-instance target measured here"
+      },
+      {
         "topicId": 328,
         "why": "Autoscaling thresholds come from the knee you measure"
       },
@@ -116772,7 +116790,7 @@
     "kind": "lesson",
     "objectives": [
       "Describe the data plane and control plane of a service mesh",
-      "Explain how mesh mTLS gives each call a verifiable workload identity",
+      "Roll out mesh mTLS from permissive to strict without breaking callers outside the mesh",
       "Spot retry and timeout conflicts between the app and the mesh, and judge when a mesh is worth its cost"
     ],
     "difficulty": 3,
@@ -116821,8 +116839,8 @@
       {
         "id": "t588-c4",
         "kind": "text",
-        "title": "What mTLS adds over a firewall rule",
-        "body": "A network rule says which addresses may connect. Mesh mTLS says which workload is calling: each proxy holds a certificate naming its service identity, issued and rotated by the control plane, often every few hours. Policies can then allow “orders may call payments” whatever pod addresses either side has, and every connection inside the cluster is encrypted.",
+        "title": "Turning on mesh mTLS: permissive first, then strict",
+        "body": "The mesh’s certificate authority gives each proxy a short-lived certificate naming its workload, often valid for 24 hours and renewed well before it expires, so identity-based mTLS needs no work in the app. Switching it on is the risky part. In permissive mode a proxy accepts both mTLS and plain text, so services join the mesh one at a time without breaking anyone. Once the mesh’s metrics show every caller arriving over mTLS, switch to strict, and plain-text callers are refused: jobs without a sidecar, pods that opted out and health checks from outside the mesh.",
         "teaches": [
           "mesh-mtls"
         ]
@@ -116874,19 +116892,19 @@
         "choices": [
           {
             "id": "a",
-            "label": "They stop, because each call needs control-plane approval"
+            "label": "They stop, because every call needs control-plane approval first"
           },
           {
             "id": "b",
-            "label": "They keep flowing with the last configuration the proxies received"
+            "label": "They keep flowing on the last config the proxies received"
           },
           {
             "id": "c",
-            "label": "They fall back to plain text with no encryption"
+            "label": "They fall back to plain text with no encryption at all"
           },
           {
             "id": "d",
-            "label": "They are rerouted through the ingress gateway"
+            "label": "They are rerouted through the ingress gateway instead"
           }
         ],
         "correctChoiceIds": [
@@ -116898,29 +116916,29 @@
         "id": "t588-a3",
         "concept": "mesh-mtls",
         "type": "multiple_choice",
-        "prompt": "What does mesh mTLS give that a network firewall rule alone does not?",
+        "prompt": "A namespace switches from permissive to strict mesh mTLS. Which callers start failing?",
         "choices": [
           {
             "id": "a",
-            "label": "Faster connections, because encryption is moved to hardware"
+            "label": "Pods with sidecars that call the services by their service names"
           },
           {
             "id": "b",
-            "label": "Each call carries a verified workload identity that policy can check"
+            "label": "Every caller, until the control plane has reissued all certificates"
           },
           {
             "id": "c",
-            "label": "Protection against bugs in the application’s own business logic"
+            "label": "Callers with no mesh proxy, such as a job that opted out of the mesh"
           },
           {
             "id": "d",
-            "label": "Validation of every request body against a published schema"
+            "label": "Only callers that speak gRPC or HTTP/2 rather than plain HTTP/1.1"
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "c"
         ],
-        "explanation": "mTLS proves which workload is calling, so policy can use identities instead of addresses. It adds some cost rather than speed, and it does not inspect business logic or request bodies."
+        "explanation": "Strict mode refuses plain-text connections, so anything without a proxy, such as an opted-out job or an outside health checker, fails; that is why permissive mode and the mesh’s traffic metrics come first. Sidecar-to-sidecar calls already use mTLS, existing certificates stay valid through the switch, and the protocol inside the tunnel does not matter."
       },
       {
         "id": "t588-a4",
@@ -117117,7 +117135,7 @@
       ],
       "takeaways": [
         "Proxies are the data plane; the control plane configures them and issues certificates.",
-        "Mesh mTLS gives each call a verified workload identity for policy.",
+        "Roll out mTLS in permissive mode, then go strict once no plain-text callers remain.",
         "App and mesh retries multiply; one layer should own them.",
         "A mesh pays off with many services and languages, not with a few."
       ]
@@ -118138,7 +118156,7 @@
           },
           {
             "id": "c",
-            "label": "Every eviction would drop below 2 available, so each one is refused"
+            "label": "Any eviction would drop below 2 available, so each is refused"
           },
           {
             "id": "d",
@@ -118186,19 +118204,19 @@
         "choices": [
           {
             "id": "a",
-            "label": "An in-place upgrade of each node, one at a time"
+            "label": "An in-place upgrade of each existing node, one node at a time"
           },
           {
             "id": "b",
-            "label": "A surge upgrade with a large surge to finish sooner"
+            "label": "A surge upgrade with a large surge so it finishes sooner"
           },
           {
             "id": "c",
-            "label": "Pausing the cluster autoscaler during the surge upgrade"
+            "label": "Pausing the cluster autoscaler for the whole surge upgrade"
           },
           {
             "id": "d",
-            "label": "A new node pool on the new version, keeping the old pool for now"
+            "label": "A new node pool on the new version, keeping the old pool"
           }
         ],
         "correctChoiceIds": [
@@ -120090,7 +120108,7 @@
     "seeAlso": [
       {
         "topicId": 582,
-        "why": "Roles and policies inside an account, which guardrails cap"
+        "why": "Roles that people and pipelines assume inside each account"
       },
       {
         "topicId": 683,
@@ -120717,22 +120735,22 @@
       },
       {
         "id": "t687-a5",
-        "concept": "flaky-tests",
+        "concept": "test-parallelism",
         "type": "estimation",
-        "prompt": "A suite has 50 flaky tests, each failing on its own 1% of the time. Roughly what percentage of runs on unchanged code pass every test?",
-        "unit": "% of runs",
-        "target": 60,
+        "prompt": "A 48-minute test suite is split into 6 shards balanced by recorded durations, and each shard spends 3 minutes on setup. About how many minutes until every shard has finished?",
+        "unit": "minutes",
+        "target": 11,
         "assumptions": [
-          "Failures are independent",
-          "Every other test is reliable"
+          "Shards run at the same time on separate runners",
+          "Balancing by duration makes each shard about equal"
         ],
-        "formula": "0.99 to the power 50",
-        "workedAnswer": "0.99⁵⁰ ≈ 0.61, so about 60% of runs pass",
-        "explanation": "Sanity check: small flake rates compound, so 40% of runs fail with nothing broken, which is why people learn to ignore red builds.",
+        "formula": "48 ÷ 6 + 3",
+        "workedAnswer": "8 minutes of tests + 3 minutes of setup = 11 minutes",
+        "explanation": "Sanity check: machine time rises from 51 to 6 × 11 = 66 runner-minutes, so you pay for a roughly 4.6 times faster answer, and once setup dominates each shard, more shards stop helping.",
         "tolerance": 0.1,
         "trapAnswers": [
-          99,
-          50
+          8,
+          51
         ]
       },
       {
@@ -121041,7 +121059,7 @@
           },
           {
             "id": "b",
-            "label": "The monitoring and logging agents"
+            "label": "The monitoring and log-shipping agents it runs"
           },
           {
             "id": "c",
