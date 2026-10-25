@@ -30,7 +30,7 @@ FIXES = [
   'It replaces the private source with its public address and a port it tracks. The destination stays as the client chose it; tracking connections is how NAT remembers each rewrite, not a substitute for it; and TCP sequence numbers pass through unchanged.'),
  (247, 'Explanation now covers every option.',
   'The active closer waits 2×MSL before reusing the address and port pair.',
-  'The active closer waits 2×MSL before reusing the address and port pair. Who initiated the connection does not matter, only who sent the first FIN; the passive closer goes straight to CLOSED after its last ACK; and TIME_WAIT is part of every normal close, not an error path.'),
+  'The active closer waits 2×MSL before reusing the address and port pair. Who initiated the connection does not matter, only who sent the first FIN; the passive closer goes to CLOSED as soon as its own FIN is acknowledged; and TIME_WAIT is part of every normal close, not an error path.'),
  (249, 'Explanation now covers every option, including the Linux default range.',
   'RFC 6335; operating systems may use a different range.',
   'RFC 6335 sets aside 49,152–65,535. Linux defaults to 32,768–60,999, which is an operating-system choice, not the IANA range; 0–1,023 are system ports and 1,024–49,151 are registered ports.'),
@@ -47,6 +47,9 @@ FIXES = [
  (252, 'Explanation now covers every option.',
   'The app only sees plain HTTP from the proxy unless it reads the forwarded scheme.',
   'The app only sees plain HTTP from the proxy unless it reads the forwarded scheme. Certificates on the app servers or HTTP/2 to the backend do not tell the app what the user used, and timeouts are unrelated to the scheme.'),
+ (254, 'Explanation now covers every option; the last distractor was partly true once balanced (reused connections do skip the certificate check), so option-balance.json now swaps it for a clearly wrong one.',
+  'Cached DNS answers and kept-alive connections remove those round trips.',
+  'Cached DNS answers and kept-alive connections remove those round trips. The browser still requests the page, often as a quick revalidation, then parses the HTML and runs the page’s JavaScript again.'),
 ]
 
 

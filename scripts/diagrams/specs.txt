@@ -1009,3 +1009,108 @@ Admission check|in-flight limit [under limit]> Workers {svc}
 Admission check|in-flight limit [over limit]?> 503|Retry-After {client}
 Producer stage {svc} > Bounded queue {queue} > Workers
 Bounded queue [full, slow down]~> Producer stage
+
+
+@541 Anycast with BGP: sites in Mumbai, Singapore and Frankfurt announce the same prefix; each network picks its best BGP path, so a user lands on the site routing prefers, and a site that withdraws its route is replaced by the next-best one.
+User in Pune {client} > ISP router|best BGP path {svc} [shorter AS path wins]> Mumbai site|announces 192.0.2.0/24
+ISP router|best BGP path [longer AS path]?> Singapore site|announces 192.0.2.0/24
+Mumbai site|announces 192.0.2.0/24 [stops announcing]~> Singapore site|announces 192.0.2.0/24
+ISP router|best BGP path [no path chosen]?> Frankfurt site|announces 192.0.2.0/24
+
+@542 Idle timeouts across hops: each caller should close idle connections before its callee does; when the backend's keep-alive is shorter than the balancer's idle timeout, the balancer can reuse a connection the backend is closing and get a reset, which it returns as a 502.
+Client pool|shortest idle timeout {client} [reuse]> Load balancer|idle 60 s {svc} [reuse]> Backend|keep-alive 5 s {svc}
+Backend|keep-alive 5 s [FIN after 5 s idle]~> Load balancer|idle 60 s
+Load balancer|idle 60 s [request on closing socket: reset]?> 502 to client
+Load balancer|idle 60 s [fix: backend keep-alive longer than 60 s]> Safe reuse
+
+@543 Debugging a connection one layer at a time: check the name, the route, the port, TLS and HTTP in order; refused means a reset from the host, a timeout means packets are dropped, and a reset mid-connection means the peer or a middlebox closed it.
+%concept
+Name|resolves as expected? > Route|packets reach it? > Port|handshake: refused or timeout? > TLS|cert matches name? > HTTP|status from which hop?
+Port|handshake: refused or timeout? [RST back]~> Refused|nothing listening
+Port|handshake: refused or timeout? [no answer]~> Timeout|firewall drops or bad route
+
+@544 Loss and queueing on one flow: random loss caps a TCP flow at roughly MSS / (RTT x sqrt(p)), and an oversized router queue fills before any loss, adding up to 0.8 s of delay on a 10 Mbit/s uplink until active queue management keeps it short.
+Bulk upload {client} [sends faster than uplink]> Router queue|1 MB on 10 Mbit/s {queue} [up to 0.8 s wait]> Home uplink
+Video call packets {client} [stuck behind the upload]> Router queue|1 MB on 10 Mbit/s
+Router queue|1 MB on 10 Mbit/s [CoDel: drop or mark early]~> Bulk upload
+Loss p and RTT {concept} [rate ~ MSS / (RTT x sqrt p)]> Single-flow ceiling {concept}
+
+@545 ICE with STUN and TURN: each peer gathers host, server-reflexive (from STUN) and relayed (from TURN) candidates, swaps them over signalling, checks every pair, and keeps the best working one, falling back to the relay.
+Peer A {client} [offer and candidates]> Signalling server {svc} [answer and candidates]> Peer B {client}
+Peer A [what is my public mapping?]> STUN server {svc}
+Peer A [allocate relay address]> TURN relay|pays the egress {ext}
+Peer A [connectivity checks, direct UDP]?> Peer B
+TURN relay|pays the egress [fallback: relayed media]~> Peer B
+
+@546 Email authentication: the receiver checks SPF for the envelope sender's domain, verifies the DKIM signature with the key in DNS, and DMARC requires one of them to pass for a domain aligned with the visible From domain before it applies the policy.
+Sending server {svc} [SMTP: MAIL FROM, From:]> Receiving server {svc}
+Receiving server [SPF: is this IP allowed?]> DNS|SPF, DKIM key, DMARC policy {store}
+Receiving server [DKIM: verify d= signature]> DNS|SPF, DKIM key, DMARC policy
+Receiving server [DMARC: aligned with From?]> Deliver
+Receiving server [no aligned pass]?> Policy|none, quarantine or reject
+Receiving server [aggregate reports]~> Domain owner {client}
+
+@547 DDoS defences: SYN cookies let a server answer a SYN flood without storing half-open entries, reflection multiplies small spoofed queries into large answers aimed at the victim, and only capacity upstream (scrubbing, anycast) can absorb a flood bigger than the uplink.
+Attacker|spoofed source {ext} [64 B queries, 1 Gbit/s]> Open servers|reflectors {ext} [3,200 B answers: 50 Gbit/s]> Victim uplink|10 Gbit/s
+Attacker|spoofed source [SYN flood]?> Server|SYN cookies, no half-open state {svc}
+Scrubbing and anycast edge {svc} [clean traffic only]> Victim uplink|10 Gbit/s
+Open servers|reflectors [absorbed upstream]~> Scrubbing and anycast edge
+
+@548 Nagle meets delayed ACK: the sender's second small write waits for the first to be acknowledged, while the receiver delays that ACK because it has no reply to carry it on, so nothing moves until the delayed-ACK timer fires about 40 ms later.
+Client|write 1: header 200 B {client} [sent at once]> Server|needs the whole request {svc}
+Client|write 1: header 200 B [write 2: body held by Nagle]~> Client send buffer {queue}
+Server|needs the whole request [ACK delayed about 40 ms]~> Client|write 1: header 200 B
+Client send buffer [ACK arrives: body sent]> Server|needs the whole request
+One write per message, or TCP_NODELAY [no stall]?> Server|needs the whole request
+
+@549 Site-to-site VPN: the office router sends traffic for the cloud range into the tunnel, encrypts and wraps each packet in an outer header to the cloud gateway, and the gateway unwraps it; every wrapper costs MTU, so the inner MTU and MSS shrink.
+Office laptop {client} [to 10.20.0.15]> Office router|10.20.0.0/16 via tunnel {svc}
+Office router|10.20.0.0/16 via tunnel [encrypt, add outer header: 60-80 B]> Internet {ext}
+Internet [public to public]> Cloud VPN gateway {svc} [check tag, decrypt, unwrap]> Cloud server|10.20.0.15
+Office router|10.20.0.0/16 via tunnel [clamp MSS to 1,400]?> Office laptop
+
+@550 VLANs on a trunk: an access port puts untagged frames into its VLAN, a trunk carries frames between switches with a 4-byte 802.1Q tag, and the far switch delivers them only to ports in the same VLAN, stripping the tag.
+Printer|access port, VLAN 20 {client} [untagged frame]> Switch 1 {svc}
+Switch 1 [trunk: 802.1Q tag VLAN 20]> Switch 2 {svc}
+Switch 2 [tag stripped]> VLAN 20 ports {client}
+Switch 2 [not forwarded]?> VLAN 10 ports {client}
+
+@601 DHCP through a relay: the phone broadcasts Discover, the router relays it as unicast to the central server with its own address so the right subnet is chosen, and Offer, Request and Ack follow to commit a lease.
+Phone|no address yet {client} [DHCPDISCOVER broadcast, UDP 67]> Router|DHCP relay {svc}
+Router|DHCP relay [unicast, stamps relay address]> DHCP server|central {svc}
+DHCP server|central [OFFER 10.8.4.57/22, lease 8 h]> Router|DHCP relay
+Phone|no address yet [DHCPREQUEST naming the server]> Router|DHCP relay
+DHCP server|central [DHCPACK: lease committed]> Lease table {store}
+
+@602 Leaf-spine fabric: every leaf has one uplink to every spine, so any two racks are two hops apart; the leaf hashes each flow onto one equal-cost spine, and losing a spine removes only its share of capacity.
+Leaf 3|48 x 25G down, uplinks to all spines {svc} [flow A hashes here]> Spine 2 {svc}
+Leaf 3|48 x 25G down, uplinks to all spines [flow B hashes here]> Spine 4 {svc}
+Spine 2 > Leaf 17 {svc}
+Spine 4 > Leaf 17
+Spine 2 [fails: flows rehash to other spines]~> Lost capacity|one spine's share
+
+@603 DNSSEC validation: the resolver checks the record's signature with the zone's DNSKEY, that key against the DS record signed by the parent, and so on up to the root key it already trusts; any failure returns SERVFAIL.
+Resolver|validating {svc} [A record + RRSIG]> shop.example zone|DNSKEY {store}
+shop.example zone|DNSKEY [vouched for by DS]> example zone|DS for shop.example {store}
+example zone|DS for shop.example [vouched for by DS]> Root zone|trusted key {store}
+Resolver|validating [any check fails]~> SERVFAIL
+Attacker|forged reply {ext} [must match ID and port, then fails signature]?> Resolver|validating
+
+@604 Cellular radio states: an idle phone must wake its radio before any DNS, handshake or request goes out, then stays in high power for seconds after the reply, so many spread-out requests cost far more radio time than one batched request.
+Phone radio idle {client} [wake: about 100 ms]> Connected to tower {svc} [DNS, TCP, TLS, request]> App server {svc}
+App server [reply]> High-power tail|several seconds {client}
+High-power tail|several seconds [no more data]~> Phone radio idle
+Carrier NAT|idle timer {svc} [idle too long: mapping dropped]?> App server
+
+@605 From counters to graphs: a collector reads interface byte counters every minute and turns the difference into a rate, which hides second-long bursts that fill the queue; the output-drops counter and flow records show what the average missed.
+Switch port|bytes, drops, errors {svc} [read every 60 s]> Collector {store} [delta x 8 / 60 s]> Utilisation graph|6% average
+Replication burst|2 GB in 1.6 s [port full, queue overflows]> Switch port|bytes, drops, errors
+Switch port|bytes, drops, errors [sampled flow records]> Flow collector|who sent what {store}
+Utilisation graph|6% average [hides the burst]~> Check drops counter
+
+@606 Connection tracking: the first packet is checked against the rules and creates an entry for its five-tuple; replies and later packets match that entry, and closed connections keep their entries for the TIME_WAIT timeout, which is how busy proxies fill the table.
+Client|10.0.1.5:51234 {client} [SYN to 203.0.113.9:443, rule allows]> Firewall|conntrack table {svc}
+Firewall|conntrack table [entry NEW, then ESTABLISHED]> Server|203.0.113.9:443 {svc}
+Server|203.0.113.9:443 [SYN-ACK matches entry]> Firewall|conntrack table
+Firewall|conntrack table [after close: entry kept 120 s]~> Table full at 262,144|new packets dropped
+Unsolicited packet {ext} [no entry, no rule]?> Dropped

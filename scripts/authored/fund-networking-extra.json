@@ -117,7 +117,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "After policy, a shorter AS path wins. BGP does not measure round-trip time or bandwidth, so b and c are not inputs to its choice; and later tie-breakers tend to favour the older, more stable path, not the newest."
+    "explanation": "After policy, a shorter AS path wins. BGP does not measure round-trip time or link bandwidth, so neither one is an input to its choice; and later tie-breakers tend to favour the older, more stable path, not the newest."
    },
    {
     "id": "t541-a2",
@@ -585,13 +585,13 @@
      },
      {
       "id": "d",
-      "label": "A long balancer timeout with short client ones"
+      "label": "Balancer < client pool < backend keep-alive"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "The caller should close first at every hop. Reversing the order makes the race the norm; equal values still race when both timers fire together; and a long balancer timeout says nothing about the backend’s, which is where the race happens."
+    "explanation": "The caller should close first at every hop. Reversing the order makes the race the norm; equal values still race when both timers fire together; and a balancer that times out before the client pool leaves the client reusing connections the balancer has already closed."
    },
    {
     "id": "t542-a3",
@@ -613,13 +613,13 @@
      },
      {
       "id": "d",
-      "label": "Inside a data centre, a handshake sends no packets"
+      "label": "Slow start only applies to connections that cross regions"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Each saved round trip is worth tens of ms between regions and well under one ms locally. Resumption works on any link; services do not share one connection; and a local handshake still sends packets, just quickly."
+    "explanation": "Each saved round trip is worth tens of ms between regions and well under one ms locally. Resumption works on any link; services do not share one connection; and slow start applies to every new TCP connection, wherever it goes."
    },
    {
     "id": "t542-a4",
@@ -629,7 +629,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "New pods must load their TLS certificates for an hour first"
+      "label": "New pods have cold caches, so the balancer avoids sending to them"
      },
      {
       "id": "b",
@@ -637,7 +637,7 @@
      },
      {
       "id": "c",
-      "label": "A layer 4 balancer sends only UDP traffic to new pods"
+      "label": "gRPC uses UDP, which a layer 4 balancer cannot spread"
      },
      {
       "id": "d",
@@ -647,7 +647,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Balancing happened when the connections opened, and they are long-lived. Certificates load in seconds; a layer 4 balancer forwards TCP as well; and gRPC clients can discover new backends, but a single long connection still pins traffic."
+    "explanation": "Balancing happened when the connections opened, and they are long-lived. A layer 4 balancer knows nothing about caches; gRPC runs over HTTP/2 on TCP, not UDP; and gRPC clients can discover new backends, but a single long connection still pins traffic."
    },
    {
     "id": "t542-a5",
@@ -3125,7 +3125,7 @@
     "id": "t548-c1",
     "kind": "text",
     "title": "Two good ideas that collide",
-    "body": "Nagle’s algorithm (RFC 896) stops a sender from flooding the network with tiny packets: while any sent data is unacknowledged, small writes are held until an ACK arrives or a full segment builds up. A delayed ACK (RFC 1122) lets a receiver wait briefly, hoping to carry the ACK on its own reply; it must still ACK at least every second full-sized segment and within 500 ms. Each saves packets. Together they can deadlock briefly.",
+    "body": "Nagle’s algorithm (RFC 896) stops a sender from flooding the network with tiny packets: while any sent data is unacknowledged, small writes are held until an ACK arrives or a full segment builds up. A delayed ACK (RFC 1122) lets a receiver wait briefly, hoping to carry the ACK on its own reply; it should still ACK at least every second full-sized segment, and must ACK within 500 ms. Each saves packets. Together they can deadlock briefly.",
     "teaches": [
      "nagle",
      "delayed-ack"
@@ -3417,7 +3417,7 @@
     "title": "How two packet savers create a pause",
     "steps": [
      "A TCP sender can send data as soon as the application writes it. On a slow, shared link in the 1980s, terminals sending one keystroke per packet spent about 40 bytes of headers on every byte typed. John Nagle’s rule, RFC 896, fixed that: if any data is in flight and unacknowledged, hold new small writes and send them together when the ACK arrives or a full segment is ready.",
-     "Receivers made a matching optimisation. Instead of acknowledging every segment at once, a receiver may wait a short time, because the application will often reply and the ACK can ride on that reply for free. RFC 1122 bounds the wait at 500 ms and requires an ACK for at least every second full-sized segment, so bulk transfers are acknowledged promptly.",
+     "Receivers made a matching optimisation. Instead of acknowledging every segment at once, a receiver may wait a short time, because the application will often reply and the ACK can ride on that reply for free. RFC 1122 requires the wait to stay under 500 ms and says a receiver should ACK at least every second full-sized segment, so bulk transfers are acknowledged promptly.",
      "The two collide when a sender writes a message in two parts and then waits for a reply. The first part goes out immediately. The second is small and data is unacknowledged, so Nagle holds it. The receiver has only part of the message, so it has no reply to send and delays its ACK. Neither side moves until the receiver’s delayed-ACK timer fires.",
      "The timer length sets the penalty. Linux commonly uses a minimum of 40 ms, adjusting with observed round trips; other systems have used 200 ms. In a data centre with sub-millisecond round trips, the timer is many times longer than the request itself, so a service can be dozens of times slower than it should be with no sign of load.",
      "There are two clean fixes. Write each message in a single call so there is never a held second part, which also saves system calls. Or set TCP_NODELAY on the socket so small writes go out at once, which most request and response libraries do; then the application should batch its own writes to avoid sending many tiny packets."
@@ -3478,7 +3478,7 @@
    "india": {
     "title": "Nagle and delayed ACKs in the RFCs and the Linux manual",
     "label": "Official documentation",
-    "body": "RFC 896, written by John Nagle in 1984, describes the small-packet problem and the rule of holding new data while earlier data is unacknowledged. RFC 1122 section 4.2.3.2 lets hosts delay ACKs, but requires an ACK for at least every second full-sized segment and a delay under 0.5 seconds. The Linux tcp(7) manual page documents TCP_NODELAY, which disables Nagle on a socket, and TCP_QUICKACK, which only temporarily leaves delayed-ACK mode."
+    "body": "RFC 896, written by John Nagle in 1984, describes the small-packet problem and the rule of holding new data while earlier data is unacknowledged. RFC 1122 section 4.2.3.2 lets hosts delay ACKs, but says they should ACK at least every second full-sized segment and requires the delay to stay under 0.5 seconds. The Linux tcp(7) manual page documents TCP_NODELAY, which disables Nagle on a socket, and TCP_QUICKACK, which only temporarily leaves delayed-ACK mode."
    },
    "pitfalls": [
     {
@@ -4494,7 +4494,7 @@
      "Guest Wi-Fi in a hotel lobby uses a /24: 254 usable addresses, minus the gateway, so 253 for guests",
      "About 60 new devices join every hour; most stay 30 minutes but keep their lease until it expires (illustrative)",
      "With 24-hour leases, addresses stay held for a day: 60 × 24 = 1,440 leases needed, far above 253",
-     "With 2-hour leases: 60 × 2 = 120 held, plus devices still present, comfortably under 253",
+     "With 2-hour leases: 60 × 2 = 120 held, which already counts devices still present, comfortably under 253",
      "Alternatively keep 24 hours and widen to a /21 (2,046 usable), if the address plan allows"
     ],
     "note": "Result. Held leases ≈ arrivals per hour × lease hours, so short leases for transient devices or a larger pool fix exhaustion; a long lease only suits devices that stay."
@@ -4864,7 +4864,7 @@
     "max": 28,
     "step": 1,
     "initial": 24,
-    "unit": "/"
+    "unit": ""
    },
    "takeaway": "A /24 holds 254 hosts and runs out; a /23 holds 510, just enough with little margin. Shortening the lease to 2 hours would bring the need down to about 120 and let the /24 work."
   },
@@ -4949,7 +4949,7 @@
     "id": "t602-c4",
     "kind": "text",
     "title": "Losing a spine costs a share, not the whole path",
-    "body": "With four spines, each carries about a quarter of leaf-to-leaf traffic. When one fails, routing withdraws it, ECMP rehashes onto the remaining three and capacity between racks falls by 25%, which a fabric sized with headroom absorbs. Flows that were on the failed spine reset or retransmit; the rest carry on. Adding a spine adds capacity the same way, which is why fabrics grow by adding spines and leaves rather than buying a bigger core.",
+    "body": "With four spines, each carries about a quarter of leaf-to-leaf traffic. When one fails, routing withdraws it, ECMP rehashes onto the remaining three and capacity between racks falls by 25%, which a fabric sized with headroom absorbs. Flows that were hashed onto the failed spine lose a few packets and retransmit them on a new path; spines keep no connection state, so connections survive, and the rest carry on. Adding a spine adds capacity the same way, which is why fabrics grow by adding spines and leaves rather than buying a bigger core.",
     "teaches": [
      "spine-failure"
     ]
@@ -5029,7 +5029,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Down: 32 × 10 = 320 Gbit/s; up: 4 × 40 = 160 Gbit/s; 320 ÷ 160 = 2:1. 1:1 would need 320 Gbit/s of uplinks; 4:1 and 8:1 compare port counts or one uplink rather than total capacity."
+    "explanation": "Down: 32 × 10 = 320 Gbit/s; up: 4 × 40 = 160 Gbit/s; 320 ÷ 160 = 2:1. 1:1 would need 320 Gbit/s of uplinks; 8:1 compares port counts (32 ÷ 4) and 4:1 compares one port’s speed (40 ÷ 10), not total capacity."
    },
    {
     "id": "t602-a3",
@@ -5301,7 +5301,7 @@
     {
      "id": "a",
      "label": "Nothing at all",
-     "feedback": "Flows on the failed spine break and must reconnect, and the remaining spines now carry more than they were sized for at this load."
+     "feedback": "Flows on the failed spine lose packets while they are rehashed, and the remaining spines now carry more than they were sized for at this load."
     },
     {
      "id": "b",
@@ -5375,8 +5375,8 @@
     ],
     "steps": [
      "A validating resolver asks for the A record of shop.example and gets it with an RRSIG signature",
-     "It fetches example’s DNSKEY and checks the signature with it",
-     "It checks that key against the DS record the .example parent zone published, signed by the parent",
+     "It fetches the shop.example zone’s DNSKEY and checks the signature with it",
+     "It checks that key against the DS record published in the parent zone, example, and signed by it",
      "It repeats up to the root, whose key the resolver already trusts",
      "If every link verifies, the answer is authentic; if any fails, the resolver returns SERVFAIL"
     ]
@@ -6012,13 +6012,13 @@
      },
      {
       "id": "d",
-      "label": "TCP slow start reset the window to zero"
+      "label": "The server’s TLS session ticket expired"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "An idle mapping that times out means the server’s next packets are dropped at the NAT. File-descriptor exhaustion would refuse new connections; DNS is not used on an open connection; and slow start never sets the window to zero."
+    "explanation": "An idle mapping that times out means the server’s next packets are dropped at the NAT. File-descriptor exhaustion would refuse new connections; DNS is not used on an open connection; and a session ticket matters only when a new connection resumes TLS."
    },
    {
     "id": "t604-a6",
@@ -6414,7 +6414,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Bursts of a second or two fill the queue while the minute’s average stays low. Counters only go up and reset hides nothing; corrupted frames raise the error counter, not drops; and a longer interval smooths the bursts even more."
+    "explanation": "Bursts of a second or two fill the queue while the minute’s average stays low. Resetting counters only hides the evidence; corrupted frames raise the error counter, not drops; and a longer interval smooths the bursts even more."
    },
    {
     "id": "t605-a4",
@@ -6737,7 +6737,7 @@
      "A client at 10.0.1.5:51234 sends a SYN to 203.0.113.9:443; the outbound rule allows it",
      "The firewall creates an entry for that five-tuple in state NEW",
      "The SYN-ACK comes back, matches the entry, and the state becomes ESTABLISHED",
-     "Every later packet in either direction matches the entry and skips the rule list",
+     "Every later packet in either direction matches the entry and is let through without re-checking each rule",
      "After FIN and ACK the entry lingers for a timeout (Linux defaults to 120 s for TIME_WAIT), then is deleted"
     ]
    },
@@ -7030,7 +7030,7 @@
     "title": "How connection tracking decides what to let through",
     "steps": [
      "A stateful firewall, a NAT device or a host with connection tracking looks at the first packet of a flow and checks it against the rule list. If the rules allow it, it creates an entry keyed by the five-tuple: source and destination address and port, and protocol.",
-     "Each later packet is looked up in a hash table first. A packet that matches an entry in either direction is allowed without walking the rules, which is both faster and what lets replies in. Packets that match nothing and are not allowed as new connections are dropped as unsolicited.",
+     "Each later packet is looked up in a hash table first. A packet that matches an entry in either direction is allowed, typically by one early rule for established traffic, without checking the rest of the list, which is both faster and what lets replies in. Packets that match nothing and are not allowed as new connections are dropped as unsolicited.",
      "The entry tracks state. For TCP it follows the handshake and close; for UDP, which has no handshake, it treats a reply within a timeout as part of the flow. Every state has a timer: on Linux, established TCP entries last 5 days of idleness by default, closing ones about 2 minutes, unreplied UDP 30 seconds.",
      "The table has a fixed maximum, set by memory. Entries for closed connections count until their timers end, so a host making thousands of short connections a second can fill it. When it is full, new connections are dropped, which looks like random packet loss to the applications.",
      "Stateless filters, such as cloud network ACLs, keep no table. They are cheaper and immune to table exhaustion and asymmetric paths, but every allowed conversation needs rules in both directions, including the replies to ephemeral ports."
@@ -7113,7 +7113,7 @@
     {
      "id": "a",
      "label": "The payment API blocks the servers’ addresses",
-     "feedback": "A blocking API would usually refuse or reset; here the ACL itself never lets the replies in."
+     "feedback": "It might drop packets too, but the ACL here drops every reply anyway, which explains the timeouts without assuming anything about the API."
     },
     {
      "id": "b",
