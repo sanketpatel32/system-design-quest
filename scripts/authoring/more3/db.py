@@ -4,9 +4,9 @@ Run: python3 scripts/authoring/more3/db.py   (then: npm run audit)
 """
 import json, os, sys
 sys.path.insert(0, os.path.dirname(__file__))
-import db_a, db_b, db_c, db_d, db_e, db_f
+import db_a, db_b, db_c, db_d, db_e, db_f, db_g, db_h
 
-topics = db_a.T + db_b.T + db_c.T + db_d.T + db_e.T + db_f.T
+topics = db_a.T + db_b.T + db_c.T + db_d.T + db_e.T + db_f.T + db_g.T + db_h.T
 
 # Steps whose relative order does not matter get alternative orders.
 for t in topics:

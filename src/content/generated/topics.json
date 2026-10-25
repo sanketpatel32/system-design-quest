@@ -119644,5 +119644,1965 @@
         "why": "Backfills during live schema migrations"
       }
     ]
+  },
+  {
+    "id": 623,
+    "slug": "table-job-queue",
+    "region": "f4-databases",
+    "order": 30,
+    "title": "Using a Table as a Job Queue: SKIP LOCKED and Its Limits",
+    "kind": "lesson",
+    "objectives": [
+      "Claim jobs from a table safely with several workers",
+      "Choose between holding a lock and taking a lease while a job runs",
+      "Recognise when a table queue should become a broker or a log"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 14,
+    "prereqIds": [
+      268
+    ],
+    "cards": [
+      {
+        "id": "t623-c1",
+        "kind": "text",
+        "title": "Why use a table as a queue",
+        "body": "Many applications already have a relational database, and their background jobs are born inside a database transaction: \"send the receipt for this order\". Putting the job in a jobs table, in the same transaction as the order, means the job exists if and only if the order committed, with no second system to keep in step. A typical jobs table has an id, a status, a run_at time, an attempt count, a lease expiry and the job's payload.",
+        "teaches": [
+          "table-queue"
+        ]
+      },
+      {
+        "id": "t623-c2",
+        "kind": "diagram",
+        "title": "Worked example: two workers claim jobs without colliding",
+        "body": "FOR UPDATE SKIP LOCKED lets each worker lock different rows instead of waiting for each other.",
+        "teaches": [
+          "skip-locked",
+          "job-claiming"
+        ],
+        "steps": [
+          "Worker A: SELECT id FROM jobs WHERE status = 'ready' AND run_at <= now() ORDER BY run_at LIMIT 10 FOR UPDATE SKIP LOCKED",
+          "A locks 10 rows. Worker B runs the same query, skips A's locked rows and gets the next 10",
+          "Without SKIP LOCKED, B would wait for A's locks; with a plain SELECT, both could take the same rows",
+          "Each worker sets status = 'running' and lease_until = now() + 5 minutes on its rows, then commits, so row locks last milliseconds",
+          "After the work, the worker deletes the job or marks it done; if it crashes, the lease expires and another worker can claim it"
+        ]
+      },
+      {
+        "id": "t623-c3",
+        "kind": "text",
+        "title": "Hold the lock, or take a lease",
+        "body": "One style keeps the transaction open while the job runs, holding the row lock. It is simple, and a crash releases the lock, so the job becomes available again. But each running job holds a connection and an open transaction for its whole duration, which in MVCC engines also holds back cleanup. The other style commits a claim with a lease expiry and works outside any transaction. It suits jobs longer than a second or two, but needs the claim query to take back expired leases and the finishing step to check that the worker still owns the job. SKIP LOCKED is available in PostgreSQL 9.5 and later, MySQL 8.0 and Oracle; SQL Server offers the READPAST hint for a similar effect.",
+        "teaches": [
+          "job-claiming"
+        ]
+      },
+      {
+        "id": "t623-c4",
+        "kind": "text",
+        "title": "Indexes and churn",
+        "body": "A queue table is small but very busy: every job is inserted, updated at least once and then deleted. A partial index such as ON jobs (run_at) WHERE status = 'ready' keeps the claim query reading only ready jobs. In PostgreSQL each update and delete leaves a dead row version, so vacuum must keep pace. A long-running transaction anywhere in the database stops that cleanup, dead entries pile up in the queue index, and claim queries that used to take a millisecond start scanning thousands of dead entries.",
+        "teaches": [
+          "queue-churn"
+        ]
+      },
+      {
+        "id": "t623-c5",
+        "kind": "text",
+        "title": "Trap: read first, then update",
+        "body": "A worker runs SELECT … WHERE status = 'ready' LIMIT 1, then UPDATE jobs SET status = 'running' WHERE id = 42. Two workers can read job 42 in the same instant, both update it, and both run it. Make the claim one atomic step: lock with FOR UPDATE SKIP LOCKED inside the claiming statement, or use a conditional UPDATE … WHERE id = 42 AND status = 'ready' and treat zero affected rows as \"someone else got it\". Even then, jobs can run twice after a lease expires, so job handlers must be idempotent.",
+        "teaches": [
+          "job-claiming"
+        ]
+      },
+      {
+        "id": "t623-c6",
+        "kind": "text",
+        "title": "Edge case: when a table queue reaches its limits",
+        "body": "Each job costs several writes on the primary: insert, claim and delete, each with index updates and log records. Thousands of jobs a second compete with the application's own writes and keep vacuum busy. A table queue also hands each job to one worker and then forgets it. If many independent consumers must each read every event, or events must be replayed later, or ordering per key matters at high volume, a log such as Kafka or a dedicated broker fits better, often fed from the database through an outbox.",
+        "teaches": [
+          "queue-limits"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t623-a1",
+        "concept": "job-claiming",
+        "type": "multiple_choice",
+        "prompt": "Two workers sometimes run the same job. Each reads a ready job with a plain SELECT, then updates its status. What is the cause?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Both read the row before either update committed"
+          },
+          {
+            "id": "b",
+            "label": "The jobs table lacks a primary key on id"
+          },
+          {
+            "id": "c",
+            "label": "The workers use different isolation levels"
+          },
+          {
+            "id": "d",
+            "label": "The status index is out of date until vacuum runs"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "A plain SELECT takes no lock, so both see job 42 as ready and both update it. Claim with FOR UPDATE SKIP LOCKED or a conditional update that checks the status. A primary key does not stop two updates of the same row. Isolation levels differing does not create the race; it exists at Read Committed for both. Index maintenance is not deferred to vacuum."
+      },
+      {
+        "id": "t623-a2",
+        "concept": "skip-locked",
+        "type": "multiple_choice",
+        "prompt": "Worker A has locked 10 ready jobs with FOR UPDATE SKIP LOCKED. Worker B runs the same query. What does B get?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "B waits until A commits, then gets the same 10"
+          },
+          {
+            "id": "b",
+            "label": "B gets an error saying the rows are locked"
+          },
+          {
+            "id": "c",
+            "label": "B gets the next 10 unlocked ready jobs"
+          },
+          {
+            "id": "d",
+            "label": "B gets A's 10 rows, but as read-only copies"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "SKIP LOCKED leaves out rows that cannot be locked immediately, so B moves on to other ready jobs at once. Waiting is the behaviour without SKIP LOCKED; an error is what NOWAIT does. Locked rows are not returned in any form."
+      },
+      {
+        "id": "t623-a3",
+        "concept": "job-claiming",
+        "type": "multiple_choice",
+        "prompt": "In a lease design, a worker crashes 2 minutes into a job whose lease lasts 5 minutes. What happens to the job?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "It is rolled back and ready again at once"
+          },
+          {
+            "id": "b",
+            "label": "It stays running until the lease expires, then can be reclaimed"
+          },
+          {
+            "id": "c",
+            "label": "It is lost unless an operator resets it by hand"
+          },
+          {
+            "id": "d",
+            "label": "The database restarts it on another worker"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "The claim was committed, so nothing rolls back. After lease_until passes, the claim query treats it as available. Immediate release happens only in the hold-the-lock style, where the crash ends the transaction. The lease exists precisely so the job is not lost. Databases do not run jobs."
+      },
+      {
+        "id": "t623-a4",
+        "concept": "queue-churn",
+        "type": "estimation",
+        "prompt": "A queue processes 2,000 jobs a second. Each job is inserted, updated once when claimed, and deleted when done. About how many million row writes a day does that add?",
+        "unit": "million/day",
+        "target": 518.4,
+        "assumptions": [
+          "2,000 jobs a second",
+          "3 row writes per job: insert, claim, delete",
+          "86,400 seconds a day",
+          "Ignore index and log writes"
+        ],
+        "formula": "jobs per second × writes per job × seconds per day",
+        "workedAnswer": "2,000 × 3 = 6,000 writes a second; × 86,400 = 518,400,000 ≈ 518 million",
+        "explanation": "Design implication: each of those writes also updates indexes and the log, and in PostgreSQL leaves dead versions for vacuum, so the queue can rival the application's own write load. 172.8 counts only the inserts, and 6 is the per-second figure in thousands.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          172.8,
+          6
+        ]
+      },
+      {
+        "id": "t623-a5",
+        "concept": "job-claiming",
+        "type": "drag_order",
+        "prompt": "Order the life of a job in a lease-based table queue.",
+        "items": [
+          {
+            "id": "s4",
+            "label": "Do the work outside any transaction"
+          },
+          {
+            "id": "s1",
+            "label": "Insert the job in the same transaction as the order"
+          },
+          {
+            "id": "s5",
+            "label": "Delete the job only if this worker still holds the lease"
+          },
+          {
+            "id": "s2",
+            "label": "Claim it with SKIP LOCKED and set a lease expiry"
+          },
+          {
+            "id": "s3",
+            "label": "Commit the claim so the row lock is released"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "The job is born with the business change, claimed atomically, and committed quickly; the work happens without an open transaction, and the final step checks ownership so a worker whose lease expired does not delete someone else's claim."
+      },
+      {
+        "id": "t623-a6",
+        "concept": "queue-limits",
+        "type": "multiple_choice",
+        "prompt": "Which new requirement is the clearest sign to move from a jobs table to a log or broker?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Jobs must be created atomically with the order"
+          },
+          {
+            "id": "b",
+            "label": "Five services must each read every order event, and replay it"
+          },
+          {
+            "id": "c",
+            "label": "About 50 jobs a second must be processed"
+          },
+          {
+            "id": "d",
+            "label": "Failed jobs should be retried three times"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Many independent consumers reading the same events, with replay, is what logs are built for; a jobs table hands each job to one worker and deletes it. Atomic creation is the main strength of a table queue. 50 jobs a second is modest for a table. Retries are a column and a WHERE clause."
+      },
+      {
+        "id": "t623-a7",
+        "concept": "table-queue",
+        "type": "tradeoff",
+        "prompt": "An online shop on one PostgreSQL primary sends about 200 emails a minute after orders commit. No email may be sent for an order that rolled back.",
+        "constraints": [
+          "Atomic with the order",
+          "Several workers",
+          "Small team, few systems"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "Broker publish",
+            "description": "Commit the order, then publish to a message broker"
+          },
+          {
+            "id": "p2",
+            "label": "Jobs table",
+            "description": "Insert a job in the order transaction; workers claim with SKIP LOCKED"
+          },
+          {
+            "id": "p3",
+            "label": "Polling orders",
+            "description": "Workers scan all orders every minute for unsent emails"
+          }
+        ],
+        "correctApproachId": "p2",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "The job commits or rolls back with the order"
+          },
+          {
+            "id": "r3",
+            "label": "Publishing after commit is atomic with the order"
+          },
+          {
+            "id": "r2",
+            "label": "SKIP LOCKED lets several workers share the queue without collisions"
+          },
+          {
+            "id": "r4",
+            "label": "Scanning all orders each minute stays cheap as the shop grows"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "If the process dies between commit and publish, the email is never sent; a broker needs an outbox to be atomic.",
+          "r4": "A full scan grows with every order ever placed, while the work per minute stays the same."
+        },
+        "explanation": "At a few emails a second a jobs table is ample, and it gives atomicity for free. Revisit it when volume or fan-out grows."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t623-f1",
+        "front": "Table queue strength",
+        "back": "Jobs commit or roll back with the business change"
+      },
+      {
+        "id": "t623-f2",
+        "front": "FOR UPDATE SKIP LOCKED",
+        "back": "Lock rows you can get now, skip the rest; workers never collide"
+      },
+      {
+        "id": "t623-f3",
+        "front": "Lease",
+        "back": "Committed claim with an expiry; expired leases are reclaimed"
+      },
+      {
+        "id": "t623-f4",
+        "front": "Limits",
+        "back": "High churn, fan-out to many consumers, replay: use a log or broker"
+      }
+    ],
+    "sources": [
+      {
+        "title": "PostgreSQL: SELECT (the locking clause)",
+        "url": "https://www.postgresql.org/docs/current/sql-select.html"
+      },
+      {
+        "title": "MySQL: Locking reads (NOWAIT and SKIP LOCKED)",
+        "url": "https://dev.mysql.com/doc/refman/8.4/en/innodb-locking-reads.html"
+      },
+      {
+        "title": "PostgreSQL: Routine vacuuming",
+        "url": "https://www.postgresql.org/docs/current/routine-vacuuming.html"
+      },
+      {
+        "title": "SQL Server: Table hints (READPAST)",
+        "url": "https://learn.microsoft.com/en-us/sql/t-sql/queries/hints-transact-sql-table"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "table-queue",
+        "skip-locked",
+        "job-claiming",
+        "queue-churn",
+        "queue-limits"
+      ],
+      "mechanism": {
+        "title": "How workers share a jobs table",
+        "steps": [
+          "A producer inserts a row with status ready and a run_at time, inside the same transaction as the change that caused it. If that transaction rolls back, the job never existed.",
+          "A worker runs a claim query: ready rows due now, in run_at order, a small LIMIT, FOR UPDATE SKIP LOCKED. The engine walks the index, tries to lock each row, and skips any row another transaction holds.",
+          "The worker marks its rows running with a lease expiry and commits. Its locks are released within milliseconds, so other workers are never blocked for the length of a job.",
+          "The worker does the job, then deletes the row or marks it done, checking that it still owns the lease. On failure it increments attempts and sets a later run_at, a simple form of backoff.",
+          "The claim query also picks up running rows whose lease has expired, which is how work from crashed workers is recovered. Because that can run a job twice, handlers must be idempotent.",
+          "Cleanup keeps the table healthy. Done rows are deleted or moved to a history table, vacuum reclaims dead versions, and the partial index on ready jobs stays small as long as nothing holds back that cleanup for long."
+        ]
+      },
+      "useWhen": [
+        "Jobs created by database transactions",
+        "Tens to a few hundred jobs a second",
+        "Teams that want one fewer system to run",
+        "Delayed jobs with a run_at time"
+      ],
+      "avoidWhen": [
+        "Thousands of jobs a second on a busy primary",
+        "Many consumers that each need every event",
+        "Replaying old events",
+        "Strict ordering per key at high volume"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Approach",
+          "Atomic with the business write",
+          "Fan-out and replay",
+          "Extra system"
+        ],
+        "rows": [
+          [
+            "Jobs table with SKIP LOCKED",
+            "Yes",
+            "No",
+            "None"
+          ],
+          [
+            "Broker, publish after commit",
+            "No, can lose jobs on crash",
+            "Some brokers",
+            "Broker"
+          ],
+          [
+            "Outbox table relayed to a broker",
+            "Yes",
+            "Yes, via the broker or log",
+            "Broker plus relay"
+          ],
+          [
+            "Log such as Kafka",
+            "Only via an outbox",
+            "Yes",
+            "Log cluster"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "What a table queue costs the primary",
+        "assumptions": [
+          "500 jobs a second",
+          "Insert, claim update and delete per job",
+          "Two indexes on the jobs table",
+          "Illustrative"
+        ],
+        "steps": [
+          "Row writes: 500 × 3 = 1,500 a second.",
+          "Index writes: each insert adds 2 index entries and, when the claim changes an indexed column, the update adds more; roughly 1,500 to 3,000 a second.",
+          "Dead row versions left for vacuum: 500 × 2 = 1,000 a second, 86.4 million a day.",
+          "At 5,000 jobs a second all of this is ten times larger, which is where a broker starts to pay for itself."
+        ],
+        "result": "A table queue is cheap at hundreds of jobs a second and an increasingly heavy tenant on the primary beyond that."
+      },
+      "india": {
+        "title": "PostgreSQL SELECT documentation",
+        "label": "Official documentation",
+        "body": "The PostgreSQL manual explains that with SKIP LOCKED, any selected rows that cannot be immediately locked are skipped. It warns that skipping locked rows gives an inconsistent view of the data, so the option is not suitable for general-purpose work, but notes that it can be used to avoid lock contention when multiple consumers access a queue-like table."
+      },
+      "pitfalls": [
+        {
+          "trap": "Claiming with a plain SELECT, then UPDATE",
+          "say": "Claim atomically with SKIP LOCKED or a conditional update"
+        },
+        {
+          "trap": "Holding a transaction open for a 10-minute job",
+          "say": "Commit a lease and work outside the transaction"
+        },
+        {
+          "trap": "Letting done rows accumulate",
+          "say": "Delete or archive them, and watch vacuum on the queue table"
+        }
+      ],
+      "takeaways": [
+        "A jobs table gives atomic enqueue with the business change",
+        "FOR UPDATE SKIP LOCKED lets workers claim different rows without waiting",
+        "Leases recover crashed work; handlers must be idempotent",
+        "Move to a broker or log for high churn, fan-out or replay"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "One job, two workers",
+      "prompt": "Only one job is ready. Worker A has claimed it with FOR UPDATE SKIP LOCKED and has not committed yet. Worker B runs the same claim query. What happens?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "B waits for A to commit, then gets nothing",
+          "feedback": "SKIP LOCKED never waits for row locks; that is the point of it."
+        },
+        {
+          "id": "b",
+          "label": "B gets no rows, immediately",
+          "feedback": "Right: the only ready row is locked, so it is skipped and B sees an empty result at once."
+        },
+        {
+          "id": "c",
+          "label": "B gets the same job and both run it",
+          "feedback": "B cannot lock a row A holds, and SKIP LOCKED leaves it out."
+        }
+      ],
+      "correctId": "b",
+      "reveal": "Empty results are normal for a queue worker: it sleeps briefly or waits for a notification, then asks again."
+    },
+    "seeAlso": [
+      {
+        "topicId": 227,
+        "why": "Background jobs in general: idempotency, retries and dead letters"
+      },
+      {
+        "topicId": 268,
+        "why": "Row locks, FOR UPDATE and MVCC, which SKIP LOCKED builds on"
+      },
+      {
+        "topicId": 238,
+        "why": "The dual-write problem and the outbox, for when jobs must flow on to a broker"
+      }
+    ]
+  },
+  {
+    "id": 624,
+    "slug": "finding-slow-queries",
+    "region": "f4-databases",
+    "order": 25,
+    "title": "Finding Slow Queries: Statement Statistics and Slow Logs",
+    "kind": "lesson",
+    "objectives": [
+      "Rank queries by total load rather than by single slow runs",
+      "Read statement statistics to tell a bad plan from too much work",
+      "Go from a statement fingerprint to a verified fix"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [
+      265
+    ],
+    "cards": [
+      {
+        "id": "t624-c1",
+        "kind": "text",
+        "title": "Two views of query load",
+        "body": "Statement statistics group executions of the same query shape and keep running totals: calls, total and mean time, rows and pages read. PostgreSQL has the pg_stat_statements extension, MySQL the performance_schema statement digest tables, and SQL Server the Query Store. A slow query log records individual executions above a time threshold, with their actual text: log_min_duration_statement in PostgreSQL, slow_query_log with long_query_time in MySQL. Statistics show where the load is; the log shows concrete examples to investigate.",
+        "teaches": [
+          "query-statistics"
+        ]
+      },
+      {
+        "id": "t624-c2",
+        "kind": "diagram",
+        "title": "Worked example: the slowest query is not the biggest problem",
+        "body": "Rank by total time, which is calls × mean time, because that is what the server spends.",
+        "teaches": [
+          "query-statistics"
+        ],
+        "steps": [
+          "Query A: a monthly report, mean 2 s, 100 calls an hour: 200 s an hour",
+          "Query B: a product lookup, mean 5 ms, 200,000 calls an hour: 1,000 s an hour",
+          "B uses five times the server time of A, though each call is 400 times faster",
+          "Cutting B to 1 ms saves 800 s an hour; making A instant saves at most 200 s",
+          "Sort by mean time to find what annoys one user; sort by total time to find what loads the server"
+        ]
+      },
+      {
+        "id": "t624-c3",
+        "kind": "text",
+        "title": "Reading a statistics row",
+        "body": "Each row describes one normalised statement, with constants replaced by parameters. Look at rows per call: a high number suggests missing filters or pagination. Compare pages read from storage with pages found in cache: many reads point to a missing index or a working set larger than memory. In MySQL, rows examined against rows sent shows how much was read to produce the answer; 2,000,000 examined for 20 sent is a scan doing an index's job. Mean time hides outliers, so check the maximum or the standard deviation as well.",
+        "teaches": [
+          "statistics-reading"
+        ]
+      },
+      {
+        "id": "t624-c4",
+        "kind": "text",
+        "title": "From fingerprint to fix",
+        "body": "Take the top statements by total time. Get a real example with real values from the slow log or the application, run it under EXPLAIN with actual timings and buffer counts, and compare estimated rows with actual rows at each step. Fix the cause: an index, a rewrite, fresher statistics, or less work requested. Then compare the statement's statistics over the same length of time before and after. PostgreSQL's auto_explain module can log the plans of statements slower than a threshold, which helps when a plan changes only sometimes.",
+        "teaches": [
+          "tuning-workflow"
+        ]
+      },
+      {
+        "id": "t624-c5",
+        "kind": "text",
+        "title": "Trap: the slow log shows only slow queries",
+        "body": "With long_query_time or log_min_duration_statement at 1 second, a server can run at 90% CPU and log nothing, because the load comes from millions of 5 ms queries. Logging every statement on a busy server is not the answer either: it adds I/O and can slow the database. Use statement statistics for the overall picture, keep the slow-log threshold for outliers, and sample if you need full text for fast queries.",
+        "teaches": [
+          "query-statistics"
+        ]
+      },
+      {
+        "id": "t624-c6",
+        "kind": "text",
+        "title": "Edge case: fast on average, slow sometimes",
+        "body": "A statement averages 3 ms but users report occasional 4-second waits. Statistics that include the maximum or the deviation show it; the plan usually does not. Common causes are waiting for a lock held by another transaction, a cache miss after a restart or failover, and a plan that changes for some parameter values. Check wait events and lock waits for the slow moments (pg_stat_activity in PostgreSQL, performance_schema in MySQL), not only the plan.",
+        "teaches": [
+          "statistics-reading"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t624-a1",
+        "concept": "query-statistics",
+        "type": "estimation",
+        "prompt": "A statement has a mean time of 40 ms and runs 50,000 times an hour. How many seconds of server time does it use per hour?",
+        "unit": "s/hour",
+        "target": 2000,
+        "assumptions": [
+          "Mean 40 ms",
+          "50,000 calls an hour",
+          "1 s = 1,000 ms"
+        ],
+        "formula": "calls × mean time",
+        "workedAnswer": "50,000 × 40 ms = 2,000,000 ms = 2,000 s an hour",
+        "explanation": "Sanity check: 2,000 s of work in a 3,600 s hour means this statement alone keeps more than half a core busy on average. 200 and 20,000 slip the decimal point by one place.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          200,
+          20000
+        ]
+      },
+      {
+        "id": "t624-a2",
+        "concept": "query-statistics",
+        "type": "multiple_choice",
+        "prompt": "Which statement should you tune first to reduce database load?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Mean 8 s, 30 calls a day"
+          },
+          {
+            "id": "b",
+            "label": "Mean 12 ms, 400,000 calls a day"
+          },
+          {
+            "id": "c",
+            "label": "Mean 900 ms, 200 calls a day"
+          },
+          {
+            "id": "d",
+            "label": "Mean 1 ms, 100,000 calls a day"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Totals: 30 × 8 s = 240 s; 400,000 × 12 ms = 4,800 s; 200 × 0.9 s = 180 s; 100,000 × 1 ms = 100 s. The 12 ms statement carries twenty times the load of the 8-second one. Slow single runs matter for those users, but they are not where the server spends its time."
+      },
+      {
+        "id": "t624-a3",
+        "concept": "query-statistics",
+        "type": "multiple_choice",
+        "prompt": "CPU sits at 90%, but the slow log, set to 1 second, has been empty all day. What is the most likely explanation?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The slow log is broken and needs a restart"
+          },
+          {
+            "id": "b",
+            "label": "The load comes from many queries under 1 second"
+          },
+          {
+            "id": "c",
+            "label": "CPU is used by the log writer itself"
+          },
+          {
+            "id": "d",
+            "label": "Queries only count as slow while waiting on disk"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Millions of fast statements can saturate a server without any single one crossing the threshold; statement statistics would show them. An empty log at a 1 s threshold is normal. Writing an empty log costs nothing. Time in the log is wall time, whether spent on CPU, disk or locks."
+      },
+      {
+        "id": "t624-a4",
+        "concept": "statistics-reading",
+        "type": "multiple_choice",
+        "prompt": "A MySQL slow log entry shows rows_examined 2,000,000 and rows_sent 20. What does that suggest?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The result was too large to send quickly"
+          },
+          {
+            "id": "b",
+            "label": "A filter is not served by an index"
+          },
+          {
+            "id": "c",
+            "label": "The network dropped most of the rows"
+          },
+          {
+            "id": "d",
+            "label": "The query cache returned old rows"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Reading two million rows to return 20 is a scan where an index lookup should be; check the plan and the filter columns. 20 rows is a small result. Rows sent counts what the server produced, not what arrived. MySQL 8.0 removed the query cache."
+      },
+      {
+        "id": "t624-a5",
+        "concept": "tuning-workflow",
+        "type": "drag_order",
+        "prompt": "Order a query-tuning pass.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Run EXPLAIN with actual timings and buffers"
+          },
+          {
+            "id": "s5",
+            "label": "Compare statistics over an equal window afterwards"
+          },
+          {
+            "id": "s1",
+            "label": "Sort statement statistics by total time"
+          },
+          {
+            "id": "s4",
+            "label": "Fix the cause: index, rewrite or statistics"
+          },
+          {
+            "id": "s2",
+            "label": "Get a real example with its actual values"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Pick by load, examine a concrete execution, change one thing, and confirm with the same measurement you started from. Run EXPLAIN with actual execution on writes only inside a transaction you roll back, or on a copy."
+      },
+      {
+        "id": "t624-a6",
+        "concept": "statistics-reading",
+        "type": "multiple_choice",
+        "prompt": "A lookup averages 3 ms, yet users sometimes wait 4 seconds for it. Its plan looks fine. What should you check next?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Whether the query needs a covering index"
+          },
+          {
+            "id": "b",
+            "label": "Lock waits and wait events at the slow moments"
+          },
+          {
+            "id": "c",
+            "label": "Whether the table should be partitioned"
+          },
+          {
+            "id": "d",
+            "label": "Whether the mean includes the planning time"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "A good plan with rare long waits usually means the statement waited for something: a row lock, a cold cache, or a connection. Wait events and lock views show which. A covering index or partitioning changes typical speed, not rare 4-second stalls. Whether planning is counted cannot turn 3 ms into 4 s."
+      },
+      {
+        "id": "t624-a7",
+        "concept": "query-statistics",
+        "type": "tradeoff",
+        "prompt": "A team wants production query monitoring on a primary that serves 20,000 statements a second.",
+        "constraints": [
+          "See where total load comes from",
+          "Get examples of outliers",
+          "Low overhead"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "Log every statement",
+            "description": "Set the slow-log threshold to zero"
+          },
+          {
+            "id": "p2",
+            "label": "Statistics plus a threshold",
+            "description": "Statement statistics, a slow log at about 500 ms, sampled plan logging"
+          },
+          {
+            "id": "p3",
+            "label": "Ad hoc only",
+            "description": "Run EXPLAIN when someone complains"
+          }
+        ],
+        "correctApproachId": "p2",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "Aggregated statistics show total load per statement at low cost"
+          },
+          {
+            "id": "r3",
+            "label": "Logging every statement has no measurable overhead"
+          },
+          {
+            "id": "r2",
+            "label": "A threshold log captures the text and values of outliers"
+          },
+          {
+            "id": "r4",
+            "label": "Complaints reliably point to the statements causing load"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "At 20,000 statements a second, full logging writes a large stream of text and can slow the server itself.",
+          "r4": "Users notice slow pages, not the fast queries that together use most of the server."
+        },
+        "explanation": "Aggregate everything cheaply, log only what is slow, and add plans for the outliers."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t624-f1",
+        "front": "Total time",
+        "back": "calls × mean time; rank by it to reduce load"
+      },
+      {
+        "id": "t624-f2",
+        "front": "Statement statistics",
+        "back": "Normalised queries with running totals: calls, time, rows, pages"
+      },
+      {
+        "id": "t624-f3",
+        "front": "Slow log",
+        "back": "Individual executions over a threshold, with real values"
+      },
+      {
+        "id": "t624-f4",
+        "front": "Rows examined vs sent",
+        "back": "A large ratio means reading far more than you return"
+      }
+    ],
+    "sources": [
+      {
+        "title": "PostgreSQL: pg_stat_statements",
+        "url": "https://www.postgresql.org/docs/current/pgstatstatements.html"
+      },
+      {
+        "title": "PostgreSQL: auto_explain",
+        "url": "https://www.postgresql.org/docs/current/auto-explain.html"
+      },
+      {
+        "title": "MySQL: The slow query log",
+        "url": "https://dev.mysql.com/doc/refman/8.4/en/slow-query-log.html"
+      },
+      {
+        "title": "SQL Server: Monitoring performance with the Query Store",
+        "url": "https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "query-statistics",
+        "statistics-reading",
+        "tuning-workflow"
+      ],
+      "mechanism": {
+        "title": "How statement statistics are collected",
+        "steps": [
+          "When a statement finishes, the engine computes a fingerprint of its normalised text, with literal values replaced by parameters, so WHERE id = 7 and WHERE id = 9 count as one statement.",
+          "It adds the execution's numbers to that statement's running totals: one more call, the elapsed time, rows returned, pages found in cache and pages read from storage.",
+          "Totals live in shared memory with a fixed number of entries. When there are more distinct statements than entries, the least-used are discarded, which is another reason to avoid statements whose text varies.",
+          "Totals grow from the last reset. To compare before and after a fix, take a snapshot, wait an equal period, and subtract, or reset at a known time.",
+          "Separately, the slow log writes one entry per execution above the threshold, with the full text and values, and in MySQL rows examined and sent.",
+          "Neither source shows why a statement waited. Lock views and wait-event sampling fill that gap and should be read alongside them when times vary widely.",
+          "Managed services and monitoring tools usually read these same views on a schedule and chart the differences, so the numbers on a dashboard are deltas of the totals described here, not a separate measurement."
+        ]
+      },
+      "useWhen": [
+        "Before any tuning work, to choose what to tune",
+        "After a release, to spot statements whose cost rose",
+        "Capacity planning, to see which statements grow with traffic",
+        "Incident reviews, to find the statement behind a spike"
+      ],
+      "avoidWhen": [
+        "Do not tune by mean time alone",
+        "Do not log every statement on a busy primary",
+        "Do not compare totals over windows of different length",
+        "Do not trust a plan from EXPLAIN without actual timings"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Tool",
+          "Shows",
+          "Misses"
+        ],
+        "rows": [
+          [
+            "Statement statistics",
+            "Total load per statement, rows, pages",
+            "Individual values and rare waits"
+          ],
+          [
+            "Slow query log",
+            "Real text and values of slow runs",
+            "Load from many fast queries"
+          ],
+          [
+            "EXPLAIN with actual timings",
+            "Where one execution spent its time",
+            "How often the statement runs"
+          ],
+          [
+            "Wait events and lock views",
+            "What a session is waiting for now",
+            "History, unless sampled"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Ranking by load",
+        "assumptions": [
+          "Three statements from one hour of statistics",
+          "Illustrative figures"
+        ],
+        "steps": [
+          "Search: 120,000 calls × 15 ms = 1,800 s.",
+          "Checkout: 8,000 calls × 60 ms = 480 s.",
+          "Export: 12 calls × 30 s = 360 s.",
+          "Halving search saves 900 s an hour, more than removing the other two entirely."
+        ],
+        "result": "The statement to tune first is the one with the largest calls × mean, which is often a fast one."
+      },
+      "india": {
+        "title": "PostgreSQL pg_stat_statements documentation",
+        "label": "Official documentation",
+        "body": "The PostgreSQL manual describes pg_stat_statements as a module that tracks planning and execution statistics of all SQL statements executed by a server. It explains that statements are combined into one entry when they have the same query structure, with constants replaced by parameter symbols, and lists columns such as calls, total_exec_time, mean_exec_time, rows, and shared blocks hit and read."
+      },
+      "pitfalls": [
+        {
+          "trap": "Tuning the slowest single query first",
+          "say": "Rank by total time to cut load"
+        },
+        {
+          "trap": "Setting the slow log to zero in production",
+          "say": "Use statistics for totals and a threshold log for outliers"
+        },
+        {
+          "trap": "Declaring victory from one fast run",
+          "say": "Compare statistics over equal windows before and after"
+        }
+      ],
+      "takeaways": [
+        "Statement statistics show total load; slow logs show examples",
+        "Rank by calls × mean time",
+        "Rows per call, pages read and rows examined point to the cause",
+        "Check waits when a good plan is sometimes slow"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Two lookups, one entry?",
+      "prompt": "An app runs SELECT * FROM users WHERE id = 7 and then SELECT * FROM users WHERE id = 9. How does pg_stat_statements record them?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "As two entries, one per id value",
+          "feedback": "Constants are replaced before grouping, so the values do not create separate entries."
+        },
+        {
+          "id": "b",
+          "label": "As one entry with calls = 2",
+          "feedback": "Right: both normalise to WHERE id = $1 and share one row of totals."
+        },
+        {
+          "id": "c",
+          "label": "Not at all, because they are too fast to record",
+          "feedback": "Every completed statement is counted, however fast."
+        }
+      ],
+      "correctId": "b",
+      "reveal": "Grouping by query shape is what makes the totals useful: a million lookups for different ids add up to one line you can rank."
+    },
+    "seeAlso": [
+      {
+        "topicId": 265,
+        "why": "Reading plans and estimates once you have found the statement"
+      },
+      {
+        "topicId": 621,
+        "why": "Plan caching, a common reason a statement is fast for some values and slow for others"
+      },
+      {
+        "topicId": 558,
+        "why": "Pages read from storage versus cache, and the working set behind them"
+      }
+    ]
+  },
+  {
+    "id": 625,
+    "slug": "estimating-table-index-size",
+    "region": "f4-databases",
+    "order": 23,
+    "title": "Estimating Table and Index Size",
+    "kind": "lesson",
+    "objectives": [
+      "Estimate bytes per row, including the engine's per-row overhead",
+      "Estimate index size from entry width and how full pages are",
+      "Turn table size into disk, memory and recovery-time plans"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [
+      264
+    ],
+    "cards": [
+      {
+        "id": "t625-c1",
+        "kind": "text",
+        "title": "Why estimate size before you have the data",
+        "body": "Size drives several decisions at once: whether the working set fits in memory, how much disk to provision, and how long a backup restore, a replica rebuild or a full-table migration will take. A rough estimate made from the schema and expected row counts is usually within a factor of two, which is enough to tell a 50 GB table from a 5 TB one. The method is the same everywhere: bytes per row, rows per page, pages per table, then the same for each index.",
+        "teaches": [
+          "size-estimation"
+        ]
+      },
+      {
+        "id": "t625-c2",
+        "kind": "diagram",
+        "title": "Worked example: 500 million orders in PostgreSQL",
+        "body": "Illustrative schema: id bigint, customer_id bigint, created_at timestamptz, total numeric, status smallint, plus a short note.",
+        "teaches": [
+          "row-overhead",
+          "index-size"
+        ],
+        "steps": [
+          "Column data: about 70 bytes per row on average, including the variable-length total and note",
+          "Per-row overhead: a 23-byte tuple header padded to 24, plus a 4-byte line pointer in the page, so about 28 bytes",
+          "Per row: about 100 bytes, so 500,000,000 × 100 bytes ≈ 50 GB for the table",
+          "Primary key index on a bigint: about 20 bytes per entry, with leaf pages about 90% full, so 500,000,000 × 20 ÷ 0.9 ≈ 11 GB",
+          "Two more indexes of similar width: about 33 GB of indexes in total, two-thirds the size of the table"
+        ]
+      },
+      {
+        "id": "t625-c3",
+        "kind": "text",
+        "title": "Where the overhead comes from",
+        "body": "Every engine adds bytes to each row. In PostgreSQL the tuple header is 23 bytes and each row also has a 4-byte line pointer; values are aligned, so a boolean followed by a bigint wastes 7 bytes of padding, and ordering columns from widest to narrowest avoids it. A NULL takes a bit in a null bitmap, not the column's width. InnoDB stores each row in the clustered primary-key index with a 5-byte record header and two hidden fields, a 6-byte transaction id and a 7-byte roll pointer, and every secondary index entry carries the primary key. Pages are 8 KB by default in PostgreSQL and 16 KB in InnoDB, each with its own header.",
+        "teaches": [
+          "row-overhead"
+        ]
+      },
+      {
+        "id": "t625-c4",
+        "kind": "text",
+        "title": "Indexes and how full their pages are",
+        "body": "An index entry holds the key, a pointer to the row and a small header. For an 8-byte key in PostgreSQL that is about 20 bytes, including the line pointer. How full the pages are matters as much as entry width. Keys that always arrive in increasing order fill leaf pages up to the fill factor, 90% by default for PostgreSQL B-trees. Random inserts split pages, which then sit about two-thirds to three-quarters full on average, so the same index can be a third larger. Updates and deletes leave further free space until it is reused or the index is rebuilt.",
+        "teaches": [
+          "index-size"
+        ]
+      },
+      {
+        "id": "t625-c5",
+        "kind": "text",
+        "title": "Trap: counting only the column bytes",
+        "body": "Adding up column widths gives the smallest number you will ever see. Per-row overhead often adds 20 to 40% for narrow rows; indexes commonly add half the table size or more; free space and dead rows add more. Then the database is copied: a primary with two replicas holds three copies, backups add more, and the write-ahead log and temporary files need room. A disk plan built from raw column bytes can be short by a factor of five or more.",
+        "teaches": [
+          "size-multipliers"
+        ]
+      },
+      {
+        "id": "t625-c6",
+        "kind": "text",
+        "title": "Edge case: measure a sample instead of trusting the formula",
+        "body": "Variable-length values, compression and fill patterns are hard to predict. Load a representative sample, say a million realistic rows, build the planned indexes, and measure. In PostgreSQL, pg_relation_size, pg_indexes_size and pg_total_relation_size report the sizes; in MySQL, information_schema.TABLES reports data_length and index_length. Scale the measurement by the expected row count; if your formula and the sample differ by more than about 30%, trust the sample and find out why.",
+        "teaches": [
+          "size-estimation"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t625-a1",
+        "concept": "row-overhead",
+        "type": "estimation",
+        "prompt": "A table will hold 200 million rows with about 92 bytes of column data each, plus 28 bytes of per-row overhead. About how many GB will the table take, before indexes?",
+        "unit": "GB",
+        "target": 24,
+        "assumptions": [
+          "200 million rows",
+          "92 bytes of data + 28 bytes overhead per row",
+          "1 GB = 10⁹ bytes",
+          "Ignore page headers and free space"
+        ],
+        "formula": "rows × (data bytes + overhead bytes)",
+        "workedAnswer": "200,000,000 × 120 bytes = 24,000,000,000 bytes = 24 GB",
+        "explanation": "Sanity check: overhead alone is 200 million × 28 bytes = 5.6 GB, nearly a quarter of the total. 18.4 forgets the overhead, and 2.4 drops a factor of ten.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          18.4,
+          2.4
+        ]
+      },
+      {
+        "id": "t625-a2",
+        "concept": "index-size",
+        "type": "estimation",
+        "prompt": "An index has 300 million entries of about 20 bytes each, and its leaf pages are about 90% full. About how many GB does it take?",
+        "unit": "GB",
+        "target": 6.67,
+        "assumptions": [
+          "300 million entries",
+          "About 20 bytes per entry",
+          "Leaf pages about 90% full",
+          "1 GB = 10⁹ bytes"
+        ],
+        "formula": "entries × bytes per entry ÷ fill fraction",
+        "workedAnswer": "300,000,000 × 20 = 6,000,000,000 bytes ÷ 0.9 ≈ 6.67 GB",
+        "explanation": "Design implication: with random inserts the pages would be nearer 70% full, about 8.6 GB, so the insert pattern matters as much as the key width. 6 ignores the free space in each page, and 5.4 multiplies by 0.9 instead of dividing.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          6,
+          5.4
+        ]
+      },
+      {
+        "id": "t625-a3",
+        "concept": "row-overhead",
+        "type": "multiple_choice",
+        "prompt": "A PostgreSQL table's columns are, in order: is_active boolean, id bigint, is_deleted boolean, created_at timestamptz. How can it be made smaller?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Change both booleans to smallint"
+          },
+          {
+            "id": "b",
+            "label": "Put the 8-byte columns first, then the booleans"
+          },
+          {
+            "id": "c",
+            "label": "Store created_at as text instead"
+          },
+          {
+            "id": "d",
+            "label": "Add a fill factor of 100 on the table"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Each 8-byte value must start on an 8-byte boundary, so a boolean before it wastes 7 bytes of padding, twice here. Ordering widest to narrowest removes 14 bytes per row. smallint is wider than boolean and still needs padding. Text timestamps are larger. 100 is already the default table fill factor."
+      },
+      {
+        "id": "t625-a4",
+        "concept": "index-size",
+        "type": "multiple_choice",
+        "prompt": "An index built fresh last year is now 40% larger, though the table's row count barely changed. Keys are random UUIDs. What explains it?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "B-tree depth grows with the age of the index"
+          },
+          {
+            "id": "b",
+            "label": "Each entry gains a timestamp as it ages"
+          },
+          {
+            "id": "c",
+            "label": "Page splits from random inserts left pages partly empty"
+          },
+          {
+            "id": "d",
+            "label": "The index now stores every old row version forever"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "A fresh build packs pages to the fill factor. Random inserts since then split full pages into half-empty ones, and deletes leave gaps, so the average page holds fewer entries. A rebuild packs them again. Depth grows with the number of entries, not age. Entries do not gain timestamps. Dead entries are cleaned up over time rather than kept forever."
+      },
+      {
+        "id": "t625-a5",
+        "concept": "size-estimation",
+        "type": "drag_order",
+        "prompt": "Order the steps of a storage estimate for a new table.",
+        "items": [
+          {
+            "id": "s2",
+            "label": "Add per-row overhead and alignment padding"
+          },
+          {
+            "id": "s4",
+            "label": "Add each planned index the same way"
+          },
+          {
+            "id": "s1",
+            "label": "List the columns and their average widths"
+          },
+          {
+            "id": "s5",
+            "label": "Multiply for replicas and add headroom for growth and logs"
+          },
+          {
+            "id": "s3",
+            "label": "Multiply by rows, allowing for page fill"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Each step builds on the one before: row width, then rows, then indexes on top of the table, and only then the copies and headroom that turn database size into disk to buy."
+      },
+      {
+        "id": "t625-a6",
+        "concept": "size-multipliers",
+        "type": "multiple_choice",
+        "prompt": "Tables and indexes total 400 GB on the primary. There are two replicas, and you want 30% headroom on each server. How much disk is needed across the three?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "About 520 GB"
+          },
+          {
+            "id": "b",
+            "label": "About 1,200 GB"
+          },
+          {
+            "id": "c",
+            "label": "About 1,560 GB"
+          },
+          {
+            "id": "d",
+            "label": "About 1,800 GB"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "400 GB × 1.3 = 520 GB per server, and three servers need 1,560 GB. 520 GB covers only the primary. 1,200 GB has three copies but no headroom. 1,800 GB adds 50% headroom rather than 30%. Backups are stored separately on top of this."
+      },
+      {
+        "id": "t625-a7",
+        "concept": "size-estimation",
+        "type": "tradeoff",
+        "prompt": "A team must order disks for a new service. The schema is designed, but no production data exists, and the estimate must be within about 30%.",
+        "constraints": [
+          "Estimate within 30%",
+          "Order hardware this month",
+          "Include indexes"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "Column-width sum",
+            "description": "Add the column widths and multiply by rows"
+          },
+          {
+            "id": "p2",
+            "label": "Copy a similar system",
+            "description": "Use the size of another team's database"
+          },
+          {
+            "id": "p3",
+            "label": "Formula checked by a sample",
+            "description": "Estimate with overhead and indexes, then load a realistic sample and measure"
+          }
+        ],
+        "correctApproachId": "p3",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "The formula covers overhead, page fill and every index"
+          },
+          {
+            "id": "r3",
+            "label": "Column widths alone come within 30% for most tables"
+          },
+          {
+            "id": "r2",
+            "label": "A measured sample catches compression and variable widths the formula misses"
+          },
+          {
+            "id": "r4",
+            "label": "Another system's size transfers well because databases are similar"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "Raw column bytes leave out row overhead, indexes and free space, which together can double the size.",
+          "r4": "Row counts, widths and indexes differ between systems, so their sizes do not transfer."
+        },
+        "explanation": "A formula gives the structure of the answer and a sample checks it; together they are reliable enough to buy hardware."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t625-f1",
+        "front": "Bytes per row",
+        "back": "Column data + per-row header + line pointer + padding"
+      },
+      {
+        "id": "t625-f2",
+        "front": "Index size",
+        "back": "entries × entry width ÷ page fill fraction"
+      },
+      {
+        "id": "t625-f3",
+        "front": "Page fill",
+        "back": "Sequential inserts pack pages; random inserts leave them about 70% full"
+      },
+      {
+        "id": "t625-f4",
+        "front": "Disk plan",
+        "back": "Tables + indexes, × copies, + headroom, then measure a sample"
+      }
+    ],
+    "sources": [
+      {
+        "title": "PostgreSQL: Database page layout",
+        "url": "https://www.postgresql.org/docs/current/storage-page-layout.html"
+      },
+      {
+        "title": "PostgreSQL: Database object size functions",
+        "url": "https://www.postgresql.org/docs/current/functions-admin.html"
+      },
+      {
+        "title": "PostgreSQL: CREATE INDEX (fill factor)",
+        "url": "https://www.postgresql.org/docs/current/sql-createindex.html"
+      },
+      {
+        "title": "MySQL: InnoDB row formats",
+        "url": "https://dev.mysql.com/doc/refman/8.4/en/innodb-row-format.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "size-estimation",
+        "row-overhead",
+        "index-size",
+        "size-multipliers"
+      ],
+      "mechanism": {
+        "title": "How rows and index entries fill pages",
+        "steps": [
+          "Storage is divided into fixed pages: 8 KB in PostgreSQL, 16 KB in InnoDB. Each page has a header, then rows or index entries, then free space.",
+          "Each row carries a header with visibility and layout information. In PostgreSQL that is 23 bytes plus a 4-byte pointer from the page's item array; InnoDB uses a record header plus hidden transaction fields.",
+          "Values are stored in column order and aligned to their natural boundaries, so the order of columns changes how much padding a row needs. NULLs cost a bit, and long values may be compressed or moved out of line.",
+          "Index entries hold the key and a row pointer (PostgreSQL) or the primary key (InnoDB secondary indexes). They are packed into leaf pages up to a fill factor and split when full.",
+          "The table and its indexes grow with inserts and with dead versions left by updates and deletes until cleanup reuses the space. Rebuilding packs pages again.",
+          "Estimates therefore come in layers: raw data, then overhead, then page fill, then indexes, then copies. Each layer is simple, and missing any one of them is the usual source of large errors."
+        ]
+      },
+      "useWhen": [
+        "Choosing server memory and disk",
+        "Predicting restore and replica rebuild times",
+        "Deciding whether to partition or archive",
+        "Comparing schema options, such as key types"
+      ],
+      "avoidWhen": [
+        "Do not plan disk from raw column widths",
+        "Do not assume an index is small because its key is",
+        "Do not ignore replicas, backups and log space",
+        "Do not trust an estimate you could measure with a sample"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Item",
+          "PostgreSQL",
+          "InnoDB"
+        ],
+        "rows": [
+          [
+            "Page size",
+            "8 KB",
+            "16 KB"
+          ],
+          [
+            "Per-row overhead",
+            "23-byte header (24 aligned) + 4-byte line pointer",
+            "5-byte header + 6-byte trx id + 7-byte roll pointer"
+          ],
+          [
+            "Where rows live",
+            "Heap, separate from indexes",
+            "Clustered primary-key index"
+          ],
+          [
+            "Secondary index entry",
+            "Key + row pointer",
+            "Key + primary key"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "From table size to recovery time",
+        "assumptions": [
+          "Tables and indexes: 80 GB",
+          "Restore speed: about 200 MB a second",
+          "Illustrative figures"
+        ],
+        "steps": [
+          "Copy time: 80,000 MB ÷ 200 MB/s = 400 s, about 7 minutes.",
+          "Index rebuilds after a logical restore can take as long again or longer.",
+          "Replaying a day of logs to reach the right moment adds more time.",
+          "At 8 TB the copy alone is about 11 hours, which may be longer than the business can wait."
+        ],
+        "result": "Size sets recovery time, so a table that grows tenfold needs its recovery plan revisited too."
+      },
+      "india": {
+        "title": "PostgreSQL page layout documentation",
+        "label": "Official documentation",
+        "body": "The PostgreSQL manual documents the page layout: a 24-byte page header, an array of 4-byte item identifiers pointing to items, free space, and the items themselves. It states that every table row begins with a fixed-size header occupying 23 bytes on most machines, followed by an optional null bitmap, and that values are aligned according to their type."
+      },
+      "pitfalls": [
+        {
+          "trap": "“The data is 35 GB, so a 50 GB disk is fine”",
+          "say": "Add overhead, indexes, copies and headroom; measure a sample"
+        },
+        {
+          "trap": "Booleans and bigints mixed at random",
+          "say": "Order columns widest first in PostgreSQL to avoid padding"
+        },
+        {
+          "trap": "Estimating an index as key bytes × rows",
+          "say": "Add the entry header and divide by how full the pages are"
+        }
+      ],
+      "takeaways": [
+        "Bytes per row = data + header + pointer + padding",
+        "Index size = entries × entry width ÷ page fill",
+        "Indexes often add half the table size or more",
+        "Multiply for copies, add headroom, and confirm with a measured sample"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Space taken by NULL",
+      "prompt": "A PostgreSQL row has a nullable 8-byte bigint column, and it is NULL in this row. How much space does that column use in the row?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "8 bytes, the same as any bigint",
+          "feedback": "NULL values are not stored as data at all."
+        },
+        {
+          "id": "b",
+          "label": "One bit in the row's null bitmap",
+          "feedback": "Right: a NULL is recorded as a bit, and no bytes are reserved for the value."
+        },
+        {
+          "id": "c",
+          "label": "4 bytes for a NULL marker",
+          "feedback": "There is no 4-byte marker; the bitmap holds one bit per column."
+        }
+      ],
+      "correctId": "b",
+      "reveal": "Sparse nullable columns are cheap in PostgreSQL. The bitmap appears only in rows that contain a NULL, and it is part of the header area."
+    },
+    "seeAlso": [
+      {
+        "topicId": 2,
+        "why": "Back-of-envelope estimation, the same method applied to whole systems"
+      },
+      {
+        "topicId": 558,
+        "why": "Comparing table and index size with memory and the working set"
+      },
+      {
+        "topicId": 552,
+        "why": "How the width of the primary key multiplies through indexes"
+      }
+    ]
+  },
+  {
+    "id": 626,
+    "slug": "database-timeouts-guardrails",
+    "region": "f4-databases",
+    "order": 26,
+    "title": "Timeouts and Guardrails Inside the Database",
+    "kind": "lesson",
+    "objectives": [
+      "Explain why client timeouts do not stop work on the server",
+      "Set statement, lock and idle-transaction limits per workload",
+      "Handle what a timeout leaves behind in a transaction"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 12,
+    "prereqIds": [
+      268
+    ],
+    "cards": [
+      {
+        "id": "t626-c1",
+        "kind": "text",
+        "title": "The database needs its own limits",
+        "body": "A client timeout ends the client's wait; it does not necessarily stop the query. The server may keep running it until it finishes or notices the connection is gone, using CPU, I/O and locks for an answer nobody will read. Server-side limits stop that work. PostgreSQL has statement_timeout, lock_timeout, idle_in_transaction_session_timeout and, from version 17, transaction_timeout. MySQL has max_execution_time for SELECT statements and innodb_lock_wait_timeout, 50 seconds by default. SQL Server has SET LOCK_TIMEOUT. Together they put a ceiling on how much one session can hold.",
+        "teaches": [
+          "server-timeouts"
+        ]
+      },
+      {
+        "id": "t626-c2",
+        "kind": "diagram",
+        "title": "Worked example: abandoned queries pile up",
+        "body": "Illustrative figures: 20 requests a second hit a query that suddenly takes 60 seconds; clients give up after 5 seconds and retry once.",
+        "teaches": [
+          "server-timeouts"
+        ],
+        "steps": [
+          "Each request runs the query twice: the first attempt and one retry",
+          "Without a server limit, each attempt runs the full 60 s, so about 20 × 2 × 60 = 2,400 queries are running at once",
+          "That is far beyond the connection limit and CPU, so every other query slows down too",
+          "With statement_timeout = 5 s, each attempt stops at 5 s: about 20 × 2 × 5 = 200 at once",
+          "Users still see errors, but the database stays up for everyone else while the slow query is fixed"
+        ]
+      },
+      {
+        "id": "t626-c3",
+        "kind": "text",
+        "title": "Choosing values per workload",
+        "body": "One global value rarely fits. A web request with a 2-second deadline wants a statement limit at or just under that deadline, because work after the deadline is wasted. A nightly report may legitimately run for 20 minutes. Set limits per role, per database or per transaction (SET LOCAL in PostgreSQL), and give long jobs their own role or a replica. Keep lock_timeout short, a few seconds, for web traffic and schema changes, so a blocked statement fails fast instead of queueing behind a lock.",
+        "teaches": [
+          "timeout-values"
+        ]
+      },
+      {
+        "id": "t626-c4",
+        "kind": "text",
+        "title": "Idle sessions that hold things",
+        "body": "A session that opened a transaction and then waits on the application, say for an external API call, holds its locks and its snapshot while doing nothing. Other writers queue behind its locks, and in MVCC engines cleanup cannot remove row versions it might still see. idle_in_transaction_session_timeout in PostgreSQL ends such sessions after a set time. The better fix is in the code: do slow external calls before or after the transaction, never inside it. Separate settings close sessions that are idle outside a transaction, such as idle_session_timeout in PostgreSQL 14 and later or wait_timeout in MySQL.",
+        "teaches": [
+          "idle-transactions"
+        ]
+      },
+      {
+        "id": "t626-c5",
+        "kind": "text",
+        "title": "Trap: relying on the client timeout alone",
+        "body": "An application sets a 3-second timeout in its driver and assumes no query can run longer. When the timeout fires, the driver stops waiting; depending on the driver, it may or may not send a cancel request, and the server may keep working. Retries then add more copies of the same expensive query. Set a matching limit on the server as well, and make retries back off.",
+        "teaches": [
+          "server-timeouts"
+        ]
+      },
+      {
+        "id": "t626-c6",
+        "kind": "text",
+        "title": "Edge case: what a timeout leaves behind",
+        "body": "Engines differ in how much a timeout undoes. In PostgreSQL, a statement cancelled by statement_timeout inside a transaction puts the whole transaction into an aborted state: later statements fail until you roll back. In MySQL, innodb_lock_wait_timeout by default rolls back only the statement that waited, and the transaction stays open with its earlier changes; innodb_rollback_on_timeout changes that to a full rollback. Either way, the application must decide: roll back and retry the whole transaction, which must be safe to repeat, or report the failure.",
+        "teaches": [
+          "timeout-aftermath"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t626-a1",
+        "concept": "server-timeouts",
+        "type": "multiple_choice",
+        "prompt": "A client's 3-second timeout fires while its query runs. The server has no statement limit. What happens to the query?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "It is cancelled on the server at the same moment"
+          },
+          {
+            "id": "b",
+            "label": "It is rolled back and retried by the database"
+          },
+          {
+            "id": "c",
+            "label": "It may keep running until it ends or the server notices"
+          },
+          {
+            "id": "d",
+            "label": "It is paused until the client reconnects"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "The timeout ends the client's wait. Unless the driver sends a cancel, the server keeps executing until it finishes or detects the closed connection, often when it tries to send results. Databases do not retry statements on their own, and there is no pause-and-resume for a disconnected client."
+      },
+      {
+        "id": "t626-a2",
+        "concept": "server-timeouts",
+        "type": "estimation",
+        "prompt": "Requests arrive at 30 per second, and each starts a query that now takes 40 seconds on the server. With no server-side limit, about how many of these queries are running at the same moment?",
+        "unit": "queries",
+        "target": 1200,
+        "assumptions": [
+          "30 new queries per second",
+          "Each runs 40 s",
+          "Steady state"
+        ],
+        "formula": "arrival rate × time each one runs (Little's law)",
+        "workedAnswer": "30 per second × 40 s = 1,200 running at once",
+        "explanation": "Design implication: a 4-second statement limit would cut that to 30 × 4 = 120, and the server stays usable while the slow query is fixed. 120 is that capped figure, and 30 is the arrival rate, not the number running.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          120,
+          30
+        ]
+      },
+      {
+        "id": "t626-a3",
+        "concept": "idle-transactions",
+        "type": "multiple_choice",
+        "prompt": "A session opened a transaction, updated a row, then waited 10 minutes on an external API. Which setting ends such sessions?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "statement_timeout"
+          },
+          {
+            "id": "b",
+            "label": "lock_timeout"
+          },
+          {
+            "id": "c",
+            "label": "idle_in_transaction_session_timeout"
+          },
+          {
+            "id": "d",
+            "label": "TCP keepalive on the connection"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "The session is idle inside a transaction, which is exactly what this setting limits; it ends the session and releases its locks. statement_timeout applies while a statement runs, and none is running. lock_timeout limits waiting for a lock, not holding one. Keepalives detect dead connections, and this one is alive."
+      },
+      {
+        "id": "t626-a4",
+        "concept": "timeout-aftermath",
+        "type": "multiple_choice",
+        "prompt": "In MySQL with default settings, a statement fails with a lock wait timeout midway through a transaction. What has been undone?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Only that statement; earlier changes remain"
+          },
+          {
+            "id": "b",
+            "label": "The whole transaction, back to its start"
+          },
+          {
+            "id": "c",
+            "label": "Nothing; the statement keeps waiting"
+          },
+          {
+            "id": "d",
+            "label": "The whole session, which is disconnected"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "By default InnoDB rolls back just the statement that timed out; the transaction is still open with its earlier changes, and the application must decide to roll back or continue. innodb_rollback_on_timeout makes it a full rollback. The statement does stop waiting, and the connection remains open."
+      },
+      {
+        "id": "t626-a5",
+        "concept": "timeout-aftermath",
+        "type": "drag_order",
+        "prompt": "In PostgreSQL, a statement inside a transaction hits statement_timeout. Order what follows in a well-behaved application.",
+        "items": [
+          {
+            "id": "s2",
+            "label": "The transaction is now aborted; further statements fail"
+          },
+          {
+            "id": "s4",
+            "label": "It retries the whole transaction with backoff, if safe to repeat"
+          },
+          {
+            "id": "s1",
+            "label": "The statement is cancelled with an error"
+          },
+          {
+            "id": "s3",
+            "label": "The application issues ROLLBACK"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "After the error, the transaction cannot continue in PostgreSQL; rolling back clears it, and only a whole-transaction retry can redo the work consistently. Retrying just the failed statement would fail again with \"current transaction is aborted\"."
+      },
+      {
+        "id": "t626-a6",
+        "concept": "timeout-values",
+        "type": "multiple_choice",
+        "prompt": "An API has a 2-second deadline for each request. What statement limit fits its database role?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "30 seconds, to be safe"
+          },
+          {
+            "id": "b",
+            "label": "None, so slow queries still finish"
+          },
+          {
+            "id": "c",
+            "label": "About 1.5 to 2 seconds"
+          },
+          {
+            "id": "d",
+            "label": "50 ms, for every role in the database"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Work that continues past the request deadline is wasted, so the limit should sit at or just under it. 30 seconds lets abandoned queries run 15 times longer than anyone waits. No limit is the pile-up case. 50 ms for every role would break legitimate reports and migrations."
+      },
+      {
+        "id": "t626-a7",
+        "concept": "timeout-values",
+        "type": "tradeoff",
+        "prompt": "One PostgreSQL database serves an API with a 2-second deadline and nightly reports that take up to 20 minutes.",
+        "constraints": [
+          "Protect the API from runaway queries",
+          "Let reports finish",
+          "Simple to operate"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "One global limit of 2 s",
+            "description": "statement_timeout = 2s for everyone"
+          },
+          {
+            "id": "p2",
+            "label": "No limits",
+            "description": "Rely on client timeouts and monitoring"
+          },
+          {
+            "id": "p3",
+            "label": "Limits per role",
+            "description": "API role 2 s; report role 30 minutes, ideally on a replica"
+          }
+        ],
+        "correctApproachId": "p3",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "Each workload gets a limit that matches its own deadline"
+          },
+          {
+            "id": "r3",
+            "label": "A single global value is easiest and fits both"
+          },
+          {
+            "id": "r2",
+            "label": "Reports keep running, but away from the API's connections"
+          },
+          {
+            "id": "r4",
+            "label": "Client timeouts already stop server work"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "A 2-second global limit kills every report; a 20-minute one protects nothing for the API.",
+          "r4": "A client timeout ends the wait, not necessarily the query on the server."
+        },
+        "explanation": "Per-role settings cost one ALTER ROLE each and let both workloads have limits that make sense."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t626-f1",
+        "front": "Client timeout",
+        "back": "Stops waiting; the server may keep working"
+      },
+      {
+        "id": "t626-f2",
+        "front": "statement_timeout",
+        "back": "Caps how long one statement may run on the server"
+      },
+      {
+        "id": "t626-f3",
+        "front": "lock_timeout",
+        "back": "Caps how long a statement may wait for a lock"
+      },
+      {
+        "id": "t626-f4",
+        "front": "Idle in transaction",
+        "back": "Holds locks and snapshot; limit it and keep external calls outside"
+      }
+    ],
+    "sources": [
+      {
+        "title": "PostgreSQL: Client connection defaults (timeouts)",
+        "url": "https://www.postgresql.org/docs/current/runtime-config-client.html"
+      },
+      {
+        "title": "MySQL: Server system variables (max_execution_time)",
+        "url": "https://dev.mysql.com/doc/refman/8.4/en/server-system-variables.html"
+      },
+      {
+        "title": "MySQL: InnoDB startup options and system variables",
+        "url": "https://dev.mysql.com/doc/refman/8.4/en/innodb-parameters.html"
+      },
+      {
+        "title": "SQL Server: SET LOCK_TIMEOUT",
+        "url": "https://learn.microsoft.com/en-us/sql/t-sql/statements/set-lock-timeout-transact-sql"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "server-timeouts",
+        "timeout-values",
+        "idle-transactions",
+        "timeout-aftermath"
+      ],
+      "mechanism": {
+        "title": "What each guardrail measures and what it does when it fires",
+        "steps": [
+          "A statement limit starts a timer when a statement begins. If the statement is still running when it expires, the server cancels it and returns an error; locks it took are released when the transaction ends.",
+          "A lock-wait limit starts a timer only while a statement waits for a lock. It turns an indefinite queue into a fast, clear failure, which matters most for schema changes and hot rows.",
+          "An idle-in-transaction limit measures time between statements inside an open transaction. When it fires, the server ends the session, which rolls the transaction back and frees its locks and snapshot.",
+          "A transaction limit, where available, caps the whole transaction however its time is split between statements and idle gaps.",
+          "Idle-session and connection limits close connections that have done nothing for a long time, protecting the connection count rather than locks.",
+          "The application sees an error in every case. It must roll back if the engine has not, decide whether the transaction is safe to retry, and back off so retries do not recreate the overload."
+        ]
+      },
+      "useWhen": [
+        "Every role used by interactive traffic",
+        "Schema migrations on busy tables (short lock waits)",
+        "Applications that call external services near transactions",
+        "Shared databases with mixed workloads"
+      ],
+      "avoidWhen": [
+        "Do not set one global limit for very different workloads",
+        "Do not set statement limits longer than anyone waits",
+        "Do not retry immediately and without limit after a timeout",
+        "Do not treat a guardrail as the fix for a slow query"
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Guardrail",
+          "Measures",
+          "On expiry"
+        ],
+        "rows": [
+          [
+            "Statement limit",
+            "Run time of one statement",
+            "Cancels the statement"
+          ],
+          [
+            "Lock-wait limit",
+            "Time waiting for one lock",
+            "Fails the waiting statement"
+          ],
+          [
+            "Idle-in-transaction limit",
+            "Idle time inside a transaction",
+            "Ends the session, rolling back"
+          ],
+          [
+            "Idle-session limit",
+            "Idle time outside a transaction",
+            "Closes the connection"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Why limits keep an incident small",
+        "assumptions": [
+          "50 requests a second",
+          "A bad query takes 30 s",
+          "Server allows 300 connections",
+          "Illustrative"
+        ],
+        "steps": [
+          "No limit: 50 × 30 = 1,500 queries would need to run at once, five times the connection limit.",
+          "New connections are refused and healthy requests fail too.",
+          "With a 2 s limit: 50 × 2 = 100 at once, a third of the connections.",
+          "Only the affected endpoint fails, and the rest of the application keeps working."
+        ],
+        "result": "A server-side limit turns a database-wide outage into one failing endpoint."
+      },
+      "india": {
+        "title": "PostgreSQL client connection defaults",
+        "label": "Official documentation",
+        "body": "The PostgreSQL manual documents statement_timeout as aborting any statement that takes more than the specified time, lock_timeout as aborting any statement that waits longer than the specified time while attempting to acquire a lock, and idle_in_transaction_session_timeout as terminating any session that has been idle within an open transaction for longer than the specified time. It advises against setting statement_timeout globally in postgresql.conf because it would affect all sessions, which is the reason to set it per role or per session instead."
+      },
+      "pitfalls": [
+        {
+          "trap": "“The driver timeout protects the database”",
+          "say": "It protects the caller; set server-side limits too"
+        },
+        {
+          "trap": "One timeout for API and reports",
+          "say": "Set limits per role or per transaction"
+        },
+        {
+          "trap": "Calling an external API inside a transaction",
+          "say": "Move the call outside; limit idle-in-transaction time as a backstop"
+        }
+      ],
+      "takeaways": [
+        "Client timeouts end the wait, not necessarily the work",
+        "Statement, lock-wait and idle-transaction limits each cap a different resource",
+        "Match each limit to the deadline of the workload using it",
+        "After a timeout, roll back and retry the whole transaction, with backoff"
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "After the timeout",
+      "prompt": "In PostgreSQL, inside BEGIN, an UPDATE is cancelled by statement_timeout. The application then runs SELECT 1 in the same transaction. What happens?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "It returns 1; only the UPDATE failed",
+          "feedback": "That is closer to MySQL's default for lock-wait timeouts; PostgreSQL aborts the transaction."
+        },
+        {
+          "id": "b",
+          "label": "It fails: the transaction is aborted until ROLLBACK",
+          "feedback": "Right: every statement fails with \"current transaction is aborted\" until the transaction ends."
+        },
+        {
+          "id": "c",
+          "label": "The UPDATE is retried automatically first",
+          "feedback": "The database never retries statements on its own."
+        }
+      ],
+      "correctId": "b",
+      "reveal": "Code that catches a timeout must end the transaction before doing anything else on that connection, and connection pools should reset sessions they get back in this state."
+    },
+    "seeAlso": [
+      {
+        "topicId": 239,
+        "why": "Deadlines across services, which database limits should match"
+      },
+      {
+        "topicId": 268,
+        "why": "Locks and long transactions, which lock and idle limits contain"
+      },
+      {
+        "topicId": 274,
+        "why": "Connection limits and pools, which runaway queries exhaust"
+      }
+    ]
   }
 ]
