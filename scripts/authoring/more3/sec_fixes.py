@@ -8,20 +8,23 @@ PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'authored', 'fund-sec
 
 # (question id, choice id, old label, new label): weak or silly distractors replaced with plausible misconceptions
 CHOICES = [
+    ('t308-a3', 'a', 'The host name was too long', 'The DNS name resolved to a public address'),
+    ('t308-a3', 'd', 'The scheme was https', 'The request used https instead of http'),
     ('t301-a1', 'b', 'Only in the database schema', 'At the CDN, with a cache rule per route'),
     ('t301-a1', 'c', 'Only in the mobile app', 'In the web form, with the rules documented'),
     ('t301-a5', 'a', 'The public home page', 'The external payment provider'),
     ('t301-a5', 'b', 'The main login page', 'The login and sign-up flows'),
     ('t302-a1', 'c', 'Compressing each message', 'Encrypting each message with AES-CTR'),
     ('t302-a1', 'd', 'Base64-encoding each message', 'A CRC-32 checksum on each message'),
+    ('t302-a2', 'b', 'They cannot encrypt more than a few bytes', 'They need a new certificate for each connection'),
     ('t302-a2', 'c', 'They expire after one second', 'Their keys must change for every record'),
     ('t302-a2', 'd', 'Browsers forbid symmetric keys', 'They cannot provide forward secrecy'),
     ('t302-a4', 'd', 'The download was fast', 'The publisher’s server was not hacked'),
     ('t303-a1', 'd', 'MD5 applied 2 times', 'HMAC-SHA-256 with a secret pepper'),
     ('t303-a2', 'c', 'Identical but in reverse', 'Identical until one of them logs in again'),
     ('t303-a2', 'd', 'Empty until first login', 'Identical, but encrypted with different keys'),
-    ('t304-a3', 'b', 'The signature changes on logout', 'Logout removes it from the server’s session table'),
-    ('t304-a3', 'c', 'JWTs expire after 5 minutes', 'Revoking the refresh token kills it at once'),
+    ('t304-a3', 'b', 'The signature changes on logout', 'The server clears its session record only on the next request'),
+    ('t304-a3', 'c', 'JWTs expire after 5 minutes', 'The refresh token cannot be revoked before it expires'),
     ('t305-a3', 'b', 'To choose the scopes', 'To prove the client’s identity to the token endpoint'),
     ('t305-a3', 'c', 'To set the token lifetime', 'To stop the code being redeemed twice'),
     ('t306-a2', 'a', 'In the browser’s local storage', 'In the admin page’s frontend route guard'),
@@ -46,14 +49,15 @@ CHOICES = [
 
 # Explanations rewritten so every option is accounted for
 EXPLANATIONS = {
+    't308-a3': 'The first host passed, but the redirect led to an internal address that was never checked. Each hop must pass the same checks, or redirects bypass them. The first name resolving to a public address is why the check passed, and the scheme or TLS of the first hop does not change where the redirect goes.',
     't301-a1': 'Clients and their forms are outside the trust boundary and can be bypassed by calling the API directly. A CDN caches responses; it does not validate input. The server boundary is the first point you control.',
     't301-a5': 'Operational side paths such as admin tools and batch jobs are easy to forget and attractive to attackers. The main user flows, the primary database and third-party providers are what people draw first.',
     't302-a1': 'A plain hash or a CRC can be recomputed by an attacker after editing the message; a MAC needs the key. Unauthenticated CTR encryption hides content but is malleable, so flipped bits go undetected.',
-    't302-a2': 'Asymmetric operations are far slower, so the handshake uses them to agree a symmetric session key for bulk data. Ephemeral key exchange is what provides forward secrecy, and session keys do not change per record.',
-    't302-a4': 'A signature proves these bytes came unchanged from the key holder. It says nothing about quality or encryption, and a hacked download server is the case it protects against, not something it rules out.',
+    't302-a2': 'Asymmetric operations are far slower, so the handshake uses them to agree a symmetric session key for bulk data. Ephemeral key exchange is what provides forward secrecy, the certificate is reused across many connections, and session keys do not change per record.',
+    't302-a4': 'A signature proves these bytes came unchanged from the key holder. It says nothing about quality or encryption. It catches files altered on a mirror or download server, but it cannot show the publisher was not hacked: an attacker who holds the signing key, or changes code before signing, produces a valid signature.',
     't303-a1': 'Password hashes must be slow and tunable; Argon2id is OWASP’s first choice. SHA-256 and HMAC are fast, so guesses stay cheap even with a salt or pepper, and AES is reversible by anyone with the key.',
     't303-a2': 'A unique salt per user makes identical passwords produce different hashes, so one cracked hash reveals nothing about the other. Hashes do not change on login, and password hashes are not encrypted.',
-    't304-a3': 'A self-contained token is checked by signature and expiry, not looked up, so there is no server session to remove and revoking the refresh token does not stop it. Use short lifetimes or a revocation check.',
+    't304-a3': 'A self-contained token is checked by signature and expiry, not looked up, so there is no server session record to clear. Refresh tokens are stored by the server and can be revoked, but that does not stop an access token already issued. Use short lifetimes or a revocation check.',
     't305-a3': 'state ties the redirect to a request this browser started, defending against cross-site request forgery on the callback. Client authentication and PKCE prove who redeems the code, and the authorisation server enforces single use.',
     't306-a2': 'Route guards, client-side role checks and hidden buttons all run on the client, which an attacker controls; anyone can call the endpoint directly. Only the server handler sees every request.',
     't307-a1': 'Assume it was copied within minutes, because scanners watch public repositories. Only revocation stops its use. History rewrites come afterwards, and waiting for scheduled rotation leaves it live.',
@@ -88,7 +92,7 @@ APPEND = [
      ' The 2025 revision, SP 800-63B-4, makes this firmer: passwords used alone must be at least 15 characters (at least 8 when they are only one factor of MFA), '
      'and verifiers shall not impose composition rules or periodic changes, though they must force a change on evidence of compromise.'),
     (310, 'deep.mechanism.steps.@Push approvals sit in between',
-     ' NIST SP 800-63B-4 cites authentication fatigue and no longer accepts a bare approve tap: the user must transfer a secret between the devices, which number matching does.'),
+     ' NIST SP 800-63B-4 cites authentication fatigue and no longer accepts a bare approve tap: the user must transfer a secret between the devices, which number matching does when the user types the number shown on screen into the app; picking it from a short list does not count.'),
 ]
 
 SOURCES = [
