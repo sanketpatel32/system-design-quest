@@ -117954,5 +117954,1202 @@
         "why": "Why databases control write order with a log and fsync"
       }
     ]
+  },
+  {
+    "id": 641,
+    "slug": "read-write-locks-lock-granularity",
+    "region": "f5-os",
+    "order": 21,
+    "title": "Read-Write Locks and Lock Granularity",
+    "kind": "lesson",
+    "objectives": [
+      "Decide when a read-write lock beats a plain mutex",
+      "Raise a lock’s throughput ceiling by shortening or splitting critical sections",
+      "Avoid writer starvation and upgrade deadlocks"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 12,
+    "prereqIds": [
+      286
+    ],
+    "cards": [
+      {
+        "id": "t641-c1",
+        "kind": "text",
+        "title": "Many readers or one writer",
+        "body": "A read-write lock lets any number of threads hold it for reading at once, or exactly one thread hold it for writing. It helps when reads are frequent, writes are rare and the read section is long enough to matter. Every reader still updates a shared count when it enters and leaves, so for very short sections the lock’s own bookkeeping can cost more than the work it protects.",
+        "teaches": [
+          "read-write-lock"
+        ]
+      },
+      {
+        "id": "t641-c2",
+        "kind": "diagram",
+        "title": "Worked example: one lock caps the whole service",
+        "body": "A cache protected by a single mutex.",
+        "teaches": [
+          "lock-granularity"
+        ],
+        "steps": [
+          "Each lookup holds the lock for 2 µs (illustrative)",
+          "Only one thread can be inside at a time, so the cache serves at most 1 ÷ 2 µs = 500,000 lookups a second, however many cores there are",
+          "Split the cache into 16 shards by key hash, each with its own lock",
+          "With keys spread evenly and enough cores, the ceiling rises toward 16 × 500,000 = 8 million lookups a second",
+          "Shortening the section to 1 µs (no allocation or logging inside it) doubles every one of those ceilings"
+        ]
+      },
+      {
+        "id": "t641-c3",
+        "kind": "text",
+        "title": "Trap: writers that never get in",
+        "body": "Many read-write locks prefer readers: a new reader may enter while a writer is waiting, as long as another reader holds the lock. Under steady read traffic there is always some reader inside, so the writer waits indefinitely and the data it should update goes stale. Choose a lock that blocks new readers once a writer queues, or keep read sections short enough that gaps appear.",
+        "teaches": [
+          "read-write-lock"
+        ]
+      },
+      {
+        "id": "t641-c4",
+        "kind": "text",
+        "title": "Misconception: you can upgrade a read lock in place",
+        "body": "Two threads each hold the read lock and both decide to write. Each asks for the write lock while still holding its read lock, each waits for the other reader to leave, and neither ever will: a deadlock. Release the read lock, take the write lock, and re-check the condition, since another thread may have changed it in between, or use a lock with an explicit single-upgrader mode.",
+        "teaches": [
+          "lock-upgrade"
+        ]
+      },
+      {
+        "id": "t641-c5",
+        "kind": "text",
+        "title": "Finer locks bring new rules",
+        "body": "Splitting one lock into many raises throughput but makes operations that span several shards harder. Moving an item between two shards needs both locks, and taking them in different orders in different threads can deadlock, so always lock shards in a fixed order such as by index. Operations over every shard, like a total count, either lock all of them in order or accept a value that is only approximately consistent.",
+        "teaches": [
+          "lock-granularity"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t641-a1",
+        "concept": "read-write-lock",
+        "type": "multiple_choice",
+        "prompt": "A configuration map is read on every request and rewritten once an hour. Each read copies a few fields in about 50 ns. Which lock choice should you test first?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A read-write lock, since reads vastly outnumber writes"
+          },
+          {
+            "id": "b",
+            "label": "A plain mutex, or an immutable snapshot swapped on change"
+          },
+          {
+            "id": "c",
+            "label": "A spin lock, since the hourly write must finish fast"
+          },
+          {
+            "id": "d",
+            "label": "No lock at all, because readers never change the map"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "With a 50 ns read section, the read-write lock’s shared reader count becomes the bottleneck, so a mutex is often as fast; swapping in a new immutable snapshot removes locking from reads entirely. The read-write lock seems right by ratio but loses on bookkeeping. A spin lock does nothing for readers, and with no lock, readers can see a half-written map during the hourly change."
+      },
+      {
+        "id": "t641-a2",
+        "concept": "read-write-lock",
+        "type": "multiple_choice",
+        "prompt": "A metrics store uses a read-write lock. Under heavy dashboard traffic, the writer that records new data falls minutes behind. What is the most likely cause?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The writer has a lower thread priority than readers"
+          },
+          {
+            "id": "b",
+            "label": "Readers hold the lock longer than the writer does"
+          },
+          {
+            "id": "c",
+            "label": "New readers keep entering while the writer waits"
+          },
+          {
+            "id": "d",
+            "label": "The write lock is recursive and blocks itself"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "A reader-preferring lock admits new readers whenever another reader is inside, so with constant reads the writer starves. Thread priority does not change lock admission, longer reads only matter because readers overlap without gaps, and a recursive lock does not block its own holder."
+      },
+      {
+        "id": "t641-a3",
+        "concept": "lock-upgrade",
+        "type": "multiple_choice",
+        "prompt": "Two threads hold the same read lock. Each then requests the write lock without releasing its read lock. What happens?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Both block forever, each waiting for the other to leave"
+          },
+          {
+            "id": "b",
+            "label": "The first to ask gets the write lock, the other waits"
+          },
+          {
+            "id": "c",
+            "label": "Both get the write lock, because they already hold it"
+          },
+          {
+            "id": "d",
+            "label": "The lock converts both reads into one shared write"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "A write lock needs every reader gone, and each thread is a reader the other is waiting on, so neither proceeds. Asking first does not help because the other reader is still inside, write locks are never shared, and no lock merges two readers into a writer."
+      },
+      {
+        "id": "t641-a4",
+        "concept": "lock-granularity",
+        "type": "multiple_choice",
+        "prompt": "A shared hash map is protected by one mutex and profiles show threads waiting on it. Which change usually raises throughput the most?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Replace the mutex with a read-write lock of the same scope"
+          },
+          {
+            "id": "b",
+            "label": "Add more threads so that more of them reach the lock"
+          },
+          {
+            "id": "c",
+            "label": "Use a fair lock so waiting threads take turns in order"
+          },
+          {
+            "id": "d",
+            "label": "Shard the map by key hash, each shard with its own lock"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "Independent locks per shard let operations on different keys run in parallel, multiplying the ceiling. A read-write lock helps only if reads dominate and are long, more threads lengthen the queue, and a fair lock orders waiting threads without letting more of them in at once."
+      },
+      {
+        "id": "t641-a5",
+        "concept": "lock-granularity",
+        "type": "estimation",
+        "prompt": "Every request holds one global lock for 4 µs. What is the most requests per second the service can complete, however many cores it has?",
+        "unit": "requests/s",
+        "target": 250000,
+        "assumptions": [
+          "The lock is held only during the 4 µs section",
+          "Handing the lock over costs nothing"
+        ],
+        "formula": "1 ÷ time held per request",
+        "workedAnswer": "1 s ÷ 4 µs = 1,000,000 ÷ 4 = 250,000 requests a second",
+        "explanation": "Sanity check: real handovers between cores add hundreds of nanoseconds, so the practical ceiling is lower; plan to stay well under it, or shorten and split the section.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          25000,
+          4000000
+        ]
+      },
+      {
+        "id": "t641-a6",
+        "concept": "lock-upgrade",
+        "type": "drag_order",
+        "prompt": "A thread holding a read lock discovers it needs to modify the data. Order the safe steps.",
+        "items": [
+          {
+            "id": "s2",
+            "label": "Acquire the write lock"
+          },
+          {
+            "id": "s4",
+            "label": "Make the change if it is still needed, then release the write lock"
+          },
+          {
+            "id": "s1",
+            "label": "Release the read lock"
+          },
+          {
+            "id": "s3",
+            "label": "Re-check the condition that made the write necessary"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Never wait for the write lock while holding the read lock, and re-check after acquiring because another writer may have acted in the gap."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t641-f1",
+        "front": "When does a read-write lock help?",
+        "back": "Many readers, rare writes, and read sections long enough to outweigh the shared reader count."
+      },
+      {
+        "id": "t641-f2",
+        "front": "Lock throughput ceiling?",
+        "back": "1 ÷ time the lock is held per operation, regardless of core count."
+      },
+      {
+        "id": "t641-f3",
+        "front": "Upgrade deadlock?",
+        "back": "Two readers both wait for the write lock while holding their read locks."
+      }
+    ],
+    "sources": [
+      {
+        "title": "pthread_rwlock_rdlock, POSIX (The Open Group)",
+        "url": "https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_rwlock_rdlock.html"
+      },
+      {
+        "title": "pthread_rwlockattr_setkind_np(3), Linux manual page",
+        "url": "https://man7.org/linux/man-pages/man3/pthread_rwlockattr_setkind_np.3.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "read-write-lock",
+        "lock-upgrade",
+        "lock-granularity"
+      ],
+      "mechanism": {
+        "title": "How a read-write lock admits threads",
+        "steps": [
+          "The lock keeps a count of active readers, a flag for an active writer, and usually a count of waiting writers, often packed into one word changed with atomic operations.",
+          "A reader may enter if no writer holds the lock; depending on the policy it may also have to wait if a writer is queued. Entering increments the reader count, and leaving decrements it.",
+          "A writer may enter only when the reader count is zero and no other writer holds the lock. Waiting threads sleep and are woken when the state changes.",
+          "Because every reader writes the shared count, readers on many cores still fight over one cache line. For short sections that traffic, not the waiting, sets the cost, which is why sharded counters or copy-on-write snapshots often beat a read-write lock.",
+          "Policies differ: reader preference maximises read throughput but can starve writers; writer preference blocks new readers once a writer waits, so writers progress but reads stall briefly.",
+          "Granularity is a separate choice: one lock over everything is simple and safe; per-shard or per-object locks raise throughput, at the cost of lock ordering rules for multi-object operations."
+        ]
+      },
+      "useWhen": [
+        "Use a read-write lock when reads dominate and each read section does real work, such as walking a structure.",
+        "Use sharding when operations touch independent keys."
+      ],
+      "avoidWhen": [
+        "Avoid read-write locks around tiny read sections; measure against a mutex.",
+        "Avoid upgrading a held read lock in place."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Approach",
+          "Read scaling",
+          "Write cost",
+          "Main risk"
+        ],
+        "rows": [
+          [
+            "One mutex",
+            "None",
+            "Low",
+            "Throughput ceiling of 1 ÷ hold time"
+          ],
+          [
+            "Read-write lock",
+            "Good for long reads",
+            "Waits for all readers",
+            "Writer starvation, upgrade deadlock"
+          ],
+          [
+            "Sharded mutexes",
+            "Good across keys",
+            "Low per shard",
+            "Lock ordering for multi-shard work"
+          ],
+          [
+            "Immutable snapshot swap",
+            "Excellent, no lock for readers",
+            "Copy the whole structure",
+            "Memory for old copies still in use"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "What sharding buys",
+        "assumptions": [
+          "Lookups hold the lock for 2 µs; the service needs 3 million lookups a second (illustrative)",
+          "Keys are spread evenly by hash"
+        ],
+        "steps": [
+          "One lock: ceiling 1 ÷ 2 µs = 500,000 a second, six times too few.",
+          "Shards needed at the ceiling: 3,000,000 ÷ 500,000 = 6.",
+          "Running each shard at no more than 50% of its ceiling keeps waits short: 6 ÷ 0.5 = 12 shards.",
+          "Round up to 16 shards, a power of two that lets the shard be picked with a bit mask of the hash."
+        ],
+        "result": "Sixteen shards give a combined ceiling of 8 million lookups a second, leaving the needed 3 million at under 40% of capacity."
+      },
+      "india": {
+        "title": "What the manual says about writer starvation",
+        "label": "Official documentation",
+        "body": "The Linux manual page for pthread_rwlockattr_setkind_np describes the reader-preference setting, which is the default in the GNU C library: a reader receives the lock even if a writer is waiting, and as long as there are readers, the writer will be starved. It also notes that the writer-preference setting is ignored by that library, because supporting recursive read locks would make it deadlock, and offers a non-recursive writer-preferring mode instead."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Reads outnumber writes, so a read-write lock is faster.”",
+          "say": "“Only if read sections are long; I’d benchmark it against a mutex and a snapshot swap.”"
+        },
+        {
+          "trap": "“Add cores to get past the lock.”",
+          "say": "“A lock caps throughput at 1 ÷ hold time; I’d shorten or shard it.”"
+        }
+      ],
+      "takeaways": [
+        "Read-write locks help long reads with rare writes.",
+        "A lock’s ceiling is one divided by its hold time.",
+        "Reader-preferring locks can starve writers.",
+        "Never upgrade a read lock while holding it; release, lock, re-check."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Will the read-write lock help?",
+      "prompt": "A service’s hot path takes a mutex around a 30 ns hash map lookup. Reads are 99% of operations. A teammate proposes switching to a read-write lock.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Probably not: the shared reader count costs about as much as the lookup",
+          "feedback": "Right: every reader still writes one shared line, so short sections gain little or nothing."
+        },
+        {
+          "id": "b",
+          "label": "Yes, roughly a hundred times faster because readers run in parallel",
+          "feedback": "Readers overlap only after each has updated the shared count, which is the expensive part here."
+        },
+        {
+          "id": "c",
+          "label": "No, read-write locks are only for reads served from disk",
+          "feedback": "They work for any data; the issue here is the tiny section, not where the data lives."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Measure before switching. For tiny read sections, sharding the map or publishing an immutable copy that readers access without a lock usually beats both a mutex and a read-write lock."
+    },
+    "seeAlso": [
+      {
+        "topicId": 286,
+        "why": "Mutual exclusion and why shared data needs a lock at all"
+      },
+      {
+        "topicId": 287,
+        "why": "Lock ordering prevents deadlocks when you split locks"
+      },
+      {
+        "topicId": 564,
+        "why": "Atomics explain why a shared reader count is costly"
+      }
+    ]
+  },
+  {
+    "id": 642,
+    "slug": "how-locks-wait-spinning-sleeping-futexes",
+    "region": "f5-os",
+    "order": 22,
+    "title": "How Locks Wait: Spinning, Sleeping and Futexes",
+    "kind": "lesson",
+    "objectives": [
+      "Explain why an uncontended lock needs no system call",
+      "Choose between spinning and sleeping from how long a lock is held",
+      "Recognise lock convoys and spinning on a preempted holder"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 11,
+    "prereqIds": [
+      286,
+      282
+    ],
+    "cards": [
+      {
+        "id": "t642-c1",
+        "kind": "text",
+        "title": "The fast path stays in user space",
+        "body": "Modern mutexes are built on a futex (fast user-space mutex): an integer in shared memory changed with atomic instructions. Taking a free lock is one compare-and-swap, with no system call. Only when the lock is already held does the waiter ask the kernel to put it to sleep on that address, and only when someone is waiting does the unlocker ask the kernel to wake one. Uncontended locking therefore costs tens of nanoseconds.",
+        "teaches": [
+          "futex"
+        ]
+      },
+      {
+        "id": "t642-c2",
+        "kind": "text",
+        "title": "Spin or sleep?",
+        "body": "A waiting thread can spin, retrying the atomic operation in a loop, or sleep in the kernel until woken. Sleeping and waking costs a pair of system calls and a context switch, on the order of microseconds, while spinning costs nothing extra if the lock frees within a few hundred nanoseconds. Most library mutexes spin briefly and then sleep, which suits both short and long hold times.",
+        "teaches": [
+          "spin-vs-sleep"
+        ]
+      },
+      {
+        "id": "t642-c3",
+        "kind": "diagram",
+        "title": "Worked example: pick by hold time",
+        "body": "Rough costs on one machine (illustrative).",
+        "teaches": [
+          "spin-vs-sleep"
+        ],
+        "steps": [
+          "Sleep and wake round trip: about 5 µs of CPU and latency",
+          "Lock held for 200 ns: spinning waits about 200 ns; sleeping would cost about 25 times more",
+          "Lock held for 1 ms: spinning burns 1 ms of a core doing nothing; sleeping costs 5 µs and frees the core for other work",
+          "Unknown or variable hold time: spin for roughly the cost of a sleep, then sleep",
+          "Rule of thumb: spin only when holders are running on other cores and sections are short"
+        ]
+      },
+      {
+        "id": "t642-c4",
+        "kind": "text",
+        "title": "Trap: spinning on a holder that is not running",
+        "body": "If the thread holding a spin lock is preempted, or the machine has more runnable threads than cores, waiters spin for their whole time slice while the holder waits to be scheduled. On a single core, spinning cannot succeed until the spinner gives up the CPU. User-space code should almost never use a pure spin lock; use the platform mutex, which falls back to sleeping.",
+        "teaches": [
+          "spin-vs-sleep"
+        ]
+      },
+      {
+        "id": "t642-c5",
+        "kind": "text",
+        "title": "Misconception: a fair lock is the fast choice",
+        "body": "Handing the lock directly to the longest waiter sounds fair, but that waiter is asleep, so every hand-off pays a wake-up while the lock sits idle; meanwhile a running thread that could have taken it at once has to queue. Under heavy contention this forms a lock convoy: throughput collapses to one wake-up per acquisition. Most default mutexes are unfair for this reason; reduce contention rather than demanding fairness.",
+        "teaches": [
+          "lock-convoy"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t642-a1",
+        "concept": "futex",
+        "type": "multiple_choice",
+        "prompt": "A program takes and releases an uncontended mutex 10 million times a second. How many system calls does locking add?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "About 20 million: one each to lock and to unlock"
+          },
+          {
+            "id": "b",
+            "label": "About 10 million, one per lock and pair"
+          },
+          {
+            "id": "c",
+            "label": "Usually none: free locks are taken with an atomic"
+          },
+          {
+            "id": "d",
+            "label": "One per second, when the kernel audits held locks"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "With no contention, lock and unlock are atomic operations on a word in user space; the kernel is called only to sleep or to wake a waiter. Two calls per pair would be true of older kernel-object locks, which is why futexes were introduced, and the kernel never audits locks periodically."
+      },
+      {
+        "id": "t642-a2",
+        "concept": "spin-vs-sleep",
+        "type": "multiple_choice",
+        "prompt": "Which situation suits a brief spin before sleeping?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A lock held for about 100 ns by threads on other cores"
+          },
+          {
+            "id": "b",
+            "label": "A lock held while a database query runs"
+          },
+          {
+            "id": "c",
+            "label": "A lock on a single-core machine with many threads"
+          },
+          {
+            "id": "d",
+            "label": "A lock held while waiting for a user to click"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "A 100 ns hold frees the lock long before a sleep and wake round trip could complete, and the holder is running elsewhere. Holding across a query or a click means milliseconds to seconds of wasted spinning, and on one core the holder cannot run while the waiter spins."
+      },
+      {
+        "id": "t642-a3",
+        "concept": "lock-convoy",
+        "type": "multiple_choice",
+        "prompt": "Under load, a service using a strictly fair (first-come, first-served) lock reaches only a fraction of the throughput of the same code with the default lock. Why?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Fair locks use a slower atomic instruction internally"
+          },
+          {
+            "id": "b",
+            "label": "Each hand-off waits for a sleeping thread to wake"
+          },
+          {
+            "id": "c",
+            "label": "Fair locks let only one core run the program at all"
+          },
+          {
+            "id": "d",
+            "label": "The default lock skips locking whenever load is high"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Handing the lock to the oldest waiter means waking a sleeping thread for every acquisition while running threads queue: a convoy. The atomics are the same, other cores keep running other code, and no correct lock skips locking under load."
+      },
+      {
+        "id": "t642-a4",
+        "concept": "spin-vs-sleep",
+        "type": "multiple_choice",
+        "prompt": "A team replaces a mutex with a hand-written spin lock. On a container limited to 2 CPUs with 16 worker threads, latency gets much worse. Why?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Spin locks need a lock-free memory allocator underneath"
+          },
+          {
+            "id": "b",
+            "label": "Spinning uses a lot of memory bandwidth on two cores"
+          },
+          {
+            "id": "c",
+            "label": "Spin locks are invalid inside containers by design"
+          },
+          {
+            "id": "d",
+            "label": "Waiters spin while the holder waits for a CPU to run on"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "With 16 runnable threads on 2 CPUs, the holder is often not running, so spinners burn quota without any chance of success. The allocator is irrelevant, bandwidth is a minor effect, and containers place no rule on spin locks."
+      },
+      {
+        "id": "t642-a5",
+        "concept": "futex",
+        "type": "estimation",
+        "prompt": "A lock is contended 10,000 times a second, and each contended acquisition sleeps and is woken at a cost of about 5 µs of CPU. Roughly how many milliseconds of CPU per second does that cost?",
+        "unit": "ms",
+        "target": 50,
+        "assumptions": [
+          "Uncontended acquisitions cost almost nothing",
+          "Every contended acquisition sleeps once"
+        ],
+        "formula": "contended acquisitions × cost each",
+        "workedAnswer": "10,000 × 5 µs = 50,000 µs = 50 ms per second",
+        "explanation": "Sanity check: 50 ms per second is 5% of one core spent on waiting alone; at 200,000 contended acquisitions a second it would be a whole core, a sign to shard or shorten the lock.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          0.05,
+          500
+        ]
+      },
+      {
+        "id": "t642-a6",
+        "concept": "futex",
+        "type": "drag_order",
+        "prompt": "Order what happens when thread B tries to take a mutex that thread A holds, until B owns it.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "A unlocks, sees waiters, and asks the kernel to wake one"
+          },
+          {
+            "id": "s1",
+            "label": "B’s atomic attempt fails and it marks the lock as having waiters"
+          },
+          {
+            "id": "s4",
+            "label": "B wakes, retries the atomic, and takes the lock"
+          },
+          {
+            "id": "s2",
+            "label": "B asks the kernel to sleep on the lock’s address"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Fast path fails, sleep on the address, unlock wakes a waiter, the waiter retries; only the contended case touches the kernel."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t642-f1",
+        "front": "Futex?",
+        "back": "An atomic integer in user space; the kernel is called only to sleep or wake when the lock is contended."
+      },
+      {
+        "id": "t642-f2",
+        "front": "Spin or sleep?",
+        "back": "Spin for holds shorter than a sleep and wake round trip (microseconds); otherwise sleep."
+      },
+      {
+        "id": "t642-f3",
+        "front": "Lock convoy?",
+        "back": "Every hand-off waits for a sleeping thread to wake, so throughput drops to one wake-up per acquisition."
+      }
+    ],
+    "sources": [
+      {
+        "title": "futex(7), Linux manual page",
+        "url": "https://man7.org/linux/man-pages/man7/futex.7.html"
+      },
+      {
+        "title": "futex(2), Linux manual page",
+        "url": "https://man7.org/linux/man-pages/man2/futex.2.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "futex",
+        "spin-vs-sleep",
+        "lock-convoy"
+      ],
+      "mechanism": {
+        "title": "The life of a contended mutex",
+        "steps": [
+          "The mutex is a word with three states, for example 0 free, 1 locked, and 2 locked with waiters. Locking tries to change 0 to 1 with compare-and-swap; success means the lock is taken without entering the kernel.",
+          "On failure the thread may spin for a short while, re-reading the word without writing so it does not fight over the cache line, and trying again when it reads 0.",
+          "If the lock is still held, the thread sets the word to 2 and calls the kernel’s futex wait on its address, asking to sleep only if the value is still 2. That check closes the race with an unlock happening at the same moment.",
+          "The kernel hashes the address to a wait queue and puts the thread to sleep. No kernel object exists for an uncontended lock; queues appear only while someone waits.",
+          "Unlocking sets the word to 0. If it was 2, the unlocker calls futex wake for one waiter. The woken thread competes again; a running thread may take the lock first, which is unfair but keeps the lock busy.",
+          "Priority-inheritance and robust variants add kernel bookkeeping so a waiting high-priority thread boosts the holder, or so a lock held by a thread that died can be recovered."
+        ]
+      },
+      "useWhen": [
+        "Use the platform mutex by default: it spins briefly and then sleeps.",
+        "Use spinning only in code that runs with preemption controlled, such as kernels or pinned threads."
+      ],
+      "avoidWhen": [
+        "Avoid pure spin locks in ordinary user-space programs.",
+        "Avoid strictly fair locks on hot paths unless starvation has been observed."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Wait strategy",
+          "Cost when held briefly",
+          "Cost when held long",
+          "Fits"
+        ],
+        "rows": [
+          [
+            "Pure spin",
+            "Lowest",
+            "Burns a core per waiter",
+            "Pinned threads, very short sections"
+          ],
+          [
+            "Spin then sleep",
+            "Low",
+            "Small spin plus one sleep",
+            "General-purpose mutexes"
+          ],
+          [
+            "Sleep immediately",
+            "Microseconds per wait",
+            "Microseconds per wait",
+            "Long or unpredictable holds"
+          ],
+          [
+            "Fair hand-off",
+            "A wake-up per acquisition",
+            "A wake-up per acquisition",
+            "When starvation is unacceptable"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "When contention starts to show",
+        "assumptions": [
+          "A lock held for 1 µs per operation at 300,000 operations a second (illustrative)",
+          "A contended acquisition costs about 5 µs of sleep and wake (illustrative)"
+        ],
+        "steps": [
+          "Lock utilisation: 300,000 × 1 µs = 0.3 s per second, so it is busy 30% of the time.",
+          "About 30% of arrivals find it held; with spinning first, most of those waits end within about a microsecond.",
+          "If they all slept instead: 300,000 × 0.3 × 5 µs = 0.45 CPU-seconds per second spent sleeping and waking.",
+          "A brief spin turns most of that into about 1 µs of spinning each: 90,000 × 1 µs = 0.09 CPU-seconds."
+        ],
+        "result": "At 30% utilisation, spinning briefly before sleeping cuts wait overhead from almost half a core to under a tenth of one in this example."
+      },
+      "india": {
+        "title": "What the manual says futexes are for",
+        "label": "Official documentation",
+        "body": "The futex(7) manual page explains that futex operation occurs entirely in user space for the non-contended case, and the kernel is involved only to arbitrate the contended case. It notes that, as any sane design will strive for non-contention, futexes are optimised for this situation: in its bare form a futex is an aligned integer touched only by atomic instructions, with system calls used solely to wait and to wake."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Mutexes are slow because they’re system calls.”",
+          "say": "“Uncontended mutexes are a single atomic; I’d measure contention before replacing one.”"
+        },
+        {
+          "trap": "“A spin lock will be faster than the mutex.”",
+          "say": "“Only if holders are always running and sections are tiny; the mutex already spins briefly.”"
+        }
+      ],
+      "takeaways": [
+        "Free locks are taken with one atomic, no system call.",
+        "Spin for holds shorter than a sleep and wake; otherwise sleep.",
+        "Spinning on a preempted holder wastes whole time slices.",
+        "Strict fairness causes convoys; reduce contention instead."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Spin lock or mutex here?",
+      "prompt": "A worker pool of 32 threads runs on a 4-CPU container. Each task takes a lock for about 2 µs to update shared state. Someone proposes a pure spin lock to avoid system calls.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Keep the mutex: with 32 threads on 4 CPUs, holders are often descheduled",
+          "feedback": "Right: spinners would burn CPU while the holder waits to run."
+        },
+        {
+          "id": "b",
+          "label": "Use the spin lock: 2 µs is far below the cost of sleeping",
+          "feedback": "Short holds favour spinning only if the holder is actually running on another core."
+        },
+        {
+          "id": "c",
+          "label": "Use a fair lock so every thread gets its turn in order",
+          "feedback": "Fair hand-offs wake a sleeping thread each time and make throughput worse."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Oversubscription is the deciding fact: with eight threads per CPU, a spinning waiter usually spins on a holder that is not running. A standard mutex already spins briefly and then sleeps, so it gets the benefit of spinning without the worst case."
+    },
+    "seeAlso": [
+      {
+        "topicId": 286,
+        "why": "The mutual exclusion that futexes implement"
+      },
+      {
+        "topicId": 282,
+        "why": "Context switches are the cost a sleeping waiter pays"
+      },
+      {
+        "topicId": 643,
+        "why": "Priority inheritance is built into some futex variants"
+      }
+    ]
+  },
+  {
+    "id": 643,
+    "slug": "priority-inversion-real-time-scheduling",
+    "region": "f5-os",
+    "order": 23,
+    "title": "Priority Inversion and Real-Time Scheduling",
+    "kind": "lesson",
+    "objectives": [
+      "Explain how a high-priority thread ends up waiting on a low-priority one",
+      "Use priority inheritance or ceilings to bound the wait",
+      "Know what nice values and real-time policies actually change"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 12,
+    "prereqIds": [
+      282,
+      286
+    ],
+    "cards": [
+      {
+        "id": "t643-c1",
+        "kind": "text",
+        "title": "Priorities and policies",
+        "body": "Normal threads share the CPU in proportion to weights set by their nice value: lower nice means a larger share, but every runnable thread still makes progress. Real-time policies (first-in-first-out and round-robin with priorities from 1 to 99) are strict: a runnable real-time thread always runs before any normal thread, and a higher real-time priority always runs before a lower one.",
+        "teaches": [
+          "scheduling-priority"
+        ]
+      },
+      {
+        "id": "t643-c2",
+        "kind": "diagram",
+        "title": "Worked example: the inversion",
+        "body": "Three threads on one core, with a lock shared by High and Low.",
+        "teaches": [
+          "priority-inversion"
+        ],
+        "steps": [
+          "Low takes the lock and starts a 1 ms update",
+          "High wakes, preempts Low, and blocks on the lock Low holds",
+          "Medium, which needs no lock, wakes and preempts Low because it outranks Low",
+          "Medium computes for 50 ms; Low cannot run to release the lock, so High waits 50 ms or more instead of about 1 ms",
+          "With priority inheritance, Low runs at High’s priority while High waits, Medium cannot preempt it, and High waits about 1 ms"
+        ]
+      },
+      {
+        "id": "t643-c3",
+        "kind": "text",
+        "title": "Two ways to bound the wait",
+        "body": "Priority inheritance raises a lock holder’s priority to that of the highest thread waiting for the lock, for as long as it holds it. A priority ceiling raises any holder to a fixed priority assigned to the lock, so nothing that could contend with it can preempt it. Both keep the inversion to the length of one critical section; both must be enabled on the lock, since ordinary mutexes do neither by default.",
+        "teaches": [
+          "priority-inheritance"
+        ]
+      },
+      {
+        "id": "t643-c4",
+        "kind": "text",
+        "title": "Trap: a real-time thread that never yields",
+        "body": "A thread switched to a real-time policy that loops without blocking will starve every normal thread on its core, including the shell you would use to stop it. Linux keeps a safety margin by default, limiting real-time threads to 95% of each second, but a misbehaving real-time thread still slows everything else to a crawl. Give real-time threads only short, bounded work and block between items.",
+        "teaches": [
+          "scheduling-priority"
+        ]
+      },
+      {
+        "id": "t643-c5",
+        "kind": "text",
+        "title": "Misconception: lower nice fixes latency",
+        "body": "Nice values change long-run CPU shares between busy threads, not how quickly a thread is woken. A thread waiting on a lock, a disk or the network gains nothing from a better nice value, and a latency problem caused by a lock held by a low-priority thread is not solved by raising the waiter. Find what the waiting thread is actually waiting for before touching priorities.",
+        "teaches": [
+          "scheduling-priority",
+          "priority-inversion"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t643-a1",
+        "concept": "priority-inversion",
+        "type": "multiple_choice",
+        "prompt": "A high-priority control thread misses deadlines. Traces show it blocked on a lock held by a low-priority logger, while a medium-priority analytics thread runs. What is happening?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Priority inversion: Medium keeps Low from releasing the lock"
+          },
+          {
+            "id": "b",
+            "label": "Deadlock: High and Low each hold a lock the other needs"
+          },
+          {
+            "id": "c",
+            "label": "Starvation: the scheduler never runs High at all"
+          },
+          {
+            "id": "d",
+            "label": "Livelock: High and Low keep yielding to each other"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "High waits for Low, and Medium outranks Low, so the lock holder cannot run: a classic inversion. Deadlock needs a cycle of waits, which Medium breaks; High runs when it is runnable but it is blocked, not ignored; and livelock needs threads actively retrying, which none is."
+      },
+      {
+        "id": "t643-a2",
+        "concept": "priority-inheritance",
+        "type": "multiple_choice",
+        "prompt": "Which change bounds High’s wait to roughly the length of Low’s critical section?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Raising Medium’s priority above High’s for fairness"
+          },
+          {
+            "id": "b",
+            "label": "Giving High a lower nice value than the others"
+          },
+          {
+            "id": "c",
+            "label": "Enabling priority inheritance on the shared mutex"
+          },
+          {
+            "id": "d",
+            "label": "Adding a second core so Medium runs elsewhere"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Inheritance lifts Low to High’s priority while High waits, so Medium cannot preempt it and the lock is released after Low’s section. Raising Medium makes things worse, nice values do not affect real-time priorities or lock waits, and a second core helps only by luck, since Medium and Low can still share one."
+      },
+      {
+        "id": "t643-a3",
+        "concept": "scheduling-priority",
+        "type": "multiple_choice",
+        "prompt": "Two CPU-bound threads share one core under the normal policy. One runs at nice 0, the other at nice 10. What happens?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The nice 0 thread runs and the other never runs at all"
+          },
+          {
+            "id": "b",
+            "label": "Both get exactly half the core, since nice only affects I/O"
+          },
+          {
+            "id": "c",
+            "label": "The nice 10 thread runs first until it has finished"
+          },
+          {
+            "id": "d",
+            "label": "Both run; the nice 0 thread gets a much larger share"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "Under the normal policy, nice sets a weight, and each nice step changes it by about 1.25 times, so ten steps give the nice 0 thread roughly nine times the share, but both progress. Strict precedence is how real-time policies behave, nice has nothing to do with I/O, and higher nice means lower priority."
+      },
+      {
+        "id": "t643-a4",
+        "concept": "scheduling-priority",
+        "type": "multiple_choice",
+        "prompt": "A real-time thread at priority 50 enters an infinite loop on a 1-core machine. What do you expect?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Normal threads still get a small slice of each second"
+          },
+          {
+            "id": "b",
+            "label": "The kernel demotes it to normal priority within a second"
+          },
+          {
+            "id": "c",
+            "label": "It runs only when no normal thread wants the CPU"
+          },
+          {
+            "id": "d",
+            "label": "The machine stops running every other thread forever"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Real-time threads outrank all normal ones, but Linux by default reserves 5% of each second for non-real-time work, so normal threads crawl rather than stop. The kernel does not demote it, real-time threads run ahead of normal ones rather than after, and the throttling margin prevents a total freeze."
+      },
+      {
+        "id": "t643-a5",
+        "concept": "scheduling-priority",
+        "type": "estimation",
+        "prompt": "Two CPU-bound threads share one core. Their scheduler weights are 1,024 (nice 0) and 335 (nice 5). Roughly what percentage of the core does the nice 0 thread get?",
+        "unit": "%",
+        "target": 75,
+        "assumptions": [
+          "Shares are proportional to weights",
+          "Both threads are always runnable"
+        ],
+        "formula": "weight ÷ total weight × 100",
+        "workedAnswer": "1,024 ÷ (1,024 + 335) × 100 ≈ 75%",
+        "explanation": "Sanity check: five nice steps of about 1.25 times each give a ratio of about 3 to 1, so roughly three quarters and one quarter; nice reshapes shares but never stops the weaker thread.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          50,
+          95
+        ]
+      },
+      {
+        "id": "t643-a6",
+        "concept": "priority-inversion",
+        "type": "drag_order",
+        "prompt": "Order the events of a bounded inversion when the mutex uses priority inheritance.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Medium wakes but cannot preempt the boosted Low"
+          },
+          {
+            "id": "s1",
+            "label": "Low takes the lock"
+          },
+          {
+            "id": "s4",
+            "label": "Low releases the lock, drops back to its own priority, and High runs"
+          },
+          {
+            "id": "s2",
+            "label": "High blocks on the lock and Low inherits High’s priority"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "explanation": "Boost on block, release, un-boost: High waits only for the rest of Low’s critical section."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t643-f1",
+        "front": "Priority inversion?",
+        "back": "High waits on a lock held by Low, while Medium preempts Low, so High waits on Medium."
+      },
+      {
+        "id": "t643-f2",
+        "front": "Priority inheritance?",
+        "back": "A lock holder temporarily runs at the priority of the highest thread waiting for it."
+      },
+      {
+        "id": "t643-f3",
+        "front": "Nice vs real-time?",
+        "back": "Nice sets proportional shares among normal threads; real-time priorities strictly preempt."
+      }
+    ],
+    "sources": [
+      {
+        "title": "sched(7), Linux manual page",
+        "url": "https://man7.org/linux/man-pages/man7/sched.7.html"
+      },
+      {
+        "title": "pthread_mutexattr_setprotocol, POSIX (The Open Group)",
+        "url": "https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_mutexattr_setprotocol.html"
+      },
+      {
+        "title": "Real-Time group scheduling, Linux kernel documentation",
+        "url": "https://docs.kernel.org/scheduler/sched-rt-group.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "scheduling-priority",
+        "priority-inversion",
+        "priority-inheritance"
+      ],
+      "mechanism": {
+        "title": "How priorities interact with locks",
+        "steps": [
+          "Each core picks the next thread from its run queue: any runnable real-time thread first, highest priority first, then normal threads by their weighted fair share.",
+          "A thread that blocks on a lock leaves the run queue; its priority no longer matters until it is woken. The lock holder keeps its own priority.",
+          "If a thread of middle priority becomes runnable, it preempts the low-priority holder, and the high-priority waiter now depends indirectly on the middle thread finishing. The wait is unbounded: as long as middle-priority work exists, the holder cannot run.",
+          "With priority inheritance, blocking on the lock records the waiter, and the kernel raises the holder to the waiter’s priority. Chains are followed: if the holder is itself waiting on another lock, that holder is boosted too.",
+          "With a priority ceiling, each lock has a fixed priority at least as high as any thread that uses it; a thread holding it runs at that priority, which also prevents some deadlocks.",
+          "Real-time scheduling adds throttling: by default real-time threads may use 950 ms of every 1,000 ms, leaving 50 ms for everything else so a runaway thread can still be stopped."
+        ]
+      },
+      "useWhen": [
+        "Use priority inheritance on locks shared by threads with different real-time priorities.",
+        "Use real-time policies only for short, bounded work with hard latency needs, such as audio or control loops."
+      ],
+      "avoidWhen": [
+        "Avoid sharing locks between real-time threads and threads that do unbounded work.",
+        "Avoid treating nice values as a fix for latency caused by waiting."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Mechanism",
+          "What it changes",
+          "Bounds inversion?",
+          "Cost"
+        ],
+        "rows": [
+          [
+            "Nice value",
+            "Long-run CPU share",
+            "No",
+            "None"
+          ],
+          [
+            "Real-time priority",
+            "Strict preemption order",
+            "No, can cause it",
+            "Starvation risk for normal work"
+          ],
+          [
+            "Priority inheritance",
+            "Boosts a holder while a higher thread waits",
+            "Yes, to one critical section",
+            "Kernel bookkeeping on contended locks"
+          ],
+          [
+            "Priority ceiling",
+            "Boosts every holder to the lock’s ceiling",
+            "Yes",
+            "Ceilings must be assigned and kept correct"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How long High really waits",
+        "assumptions": [
+          "Low’s critical section takes 1 ms; Medium runs CPU work in 50 ms bursts; High’s deadline is 10 ms (illustrative)"
+        ],
+        "steps": [
+          "Without inheritance, worst case: High waits for Medium’s burst plus the rest of Low’s section, 50 + 1 = 51 ms.",
+          "That misses the 10 ms deadline by 41 ms, and two Medium bursts in a row would double it.",
+          "With inheritance: High waits for at most the remainder of Low’s section, about 1 ms.",
+          "High then has about 9 ms of its 10 ms budget left for its own work."
+        ],
+        "result": "Inheritance turns a 51 ms worst case into about 1 ms here; the bound depends only on the critical section, not on unrelated work."
+      },
+      "india": {
+        "title": "An inversion on another planet",
+        "label": "Publicly reported",
+        "body": "NASA’s Mars Pathfinder lander, which landed in 1997, suffered repeated system resets on the surface. Engineers publicly described the cause as priority inversion: a low-priority meteorological task held a mutex needed by a high-priority bus management task, while medium-priority communication tasks kept the low one from running, so a watchdog detected the missed deadline and reset the computer. The fix, uploaded from Earth, enabled priority inheritance on that mutex."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Make the slow thread a higher priority.”",
+          "say": "“I’d first check what it is waiting for; if it’s a lock held by a lower thread, I’d use priority inheritance.”"
+        },
+        {
+          "trap": "“Real-time priority will make it fast.”",
+          "say": "“It makes it preempt others, not run faster; unbounded work at real-time priority starves the machine.”"
+        }
+      ],
+      "takeaways": [
+        "A high-priority waiter can be held up by medium-priority work.",
+        "Priority inheritance or ceilings bound the wait to one critical section.",
+        "Nice sets shares; real-time priorities strictly preempt.",
+        "Real-time threads must do short, bounded work."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "How long does High wait?",
+      "prompt": "On one core, Low (priority 10) takes a lock for a 2 ms update. High (priority 90) then blocks on that lock. Medium (priority 50) wakes and computes for 40 ms. The mutex uses no special protocol.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "About 42 ms: Medium runs first, then Low finishes",
+          "feedback": "Right: Medium outranks Low, so the lock holder cannot run until Medium is done."
+        },
+        {
+          "id": "b",
+          "label": "About 2 ms, since High outranks everyone",
+          "feedback": "High is blocked, not runnable, so its priority does not help Low."
+        },
+        {
+          "id": "c",
+          "label": "Forever: this is a deadlock",
+          "feedback": "There is no cycle; once Medium finishes, Low releases the lock."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Enable priority inheritance on the mutex and Low runs at priority 90 while High waits, so Medium cannot preempt it and High waits about 2 ms."
+    },
+    "seeAlso": [
+      {
+        "topicId": 282,
+        "why": "How the scheduler picks among runnable threads"
+      },
+      {
+        "topicId": 642,
+        "why": "Lock waiting is where inversions happen"
+      },
+      {
+        "topicId": 287,
+        "why": "Priority ceilings also help prevent some deadlocks"
+      }
+    ]
   }
 ]
