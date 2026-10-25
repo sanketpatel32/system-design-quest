@@ -185,4 +185,18 @@ describe('fundamentals models', () => {
     expect(o.verdict!.ok).toBe(false)
     expect(MODELS['long-task'].run(150, { chunkMs: 50, goodInpMs: 200 }).verdict!.text).toContain('handler and paint')
   })
+  it('amdahl: 10 s serial + 90 s parallel -> 19 s (5.3×) on 10 cores, 13 s (7.7×) on 30, ceiling 10×', () => {
+    const p = { serialS: 10, parallelS: 90 }
+    const ten = MODELS.amdahl.run(10, p)
+    expect(val(ten, 0)).toBe('19 s')
+    expect(val(ten, 1)).toBe('5.3×')
+    expect(val(ten, 2)).toBe('10×')
+    expect(val(ten, 3)).toBe('53%')
+    expect(ten.verdict!.ok).toBe(true)
+    const thirty = MODELS.amdahl.run(30, p)
+    expect(val(thirty, 0)).toBe('13 s')
+    expect(val(thirty, 1)).toBe('7.7×')
+    expect(thirty.verdict!.ok).toBe(false)
+    expect(val(MODELS.amdahl.run(1, p), 1)).toBe('1×')
+  })
 })
