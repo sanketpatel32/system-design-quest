@@ -2507,15 +2507,15 @@
  },
  {
   "id": 577,
-  "slug": "ddos-resilience",
+  "slug": "bots-and-automated-abuse",
   "region": "f6-security",
   "order": 17,
-  "title": "Surviving DDoS: Absorb, Filter and Shed",
+  "title": "Defending Against Bots and Automated Abuse",
   "kind": "lesson",
   "objectives": [
-   "Tell volumetric, protocol and application-layer floods apart",
-   "Explain why floods must be absorbed at the edge, before the origin",
-   "Defend expensive endpoints against request floods without runaway cost"
+   "Name the automated threat a business flow faces",
+   "Combine signals into a risk score instead of trusting one check",
+   "Raise the attacker’s cost without punishing real users"
   ],
   "difficulty": "intermediate",
   "durationMinutes": 15,
@@ -2526,187 +2526,189 @@
    {
     "id": "t577-c1",
     "kind": "text",
-    "title": "Three kinds of flood",
-    "body": "Volumetric attacks fill the network pipe and are measured in gigabits per second. Protocol attacks, such as SYN floods, exhaust connection tables and firewall state, and are measured in packets per second. Application-layer attacks send valid-looking HTTP requests to expensive endpoints such as search, login or checkout, and are measured in requests per second. A rule that stops one kind does nothing against the others, so identify the layer before choosing a response.",
+    "title": "Name the abuse, not just the bot",
+    "body": "The OWASP Automated Threats project names more than twenty abuses of legitimate features. Carding tests stolen cards with small payments. Scalping buys limited stock for resale. Scraping copies content or prices. Account creation farms fake sign-ups for referral rewards or spam. Denial of inventory holds stock in carts without paying. Each one uses requests that look valid, so the defence depends on the flow being abused. Some bots are welcome, such as verified search crawlers, uptime monitors and partner integrations, so identify those and let them through.",
     "teaches": [
-     "ddos-layers"
+     "automated-threats"
     ]
    },
    {
     "id": "t577-c2",
     "kind": "text",
-    "title": "Absorb at the edge, not at the origin",
-    "body": "If your data centre has a 10 Gbps uplink, a 100 Gbps flood fills the link upstream of your firewall, so nothing you run can drop it in time. Large anycast networks (CDNs and cloud DDoS services) advertise the same addresses from many locations, so the flood spreads across all of them and is filtered close to its sources. Your origin then accepts traffic only from the edge provider, ideally over a private connection.",
+    "title": "Signals, scored together",
+    "body": "No single signal is reliable. Combine many: attempt rates per account, device, card and network; whether the address belongs to a datacentre or a residential proxy pool; whether headers and TLS fingerprint match the browser claimed; behaviour such as impossible typing speed; and outcome ratios, like the share of payments declined. Feed them into a risk score per request or session, and act on the score, not on any one rule.",
     "teaches": [
-     "edge-absorption"
+     "bot-signals"
     ]
    },
    {
     "id": "t577-c3",
     "kind": "diagram",
-    "title": "Worked example: why reflection multiplies traffic",
-    "body": "Reflection abuses open UDP services that send large replies to small queries. This is how to reason about it as a defender.",
+    "title": "Worked example: stopping card testing at checkout",
+    "body": "Guest checkout suddenly sees thousands of tiny payments, most of them declined.",
     "teaches": [
-     "amplification"
+     "bot-signals",
+     "friction-ladder"
     ],
     "steps": [
-     "UDP has no handshake, so a query can carry a forged source address: the victim’s",
-     "Each open service replies to that address with a much larger response",
-     "Illustrative: 60-byte queries drawing 3,000-byte replies multiply traffic 50 times, so 2 Gbps sent becomes 100 Gbps received",
-     "Defence for everyone: networks drop packets with forged source addresses (BCP 38), and operators close or rate-limit open UDP services",
-     "Defence for the victim: absorb at an anycast edge and drop unexpected UDP before it reaches the origin"
+     "Alert on the spike in the decline ratio, not on request volume alone",
+     "Cap attempts per card, device, account and network over an hour and a day",
+     "Step up risky payments to cardholder verification or an extra challenge",
+     "Delay fulfilment of small first-time orders from risky sessions",
+     "Feed confirmed fraud and chargebacks back into the risk score"
     ]
    },
    {
     "id": "t577-c4",
     "kind": "text",
-    "title": "Misconception: autoscaling defeats a DDoS",
-    "body": "Adding servers does nothing when the link is full, because the traffic never reaches them. Against an application-layer flood, scaling turns the attack into a bill while the shared database still saturates. Put hard maximums on scaling, and filter before you scale: per-client rate limits, bot challenges on risky paths, caching that ignores junk query parameters, and load shedding that keeps checkout alive while dropping low-priority work.",
+    "title": "Misconception: a CAPTCHA stops bots",
+    "body": "Solving services clear challenges for a small fee per thousand, and solver models handle many puzzles directly. Meanwhile, CAPTCHAs slow real customers and exclude people who rely on assistive technology. Treat a challenge as one rung on a ladder, shown only when the risk score is high, and make the abuse unprofitable in other ways, such as delaying referral rewards until an account shows real activity.",
     "teaches": [
-     "app-layer-defence"
+     "friction-ladder",
+     "abuse-economics"
     ]
    },
    {
     "id": "t577-c5",
     "kind": "text",
-    "title": "Trap: leaving the origin reachable directly",
-    "body": "An edge network only helps if attackers must go through it. Origin addresses leak through old DNS records, mail servers on the same host, test subdomains and error pages. Once found, the origin can be flooded directly. Firewall the origin to accept only the edge provider’s address ranges or an authenticated tunnel. If the address has leaked, move to a new one.",
+    "title": "Trap: blocking loudly",
+    "body": "A clear “403 bot detected” tells the operator exactly which check fired, and they adapt within hours. Prefer quieter responses where you can: slow the session, show a challenge, accept the sign-up but withhold its reward, or return plausible but useless results. Measure success by business outcomes, such as fake accounts, declined payments or scraped volume, not by the number of requests blocked.",
     "teaches": [
-     "edge-absorption"
+     "abuse-economics"
     ]
    }
   ],
   "questions": [
    {
     "id": "t577-a1",
-    "concept": "ddos-layers",
+    "concept": "automated-threats",
     "type": "multiple_choice",
-    "prompt": "Inbound traffic is only 200 Mbps, but login receives 80,000 valid-looking requests a second from many addresses, and the database is pegged. What kind of attack is it?",
+    "prompt": "Resellers’ scripts fill carts with concert tickets and hold them until the timer runs out, so fans see them as sold out. Which automated threat is this?",
     "choices": [
      {
       "id": "a",
-      "label": "A volumetric flood that fills the link"
+      "label": "Scraping"
      },
      {
       "id": "b",
-      "label": "An application-layer request flood"
+      "label": "Denial of inventory"
      },
      {
       "id": "c",
-      "label": "A reflection attack using open UDP services"
+      "label": "Credential stuffing"
      },
      {
       "id": "d",
-      "label": "A SYN flood filling the connection table"
+      "label": "Carding"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Low bandwidth with many complete, valid HTTP requests that exhaust a backend is the application-layer pattern. A volumetric or reflection attack would show high bandwidth, and a SYN flood would leave half-open connections rather than completed logins."
+    "explanation": "Holding stock without buying it denies it to others. Scraping copies data, credential stuffing replays leaked passwords, and carding tests stolen cards. Scalping, buying the stock to resell, is the related threat that often follows."
    },
    {
     "id": "t577-a2",
-    "concept": "edge-absorption",
+    "concept": "bot-signals",
     "type": "multiple_choice",
-    "prompt": "Your origin has a 10 Gbps uplink, and a 300 Gbps flood arrives. Where can it be absorbed?",
+    "prompt": "Guest checkout sees 40,000 payment attempts in an hour, 95% declined, mostly for tiny amounts. What is the best first response?",
     "choices": [
      {
       "id": "a",
-      "label": "On the origin, by adding application servers"
+      "label": "Block the country that sent the most attempts"
      },
      {
       "id": "b",
-      "label": "At the origin firewall, by dropping bad packets"
+      "label": "Turn off guest checkout for all customers for a month"
      },
      {
       "id": "c",
-      "label": "Across a large anycast edge, before it reaches you"
+      "label": "Cap attempts per card and device; challenge risky payments"
      },
      {
       "id": "d",
-      "label": "By raising the origin’s TCP backlog setting"
+      "label": "Raise the minimum order value to discourage small orders"
      }
     ],
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "The link saturates upstream of everything at the origin, so only capacity larger than the attack, spread across many locations, can absorb it. Servers, firewall rules and backlog settings all sit behind the full pipe."
+    "explanation": "This is card testing, and limits on the card and device attack its economics while real customers barely notice. Attackers rotate proxies, so a country block mostly hurts real buyers there. Removing guest checkout loses sales for a month. A minimum order value changes little, since testers can pay more."
    },
    {
     "id": "t577-a3",
-    "concept": "amplification",
-    "type": "estimation",
-    "prompt": "An attacker sends 2 Gbps of 60-byte queries to open UDP services, each of which replies with 3,000 bytes to the forged source. Roughly how much traffic reaches the victim?",
-    "unit": "Gbps",
-    "target": 100,
-    "assumptions": [
-     "2 Gbps of queries",
-     "60-byte query, 3,000-byte reply",
-     "Every query is answered"
-    ],
-    "formula": "sent rate × (reply size / query size)",
-    "workedAnswer": "Amplification = 3,000 / 60 = 50, so 2 Gbps × 50 = 100 Gbps.",
-    "explanation": "Design implication: that is ten times a 10 Gbps uplink, so only an edge network with more capacity than the flood can absorb it.",
-    "tolerance": 0.1,
-    "trapAnswers": [
-     2,
-     50
-    ]
-   },
-   {
-    "id": "t577-a4",
-    "concept": "app-layer-defence",
+    "concept": "friction-ladder",
     "type": "multiple_choice",
-    "prompt": "During a request flood on /search, autoscaling has grown the fleet from 20 to 400 servers. What is the main risk of letting it continue?",
+    "prompt": "Why does a CAPTCHA on the sign-up form, on its own, fail against a determined fake-account farm?",
     "choices": [
      {
       "id": "a",
-      "label": "The bill climbs while the database behind it still saturates"
+      "label": "Solving services and solver models clear challenges cheaply"
      },
      {
       "id": "b",
-      "label": "Autoscaling makes the attack traffic itself larger"
+      "label": "Farms send requests too slowly to trigger a challenge"
      },
      {
       "id": "c",
-      "label": "New servers cannot join the load balancer mid-attack"
+      "label": "Sign-up forms are rarely a target for automation"
      },
      {
       "id": "d",
-      "label": "Scaling turns off the edge cache for the site"
+      "label": "CAPTCHAs are shown only to users on mobile devices"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Stateless servers scale but the shared database does not, so cost rises with no gain in availability. The attack rate is set by the attacker, servers can still register, and scaling does not change cache settings."
+    "explanation": "Challenges are a cost, and for this abuse the cost is tiny. A challenge shown at sign-up applies at any speed. Sign-up is a top target, for referral rewards and spam. CAPTCHAs are shown on any device the site chooses."
+   },
+   {
+    "id": "t577-a4",
+    "concept": "abuse-economics",
+    "type": "estimation",
+    "prompt": "Illustrative prices: an operator pays $2 per 1,000 CAPTCHA solves and earns $0.50 per fake account, which needs 3 solves. How much do the solves cost them per 1,000 accounts?",
+    "unit": "dollars",
+    "target": 6,
+    "assumptions": [
+     "$2 per 1,000 solves",
+     "3 solves per account",
+     "$0.50 earned per account"
+    ],
+    "formula": "accounts × solves per account × price per solve",
+    "workedAnswer": "1,000 × 3 = 3,000 solves; 3,000 / 1,000 × 2 = $6, against 1,000 × 0.50 = $500 of revenue.",
+    "explanation": "Design implication: friction costing about 1% of the payoff deters nobody. Cut the payoff instead, for example by paying referral rewards only after real purchases.",
+    "tolerance": 0.1,
+    "trapAnswers": [
+     2,
+     3000
+    ]
    },
    {
     "id": "t577-a5",
-    "concept": "ddos-layers",
+    "concept": "friction-ladder",
     "type": "drag_order",
-    "prompt": "Order the response when a flood begins.",
+    "prompt": "Order these responses from least to most friction for a real user who is wrongly flagged.",
     "items": [
      {
       "id": "s3",
-      "label": "Apply the matching filter at the edge"
+      "label": "Run an invisible check such as a browser proof-of-work"
      },
      {
       "id": "s1",
-      "label": "Detect: traffic or errors far above the baseline"
+      "label": "Observe and score the session silently"
      },
      {
       "id": "s5",
-      "label": "Review and tune the rules after the attack"
+      "label": "Block, or require a verified identity"
      },
      {
       "id": "s2",
-      "label": "Classify the layer: bandwidth, packets or requests"
+      "label": "Slow it down with rate limits or small delays"
      },
      {
       "id": "s4",
-      "label": "Shed low-priority work at the origin if it is still overloaded"
+      "label": "Show an interactive challenge"
      }
     ],
     "correctOrder": [
@@ -2716,204 +2718,233 @@
      "s4",
      "s5"
     ],
-    "explanation": "The layer decides the filter, so classify before acting. Shedding protects what is left, and a review makes the next attack cheaper to stop."
+    "explanation": "Climb the ladder only as far as the risk score demands, so most false positives feel no friction at all and real attackers face rising cost."
    },
    {
     "id": "t577-a6",
-    "concept": "app-layer-defence",
-    "type": "multiple_choice",
-    "prompt": "The 2023 HTTP/2 Rapid Reset attacks opened streams and cancelled them at once, many times per connection. Why did this hurt servers so much?",
-    "choices": [
+    "concept": "abuse-economics",
+    "type": "tradeoff",
+    "prompt": "A price-comparison company scrapes your whole catalogue each night, adding 30% to traffic and leaking promotions early.",
+    "constraints": [
+     "Shoppers must not notice any change",
+     "Scrapers use residential proxies",
+     "Some partners want the data legitimately"
+    ],
+    "approaches": [
      {
-      "id": "a",
-      "label": "The resets used up the victims’ network bandwidth"
+      "id": "p1",
+      "label": "Per-client rate limits, headless-browser detection and a paid data feed",
+      "description": "Limit and sell"
      },
      {
-      "id": "b",
-      "label": "Servers started work on each stream before it was cancelled"
+      "id": "p2",
+      "label": "Block all datacentre address ranges",
+      "description": "Block ranges"
      },
      {
-      "id": "c",
-      "label": "The resets broke the encryption on each connection"
-     },
-     {
-      "id": "d",
-      "label": "Each reset forced a new TLS handshake"
+      "id": "p3",
+      "label": "Put the catalogue behind a login",
+      "description": "Login wall"
      }
     ],
-    "correctChoiceIds": [
-     "b"
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r1",
+      "label": "A paid feed turns the cost into revenue and removes the incentive"
+     },
+     {
+      "id": "r2",
+      "label": "Per-client limits cap cost without touching normal shoppers"
+     },
+     {
+      "id": "r3",
+      "label": "Datacentre blocks stop scrapers that use residential proxies"
+     },
+     {
+      "id": "r4",
+      "label": "A login wall costs nothing in lost customers"
+     }
     ],
-    "explanation": "Cancelling a stream let the client open another at once without hitting the concurrent-stream limit, while the server had already begun work. Bandwidth was modest, TLS stayed intact, and the same connection was reused. That is why fixes limit how fast a client may reset streams."
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": {
+     "r3": "Residential proxies are exactly how scrapers avoid datacentre blocks.",
+     "r4": "Shoppers browse before signing in, and search engines cannot index a login wall."
+    },
+    "explanation": "Raise the cost of the abusive path and offer a legitimate path to anyone who will pay for the data."
    }
   ],
   "flashcards": [
    {
     "id": "t577-f1",
-    "front": "Three DDoS layers",
-    "back": "Volumetric (Gbps), protocol (packets/s and state), application (requests/s)."
+    "front": "Carding",
+    "back": "Testing stolen cards with small payments; watch decline ratios."
    },
    {
     "id": "t577-f2",
-    "front": "Why absorb at the edge?",
-    "back": "A flood larger than your uplink fills it before any origin defence runs."
+    "front": "Why not one signal?",
+    "back": "Each is easy to fake; combine them into a risk score."
    },
    {
     "id": "t577-f3",
-    "front": "Origin hardening for DDoS",
-    "back": "Accept traffic only from the edge provider; move the address if it leaks."
+    "front": "Friction ladder",
+    "back": "Observe, slow, invisible check, challenge, block: climb only as risk demands."
    }
   ],
   "sources": [
    {
-    "title": "Google Cloud: mitigating a 398 million rps DDoS attack",
-    "url": "https://cloud.google.com/blog/products/identity-security/google-cloud-mitigated-largest-ddos-attack-peaking-above-398-million-rps"
+    "title": "OWASP Automated Threats to Web Applications",
+    "url": "https://owasp.org/www-project-automated-threats-to-web-applications/"
    },
    {
-    "title": "AWS: How DDoS attacks work and how to protect against them",
-    "url": "https://docs.aws.amazon.com/waf/latest/developerguide/ddos-overview.html"
+    "title": "OWASP API6:2023 Unrestricted Access to Sensitive Business Flows",
+    "url": "https://owasp.org/API-Security/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/"
    },
    {
-    "title": "OWASP Denial of Service Cheat Sheet",
-    "url": "https://cheatsheetseries.owasp.org/cheatsheets/Denial_of_Service_Cheat_Sheet.html"
-   },
-   {
-    "title": "RFC 2827 (BCP 38): Network Ingress Filtering",
-    "url": "https://www.rfc-editor.org/rfc/rfc2827"
+    "title": "OWASP Credential Stuffing Prevention Cheat Sheet",
+    "url": "https://cheatsheetseries.owasp.org/cheatsheets/Credential_Stuffing_Prevention_Cheat_Sheet.html"
    }
   ],
   "deep": {
    "teaches": [
-    "ddos-layers",
-    "edge-absorption",
-    "amplification",
-    "app-layer-defence"
+    "automated-threats",
+    "bot-signals",
+    "friction-ladder",
+    "abuse-economics"
    ],
    "mechanism": {
-    "title": "Defence in layers, from the internet inward",
+    "title": "How an abuse defence works",
     "steps": [
-     "Edge capacity: put public endpoints behind an anycast network whose capacity is far larger than plausible attacks. It absorbs volumetric and reflection floods across many locations and drops obviously invalid packets.",
-     "Protocol protection: SYN cookies and stateless filtering at the edge keep connection tables from filling. Only well-formed, completed connections are passed on.",
-     "Request filtering: a web application firewall and per-client rate limits act on paths, headers and behaviour. Challenges are reserved for risky traffic, and rules can be switched on in minutes during an attack.",
-     "Caching: serve as much as possible from the edge, and normalise cache keys so random query strings cannot force misses.",
-     "Origin protection: accept traffic only from the edge, cap autoscaling, and shed load by priority. Keep checkout and login alive, and drop recommendations and analytics first.",
-     "Preparation: baseline normal traffic, rehearse the runbook, know how to reach your provider’s response team, and set budget alerts so an attack cannot quietly run up the bill."
+     "Map the flows worth abusing: sign-up, login, checkout, gift cards, search, price pages, limited stock and referral rewards. For each flow, write down which automated threat applies and what a successful attack earns, because the payoff decides how hard attackers will push.",
+     "Instrument outcomes: record for each flow the business result as well as the request, such as accounts that never act, payments declined, carts abandoned at the timer or pages fetched per session. Abuse shows up in outcomes long before it shows up in request rates.",
+     "Score risk: combine rate counters per account, device, card and network with reputation, fingerprint consistency and behaviour into a score per session. Retrain or retune it with confirmed abuse and with complaints from real users who were wrongly flagged.",
+     "Respond on a ladder: let low scores through untouched, slow or invisibly check medium scores, and challenge or block only high scores. Prefer quiet responses that do not reveal which signal fired.",
+     "Change the economics: delay rewards until real activity, hold risky orders, limit purchases per buyer for scarce stock, and offer paid or partner access for data that people will otherwise scrape.",
+     "Review and adapt: attackers change tools within days, so watch the outcome metrics after each change, keep an allowlist of verified good bots, and treat the defence as an ongoing operation rather than a project."
     ]
    },
    "useWhen": [
-    "Any public-facing service that would lose money or trust when unavailable",
-    "Services with expensive endpoints such as search, login or report generation"
+    "Flows with a direct payoff: payments, rewards, scarce stock, valuable data",
+    "Sites where fake accounts or scraping already show up in business metrics"
    ],
    "avoidWhen": [
-    "Internal-only services with no public addresses, where network controls suffice",
-    "Using challenges on every request, which harms real users and accessibility"
+    "Adding challenges for all users when abuse is limited to one flow",
+    "Relying on a single vendor score without checking business outcomes"
    ],
    "tradeoffs": {
     "columns": [
      "Defence",
-     "Handles",
-     "Limits"
+     "Raises cost by",
+     "Weakness"
     ],
     "rows": [
      [
-      "Anycast edge or scrubbing service",
-      "Volumetric and reflection floods",
-      "Must be in the path; a leaked origin bypasses it"
+      "Per-key rate limits",
+      "Capping attempts per card, device or account",
+      "Attackers spread across many keys"
      ],
      [
-      "SYN cookies and stateless filters",
-      "Protocol and state exhaustion",
-      "Little help against valid HTTP floods"
+      "Reputation and fingerprints",
+      "Flagging datacentres and spoofed clients",
+      "Residential proxies and real browsers"
      ],
      [
-      "WAF and per-client rate limits",
-      "Application-layer request floods",
-      "Rules need tuning; distributed bots spread load"
+      "Challenges",
+      "Adding time or a fee per attempt",
+      "Cheap solving services; hurts accessibility"
      ],
      [
-      "Caching and load shedding",
-      "Expensive or repeated requests",
-      "Only cacheable content; shedding drops some real users"
+      "Payoff removal",
+      "Making success worth less",
+      "Needs product changes, not just security"
      ]
     ]
    },
    "numbers": {
-    "title": "When caching saves you, and when it does not",
+    "title": "What does card testing cost a merchant?",
     "assumptions": [
-     "Attack: 1,000,000 requests a second on a product page",
-     "Origin capacity: 20,000 requests a second",
-     "Edge cache hit ratio for that page: 99%"
+     "40,000 payment attempts an hour",
+     "A processor fee of $0.10 per attempt, illustrative",
+     "The attack runs 8 hours overnight",
+     "Caps per card and device stop 90% of attempts"
     ],
     "steps": [
-     "With caching: 1,000,000 × 0.01 = 10,000 requests a second reach the origin, half its capacity",
-     "Attacker adds a random query string to every request; if the cache key includes it, the hit ratio drops to about 0%",
-     "Then 1,000,000 a second reach the origin, 50 times its capacity",
-     "Fix: drop unknown query parameters from the cache key and rate-limit per client, which brings origin load back under 20,000"
+     "Fees per hour: 40,000 × 0.10 = $4,000",
+     "Overnight: 4,000 × 8 = $32,000 in fees alone",
+     "With caps, 10% get through: 32,000 × 0.1 = $3,200",
+     "Processors may also raise fees or end the account if decline rates stay high"
     ],
-    "result": "Caching absorbs a request flood only when attackers cannot bust the cache, so normalise cache keys and keep per-client limits on uncached paths."
+    "result": "Simple caps cut the illustrative overnight fee bill from about $32,000 to about $3,200, before counting chargebacks."
    },
    "india": {
-    "title": "HTTP/2 Rapid Reset, 2023",
-    "label": "Publicly reported",
-    "body": "In October 2023 Google Cloud reported mitigating a DDoS attack that peaked above 398 million requests per second. That was about 7.5 times its previous record of 46 million. The attack used a new HTTP/2 technique called Rapid Reset, which opens and cancels streams in quick succession, and was tracked as CVE-2023-44487. Google said the two-minute attack generated more requests than Wikipedia’s reported article views for all of September 2023. Absorbing it relied on global edge capacity and load balancing, plus server fixes that limit how quickly a client can reset streams."
+    "title": "OWASP Automated Threats to Web Applications",
+    "label": "Official documentation",
+    "body": "The OWASP Automated Threats to Web Applications project publishes a handbook that names automated threat events, such as OAT-001 Carding, OAT-005 Scalping, OAT-008 Credential Stuffing, OAT-010 Card Cracking and OAT-012 Cashing Out. Its examples show organisations writing requirements in terms of these threat events, for instance that payment functions must not be open to carding or card cracking, rather than naming a product. OWASP’s API Security Top 10 makes the same point as API6:2023, Unrestricted Access to Sensitive Business Flows."
    },
    "pitfalls": [
     {
-     "trap": "Counting on autoscaling to ride out an attack",
-     "say": "Scaling cannot clear a full link, and it bills you for request floods; I would filter at the edge and cap scaling."
+     "trap": "Measuring success by requests blocked",
+     "say": "Measure fake accounts, declined payments and scraped volume, because blocked counts rise as attackers retry."
     },
     {
-     "trap": "Putting a CDN in front but leaving the origin open",
-     "say": "Firewall the origin to the edge provider’s ranges, or attackers simply go around it."
+     "trap": "Adding a CAPTCHA and calling it done",
+     "say": "Use challenges as one rung on a ladder, and remove the payoff that makes abuse worth it."
     },
     {
-     "trap": "One rule for every flood",
-     "say": "Classify the layer first: bandwidth, packets and requests each need a different filter."
+     "trap": "Returning an explicit bot error",
+     "say": "Respond quietly, with delays, challenges or withheld rewards, so attackers cannot see which signal fired."
     }
    ],
    "takeaways": [
-    "Identify the layer: bandwidth, packets or requests",
-    "Absorb floods at an anycast edge larger than the attack",
-    "Hide and lock down the origin behind the edge",
-    "Filter, cache and shed before you scale"
+    "Name the threat for each abused flow",
+    "Score many signals together",
+    "Climb a friction ladder only as risk demands",
+    "Make abuse unprofitable, and measure business outcomes"
    ]
   },
   "interactive": {
    "kind": "predict",
-   "title": "Will autoscaling save you?",
-   "prompt": "Your origin has a 10 Gbps uplink and autoscaling up to 500 servers. A 150 Gbps UDP flood arrives at its address.",
+   "title": "What does the operator do next?",
+   "prompt": "You return 403 “bot detected” to any request missing a header that normal browsers send.",
    "choices": [
     {
      "id": "a",
-     "label": "No: the link is full before traffic reaches a server",
-     "feedback": "Right: the bottleneck is upstream of everything you can scale."
+     "label": "Adds the header within hours and carries on",
+     "feedback": "Right: the error told them exactly what to fix."
     },
     {
      "id": "b",
-     "label": "Yes: more servers can absorb more traffic",
-     "feedback": "Servers sit behind the saturated 10 Gbps link."
+     "label": "Gives up, since the site clearly detects bots",
+     "feedback": "Abuse is a business; a cheap fix is worth making."
     },
     {
      "id": "c",
-     "label": "Yes, if the servers drop the UDP packets",
-     "feedback": "By the time packets reach a server, the link has already dropped real traffic."
+     "label": "Switches to slower, manual abuse",
+     "feedback": "Not while an automated fix is this easy."
     }
    ],
    "correctId": "a",
-   "reveal": "Volumetric floods are absorbed by capacity larger than the attack, which in practice means an anycast edge."
+   "reveal": "Respond quietly and combine signals, so one change on the attacker’s side does not undo the defence."
   },
   "seeAlso": [
    {
+    "topicId": 573,
+    "why": "Credential stuffing is the login form of automated abuse"
+   },
+   {
     "topicId": 233,
-    "why": "Rate limiting, the core tool against application-layer floods"
+    "why": "Rate limiting is the first rung of the friction ladder"
    },
    {
-    "topicId": 308,
-    "why": "SSRF, another way attackers turn your own servers into their tool"
-   },
-   {
-    "topicId": 329,
-    "why": "Locking the origin down to edge-only traffic with network rules"
+    "topicId": 663,
+    "why": "APIs expose business flows to the same automation"
    }
   ]
  },
