@@ -253,4 +253,5 @@ if (errors.length) {
   errors.forEach((e) => console.error(' -', e))
   process.exit(1)
 }
-console.log(`AUDIT OK: ${topics.length} topics (120 System Design + ${topics.length - coreCount} Fundamentals), 40 bosses, counts and keys valid`)
+const sdExtraCount = ids.filter((i) => i >= 501 && i <= 599).length
+console.log(`AUDIT OK: ${topics.length} topics (${coreCount + sdExtraCount} System Design + ${topics.length - coreCount - sdExtraCount} Fundamentals), 40 bosses, counts and keys valid`)

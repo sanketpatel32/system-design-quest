@@ -5872,7 +5872,7 @@
           },
           {
             "id": "a",
-            "label": "Each instance has its own copy, so a change must be invalidated in all 50"
+            "label": "A change must be invalidated in all 50 copies"
           },
           {
             "id": "c",
@@ -66705,15 +66705,15 @@
           },
           {
             "id": "b",
-            "label": "2 ms"
+            "label": "About 2 ms"
           },
           {
             "id": "d",
-            "label": "2 s"
+            "label": "About 2 s"
           },
           {
             "id": "c",
-            "label": "20 ms (illustrative)"
+            "label": "About 20 ms"
           }
         ],
         "correctChoiceIds": [
@@ -113968,8 +113968,8 @@
         "steps": [
           "Chance that all 100 shards are fast: 0.99¹⁰⁰ ≈ 0.366, so about 63% of pages wait for at least one call slower than 120 ms.",
           "Hedge: if a shard has not replied by 30 ms (its p95), send the same read to another replica and take whichever answers first.",
-          "A call now stays slow only if both copies are slow, roughly 0.01 × 0.01 = 0.0001 if the replicas fail independently.",
-          "Chance a page waits on a slow call: 1 − 0.9999¹⁰⁰ ≈ 1%, down from about 63%, for about 5% extra backend requests (only the calls past p95 get a copy)."
+          "A call now stays slow only if both copies are slow. The copy starts 30 ms late, so it must answer within 90 ms; treating that as the same 1% tail gives roughly 0.01 × 0.01 = 0.0001 (a little more in practice, since 90 ms sits between the p95 and the p99).",
+          "Chance a page waits on a slow call: 1 − 0.9999¹⁰⁰ ≈ 1%, a few percent at worst, down from about 63%, for about 5% extra backend requests (only the calls past p95 get a copy)."
         ],
         "note": "Hedging after the p95 trades a few percent more load for a large cut in the tail, but only for requests that are safe to send twice."
       },
@@ -114205,7 +114205,7 @@
         "correctChoiceIds": [
           "b"
         ],
-        "explanation": "Only calls slower than the p95, about 5% of them, get a second copy. 100% would be sending two copies of every call; 50% and 1% do not follow from a p95 trigger."
+        "explanation": "Only calls slower than the p95, about 5% of them, get a second copy. 100% would be sending two copies of every call, 50% would be a trigger at the p50, and 1% a trigger at the p99."
       }
     ],
     "flashcards": [
@@ -114301,7 +114301,7 @@
         ],
         "steps": [
           "Without hedging, the chance a page sees no slow call is 0.99¹⁰⁰ ≈ 0.366, so about 63% of pages wait more than 120 ms.",
-          "With a hedge at 30 ms, a call stays slow only if both copies are slow: about 0.01 × 0.01 = 0.0001.",
+          "With a hedge at 30 ms, a call stays slow only if both copies are slow: about 0.01 × 0.01 = 0.0001, treating the copy’s remaining 90 ms as roughly its p99.",
           "Pages that still wait on a slow call: 1 − 0.9999¹⁰⁰ ≈ 0.01, about 1%.",
           "Extra load: only calls past the p95, about 5% of them, send a copy, so backends see about 5% more reads."
         ],
@@ -114738,7 +114738,7 @@
         "steps": [
           "A single key would need 40,000 writes per second on one partition: 8 times its comfortable rate.",
           "Minimum sub-counters: 40,000 ÷ 5,000 = 8; use 16 for headroom, about 2,500 writes per second each.",
-          "Reading the total means summing 16 keys; doing that once every 2 seconds and caching the sum costs 8 small batched reads per second.",
+          "Reading the total means summing 16 keys; doing that in one batched read every 2 seconds and caching the sum costs about 8 key reads per second.",
           "Alternatively, each of 20 app servers buffers votes and flushes once a second: 20 writes per second reach the store, at up to 1 second of lag."
         ],
         "result": "Either 16 sub-counters or per-server batching brings a 40,000-per-second hot key under one partition’s limit; batching writes far less but loses up to a second of votes if a server crashes before flushing."
@@ -114804,6 +114804,10 @@
         "why": "Hot keys are the failure mode that a good shard key alone cannot prevent."
       },
       {
+        "topicId": 114,
+        "why": "The Distributed Counter boss puts split counters into a full design."
+      },
+      {
         "topicId": 49,
         "why": "Count-Min sketches find heavy hitters in small, fixed memory."
       },
@@ -114817,7 +114821,7 @@
     "id": 503,
     "slug": "event-sourcing-and-cqrs",
     "region": "r6-messaging",
-    "order": 10,
+    "order": 11,
     "title": "Event Sourcing and CQRS",
     "kind": "lesson",
     "objectives": [
@@ -115537,7 +115541,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Created money shows up as a transaction whose entries do not net to zero. A non-negative balance check misses money added to the wrong account, and status codes and throughput say nothing about amounts."
+        "explanation": "Created money shows up as a transaction whose entries do not net to zero. A non-negative balance check only fires when a balance drops below zero, so it cannot see money that appears; status codes and throughput say nothing about amounts."
       },
       {
         "id": "t504-a7",
@@ -116262,7 +116266,7 @@
         "id": "t506-c5",
         "kind": "text",
         "title": "Trap: cells that share a dependency",
-        "body": "Cells that all write to one global database or call one shared service are not isolated; that dependency fails them together. Keep data and critical dependencies inside each cell, and treat the few truly global pieces (the router, identity, billing aggregation) as separately hardened systems. Shuffle sharding reduces the overlap further: give each customer a random pair of workers, so that one bad customer shares both workers with few others.",
+        "body": "Cells that all write to one global database or call one shared service are not isolated; that dependency fails them together. Keep data and critical dependencies inside each cell, and treat the few truly global pieces (the router, identity, billing aggregation) as separately hardened systems. Shuffle sharding reduces the overlap further: give each customer a random pair of workers, so that one bad customer shares both workers with few others. With 10 workers there are 10 × 9 ÷ 2 = 45 possible pairs, so only about 1 in 45 other customers loses both of its workers; the rest keep at least one.",
         "teaches": [
           "cell",
           "shuffle-sharding"
@@ -116334,7 +116338,7 @@
           },
           {
             "id": "c",
-            "label": "The router that maps customers to cells"
+            "label": "The customer-to-cell router"
           },
           {
             "id": "d",
@@ -116400,7 +116404,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Adding cells keeps each one inside limits that were load-tested. Doubling cells moves them into untested territory, merging removes isolation, and the router forwards traffic rather than serving it."
+        "explanation": "Adding cells keeps each one inside limits that were load-tested. Doubling each cell’s size moves it into untested territory, merging removes isolation, and the router forwards traffic rather than serving it."
       },
       {
         "id": "t506-a6",
@@ -116428,7 +116432,7 @@
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "There are 8 × 7 ÷ 2 = 28 possible pairs, and only customers with the same pair lose both workers. 1 in 4 is the share holding at least one specific worker, a different and larger number; 1 in 8 and 1 in 2 do not follow from the pairing."
+        "explanation": "There are 8 × 7 ÷ 2 = 28 possible pairs, and only customers with the same pair lose both workers. 1 in 4 is the share holding one specific worker; about 1 in 2 (13 of 28 pairs) is the share that loses at least one worker but keeps the other; 1 in 8 does not follow from the pairing."
       },
       {
         "id": "t506-a7",
@@ -116557,7 +116561,7 @@
         "steps": [
           "Blast radius per cell = 100% ÷ cells, so 5% needs at least 100 ÷ 5 = 20 cells.",
           "With 20 cells, one bad deploy affects about 5% of merchants for about 30 minutes.",
-          "Merchant-minutes lost = 5% × 30 = 1.5% of an hour-long window, against 100% × 30 if deployed everywhere at once.",
+          "Merchant-minutes lost: 5% of merchants × 30 minutes = 1.5 minutes per merchant on average, against 30 minutes for every merchant if the change went everywhere at once.",
           "If each cell is load-tested to 10,000 requests per second and peak is 150,000, 150,000 ÷ 10,000 = 15 cells of capacity are needed, so the blast-radius target (20), not load, sets the count."
         ],
         "result": "Pick the number of cells from the larger of the blast-radius target and the capacity need; here containment, not traffic, decides on 20."
@@ -117004,10 +117008,10 @@
         "steps": [
           "Average busy workers = 3,000 × 0.04 = 120.",
           "For 70% utilisation, pool size ≈ 120 ÷ 0.7 ≈ 171, so about 175 workers.",
-          "If a payment dependency slows to 120 ms, busy workers become 3,000 × 0.12 = 360, more than double the pool, so a timeout of around 100 ms with a fallback is needed.",
+          "If a payment dependency slows to 120 ms, busy workers become 3,000 × 0.12 = 360, about double the pool. Even a 100 ms timeout leaves 3,000 × 0.1 = 300 busy, so a timeout alone is not enough: a circuit breaker or fallback that fails fast must bring holding time back near 40 ms.",
           "Queue bound: 0.5 seconds of work at 3,000 per second is about 1,500 waiting requests; beyond that, reject quickly."
         ],
-        "result": "About 175 workers handle the peak at roughly 70% busy; the dependency timeout matters as much as the pool size, because holding time drives concurrency."
+        "result": "About 175 workers handle the peak at roughly 70% busy; bounding holding time (timeouts plus a fail-fast circuit breaker) matters as much as the pool size, because holding time drives concurrency."
       },
       "india": {
         "title": "A Tatkal-style booking rush",
@@ -117052,7 +117056,7 @@
         "initial": 50,
         "unit": "ms"
       },
-      "takeaway": "Busy threads = 2,000 × the holding time in seconds. The 200-thread pool fills at 100 ms, with no change in traffic at all; slow dependencies, not just traffic spikes, exhaust pools, so bound holding time with timeouts."
+      "takeaway": "Busy threads = 2,000 × the holding time in seconds. The 200-thread pool fills at 100 ms, with no change in traffic at all, and queues already bite from about 70 ms (140 threads, 70% busy). Slow dependencies, not just traffic spikes, exhaust pools, so bound holding time with timeouts."
     },
     "seeAlso": [
       {
@@ -117066,6 +117070,14 @@
       {
         "topicId": 36,
         "why": "Message queues need the same bound-and-drain thinking when consumers fall behind."
+      },
+      {
+        "topicId": 274,
+        "why": "Connection pools are sized with the same rate × holding-time rule."
+      },
+      {
+        "topicId": 356,
+        "why": "Load shedding and backpressure are what a bounded queue does when it is full."
       }
     ]
   },

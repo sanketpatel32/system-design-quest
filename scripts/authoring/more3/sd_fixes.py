@@ -63,6 +63,9 @@ TEXT = [
      'Keep the last 3–5 minutes for a short close: restate the design in two sentences; name the top two bottlenecks and what changes at 10× load; '
      'list the three signals you would alert on (for example error rate, p99 latency, queue lag); mention one simplification you made on purpose; '
      'and say what you would build or load-test first. A crisp close shows judgement and hands the interviewer easy follow-ups.'),
+    # reviewer: t15-a4's correct option was far longer than every distractor, a length giveaway
+    ('lessons-01-20.json', 'Each instance has its own copy, so a change must be invalidated in all 50',
+     'A change must be invalidated in all 50 copies'),
     # t115-a5: refresh the UPI anchor to the NPCI-reported August 2025 volume
     ('lessons-101-120.json', 'UPI handles about 15B transactions a month. Roughly what is the average per second?',
      'UPI crossed 20B transactions in a month in August 2025 (publicly reported by NPCI). Roughly what is the average per second?'),
