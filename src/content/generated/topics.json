@@ -118425,5 +118425,1263 @@
         "why": "The same safety ideas as a canary, applied to nodes instead of code"
       }
     ]
+  },
+  {
+    "id": 682,
+    "slug": "stateful-workloads-kubernetes",
+    "region": "f7-cloud",
+    "order": 17,
+    "title": "Stateful Workloads on Kubernetes: Volumes, StatefulSets and Operators",
+    "kind": "lesson",
+    "objectives": [
+      "Explain what a StatefulSet adds: stable names, a volume per pod and ordered rollouts",
+      "Predict how zonal block volumes and the volume binding mode constrain where pods run",
+      "Decide between running a database with an operator and using a managed database"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 14,
+    "prereqIds": [
+      322,
+      589
+    ],
+    "cards": [
+      {
+        "id": "t682-c1",
+        "kind": "text",
+        "title": "Claims, volumes and classes",
+        "body": "A pod asks for storage with a persistent volume claim: a size, an access mode and a storage class. The storage class names a provisioner, usually the cloud’s block or file storage driver, which creates a persistent volume and binds it to the claim. The volume outlives the pod, so a restarted or rescheduled pod mounts the same data. The class’s reclaim policy decides whether deleting the claim also deletes the disk (Delete) or keeps it for manual recovery (Retain).",
+        "teaches": [
+          "persistent-volumes"
+        ]
+      },
+      {
+        "id": "t682-c2",
+        "kind": "text",
+        "title": "What a StatefulSet adds",
+        "body": "A Deployment’s pods are interchangeable: random names, shared or no storage, replaced in any order. A StatefulSet gives each pod a stable ordinal name such as db-0, db-1 and db-2, a stable DNS name through a headless Service, and its own claim from a volume claim template, so db-1 always comes back with db-1’s disk. Rolling updates replace one pod at a time, from the highest ordinal down, waiting for each to be ready before moving on.",
+        "teaches": [
+          "statefulset-identity"
+        ]
+      },
+      {
+        "id": "t682-c3",
+        "kind": "text",
+        "title": "Misconception: a StatefulSet makes the database highly available",
+        "body": "A StatefulSet keeps identity and storage attached to each pod; it knows nothing about replication, leader election, failover or backups. If db-0 is the primary and its node dies, the StatefulSet recreates db-0 and reattaches its disk, which can take minutes, but promoting a replica in the meantime is the database’s job, or an operator’s. Three replicas only help if the database itself replicates between them.",
+        "teaches": [
+          "statefulset-identity",
+          "db-operators"
+        ]
+      },
+      {
+        "id": "t682-c4",
+        "kind": "diagram",
+        "title": "Where a zonal volume lets a pod run",
+        "body": "The disk lives in one zone, so the pod must too.",
+        "teaches": [
+          "zonal-volumes"
+        ],
+        "steps": [
+          "A pod with a claim is created; with delayed binding, no disk exists yet",
+          "The scheduler picks a node, taking the pod’s other constraints into account",
+          "The provisioner creates the disk in that node’s zone and binds it",
+          "Later the pod is rescheduled: only nodes in the disk’s zone qualify",
+          "If that zone has no capacity, the pod stays Pending",
+          "Recovery in another zone needs a snapshot restore or database replication"
+        ]
+      },
+      {
+        "id": "t682-c5",
+        "kind": "text",
+        "title": "Trap: binding the disk before the pod is placed",
+        "body": "With immediate binding, the disk is created as soon as the claim exists, in whichever zone the provisioner picks. The scheduler must then put the pod in that zone, even if the pod’s spread rules or the free capacity point elsewhere, and pods can stay Pending. Storage classes for zonal disks should use the WaitForFirstConsumer binding mode, so the disk is created in the zone of the node the pod was scheduled to.",
+        "teaches": [
+          "zonal-volumes"
+        ]
+      },
+      {
+        "id": "t682-c6",
+        "kind": "text",
+        "title": "Operators: running a database as code",
+        "body": "An operator is a controller plus custom resources that encode how to run one piece of software: create a primary and replicas, fail over, take backups, upgrade versions. You declare a cluster resource, and the operator reconciles towards it, much like a Deployment controller does for pods. A good operator makes self-run databases workable, but your team still owns its upgrades, its bugs and every 3 a.m. failover. A managed database moves that work to the provider.",
+        "teaches": [
+          "db-operators"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t682-a1",
+        "concept": "statefulset-identity",
+        "type": "multiple_choice",
+        "prompt": "Why run a three-node database cluster as a StatefulSet rather than a Deployment?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Each pod keeps a stable name and its own volume across restarts"
+          },
+          {
+            "id": "b",
+            "label": "A StatefulSet replicates the data between the three pods"
+          },
+          {
+            "id": "c",
+            "label": "A StatefulSet can only be scheduled on nodes with local disks"
+          },
+          {
+            "id": "d",
+            "label": "It promotes a replica to primary when the leader fails"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Stable identity and one volume per pod are what a StatefulSet provides. Replication and promotion are the database’s or an operator’s job, and StatefulSets work with any storage class, network disks included."
+      },
+      {
+        "id": "t682-a2",
+        "concept": "zonal-volumes",
+        "type": "multiple_choice",
+        "prompt": "A database pod’s node fails. The pod is recreated but stays Pending, although other zones have plenty of free nodes. Why?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The StatefulSet waits for an operator to approve the new pod"
+          },
+          {
+            "id": "b",
+            "label": "Its zonal disk can only attach to nodes in the original zone"
+          },
+          {
+            "id": "c",
+            "label": "The scheduler never reschedules a pod that owns a volume"
+          },
+          {
+            "id": "d",
+            "label": "The new pod must keep the same IP address as the old one"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "A block volume lives in one zone, so the pod can only run there, and that zone has no room. No approval is needed, pods with volumes are rescheduled normally within the volume’s zone, and pod IPs are allowed to change."
+      },
+      {
+        "id": "t682-a3",
+        "concept": "persistent-volumes",
+        "type": "multiple_choice",
+        "prompt": "A team deletes the claim for a test database, and the cloud disk disappears with it. Which setting caused that?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The claim’s access mode was ReadWriteOnce"
+          },
+          {
+            "id": "b",
+            "label": "The volume binding mode was WaitForFirstConsumer"
+          },
+          {
+            "id": "c",
+            "label": "The storage class reclaim policy was Delete"
+          },
+          {
+            "id": "d",
+            "label": "The StatefulSet was set to roll pods in order"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "With reclaim policy Delete, removing the claim deletes the volume and its disk; Retain would have kept it. Access mode controls how many nodes can mount it, binding mode controls when it is created, and pod ordering does not touch volumes."
+      },
+      {
+        "id": "t682-a4",
+        "concept": "db-operators",
+        "type": "multiple_choice",
+        "prompt": "A small team with no database specialists needs PostgreSQL for one service. What is usually the better choice?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A StatefulSet of three pods with the stock PostgreSQL image"
+          },
+          {
+            "id": "b",
+            "label": "A database operator in the cluster, managed by the team"
+          },
+          {
+            "id": "c",
+            "label": "One pod with a volume, and backups when someone remembers"
+          },
+          {
+            "id": "d",
+            "label": "The cloud provider’s managed PostgreSQL service"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "A managed service hands failover, patching and backups to the provider, which matters most for a team without specialists. A bare StatefulSet has no failover, an operator still leaves the team owning upgrades and incidents, and ad hoc backups are how data is lost."
+      },
+      {
+        "id": "t682-a5",
+        "concept": "statefulset-identity",
+        "type": "estimation",
+        "prompt": "A StatefulSet of 5 pods is updated one pod at a time. Each pod takes about 3 minutes to stop, start and become ready again. How long does the rollout take?",
+        "unit": "minutes",
+        "target": 15,
+        "assumptions": [
+          "Pods are replaced strictly one after another",
+          "No pod fails its readiness check"
+        ],
+        "formula": "5 pods × 3 minutes",
+        "workedAnswer": "5 × 3 = 15 minutes",
+        "explanation": "Sanity check: a Deployment with a surge could replace several pods at once, but a StatefulSet waits for each ordinal in turn, so slow-starting databases make long rollouts.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          3,
+          5
+        ]
+      },
+      {
+        "id": "t682-a6",
+        "concept": "zonal-volumes",
+        "type": "drag_order",
+        "prompt": "Order what happens when a pod with a WaitForFirstConsumer claim is first created.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "The provisioner creates a disk in that node’s zone"
+          },
+          {
+            "id": "s1",
+            "label": "The claim exists but has no volume yet"
+          },
+          {
+            "id": "s5",
+            "label": "The kubelet attaches and mounts the disk, and the pod starts"
+          },
+          {
+            "id": "s2",
+            "label": "The scheduler places the pod on a node"
+          },
+          {
+            "id": "s4",
+            "label": "The volume is bound to the claim"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Delayed binding lets scheduling pick the zone first, so the disk is created where the pod will run."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t682-f1",
+        "front": "StatefulSet gives?",
+        "back": "Stable ordinal names, stable DNS, one volume per pod, ordered one-at-a-time rollouts."
+      },
+      {
+        "id": "t682-f2",
+        "front": "WaitForFirstConsumer?",
+        "back": "Creates the disk only after the pod is scheduled, in that node’s zone."
+      },
+      {
+        "id": "t682-f3",
+        "front": "Reclaim policy Delete vs Retain?",
+        "back": "Delete removes the disk with the claim; Retain keeps it for manual recovery."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Kubernetes: StatefulSets",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
+      },
+      {
+        "title": "Kubernetes: Persistent Volumes",
+        "url": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+      },
+      {
+        "title": "Kubernetes: Storage Classes",
+        "url": "https://kubernetes.io/docs/concepts/storage/storage-classes/"
+      },
+      {
+        "title": "Kubernetes: Operator pattern",
+        "url": "https://kubernetes.io/docs/concepts/extend-kubernetes/operator/"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "persistent-volumes",
+        "statefulset-identity",
+        "zonal-volumes",
+        "db-operators"
+      ],
+      "mechanism": {
+        "title": "How state survives on a platform built for replaceable pods",
+        "steps": [
+          "Storage is requested, not configured on nodes. A persistent volume claim asks for a size and access mode from a storage class; the class’s provisioner creates a volume, usually a cloud block disk, and binds it one to one with the claim. ReadWriteOnce volumes attach to one node at a time, which suits databases; shared file storage offers ReadWriteMany at lower performance. Expansion, snapshots and encryption come from the driver and class settings.",
+          "StatefulSets add identity. Pods get ordinal names, a headless Service gives each a DNS name such as db-1.db, and a volume claim template creates one claim per ordinal. When db-1 is rescheduled it gets db-1’s claim back. Pods are created in order and, by default, updated in reverse order, one at a time, each waiting to be ready. By default the claims stay when the StatefulSet is scaled down or deleted, which protects data but leaves disks to clean up.",
+          "Block volumes are zonal. A pod using one can only run in the volume’s zone, so a zone outage or a full zone keeps it Pending. WaitForFirstConsumer binding creates the volume after scheduling, which keeps spread and capacity decisions with the scheduler. Surviving a zone loss therefore needs replication at the database level across pods in different zones, or restoring a snapshot into another zone, which costs time and recent writes.",
+          "The database still has to be operated: replication, leader election, failover, backups, version and schema upgrades, and connection routing to the current primary. Operators package that knowledge as a controller with custom resources, and the mature ones handle failover and backups well. They also add a component to upgrade and debug, and a failure mode where the operator itself is broken during an incident.",
+          "Managed database services take on failover, patching, backups and storage scaling, with documented recovery behaviour, in exchange for less control and a higher unit price. For most teams the sensible default is a managed database, with Kubernetes running the stateless tiers; self-running on Kubernetes makes sense when a team has the skills, needs an engine or version the provider lacks, or must run the same stack everywhere."
+        ]
+      },
+      "useWhen": [
+        "Stateful software that needs stable identity and its own disk, with a mature operator.",
+        "Platforms that must run the same database stack on several clouds or on premises."
+      ],
+      "avoidWhen": [
+        "Avoid self-running critical databases without the skills to own failover and upgrades.",
+        "Avoid assuming a StatefulSet replicates data or survives a zone loss on its own."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Option",
+          "You own",
+          "Zone loss"
+        ],
+        "rows": [
+          [
+            "StatefulSet, no operator",
+            "Everything, by hand",
+            "Pods wait for the zone; no failover"
+          ],
+          [
+            "StatefulSet with an operator",
+            "The operator and its upgrades",
+            "Operator promotes a replica in another zone"
+          ],
+          [
+            "Managed database service",
+            "Schema, queries, sizing",
+            "Provider fails over to a standby"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Time to recover a primary in a failed zone",
+        "assumptions": [
+          "Primary in zone A on a zonal disk; replicas in B and C",
+          "Zone A is down for 2 hours",
+          "Illustrative timings"
+        ],
+        "steps": [
+          "Without failover: the primary waits for zone A, so writes stop for about 120 minutes.",
+          "Operator or managed failover: detect in about 1 minute, promote a replica in about 1 minute, reconnect clients in about 1 minute.",
+          "Writes resume after about 3 minutes, losing at most the replication lag if replication was asynchronous."
+        ],
+        "result": "A StatefulSet alone ties recovery to the zone; replication plus automated failover turns a two-hour outage into minutes."
+      },
+      "india": {
+        "title": "Storage and StatefulSets in the docs",
+        "label": "Official documentation",
+        "body": "The Kubernetes documentation describes StatefulSets as giving pods sticky identities and stable storage, updating them in reverse ordinal order by default, and keeping their claims when pods are deleted or scaled down. The storage class page documents reclaim policies and recommends WaitForFirstConsumer for topology-constrained volumes, so the volume is provisioned according to the pod’s scheduling constraints. The operator pattern page explains operators as controllers with custom resources."
+      },
+      "pitfalls": [
+        {
+          "trap": "“It runs as a StatefulSet, so the database is highly available.”",
+          "say": "“I’d check what replicates the data and who promotes a replica; the StatefulSet only keeps identity and disks.”"
+        },
+        {
+          "trap": "“Our database pod can move to any zone if one fails.”",
+          "say": "“I’d check the disk: a zonal volume pins the pod, so we need replication across zones.”"
+        }
+      ],
+      "takeaways": [
+        "Claims request storage; the class decides the provisioner, binding mode and reclaim policy.",
+        "StatefulSets give stable names and one disk per pod, not replication.",
+        "Zonal disks pin pods to a zone; use WaitForFirstConsumer and replicate across zones.",
+        "Default to a managed database unless you can own an operator and its failovers."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Scaling a StatefulSet down and up",
+      "prompt": "A StatefulSet of 4 pods, db-0 to db-3, is scaled down to 2 and, a week later, back up to 4. The claims use the default retention settings.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "db-2 and db-3 come back with their old disks and last week’s data",
+          "feedback": "Right: by default the claims stay when you scale down, and the same ordinals reattach them."
+        },
+        {
+          "id": "b",
+          "label": "db-2 and db-3 get new, empty disks, because their claims were deleted",
+          "feedback": "That needs a retention policy that deletes claims on scale-down, which is not the default."
+        },
+        {
+          "id": "c",
+          "label": "The scale-up fails until the old claims are deleted by hand",
+          "feedback": "The old claims are reused, not in the way."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Stale replicas rejoin with week-old data, so the database must resync them; delete or reset the claims on purpose if you want fresh replicas."
+    },
+    "seeAlso": [
+      {
+        "topicId": 322,
+        "why": "Pods and controllers, the stateless half of the platform"
+      },
+      {
+        "topicId": 589,
+        "why": "Scheduling rules that decide which zone a volume ends up in"
+      },
+      {
+        "topicId": 330,
+        "why": "Backups and restores that still matter when volumes persist"
+      }
+    ]
+  },
+  {
+    "id": 683,
+    "slug": "connecting-networks-peering-private-endpoints",
+    "region": "f7-cloud",
+    "order": 19,
+    "title": "Connecting Networks: Peering, Transit Hubs, Private Endpoints and Hybrid Links",
+    "kind": "lesson",
+    "objectives": [
+      "Explain why peering is not transitive and why address ranges must not overlap",
+      "Choose between a peering mesh and a transit hub as the number of networks grows",
+      "Reach managed services through private endpoints, and pick VPN or a dedicated link to on-premises"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 14,
+    "prereqIds": [
+      329
+    ],
+    "cards": [
+      {
+        "id": "t683-c1",
+        "kind": "text",
+        "title": "Peering joins two networks, and only two",
+        "body": "Peering connects two virtual networks so their private addresses can reach each other over the provider’s backbone, with no gateway in the path. It has two rules that shape every design. Ranges must not overlap, because a route cannot point to the same addresses in two places. And peering is not transitive: if A peers with B and B with C, A still cannot reach C through B. Each pair that must talk needs its own peering.",
+        "teaches": [
+          "vpc-peering"
+        ]
+      },
+      {
+        "id": "t683-c2",
+        "kind": "text",
+        "title": "Worked example: ten networks",
+        "body": "Ten networks that all need to reach each other need a peering for every pair: 10 × 9 = 90 ordered pairs, halved to 45 peerings, each with route table entries on both sides. Add an eleventh network and that is 10 more. A transit hub, a managed router that networks attach to, needs 10 attachments and one place for route tables, inspection and logging, at the cost of an extra hop and a per-gigabyte processing charge.",
+        "teaches": [
+          "transit-hub"
+        ]
+      },
+      {
+        "id": "t683-c3",
+        "kind": "diagram",
+        "title": "Private access to a managed service",
+        "body": "The service appears as an address inside your own network.",
+        "teaches": [
+          "private-endpoints"
+        ],
+        "steps": [
+          "The provider’s service, or a partner’s, publishes an endpoint service",
+          "You create a private endpoint in your subnet; it gets a private IP",
+          "Private DNS maps the service hostname to that private IP",
+          "Your app calls the usual hostname and the traffic stays on the provider network",
+          "No NAT gateway, internet gateway or public IP is involved",
+          "Policies on the endpoint can limit which resources it reaches"
+        ]
+      },
+      {
+        "id": "t683-c4",
+        "kind": "text",
+        "title": "Private endpoints for managed services",
+        "body": "Managed services such as object storage, queues and databases have public endpoints by default, so private servers reach them through a NAT gateway and pay its processing charge. A private endpoint puts the service on a private IP in your own network, so traffic never touches the internet path and the service can be locked to accept calls only through that endpoint. Names are the usual catch: private DNS must resolve the service hostname to the endpoint, or clients silently keep using the public path.",
+        "teaches": [
+          "private-endpoints"
+        ]
+      },
+      {
+        "id": "t683-c5",
+        "kind": "text",
+        "title": "Reaching on-premises: VPN or a dedicated link",
+        "body": "A site-to-site VPN runs encrypted tunnels over the internet. It is quick to set up and cheap, but throughput per tunnel is limited to a few gigabits per second at most, and latency varies with the internet path. A dedicated interconnect is a private circuit from your data centre or a colocation site into the provider, with steady latency and 10 or 100 gigabit ports, but it takes weeks to order. Many teams run a VPN as the backup path for the dedicated link.",
+        "teaches": [
+          "hybrid-connectivity"
+        ]
+      },
+      {
+        "id": "t683-c6",
+        "kind": "text",
+        "title": "Trap: every team picked 10.0.0.0/16",
+        "body": "Each team created its network with the console’s default range. Two years later they need to connect, and every network overlaps with every other, so peering and routing are impossible without renumbering or address translation. Plan address space centrally from the start: one non-overlapping block per network, room for growth, and on-premises ranges excluded.",
+        "teaches": [
+          "vpc-peering"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t683-a1",
+        "concept": "vpc-peering",
+        "type": "multiple_choice",
+        "prompt": "Network A peers with B, and B peers with C. Can a server in A reach a server in C?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Yes, traffic is forwarded through B’s routing table"
+          },
+          {
+            "id": "b",
+            "label": "Only if B runs a NAT gateway for the other two networks"
+          },
+          {
+            "id": "c",
+            "label": "Yes, as long as the three address ranges do not overlap"
+          },
+          {
+            "id": "d",
+            "label": "No; A and C need a peering of their own, or a shared hub"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "Peering is not transitive, so A to C needs its own peering or a transit hub. B’s routes do not forward peered traffic, a NAT gateway in B does not route peered traffic, and non-overlapping ranges are necessary but not sufficient."
+      },
+      {
+        "id": "t683-a2",
+        "concept": "vpc-peering",
+        "type": "multiple_choice",
+        "prompt": "Two teams’ networks both use 10.0.0.0/16, and now they must connect. What is the core problem?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Peering requires both networks to be in the same region"
+          },
+          {
+            "id": "b",
+            "label": "Routes cannot send the same addresses to two places"
+          },
+          {
+            "id": "c",
+            "label": "The networks need the same security group names first"
+          },
+          {
+            "id": "d",
+            "label": "Peering only works between networks in one account"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Overlapping ranges make routing ambiguous, so peering is refused; renumbering or translation is required. Cross-region and cross-account peering are both widely supported, and security group names have nothing to do with routing."
+      },
+      {
+        "id": "t683-a3",
+        "concept": "private-endpoints",
+        "type": "multiple_choice",
+        "prompt": "Private servers upload terabytes to the provider’s object storage through a NAT gateway, and the NAT bill is large. What fixes it?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A private endpoint for object storage inside the network"
+          },
+          {
+            "id": "b",
+            "label": "A bigger NAT gateway so the traffic costs less per gigabyte"
+          },
+          {
+            "id": "c",
+            "label": "Public IPs on the servers so they can skip the NAT gateway"
+          },
+          {
+            "id": "d",
+            "label": "A VPN tunnel between the network and the storage service"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "A private endpoint keeps the traffic on a private path, so it no longer goes through the NAT gateway. NAT pricing is per gigabyte whatever the size, public IPs expose the servers, and a VPN is for connecting networks, not for reaching a provider service."
+      },
+      {
+        "id": "t683-a4",
+        "concept": "hybrid-connectivity",
+        "type": "multiple_choice",
+        "prompt": "A factory must send a steady 8 Gbps to the cloud with predictable latency, for years. Which link fits?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A single site-to-site VPN tunnel over the internet"
+          },
+          {
+            "id": "b",
+            "label": "Peering between the factory network and the cloud network"
+          },
+          {
+            "id": "c",
+            "label": "A dedicated interconnect, with a VPN as the backup path"
+          },
+          {
+            "id": "d",
+            "label": "Public endpoints with TLS from the factory over the internet"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Steady high throughput and predictable latency are what a dedicated circuit offers, and a VPN behind it covers circuit failures. One VPN tunnel tops out at a few gigabits with variable latency, peering connects cloud networks rather than sites, and the public internet gives no latency promise."
+      },
+      {
+        "id": "t683-a5",
+        "concept": "transit-hub",
+        "type": "estimation",
+        "prompt": "Twelve networks must all reach each other. How many peerings does a full mesh need?",
+        "unit": "peerings",
+        "target": 66,
+        "assumptions": [
+          "Every pair needs exactly one peering",
+          "No network is reached through another"
+        ],
+        "formula": "n × (n − 1) ÷ 2 with n = 12",
+        "workedAnswer": "12 × 11 = 132, halved is 66 peerings",
+        "explanation": "Design implication: a transit hub would need 12 attachments instead of 66 peerings, and each new network adds one attachment rather than 12 more peerings.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          12,
+          132
+        ]
+      },
+      {
+        "id": "t683-a6",
+        "concept": "transit-hub",
+        "type": "tradeoff",
+        "prompt": "A company runs 15 networks across teams, plus a data-centre link, and adds a few networks each quarter.",
+        "constraints": [
+          "Security wants one place to inspect traffic between networks",
+          "Network changes must not need edits in every network",
+          "A small extra hop is acceptable"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "Peer every pair of networks directly",
+            "description": "Full mesh"
+          },
+          {
+            "id": "p2",
+            "label": "Attach every network and the data-centre link to a transit hub",
+            "description": "Transit hub"
+          },
+          {
+            "id": "p3",
+            "label": "Merge all teams into one large shared network",
+            "description": "One network"
+          }
+        ],
+        "correctApproachId": "p2",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "New networks need one attachment, not a peering to each other network"
+          },
+          {
+            "id": "r3",
+            "label": "A mesh is cheaper at any size because it has no processing charge"
+          },
+          {
+            "id": "r2",
+            "label": "Routing, inspection and the on-premises link sit in one place"
+          },
+          {
+            "id": "r4",
+            "label": "One shared network removes the need for any access control"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3",
+          "r4"
+        ],
+        "rationaleConflicts": {
+          "r3": "Peering avoids the hub’s charge, but 105 peerings and their routes cost far more in operations, and give no central inspection point.",
+          "r4": "A single network still needs segmentation, and merges every team’s blast radius into one."
+        },
+        "explanation": "At this size a hub keeps routing and inspection central and makes each new network one attachment; a full mesh would already need 105 peerings."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t683-f1",
+        "front": "Two rules of peering?",
+        "back": "Ranges must not overlap, and peering is not transitive."
+      },
+      {
+        "id": "t683-f2",
+        "front": "Full mesh of n networks?",
+        "back": "n × (n − 1) ÷ 2 peerings; a hub needs n attachments."
+      },
+      {
+        "id": "t683-f3",
+        "front": "Private endpoint catch?",
+        "back": "Private DNS must resolve the service name to the endpoint, or traffic stays on the public path."
+      }
+    ],
+    "sources": [
+      {
+        "title": "AWS: What is VPC peering?",
+        "url": "https://docs.aws.amazon.com/vpc/latest/peering/what-is-vpc-peering.html"
+      },
+      {
+        "title": "AWS: What is a transit gateway?",
+        "url": "https://docs.aws.amazon.com/vpc/latest/tgw/what-is-transit-gateway.html"
+      },
+      {
+        "title": "Google Cloud: Private Service Connect",
+        "url": "https://cloud.google.com/vpc/docs/private-service-connect"
+      },
+      {
+        "title": "Microsoft Learn: What is Azure Private Link?",
+        "url": "https://learn.microsoft.com/en-us/azure/private-link/private-link-overview"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "vpc-peering",
+        "transit-hub",
+        "private-endpoints",
+        "hybrid-connectivity"
+      ],
+      "mechanism": {
+        "title": "How cloud networks are joined to each other and to the rest of the world",
+        "steps": [
+          "Start with address planning. Every network that may ever connect to another, including on-premises ranges and partner networks, needs a range that overlaps with none of them. A central plan that hands out blocks per account and region, with room to grow, avoids the most expensive networking mistake, which is discovering overlaps when two networks must finally talk.",
+          "Peering links two networks directly over the provider backbone. Traffic stays private, there is no extra hop, and peered traffic is billed at internal transfer rates, often free within one zone. Peering is not transitive, so it suits a few networks or a few specific pairs. Each side still controls access with security rules, and route tables on both sides must point the peer’s range at the peering.",
+          "A transit hub, offered by each major provider under its own name, is a managed router: networks, VPNs and dedicated links attach to it, and its route tables decide who can reach whom. It scales linearly with the number of networks, gives one place to put inspection firewalls and flow logs, and can separate environments with different route tables. It adds an extra hop and a per-gigabyte processing charge.",
+          "Private endpoints bring a managed or partner service into your network as a private IP. Calls to object storage, queues, secrets or a SaaS vendor stay on the provider network, skip the NAT gateway and its charges, and the service can refuse anything that does not arrive through the endpoint. Private DNS zones make the normal hostname resolve to the endpoint, which is the step most often missed.",
+          "Hybrid links connect sites. A site-to-site VPN uses IPsec tunnels over the internet, is ready in minutes and suits modest or backup traffic. A dedicated interconnect is a physical circuit at 10 or 100 gigabits per second with stable latency, ordered through the provider or a partner at a colocation site. Routes are exchanged dynamically with BGP, and production designs use two circuits in different locations, or a circuit plus a VPN, so one failure does not cut the site off."
+        ]
+      },
+      "useWhen": [
+        "Organisations with several accounts, environments or teams that need controlled private connectivity.",
+        "Workloads that move a lot of data to managed services or to on-premises systems."
+      ],
+      "avoidWhen": [
+        "Avoid full peering meshes beyond a handful of networks.",
+        "Avoid default address ranges for any network that may ever connect to another."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Option",
+          "Scales to",
+          "Cost"
+        ],
+        "rows": [
+          [
+            "Peering",
+            "A few networks or pairs",
+            "No hop; routes on both sides"
+          ],
+          [
+            "Transit hub",
+            "Hundreds of networks",
+            "Extra hop and per-GB processing"
+          ],
+          [
+            "Private endpoint",
+            "Many services per network",
+            "Hourly and per-GB endpoint charges"
+          ],
+          [
+            "VPN or interconnect",
+            "Sites to cloud",
+            "VPN: limited; circuit: weeks to order"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Mesh vs hub as networks grow",
+        "assumptions": [
+          "15 networks today, 25 within two years",
+          "Every network must reach every other",
+          "Counts only; prices vary by provider"
+        ],
+        "steps": [
+          "Mesh today: 15 × 14 = 210, halved is 105 peerings.",
+          "Mesh at 25: 25 × 24 = 600, halved is 300 peerings.",
+          "Hub: 15 attachments today and 25 later, one per network."
+        ],
+        "result": "A mesh grows with the square of the network count while a hub grows linearly, which is why most organisations switch to a hub before about ten networks."
+      },
+      "india": {
+        "title": "Peering and private access in provider docs",
+        "label": "Official documentation",
+        "body": "AWS documents that VPC peering connections do not support transitive peering and cannot connect networks with overlapping ranges, and describes a transit gateway as a regional hub connecting networks and on-premises links. Google Cloud’s Private Service Connect and Azure Private Link both expose services on private IP addresses inside a consumer network, so traffic does not traverse the public internet."
+      },
+      "pitfalls": [
+        {
+          "trap": "“B is peered with both, so A can reach C through it.”",
+          "say": "“I’d add an A–C peering or a hub; peering is not transitive.”"
+        },
+        {
+          "trap": "“We’ll pick address ranges when we need to connect.”",
+          "say": "“I’d plan non-overlapping ranges now; renumbering later is far more expensive.”"
+        }
+      ],
+      "takeaways": [
+        "Peering is not transitive, and ranges must never overlap; plan addresses centrally.",
+        "A mesh needs n × (n − 1) ÷ 2 peerings; a hub needs n attachments.",
+        "Private endpoints keep service traffic off NAT and the internet; fix private DNS.",
+        "VPN for quick or backup links; dedicated interconnect for steady, high throughput."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The private endpoint nobody used",
+      "prompt": "A team creates a private endpoint for the storage service, but the NAT gateway bill does not change. The servers still call storage.example-cloud.com.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The hostname still resolves to the public address, so traffic still goes through NAT",
+          "feedback": "Right: without private DNS for the service name, clients never learn the endpoint’s private IP."
+        },
+        {
+          "id": "b",
+          "label": "Private endpoints only take effect after the servers are rebooted",
+          "feedback": "Nothing on the servers needs a restart; name resolution decides the path."
+        },
+        {
+          "id": "c",
+          "label": "The storage service blocks endpoints until the bucket is made public",
+          "feedback": "Endpoints are for private access; making the bucket public is the opposite of the goal."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Attach a private DNS zone so the service hostname resolves to the endpoint, then confirm with a lookup from a server and watch NAT traffic fall."
+    },
+    "seeAlso": [
+      {
+        "topicId": 329,
+        "why": "The single network, subnets and NAT gateway this lesson connects together"
+      },
+      {
+        "topicId": 243,
+        "why": "CIDR ranges, which must not overlap between networks"
+      },
+      {
+        "topicId": 584,
+        "why": "Data transfer and NAT charges that private paths reduce"
+      }
+    ]
+  },
+  {
+    "id": 684,
+    "slug": "cloud-quotas-and-limits",
+    "region": "f7-cloud",
+    "order": 20,
+    "title": "Cloud Quotas and Limits: The Capacity You Do Not Own",
+    "kind": "lesson",
+    "objectives": [
+      "Tell adjustable quotas from hard limits, and find the ones a design depends on",
+      "Handle API throttling with backoff, jitter and lower concurrency",
+      "Plan quota headroom for scaling events, failover regions and IP address space"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [
+      328,
+      329
+    ],
+    "cards": [
+      {
+        "id": "t684-c1",
+        "kind": "text",
+        "title": "Two kinds of ceiling",
+        "body": "Every cloud account has ceilings per region: how many vCPUs of each instance family, load balancers, addresses, function concurrency, API calls per second. Most are adjustable quotas, set low by default to protect new accounts and the provider, and raised on request, sometimes within minutes and sometimes after days of review. Some are hard limits fixed by the service’s design, such as a maximum object size or rules per security group, and those must shape the design itself.",
+        "teaches": [
+          "service-quotas"
+        ]
+      },
+      {
+        "id": "t684-c2",
+        "kind": "text",
+        "title": "Throttling is a quota on API calls",
+        "body": "Control-plane APIs, the ones that create instances, update DNS or read secrets, are rate limited per account, often with a token bucket that allows short bursts. Exceed it and calls fail with a throttling error. A deploy tool firing 300 parallel calls, or every pod reading a secret at start-up, can trip it. Retry with exponential backoff and jitter, lower the concurrency, and cache what you read, rather than retrying immediately and making it worse.",
+        "teaches": [
+          "api-throttling"
+        ]
+      },
+      {
+        "id": "t684-c3",
+        "kind": "diagram",
+        "title": "Finding the limits before an incident does",
+        "body": "Quota work is part of capacity planning.",
+        "teaches": [
+          "quota-headroom"
+        ],
+        "steps": [
+          "List the resources a scale-up or failover would create",
+          "Look up the quota for each in every region you might use",
+          "Compare the peak or failover need with the quota",
+          "Request increases ahead of time, and record them as code where possible",
+          "Alert when usage passes about 80% of any quota",
+          "Re-check after every architecture change or new region"
+        ]
+      },
+      {
+        "id": "t684-c4",
+        "kind": "text",
+        "title": "Worked example: pods that eat subnet addresses",
+        "body": "Some Kubernetes network plugins give every pod an address from the cloud subnet. A /22 subnet holds 1,024 addresses, and the provider reserves a few, here 5, leaving 1,019. If each node uses 1 address for itself and 30 for pods, that is 31 per node, so the subnet fits 1,019 ÷ 31 ≈ 32 nodes. An autoscaler that wants node 33 fails with an address error, even though the vCPU quota has plenty of room.",
+        "teaches": [
+          "ip-exhaustion"
+        ]
+      },
+      {
+        "id": "t684-c5",
+        "kind": "text",
+        "title": "Trap: the failover region with default quotas",
+        "body": "The disaster recovery plan says to start 200 instances in the second region. That region has never run more than 10, so its quota is still at the default, and the failover stops at the first quota error during the worst hour of the year. Failover regions need the same quotas as production, tested by actually launching at scale in a game day, not by reading the plan.",
+        "teaches": [
+          "quota-headroom"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t684-a1",
+        "concept": "service-quotas",
+        "type": "multiple_choice",
+        "prompt": "Which is usually an adjustable quota rather than a hard limit of the service?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The maximum size of one object in object storage"
+          },
+          {
+            "id": "b",
+            "label": "The number of vCPUs an account may run in a region"
+          },
+          {
+            "id": "c",
+            "label": "The maximum length of a function’s single run"
+          },
+          {
+            "id": "d",
+            "label": "The maximum number of rules in one security group"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "Regional vCPU quotas exist to protect accounts and the provider, and are raised on request. Object size, maximum run time and rules per group come from how each service is built and are fixed, or adjustable only within narrow bounds."
+      },
+      {
+        "id": "t684-a2",
+        "concept": "api-throttling",
+        "type": "multiple_choice",
+        "prompt": "A deploy script makes 300 parallel calls to the cloud API and many fail with throttling errors. What is the right fix?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Retry each failed call immediately until it succeeds"
+          },
+          {
+            "id": "b",
+            "label": "Run the script from several machines to spread the calls"
+          },
+          {
+            "id": "c",
+            "label": "Back off exponentially with jitter and lower the concurrency"
+          },
+          {
+            "id": "d",
+            "label": "Switch the script to a different region’s API endpoint"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Backoff with jitter spreads retries out, and lower concurrency stays under the rate limit. Immediate retries add load to an exhausted bucket, the limit is per account so more machines do not help, and another region’s endpoint manages different resources."
+      },
+      {
+        "id": "t684-a3",
+        "concept": "quota-headroom",
+        "type": "multiple_choice",
+        "prompt": "During a regional outage, the failover to the second region stops after 10 instances with a quota error. What should have been done?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Raise the second region’s quotas to the failover need, and test it"
+          },
+          {
+            "id": "b",
+            "label": "Use larger instances in the failover region to need fewer of them"
+          },
+          {
+            "id": "c",
+            "label": "Keep the failover runbook short so it starts sooner"
+          },
+          {
+            "id": "d",
+            "label": "Request the quota increase as the first step of the failover"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Quotas must already match the failover need, proven by a real test launch. Larger instances still count against the vCPU quota, a shorter runbook does not change the ceiling, and an increase requested mid-outage may take longer than the outage."
+      },
+      {
+        "id": "t684-a4",
+        "concept": "ip-exhaustion",
+        "type": "multiple_choice",
+        "prompt": "The node autoscaler fails with “insufficient free addresses in subnet” while the vCPU quota is only half used. What is happening?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The provider has run out of capacity for that instance type"
+          },
+          {
+            "id": "b",
+            "label": "The cluster has hit its maximum number of nodes"
+          },
+          {
+            "id": "c",
+            "label": "The subnet’s security group rules limit the number of nodes"
+          },
+          {
+            "id": "d",
+            "label": "Pods and nodes have used up the subnet’s address range"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "When pods take subnet addresses, the range runs out before compute does. A capacity shortage gives a different error, a node maximum is not about addresses, and security group rules do not consume or limit addresses."
+      },
+      {
+        "id": "t684-a5",
+        "concept": "ip-exhaustion",
+        "type": "estimation",
+        "prompt": "A /22 subnet has 1,024 addresses, and the provider reserves 5. Each node needs 1 address plus 30 for its pods. How many nodes fit?",
+        "unit": "nodes",
+        "target": 32,
+        "assumptions": [
+          "Every pod gets a subnet address",
+          "Nothing else uses the subnet"
+        ],
+        "formula": "(1,024 − 5) ÷ 31, rounded down",
+        "workedAnswer": "1,019 ÷ 31 ≈ 32.9, so 32 nodes",
+        "explanation": "Design implication: a /24 would hold only 8 such nodes, so size pod subnets for the largest cluster you expect, or use a plugin mode that gives pods addresses from a separate range.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          8,
+          1019
+        ]
+      },
+      {
+        "id": "t684-a6",
+        "concept": "quota-headroom",
+        "type": "drag_order",
+        "prompt": "Order the steps to make a planned launch-day scale-up safe from quota errors.",
+        "items": [
+          {
+            "id": "s4",
+            "label": "Request increases well before the event"
+          },
+          {
+            "id": "s2",
+            "label": "Look up the quota for each in each region"
+          },
+          {
+            "id": "s5",
+            "label": "Test by launching at the planned scale"
+          },
+          {
+            "id": "s1",
+            "label": "List every resource the scale-up will create"
+          },
+          {
+            "id": "s3",
+            "label": "Compare the peak need with each quota"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Inventory, look up, compare, raise early, then prove it with a real launch."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t684-f1",
+        "front": "Quota vs hard limit?",
+        "back": "A quota is a default ceiling you can raise; a hard limit is part of the service design."
+      },
+      {
+        "id": "t684-f2",
+        "front": "Fix for API throttling?",
+        "back": "Exponential backoff with jitter, lower concurrency, and caching reads."
+      },
+      {
+        "id": "t684-f3",
+        "front": "Failover region quotas?",
+        "back": "Raise them to match production ahead of time, and prove it with a launch test."
+      }
+    ],
+    "sources": [
+      {
+        "title": "AWS: What is Service Quotas?",
+        "url": "https://docs.aws.amazon.com/servicequotas/latest/userguide/intro.html"
+      },
+      {
+        "title": "Google Cloud: Quotas and limits",
+        "url": "https://cloud.google.com/docs/quotas/overview"
+      },
+      {
+        "title": "Microsoft Learn: Azure subscription and service limits, quotas and constraints",
+        "url": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/azure-subscription-service-limits"
+      },
+      {
+        "title": "AWS: IP addressing for your VPCs and subnets",
+        "url": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-ip-addressing.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "service-quotas",
+        "api-throttling",
+        "quota-headroom",
+        "ip-exhaustion"
+      ],
+      "mechanism": {
+        "title": "How quotas shape capacity planning",
+        "steps": [
+          "The cloud looks unlimited, but each account has ceilings per region and per resource. Quotas cover running vCPUs by instance family, GPUs, addresses, load balancers, managed database instances, function concurrency, storage volumes and more. They start at conservative defaults and are raised through a request, which may be approved automatically or sent for review, especially for scarce resources such as GPUs.",
+          "Hard limits are different: they come from how a service is built, such as the largest object or message, the longest function run, or the most rules in one security group, and requests do not move them, or only within narrow bounds. A design that needs more than a hard limit must change, for example by splitting objects, chaining functions or using more groups. Read the limits pages for every service a design depends on before building on it.",
+          "Control-plane APIs are rate limited too, per account and often per action, using token buckets that refill at a steady rate and allow bursts. Throttling errors appear during deploys, large autoscaling events and start-up storms, when hundreds of instances or pods call the same API at once. Clients should retry with exponential backoff and jitter, cap their own concurrency and cache results; the provider SDKs do some of this by default, and custom tooling must do it too.",
+          "Addresses are a quiet quota. Subnets have fixed sizes, providers reserve a few addresses in each, and some network plugins give every pod a subnet address. Load balancers, endpoints and managed services also take addresses in your subnets. Size subnets for peak node and pod counts with growth, keep spare ranges in the plan, and watch free addresses per subnet as a metric like any other capacity.",
+          "Treat quotas as part of capacity planning. For each scaling event and failover plan, list the resources it creates, compare with the quotas in every region involved, raise them in advance, and alert at around 80% of each. Some providers let quota requests be managed through infrastructure as code or organisation templates, so new accounts start with the right ceilings. Prove failover quotas with a launch test, because a quota error in the middle of an incident has no quick fix."
+        ]
+      },
+      "useWhen": [
+        "Before launches, sales events, new regions and any disaster recovery test.",
+        "Accounts where autoscaling or failover may create many resources quickly."
+      ],
+      "avoidWhen": [
+        "Avoid treating default quotas as capacity; they are a starting point.",
+        "Avoid immediate, unbounded retries against throttled control-plane APIs."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Ceiling",
+          "Example",
+          "Response"
+        ],
+        "rows": [
+          [
+            "Adjustable quota",
+            "vCPUs per region",
+            "Raise ahead of need, alert at 80%"
+          ],
+          [
+            "Hard limit",
+            "Max object or run time",
+            "Change the design"
+          ],
+          [
+            "API rate limit",
+            "Calls per second",
+            "Backoff, jitter, lower concurrency"
+          ],
+          [
+            "Address space",
+            "Free IPs in a subnet",
+            "Size subnets for peak, add ranges"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Quota needed for a failover",
+        "assumptions": [
+          "Production peak: 120 instances of 8 vCPUs",
+          "Failover region default quota: 256 vCPUs",
+          "Illustrative sizes"
+        ],
+        "steps": [
+          "Failover need: 120 × 8 = 960 vCPUs.",
+          "Default quota covers 256 ÷ 8 = 32 instances, about a quarter of the need.",
+          "Raise the quota to about 1,200 vCPUs, the need plus 25% headroom, before the plan is relied on."
+        ],
+        "result": "A failover plan without matching quotas tops out at a fraction of the load it is meant to carry."
+      },
+      "india": {
+        "title": "Quotas in provider documentation",
+        "label": "Official documentation",
+        "body": "AWS Service Quotas, Google Cloud’s quotas documentation and Azure’s subscription and service limits page all distinguish adjustable quotas from fixed limits and describe how to view usage and request increases per region. AWS documents that five addresses in each subnet are reserved, which is why a /24 offers 251 usable addresses rather than 256, a detail that matters when pods draw from subnet ranges."
+      },
+      "pitfalls": [
+        {
+          "trap": "“It’s the cloud, we can scale to whatever we need.”",
+          "say": "“I’d check the quotas in every region the plan uses and raise them before the event.”"
+        },
+        {
+          "trap": "“The deploy failed with throttling, so I added retries.”",
+          "say": "“I’d add exponential backoff with jitter and lower the concurrency, or the retries make it worse.”"
+        }
+      ],
+      "takeaways": [
+        "Quotas are adjustable defaults; hard limits must shape the design.",
+        "Throttling needs backoff with jitter and lower concurrency, not instant retries.",
+        "Failover regions need production-sized quotas, proven by a launch test.",
+        "Subnet addresses are a quota too; size them for peak nodes and pods."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The sale that hit a wall at 40",
+      "prompt": "For a flash sale you set the autoscaler maximum to 120 instances of 8 vCPUs. The region’s vCPU quota for that family is 320. Traffic arrives.",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Scaling stops at 40 instances with quota errors, far below the maximum",
+          "feedback": "Right: 320 ÷ 8 = 40 instances; the autoscaler maximum cannot exceed the account quota."
+        },
+        {
+          "id": "b",
+          "label": "The autoscaler reaches 120 instances because its own maximum wins",
+          "feedback": "The autoscaler can only request; the provider refuses launches above the quota."
+        },
+        {
+          "id": "c",
+          "label": "The provider raises the quota automatically to match the autoscaler",
+          "feedback": "Increases go through a quota request, which may need review; the autoscaler does not raise them."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Compare the autoscaler maximum with the quota for each region and family, request the increase days ahead, and alert at 80% of the quota."
+    },
+    "seeAlso": [
+      {
+        "topicId": 328,
+        "why": "Autoscaling, whose maximum is bounded by quotas"
+      },
+      {
+        "topicId": 243,
+        "why": "Subnet sizes that decide how many addresses exist"
+      },
+      {
+        "topicId": 581,
+        "why": "Zone and region capacity plans that quotas must match"
+      }
+    ]
   }
 ]

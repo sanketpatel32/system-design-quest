@@ -933,6 +933,23 @@ Control plane|upgraded first {svc} > Cordon old node {svc} > Evict pod {svc}
 Evict pod {svc} [budget allows]> Recreated on new node {svc}
 Evict pod {svc} [budget refuses]?> Retry later
 
+@682 A StatefulSet with zonal disks: each ordinal pod keeps its own claim and disk in one zone, and the database replicates between pods in different zones.
+StatefulSet|db {svc} > db-0|zone A {svc} > Disk db-0|zone A {store}
+StatefulSet|db {svc} > db-1|zone B {svc} > Disk db-1|zone B {store}
+db-0|zone A {svc} [database replication]~> db-1|zone B {svc}
+Operator or managed service {svc} [promote on failure]?> db-1|zone B {svc}
+
+@683 Joining networks: spoke networks and the data-centre link attach to a transit hub, and a private endpoint brings a managed service into a network on a private IP.
+Network A {svc} > Transit hub|route tables {svc}
+Network B {svc} > Transit hub|route tables {svc}
+Data centre {ext} [VPN or interconnect]> Transit hub|route tables {svc}
+Network A {svc} [private DNS]> Private endpoint|10.1.2.15 {svc} > Managed storage {store}
+
+@684 Quotas in a scale-up: the autoscaler requests instances, the provider checks the regional vCPU quota and subnet addresses, and launches above either ceiling fail.
+Autoscaler|max 120 {svc} > Launch request {svc} > Quota check|vCPUs per region {ext}
+Quota check|vCPUs per region {ext} [within quota]> Subnet addresses {store} [free IPs]> New instance {svc}
+Quota check|vCPUs per region {ext} [over quota]?> Launch fails
+
 # ---------- Frontend additions (215-220) ----------
 @215 Event propagation for one click: the event is captured from the window down through the table and row to the clicked button, runs on the button, then bubbles back up through the row to the table in the same dispatch, where one delegated listener handles clicks for every row.
 Window > Document > Table|delegated listener {client} [capture]> Row > Button|target {client}
