@@ -75883,11 +75883,11 @@
           },
           {
             "id": "b",
-            "label": "Compress the response"
+            "label": "Use a faster serialiser for the response"
           },
           {
             "id": "c",
-            "label": "Add more middleware logging"
+            "label": "Move the handler to a server with more cores"
           },
           {
             "id": "d",
@@ -75897,7 +75897,7 @@
         "correctChoiceIds": [
           "d"
         ],
-        "explanation": "Twelve round trips dominate; cutting them saves most of the 420 ms."
+        "explanation": "a: a bigger pool helps concurrent requests, but these queries run one after another. b: serialising the response is a small part of the time next to 12 × 35 ms = 420 ms of round trips. c: the handler is waiting on the network, not the CPU, so more cores change nothing. d: correct, one or two queries remove most of the 420 ms of sequential round trips."
       },
       {
         "id": "t221-a4",
@@ -76780,37 +76780,32 @@
         "id": "t223-a5",
         "concept": "status-classes",
         "type": "drag_order",
-        "prompt": "Order the status classes by first digit.",
+        "prompt": "A request did not succeed. Order the questions to ask when picking its status code.",
         "items": [
           {
-            "id": "s4",
-            "label": "4xx client error"
-          },
-          {
-            "id": "s2",
-            "label": "2xx success"
-          },
-          {
-            "id": "s5",
-            "label": "5xx server error"
+            "id": "s3",
+            "label": "Does the resource not exist? 404"
           },
           {
             "id": "s1",
-            "label": "1xx informational"
+            "label": "Did the server itself fail? Pick a 5xx"
           },
           {
-            "id": "s3",
-            "label": "3xx redirection"
+            "id": "s4",
+            "label": "Is the request malformed, invalid or conflicting? 400, 422 or 409"
+          },
+          {
+            "id": "s2",
+            "label": "Is the caller unauthenticated or not allowed? 401 or 403"
           }
         ],
         "correctOrder": [
           "s1",
           "s2",
           "s3",
-          "s4",
-          "s5"
+          "s4"
         ],
-        "explanation": "The first digit gives the class."
+        "explanation": "Stop at the first match. A server fault is never reported as the client’s mistake; access is checked before existence so callers without access cannot probe which ids exist; validation and conflicts come last because they concern a resource the caller may use."
       },
       {
         "id": "t223-a6",
@@ -77012,8 +77007,8 @@
         },
         {
           "id": "b",
-          "label": "400 Bad Request",
-          "feedback": "Also acceptable in many APIs, but 422 is more specific for valid syntax with invalid content."
+          "label": "409 Conflict",
+          "feedback": "Nothing clashes with the stored state; the request’s own dates break a rule, which is a validation error."
         },
         {
           "id": "c",
@@ -77028,6 +77023,10 @@
       {
         "topicId": 8,
         "why": "REST API design at system scale"
+      },
+      {
+        "topicId": 535,
+        "why": "When work outlasts a request, 202 Accepted and a status URL take over"
       }
     ]
   },
@@ -77272,8 +77271,8 @@
         "approaches": [
           {
             "id": "p3",
-            "label": "Tell clients never to retry",
-            "description": "No duplicates sent"
+            "label": "Turn off client retries; refund any duplicates",
+            "description": "No retry logic to build"
           },
           {
             "id": "p2",
@@ -77282,7 +77281,7 @@
           },
           {
             "id": "p1",
-            "label": "Client-generated idempotency key, stored with the response for 24 hours",
+            "label": "Client-chosen idempotency key, response stored 24 h",
             "description": "Replay the first result"
           }
         ],
@@ -77469,6 +77468,10 @@
       {
         "topicId": 40,
         "why": "Idempotency in messaging and event processing"
+      },
+      {
+        "topicId": 531,
+        "why": "Money postings are where idempotent writes matter most"
       }
     ]
   },
@@ -77713,17 +77716,17 @@
         "approaches": [
           {
             "id": "p2",
-            "label": "One shared admin account",
+            "label": "One shared admin login, with refunds noted against ticket numbers",
             "description": "Simple to set up"
           },
           {
             "id": "p3",
-            "label": "Everyone is admin; trust staff",
+            "label": "Everyone gets admin; a manager reviews refunds each week",
             "description": "No friction"
           },
           {
             "id": "p1",
-            "label": "Roles with explicit permissions, a refund limit check, deny by default, and an audit log",
+            "label": "Per-person accounts with roles, a refund limit and an audit log",
             "description": "Least privilege"
           }
         ],
@@ -78556,17 +78559,17 @@
         "approaches": [
           {
             "id": "p2",
-            "label": "Send inline in the request and give up on error",
+            "label": "Send inline in the request; show the user a retry button on error",
             "description": "Simple"
           },
           {
             "id": "p3",
-            "label": "Retry immediately in a tight loop until it works",
+            "label": "Queued job retried at once, in a loop, until the provider accepts",
             "description": "Fast recovery"
           },
           {
             "id": "p1",
-            "label": "Queue with retries and exponential backoff, a message id per invoice, and a dead-letter queue",
+            "label": "Queued job: backoff retries, per-invoice message id, dead-letter queue",
             "description": "Retry safely"
           }
         ],
@@ -78748,6 +78751,10 @@
       {
         "topicId": 39,
         "why": "Delivery semantics: at-least-once vs exactly-once in depth"
+      },
+      {
+        "topicId": 535,
+        "why": "Clients learn how a queued job is going through a status resource"
       }
     ]
   },
@@ -79581,6 +79588,10 @@
       {
         "topicId": 54,
         "why": "Logs, metrics and traces across a whole system"
+      },
+      {
+        "topicId": 534,
+        "why": "Percentiles matter most when one request fans out to many servers"
       }
     ]
   },
@@ -79827,7 +79838,7 @@
         "approaches": [
           {
             "id": "p1",
-            "label": "Up to 2 retries with jittered exponential backoff, within the deadline, at the checkout layer only",
+            "label": "Up to 2 jittered backoff retries at checkout only, within the deadline",
             "description": "Bounded and spread out"
           },
           {
@@ -79837,7 +79848,7 @@
           },
           {
             "id": "p2",
-            "label": "Retry immediately up to 10 times",
+            "label": "Up to 10 immediate retries at checkout, no backoff",
             "description": "Recovers quickly from blips"
           }
         ],
@@ -81096,17 +81107,17 @@
         "approaches": [
           {
             "id": "p1",
-            "label": "Shared counter store with atomic increments; fail open with local limits for normal endpoints, fail closed for login",
+            "label": "Shared atomic counters; fail open on local limits, closed for login",
             "description": "Correct and resilient"
           },
           {
             "id": "p3",
-            "label": "Shared store; reject all traffic if it is down",
+            "label": "Shared atomic counters; reject every request while the store is down",
             "description": "Strict"
           },
           {
             "id": "p2",
-            "label": "Local counters on each server only",
+            "label": "Local counters on each server, each allowing the limit ÷ 12",
             "description": "No shared dependency"
           }
         ],
@@ -81133,7 +81144,7 @@
           "r3"
         ],
         "rationaleConflicts": {
-          "r3": "Each server still sees only a share, so the effective limit multiplies."
+          "r3": "A key’s traffic is rarely spread evenly, so it is blocked early on one server while getting extra room on others."
         },
         "explanation": "Share counters for correctness and choose fail-open or fail-closed per endpoint."
       }
@@ -82567,6 +82578,10 @@
       {
         "topicId": 234,
         "why": "Filters and sort fields are untrusted input"
+      },
+      {
+        "topicId": 538,
+        "why": "Batch jobs walk big tables with the same keyset idea"
       }
     ]
   },
@@ -83259,8 +83274,8 @@
         "steps": [
           "A transaction is atomic only inside one resource manager. The database makes the order row and its order lines commit together; it knows nothing about a message broker. Any sequence of two independent writes has a window where one has happened and the other has not.",
           "Commit then publish can lose events (crash after commit). Publish then commit can invent events (commit fails after publish). Retrying the publish on error helps with transient failures but not with a crash, because the intent to publish lived only in memory.",
-          "Polling relays must not rely on a monotonically advancing id: ids are assigned at insert time, transactions commit in another order, so a row can become visible behind the watermark. Change data capture reads the commit log in commit order; pollers can track a sent flag or re-scan a recent window instead.",
           "A relay moves outbox rows to the broker. It can poll for unsent rows in order, or read the database’s change log (change data capture). It publishes, then marks the row sent or advances its position; a crash between those two steps causes a re-publish rather than a loss.",
+          "Polling relays must not rely on a monotonically advancing id: ids are assigned at insert time, transactions commit in another order, so a row can become visible behind the watermark. Change data capture reads the commit log in commit order; pollers can track a sent flag or re-scan a recent window instead.",
           "Consumers therefore receive each event at least once. They store handled event ids, ideally in the same transaction as their own state change, so the effect is applied once. Events carry ids and, where order matters, a per-entity sequence number.",
           "The same reasoning applies to other side effects: sending email, calling a payment provider, updating a search index. Record the intent durably with the change, then perform the effect with retries and idempotency keys."
         ]
@@ -83380,6 +83395,10 @@
       {
         "topicId": 266,
         "why": "Why remote calls stay out of open transactions"
+      },
+      {
+        "topicId": 532,
+        "why": "Event sourcing makes the event log itself the source of truth"
       }
     ]
   },
@@ -83760,6 +83779,10 @@
       {
         "topicId": 230,
         "why": "Retries that must fit inside the deadline"
+      },
+      {
+        "topicId": 534,
+        "why": "Per-call deadlines are one of the main tools against fan-out tail latency"
       }
     ]
   },
@@ -84177,6 +84200,10 @@
       {
         "topicId": 234,
         "why": "Deserialising untrusted input safely"
+      },
+      {
+        "topicId": 536,
+        "why": "Contract tests check that consumers and producers still agree"
       }
     ]
   },
@@ -113857,6 +113884,3480 @@
       {
         "topicId": 233,
         "why": "Rate limiting, which caps load per client"
+      }
+    ]
+  },
+  {
+    "id": 531,
+    "slug": "money-in-code",
+    "region": "f2-backend",
+    "order": 27,
+    "title": "Money in Code: Minor Units, Rounding and Ledgers",
+    "kind": "lesson",
+    "objectives": [
+      "Store amounts as integer minor units together with a currency code",
+      "Round once, at a stated step, with a stated rule, and hand out remainders",
+      "Record each money movement as balanced double-entry ledger rows"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 14,
+    "prereqIds": [
+      224
+    ],
+    "cards": [
+      {
+        "id": "t531-c1",
+        "kind": "text",
+        "title": "Why 0.1 + 0.2 is not 0.3 in binary floating point",
+        "body": "A binary double cannot hold 0.1 exactly; it stores the nearest value it can, a tiny bit above 0.1. Adding 0.1 and 0.2 gives 0.30000000000000004. That error is harmless in physics and fatal in a ledger, where totals must match to the paisa. Store money as an integer count of the currency’s minor unit (₹499.99 is 49,999 paise) or as a fixed-scale decimal type, and keep the ISO 4217 currency code with it: INR and USD have 2 minor digits, JPY has 0, and KWD has 3.",
+        "teaches": [
+          "minor-units"
+        ]
+      },
+      {
+        "id": "t531-c2",
+        "kind": "text",
+        "title": "Worked example: splitting ₹100 three ways",
+        "body": "₹100 is 10,000 paise, and 10,000 ÷ 3 is 3,333 with 1 paisa left over. Rounding each share to ₹33.33 charges ₹99.99 in total, so one paisa vanishes from the books. Instead give everyone the floor (3,333) and hand the leftover units out one at a time by a fixed rule, such as to the payer first: 3,334 + 3,333 + 3,333 = 10,000. The shares differ by at most one paisa and always add up.",
+        "teaches": [
+          "allocation",
+          "rounding"
+        ]
+      },
+      {
+        "id": "t531-c3",
+        "kind": "diagram",
+        "title": "Double entry: two rows that sum to zero",
+        "body": "Each movement of money is one journal entry made of rows that cancel out, written in one transaction.",
+        "teaches": [
+          "double-entry"
+        ],
+        "steps": [
+          "A ₹500 transfer from wallet A to wallet B is one journal entry",
+          "Row 1: account A, −50,000 paise",
+          "Row 2: account B, +50,000 paise",
+          "The rows of the entry must sum to zero before the transaction commits",
+          "A balance is the sum of an account’s rows; past rows are never edited"
+        ]
+      },
+      {
+        "id": "t531-c4",
+        "kind": "text",
+        "title": "Rounding: choose the rule and the moment",
+        "body": "Two decisions change totals. The mode: half-up turns 2.5 into 3, while half-even (banker’s rounding) turns 2.5 into 2 and 3.5 into 4, which removes the upward bias over millions of roundings. The moment: three items at ₹10.10 with 18% tax give 3 × ₹1.82 = ₹5.46 if tax is rounded per line, but ₹5.45 if it is computed once on ₹30.30. Both are defensible; write down which one the tax rules or contract require and use it in invoices, refunds and reports alike.",
+        "teaches": [
+          "rounding"
+        ]
+      },
+      {
+        "id": "t531-c5",
+        "kind": "text",
+        "title": "Trap: a balance column updated in place",
+        "body": "“UPDATE accounts SET balance = balance − 500” keeps no history, cannot explain how a balance was reached, and subtracts twice when a timed-out request is retried. Append ledger rows instead, keyed by a unique transfer id so a retry is rejected by the database, and derive the balance from the rows (or keep a cached balance that is updated in the same transaction and checked against them).",
+        "teaches": [
+          "double-entry",
+          "idempotent-postings"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t531-a1",
+        "concept": "minor-units",
+        "type": "multiple_choice",
+        "prompt": "A price of ₹499.99 goes into a database column. Which representation keeps every total exact?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A double-precision float holding 499.99"
+          },
+          {
+            "id": "b",
+            "label": "The integer 49999 alongside the code INR"
+          },
+          {
+            "id": "c",
+            "label": "The text “499.99”, parsed to a float to sum"
+          },
+          {
+            "id": "d",
+            "label": "A 32-bit float that is rounded for display"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "a: the double nearest 499.99 is slightly off, and errors add up across sums. b: correct, integers in the minor unit add exactly and the code says how many minor digits there are. c: parsing to a float before summing brings back the same error. d: a 32-bit float is even less precise, and rounding at display hides the drift instead of removing it."
+      },
+      {
+        "id": "t531-a2",
+        "concept": "minor-units",
+        "type": "multiple_choice",
+        "prompt": "An API stores amounts for INR and JPY accounts as integer minor units. What must travel with each amount?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The exchange rate on the day it was created"
+          },
+          {
+            "id": "b",
+            "label": "Its ISO 4217 currency code"
+          },
+          {
+            "id": "c",
+            "label": "A flag saying whether it was rounded"
+          },
+          {
+            "id": "d",
+            "label": "How many decimals the app displays"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "a: a rate is needed only when converting, not to know what the stored number means. b: correct, the code tells you the unit, and INR has 2 minor digits while JPY has 0, so 500 means ₹5.00 or ¥500. c: a rounding flag does not say what the unit is. d: display settings vary by screen; the currency code is the stable fact."
+      },
+      {
+        "id": "t531-a3",
+        "concept": "allocation",
+        "type": "multiple_choice",
+        "prompt": "₹100 is split between 3 people in paise. Which result keeps the books balanced?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "3,333 paise each, writing off the extra paisa"
+          },
+          {
+            "id": "b",
+            "label": "3,334 + 3,333 + 3,333 paise"
+          },
+          {
+            "id": "c",
+            "label": "3,333.33 paise each, kept as decimals"
+          },
+          {
+            "id": "d",
+            "label": "3,334 paise each, the payer covering 2 more"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "a: the books are short by one paisa on every split. b: correct, floors plus one leftover unit handed out by a fixed rule sum to exactly 10,000. c: a paisa cannot be charged in thirds, so this only postpones the rounding. d: charging 10,002 paise collects more than the bill."
+      },
+      {
+        "id": "t531-a4",
+        "concept": "rounding",
+        "type": "multiple_choice",
+        "prompt": "Half-even (banker’s) rounding is applied to ₹2.5 and ₹3.5, rounding to whole rupees. What are the results?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "3 and 4"
+          },
+          {
+            "id": "b",
+            "label": "2 and 4"
+          },
+          {
+            "id": "c",
+            "label": "2 and 3"
+          },
+          {
+            "id": "d",
+            "label": "3 and 3"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "a: that is half-up, which always rounds .5 upwards. b: correct, half-even rounds .5 to the nearest even digit, so the ups and downs cancel out over many values. c: that is half-down or truncation. d: that is half-odd, a rarely used mode."
+      },
+      {
+        "id": "t531-a5",
+        "concept": "idempotent-postings",
+        "type": "multiple_choice",
+        "prompt": "A transfer request times out and the client retries. The handler runs “balance = balance − 500” each time. What is the safest fix?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Retry the update only after a timeout"
+          },
+          {
+            "id": "b",
+            "label": "Lock the account row for the whole request"
+          },
+          {
+            "id": "c",
+            "label": "Post ledger rows under a unique transfer id"
+          },
+          {
+            "id": "d",
+            "label": "Ask clients to wait longer before retrying"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "a: the timeout is exactly when the first update may already have applied. b: a lock serialises the two attempts, but both still subtract. c: correct, the unique id makes the second posting fail, so the retry can return the first result. d: a longer wait makes duplicates rarer, not impossible."
+      },
+      {
+        "id": "t531-a6",
+        "concept": "double-entry",
+        "type": "drag_order",
+        "prompt": "Order the steps that record a ₹500 wallet transfer.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Insert −50,000 paise for the sender and +50,000 for the receiver"
+          },
+          {
+            "id": "s1",
+            "label": "Begin one database transaction"
+          },
+          {
+            "id": "s5",
+            "label": "Commit and return the entry id"
+          },
+          {
+            "id": "s2",
+            "label": "Insert the transfer id into a table with a unique constraint"
+          },
+          {
+            "id": "s4",
+            "label": "Check that the rows sum to zero and the sender stays at or above zero"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "One transaction holds everything; the unique id turns a retry into a clean rejection, and the checks run before commit so a broken entry never becomes visible."
+      },
+      {
+        "id": "t531-a7",
+        "concept": "rounding",
+        "type": "estimation",
+        "prompt": "An app splits ₹100 bills three ways, rounds each share to ₹33.33 and drops the leftover paisa. It does 200,000 such splits a day. How many rupees go unaccounted for each day?",
+        "unit": "₹",
+        "target": 2000,
+        "assumptions": [
+          "One paisa is lost per split",
+          "100 paise make a rupee"
+        ],
+        "formula": "200,000 × 1 paisa ÷ 100",
+        "workedAnswer": "200,000 paise ÷ 100 = ₹2,000 a day",
+        "explanation": "Sanity check: that is about ₹7.3 lakh a year of drift from one rounding rule, which reconciliation will flag even though each single split looks fine.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          200000,
+          20000
+        ]
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t531-f1",
+        "front": "How should money be stored?",
+        "back": "As integer minor units (or a fixed-scale decimal) plus an ISO 4217 currency code."
+      },
+      {
+        "id": "t531-f2",
+        "front": "Half-even rounding of 2.5 and 3.5?",
+        "back": "2 and 4: .5 goes to the even neighbour, so bias cancels out."
+      },
+      {
+        "id": "t531-f3",
+        "front": "Double entry?",
+        "back": "Every movement is rows that sum to zero; balances are sums of rows, never edited in place."
+      }
+    ],
+    "sources": [
+      {
+        "title": "PostgreSQL: Numeric types",
+        "url": "https://www.postgresql.org/docs/current/datatype-numeric.html"
+      },
+      {
+        "title": "Martin Fowler: Money (Patterns of Enterprise Application Architecture)",
+        "url": "https://martinfowler.com/eaaCatalog/money.html"
+      },
+      {
+        "title": "Martin Fowler: Accounting Entry",
+        "url": "https://martinfowler.com/eaaDev/AccountingEntry.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "minor-units",
+        "rounding",
+        "allocation",
+        "double-entry",
+        "idempotent-postings"
+      ],
+      "mechanism": {
+        "title": "How money stays exact from request to ledger",
+        "steps": [
+          "Parse money at the edge into an exact type. A request carrying “499.99” and “INR” becomes 49,999 minor units with the code INR, using the number of minor digits that ISO 4217 lists for the currency. From then on, arithmetic is integer addition and subtraction, which is exact. Binary floating point never appears, not even in a quick sum for a report, because a single float conversion brings back rounding error.",
+          "Multiplication and division are where rounding enters: tax, discounts, interest, currency conversion and splits. Each produces a fraction of a minor unit that has to be rounded. Do it once, at a step you name (per line or per invoice), with a mode you name (half-up, half-even), and keep the unrounded rate or price in the record so the calculation can be repeated and explained later.",
+          "Splits need allocation, not rounding. Dividing 10,000 paise three ways gives three floors of 3,333 and a remainder of 1. Hand the remainder out one unit at a time by a deterministic rule, such as largest fractional part first or a fixed party order. The same rule, applied on refund, reverses each share exactly, so a partially refunded group bill does not leave a stray paisa behind.",
+          "Record movements as journal entries in a double-entry ledger. A transfer, a payment or a fee is one entry made of rows on two or more accounts whose amounts sum to zero; the check runs inside the same transaction that inserts the rows. Because money is never created or destroyed by a single row, summing all accounts gives zero, and any mismatch points straight at a bug.",
+          "Make each posting idempotent. The entry carries an id from the business event, such as the payment reference, protected by a unique constraint. A retry, a duplicated webhook or a replayed message hits the constraint and the handler returns the original result. Balances are sums of rows, optionally cached in a column that is updated in the same transaction, and a nightly job compares the cache with the sums."
+        ]
+      },
+      "useWhen": [
+        "Any system that charges, refunds, splits or reports money.",
+        "Wallets, marketplaces and billing where balances must be explained to auditors."
+      ],
+      "avoidWhen": [
+        "Avoid floats for money anywhere, including analytics totals that finance will compare.",
+        "Avoid editing past ledger rows; correct mistakes with a new reversing entry."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Representation",
+          "Exactness",
+          "Main pitfall"
+        ],
+        "rows": [
+          [
+            "Integer minor units",
+            "Exact for add and subtract",
+            "Needs the currency to know the unit"
+          ],
+          [
+            "Fixed-scale decimal",
+            "Exact to its stated scale",
+            "Scale must cover rates and tax"
+          ],
+          [
+            "Binary float",
+            "Approximate",
+            "Totals drift by fractions of a paisa"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Per-line or per-invoice tax rounding",
+        "assumptions": [
+          "3 items at ₹10.10 each",
+          "18% tax",
+          "Round half-up to the paisa"
+        ],
+        "steps": [
+          "Per line: ₹10.10 × 0.18 = ₹1.818, which rounds to ₹1.82.",
+          "Three lines: 3 × ₹1.82 = ₹5.46 of tax.",
+          "Per invoice: ₹30.30 × 0.18 = ₹5.454, which rounds to ₹5.45.",
+          "The two rules differ by 1 paisa on this invoice; across many invoices the gap adds up and must match what the tax return reports."
+        ],
+        "result": "Neither rule is wrong; mixing them is. Pick the one the rules or contract require and use it in invoices, credit notes and reports alike."
+      },
+      "india": {
+        "title": "Paise, GST lines and wallet transfers",
+        "label": "Illustrative example",
+        "body": "Illustrative: an Indian marketplace shows ₹499.99 on screen but stores 49,999 with the code INR. Tax on each invoice is computed either per line or on the invoice total, and the business picks one rule and applies it to invoices, credit notes and refunds so the totals reconcile with its tax filings. A transfer between two customer wallets is recorded as two ledger rows that sum to zero, keyed by the payment reference so that a retried callback from the payment network cannot post the money twice. Finance can then rebuild any balance from its rows."
+      },
+      "pitfalls": [
+        {
+          "trap": "“A double is precise enough for rupees.”",
+          "say": "“Doubles cannot hold 0.1 exactly; I’d store paise as integers with the currency code.”"
+        },
+        {
+          "trap": "“Round each share and the totals will work out.”",
+          "say": "“I’d allocate the remainder by a fixed rule so the shares always sum to the bill.”"
+        }
+      ],
+      "takeaways": [
+        "Store money as integer minor units with an ISO 4217 code.",
+        "Round once, at a named step, with a named mode.",
+        "Split with allocation so shares sum exactly to the total.",
+        "Record movements as balanced double-entry rows, each keyed for idempotency."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Splitting ₹100 three ways",
+      "prompt": "A bill-split feature computes 100 ÷ 3 in floating point, rounds each share to two decimals and charges three cards. What does finance see when it adds up the charges for this bill?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "₹99.99 charged against a ₹100 bill",
+          "feedback": "Right: each share rounds down to ₹33.33, and the leftover paisa belongs to nobody."
+        },
+        {
+          "id": "b",
+          "label": "Exactly ₹100, since the rounding cancels out",
+          "feedback": "All three shares round the same way, so nothing cancels; the error is one paisa every time."
+        },
+        {
+          "id": "c",
+          "label": "₹100.02, since each share rounds up",
+          "feedback": "33.333… is below the halfway point, so half-up rounding takes it down, not up."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Work in paise and allocate: 10,000 ÷ 3 gives three floors of 3,333 and a remainder of 1, which goes to one person by a fixed rule. The shares become 3,334, 3,333 and 3,333 and always add up to the bill."
+    },
+    "seeAlso": [
+      {
+        "topicId": 224,
+        "why": "Idempotency keys are what stop a retried payment from posting twice"
+      },
+      {
+        "topicId": 266,
+        "why": "A transfer’s ledger rows must commit or roll back together, which is what transactions guarantee"
+      },
+      {
+        "topicId": 238,
+        "why": "Ledger rows and their outgoing events have to commit together, which is the dual-write problem"
+      }
+    ]
+  },
+  {
+    "id": 532,
+    "slug": "event-sourcing-and-cqrs",
+    "region": "f2-backend",
+    "order": 28,
+    "title": "Event Sourcing and CQRS",
+    "kind": "lesson",
+    "objectives": [
+      "Store state as an append-only log of events and rebuild it by replaying them",
+      "Separate the write model from read models that projections keep up to date",
+      "Judge when the extra moving parts pay for themselves"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 14,
+    "prereqIds": [
+      238
+    ],
+    "cards": [
+      {
+        "id": "t532-c1",
+        "kind": "text",
+        "title": "State as a list of facts",
+        "body": "Instead of a row that holds an account’s current balance, store what happened to it: AccountOpened, Deposited ₹500, Withdrew ₹200. The current state is the result of applying the events in order. Events are immutable and named in the past tense; a mistake is corrected by a new event, such as a reversal, not by editing an old one. You get a full history for free and can answer questions like “what was the balance on 3 March?” by replaying up to that date.",
+        "teaches": [
+          "event-log"
+        ]
+      },
+      {
+        "id": "t532-c2",
+        "kind": "diagram",
+        "title": "Commands in, events out, views updated",
+        "body": "The write side decides; the read side catches up.",
+        "teaches": [
+          "event-log",
+          "expected-version",
+          "projections"
+        ],
+        "steps": [
+          "A command arrives: “withdraw ₹200 from account 7”",
+          "Load account 7 by replaying its events, or a snapshot plus the events after it",
+          "Check the rule: the balance must stay at or above zero",
+          "Append Withdrew ₹200 with expected version 42; reject if another write got there first",
+          "Projections read the new event and update read tables such as balances and statements"
+        ]
+      },
+      {
+        "id": "t532-c3",
+        "kind": "text",
+        "title": "Worked example: replay cost and snapshots",
+        "body": "An account with 20,000 events, at an estimated 5 µs to apply each one, takes 20,000 × 5 µs = 100 ms to load, on every command. Saving a snapshot of the state every 1,000 events caps the replay at the last 1,000 or fewer: at most 5 ms. A snapshot is only a cache. If it is lost or its format changes, delete it and rebuild it from the events, which remain the source of truth.",
+        "teaches": [
+          "snapshots"
+        ]
+      },
+      {
+        "id": "t532-c4",
+        "kind": "text",
+        "title": "CQRS: one model for decisions, others for reading",
+        "body": "Command Query Responsibility Segregation splits the code that changes state from the code that answers queries. The write side validates commands against the event stream; the read side keeps denormalised tables shaped for each screen, filled by projections that consume events. The cost is lag: just after a write, a read model may not show it yet. Return the new version from the command and let the screen wait for that version, or read from the write side for that one view. CQRS works without event sourcing, and the reverse is also true.",
+        "teaches": [
+          "projections",
+          "read-lag"
+        ]
+      },
+      {
+        "id": "t532-c5",
+        "kind": "text",
+        "title": "Trap: editing or reshaping stored events",
+        "body": "Stored events are a contract with every projection and with your own past. Renaming a field or changing what an event means breaks replay. Add a new event version and convert old shapes as they are read (upcasting) instead of rewriting history. Personal data needs a plan too: keep it out of events, or encrypt it with a per-person key that can be deleted when the person asks to be erased.",
+        "teaches": [
+          "event-versioning"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t532-a1",
+        "concept": "event-log",
+        "type": "multiple_choice",
+        "prompt": "In an event-sourced account, a ₹500 deposit was recorded by mistake. How is it corrected?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Delete the Deposited event and replay"
+          },
+          {
+            "id": "b",
+            "label": "Edit the event so its amount is zero"
+          },
+          {
+            "id": "c",
+            "label": "Append a reversal event cancelling it"
+          },
+          {
+            "id": "d",
+            "label": "Update the balance read table directly"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "a: deleting history breaks the audit trail and any projection that already used the event. b: editing an event rewrites a fact other systems may have acted on. c: correct, the log keeps both the mistake and its correction, and replay gives the right balance. d: the read table would disagree with the events and be overwritten on the next rebuild."
+      },
+      {
+        "id": "t532-a2",
+        "concept": "expected-version",
+        "type": "multiple_choice",
+        "prompt": "Two withdrawals for the same account both load it at version 42 and try to append. What stops both succeeding when the balance covers only one?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Projections recompute the balance after both"
+          },
+          {
+            "id": "b",
+            "label": "A snapshot that was taken at version 42"
+          },
+          {
+            "id": "c",
+            "label": "An expected-version check on each append"
+          },
+          {
+            "id": "d",
+            "label": "Ordering the two events by their timestamps"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "a: projections run after the fact; by then both withdrawals are recorded. b: a snapshot speeds up loading but does not guard writes. c: correct, the first append moves the stream to 43, so the second append, still expecting 42, is rejected and can reload and retry. d: timestamps order events but do not stop the second decision being made on stale state."
+      },
+      {
+        "id": "t532-a3",
+        "concept": "read-lag",
+        "type": "multiple_choice",
+        "prompt": "A user withdraws money and the next screen, served from a projection, still shows the old balance. Why?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The projection has not processed the event yet"
+          },
+          {
+            "id": "b",
+            "label": "The event was appended to the wrong stream"
+          },
+          {
+            "id": "c",
+            "label": "Snapshots hide events that are newer than them"
+          },
+          {
+            "id": "d",
+            "label": "The command was rejected without an error"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "a: correct, read models are updated asynchronously and lag the write side by a little. b: then the balance would stay wrong, not catch up a moment later. c: loading replays the events after a snapshot, so nothing is hidden. d: a rejected command returns an error; nothing would be written at all."
+      },
+      {
+        "id": "t532-a4",
+        "concept": "snapshots",
+        "type": "multiple_choice",
+        "prompt": "What is a snapshot in an event-sourced system?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A cached state at a version, rebuildable from events"
+          },
+          {
+            "id": "b",
+            "label": "A backup of the event store kept for disaster recovery"
+          },
+          {
+            "id": "c",
+            "label": "The authoritative record that replaces older events"
+          },
+          {
+            "id": "d",
+            "label": "A read model shaped to suit one screen"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "a: correct, it saves replay time and can be thrown away. b: backups protect the store itself; snapshots live alongside it to speed up loads. c: the events stay authoritative; deleting them would lose history. d: read models serve queries, while snapshots serve the write side."
+      },
+      {
+        "id": "t532-a5",
+        "concept": "es-fit",
+        "type": "multiple_choice",
+        "prompt": "Which system gains most from event sourcing?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A profile page that stores a name and an avatar"
+          },
+          {
+            "id": "b",
+            "label": "A product page cache rebuilt every hour"
+          },
+          {
+            "id": "c",
+            "label": "A settings table read on every request"
+          },
+          {
+            "id": "d",
+            "label": "A wallet where auditors ask how balances arose"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "a: simple overwrite-in-place data gains little from a history. b: a cache is derived data that can be recomputed from elsewhere. c: a settings table needs fast reads of the current value, not a history. d: correct, the event history is the explanation auditors ask for, and new reports can be built from it."
+      },
+      {
+        "id": "t532-a6",
+        "concept": "projections",
+        "type": "drag_order",
+        "prompt": "Order how a new read model is added to a live event-sourced system.",
+        "items": [
+          {
+            "id": "s4",
+            "label": "Switch reads to the new table"
+          },
+          {
+            "id": "s2",
+            "label": "Replay the full history into a new table"
+          },
+          {
+            "id": "s5",
+            "label": "Drop the old read model once unused"
+          },
+          {
+            "id": "s1",
+            "label": "Write the projection that maps events to rows"
+          },
+          {
+            "id": "s3",
+            "label": "Let it catch up with live events"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Because events hold the full history, a new view can be built beside the old one and swapped in only once it has caught up."
+      },
+      {
+        "id": "t532-a7",
+        "concept": "snapshots",
+        "type": "estimation",
+        "prompt": "An account stream holds 50,000 events and applying one takes about 4 µs. Roughly how many milliseconds does a full replay take?",
+        "unit": "ms",
+        "target": 200,
+        "assumptions": [
+          "Events are applied one after another",
+          "Reading them is not counted"
+        ],
+        "formula": "50,000 × 4 µs",
+        "workedAnswer": "50,000 × 4 µs = 200,000 µs = 200 ms",
+        "explanation": "Design implication: 200 ms added to every command is too slow, so take a snapshot every 1,000 events and replay at most about 4 ms.",
+        "tolerance": 0.15,
+        "trapAnswers": [
+          20,
+          2000
+        ]
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t532-f1",
+        "front": "Event sourcing?",
+        "back": "Store immutable events; current state is the result of replaying them."
+      },
+      {
+        "id": "t532-f2",
+        "front": "CQRS?",
+        "back": "Separate the write model that decides from read models that projections keep updated."
+      },
+      {
+        "id": "t532-f3",
+        "front": "How are two writers kept from both appending?",
+        "back": "An expected-version check: the append fails if the stream moved on."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Martin Fowler: Event Sourcing",
+        "url": "https://martinfowler.com/eaaDev/EventSourcing.html"
+      },
+      {
+        "title": "Martin Fowler: CQRS",
+        "url": "https://martinfowler.com/bliki/CQRS.html"
+      },
+      {
+        "title": "Microsoft Learn: Event Sourcing pattern",
+        "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "event-log",
+        "expected-version",
+        "projections",
+        "read-lag",
+        "snapshots",
+        "event-versioning",
+        "es-fit"
+      ],
+      "mechanism": {
+        "title": "How an event-sourced service handles a command",
+        "steps": [
+          "Each entity, such as an account or an order, has its own stream of events, identified by the entity id and numbered by version. The event store’s job is narrow: append events to a stream atomically and read a stream back in order. It is often a table keyed by (stream id, version) with a unique constraint, which makes the next step possible.",
+          "A command is handled by loading the entity: read the latest snapshot if one exists, then apply the events after it. The handler checks business rules against that state, such as “balance must stay at or above zero”, and produces zero or more new events. It never changes the state directly; the new events are the change.",
+          "The new events are appended with the version the handler loaded, here 42. If another command appended version 43 in between, the unique constraint or the store’s expected-version check rejects the write. The handler reloads and tries again, or reports a conflict. This is optimistic concurrency, and it is what keeps two decisions based on the same stale state from both being recorded.",
+          "Projections subscribe to the events and maintain read models: a balance table, a statement list, a search index. Each projection records the last event position it processed, so it can resume after a crash, and it must be idempotent because events can be delivered again. Read models lag the write side, usually by milliseconds and by much longer after an outage, so screens that must show a fresh write need a version check or a read from the write side.",
+          "Because the log is the source of truth, read models are disposable. A bug in a projection is fixed by correcting the code and replaying history into a new table; a new report is built the same way. The price is operational: event schemas must evolve compatibly, replays of large histories take time and capacity, and personal data in an immutable log needs a deliberate erasure strategy."
+        ]
+      },
+      "useWhen": [
+        "Domains where the history is the product: ledgers, orders, bookings and audit-heavy workflows.",
+        "Systems that need several differently shaped read models built from the same changes."
+      ],
+      "avoidWhen": [
+        "Avoid it for simple create-read-update screens; a table with an audit log is far cheaper.",
+        "Avoid it when the team cannot run projections, replays and schema versioning in production."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Approach",
+          "History kept",
+          "Complexity",
+          "Read freshness"
+        ],
+        "rows": [
+          [
+            "Plain table, updated in place",
+            "Current state only",
+            "Low",
+            "Immediate"
+          ],
+          [
+            "Table plus audit log",
+            "Changes, as a side record",
+            "Moderate",
+            "Immediate"
+          ],
+          [
+            "Event sourcing with CQRS",
+            "Full history is the source",
+            "High",
+            "Read models lag slightly"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Catching up after a projection outage",
+        "assumptions": [
+          "500 events per second arrive steadily",
+          "The projection was down for 10 minutes",
+          "It can process 2,000 events per second"
+        ],
+        "steps": [
+          "Backlog: 500 × 600 s = 300,000 events.",
+          "While catching up, new events keep arriving, so the backlog shrinks at 2,000 − 500 = 1,500 events per second.",
+          "Time to catch up: 300,000 ÷ 1,500 = 200 s, a little over 3 minutes.",
+          "During that time the read models show data up to 13 minutes old at worst."
+        ],
+        "result": "A projection needs headroom well above the arrival rate, or every outage leaves a long period of stale screens. Alert on lag, not just on errors."
+      },
+      "india": {
+        "title": "A loan account as a stream of events",
+        "label": "Illustrative example",
+        "body": "Illustrative: a lending app stores each loan as a stream: Disbursed, InstalmentDue, InstalmentPaid, LateFeeCharged, LateFeeWaived. When a customer disputes a late fee or an auditor asks how the outstanding amount on 5 January was computed, the team replays the stream up to that date and shows each step. A new collections dashboard was added later by writing one projection and replaying the full history into it, without touching the code that records payments."
+      },
+      "pitfalls": [
+        {
+          "trap": "“We will just fix the bad event in the database.”",
+          "say": "“I’d append a correcting event, so the history and every projection stay consistent.”"
+        },
+        {
+          "trap": "“Reads are always up to date.”",
+          "say": "“Read models lag the write side, so I’d design the screens that need fresh data around that.”"
+        }
+      ],
+      "takeaways": [
+        "Events are immutable facts; state is a replay of them.",
+        "Appends use an expected version to stop conflicting writes.",
+        "Projections build disposable read models that lag slightly.",
+        "Snapshots cap replay time; schemas must evolve compatibly."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "A buggy projection",
+      "prompt": "A loyalty-points projection gave double points for refunds for three weeks. The events themselves were recorded correctly. What is the cleanest fix?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Fix the projection and rebuild it from the events",
+          "feedback": "Right: derived data is disposable, and replaying runs the corrected code over the true history."
+        },
+        {
+          "id": "b",
+          "label": "Append correcting events for each affected customer",
+          "feedback": "The events were right; adding corrections would record facts that never happened."
+        },
+        {
+          "id": "c",
+          "label": "Patch the read table with a one-off script",
+          "feedback": "Possible, but the script re-implements the logic by hand and can drift from the fixed projection."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "When the error is in derived data, fix the code that derives it and replay. Build the new read model beside the old one, switch reads over once it has caught up, then drop the old table."
+    },
+    "seeAlso": [
+      {
+        "topicId": 238,
+        "why": "Publishing events alongside a state change is the dual-write problem this design avoids"
+      },
+      {
+        "topicId": 44,
+        "why": "The outbox and change data capture are lighter ways to publish changes from a normal table"
+      },
+      {
+        "topicId": 72,
+        "why": "Expected-version appends are optimistic locking applied to an event stream"
+      }
+    ]
+  },
+  {
+    "id": 533,
+    "slug": "multi-tenant-backends",
+    "region": "f2-backend",
+    "order": 29,
+    "title": "Multi-Tenant Backends: Isolation and Noisy Neighbours",
+    "kind": "lesson",
+    "objectives": [
+      "Compare shared tables, a schema per tenant and a database per tenant",
+      "Enforce the tenant boundary on every query, cache key and file path",
+      "Stop one busy tenant from starving the others with per-tenant limits"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 14,
+    "prereqIds": [
+      225
+    ],
+    "cards": [
+      {
+        "id": "t533-c1",
+        "kind": "text",
+        "title": "Three ways to share a database",
+        "body": "Pooled: every tenant’s rows sit in shared tables with a tenant_id column, the cheapest option per tenant and one migration for all. Schema per tenant: one database, a separate schema each, with better separation but a migration that runs thousands of times. Database per tenant (silo): strongest isolation, per-tenant backup and restore, and the highest cost. Many products mix them: small tenants pooled, large or regulated tenants given their own database.",
+        "teaches": [
+          "tenancy-models"
+        ]
+      },
+      {
+        "id": "t533-c2",
+        "kind": "text",
+        "title": "Worked example: one missing filter",
+        "body": "“SELECT * FROM invoices WHERE id = $1” looks harmless in a pooled table, until a user of tenant B sends tenant A’s invoice id. The fix has layers. Take the tenant id from the authenticated session, never from the request body. Include it in every query, ideally through composite keys like (tenant_id, id). Add database row-level security, such as a policy that only shows rows whose tenant_id matches a value set for the session, so a forgotten filter returns nothing instead of another customer’s data.",
+        "teaches": [
+          "tenant-isolation"
+        ]
+      },
+      {
+        "id": "t533-c3",
+        "kind": "diagram",
+        "title": "Where the tenant id comes from",
+        "body": "The tenant is decided once, on the server, and carried everywhere.",
+        "teaches": [
+          "tenant-isolation",
+          "tenant-keys"
+        ],
+        "steps": [
+          "A request arrives with a session token",
+          "The auth layer resolves the user’s tenant; a tenant id in the body is ignored",
+          "The tenant id goes on the request context and the database session",
+          "Each query filters by tenant, and row-level security rejects any that do not",
+          "Cache keys, file paths, logs and metrics carry the tenant id too"
+        ]
+      },
+      {
+        "id": "t533-c4",
+        "kind": "text",
+        "title": "Noisy neighbours and fair shares",
+        "body": "One tenant’s bulk export can take every worker and connection, and everyone else waits. Give each tenant a share: rate limits per tenant, a cap on concurrent jobs and connections, query timeouts, and fair scheduling so a queue serves tenants in turn instead of first come, first served. With a pool of 100 connections and a cap of 20 per tenant, the busiest tenant can never hold more than a fifth of it.",
+        "teaches": [
+          "noisy-neighbour"
+        ]
+      },
+      {
+        "id": "t533-c5",
+        "kind": "text",
+        "title": "Trap: cache keys without the tenant",
+        "body": "A cache entry keyed “report:2026-10” is filled by tenant A and then served to tenant B. The same leak happens with object storage paths, search indexes and temporary files. Put the tenant id in every key and path, filter search queries by it, and add a test that logs in as two tenants and checks neither can see the other’s data.",
+        "teaches": [
+          "tenant-keys"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t533-a1",
+        "concept": "tenancy-models",
+        "type": "multiple_choice",
+        "prompt": "A product has 20,000 small tenants and 3 banks whose contracts require their data in a separate database. What fits?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A separate database for each of the 20,003 tenants"
+          },
+          {
+            "id": "b",
+            "label": "Pool the small tenants; give each bank a database"
+          },
+          {
+            "id": "c",
+            "label": "One schema per tenant inside a shared database"
+          },
+          {
+            "id": "d",
+            "label": "Shared tables for all, with a bank flag per row"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "a: 20,003 databases to patch, migrate and back up is heavy for tenants that do not need it. b: correct, the cheap pooled model serves most tenants and the three banks get the isolation they pay for. c: a shared database does not meet a separate-database requirement, and 20,003 schemas are hard to migrate. d: a flag does not separate the data at all."
+      },
+      {
+        "id": "t533-a2",
+        "concept": "tenant-isolation",
+        "type": "multiple_choice",
+        "prompt": "Where should the server get a request’s tenant id from?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A tenant_id field in the JSON body"
+          },
+          {
+            "id": "b",
+            "label": "A subdomain, trusted as the client sent it"
+          },
+          {
+            "id": "c",
+            "label": "The authenticated session, on the server"
+          },
+          {
+            "id": "d",
+            "label": "A header the mobile app adds to requests"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "a: the body is attacker-controlled; anyone can type another tenant’s id. b: a subdomain can pick the tenant for routing, but it must still be checked against the session. c: correct, the server resolves it from who is logged in, so a user cannot claim another tenant. d: headers are just as easy to change as the body."
+      },
+      {
+        "id": "t533-a3",
+        "concept": "tenant-isolation",
+        "type": "multiple_choice",
+        "prompt": "The code already filters every query by tenant. Why add row-level security in the database as well?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "It catches a query that forgets the filter"
+          },
+          {
+            "id": "b",
+            "label": "It makes the tenant queries run faster"
+          },
+          {
+            "id": "c",
+            "label": "It replaces authenticating the user"
+          },
+          {
+            "id": "d",
+            "label": "It lets tenants share cache entries safely"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "a: correct, it is a backstop: a missed filter returns no rows instead of another tenant’s rows. b: policies add a condition to queries; they do not speed them up. c: the database still needs to be told which tenant the session belongs to, which comes from authentication. d: caches sit outside the database and need their own tenant keys."
+      },
+      {
+        "id": "t533-a4",
+        "concept": "noisy-neighbour",
+        "type": "multiple_choice",
+        "prompt": "One tenant’s bulk export fills the shared worker pool and other tenants’ jobs wait for minutes. Which fix targets the cause?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Double the number of workers for everyone"
+          },
+          {
+            "id": "b",
+            "label": "Move all tenants to bigger database servers"
+          },
+          {
+            "id": "c",
+            "label": "Retry the waiting jobs more often"
+          },
+          {
+            "id": "d",
+            "label": "Cap each tenant’s concurrent jobs"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "a: the export grows to fill the extra workers too. b: the bottleneck is the shared worker pool, not the database. c: retries add load and do not reach the front of the queue sooner. d: correct, a per-tenant cap leaves room for everyone else however large one tenant’s export is."
+      },
+      {
+        "id": "t533-a5",
+        "concept": "tenant-keys",
+        "type": "multiple_choice",
+        "prompt": "Tenant B sees tenant A’s monthly report on its dashboard. Which bug is most likely?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A cache key that leaves out the tenant id"
+          },
+          {
+            "id": "b",
+            "label": "A replica lagging by a few seconds"
+          },
+          {
+            "id": "c",
+            "label": "A missing index on the reports table"
+          },
+          {
+            "id": "d",
+            "label": "A session token that expired mid-request"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "a: correct, two tenants mapped to the same key share the cached report. b: lag shows older data from the same tenant, not another tenant’s data. c: a missing index slows the query; it does not change which rows match. d: an expired token causes a login error, not someone else’s data."
+      },
+      {
+        "id": "t533-a6",
+        "concept": "tenancy-models",
+        "type": "drag_order",
+        "prompt": "Order the steps to move a large tenant from pooled tables to its own database.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Pause the tenant’s writes briefly while replication catches up"
+          },
+          {
+            "id": "s5",
+            "label": "Delete the tenant’s rows from the pool once checks pass"
+          },
+          {
+            "id": "s1",
+            "label": "Create the new database and run the migrations"
+          },
+          {
+            "id": "s4",
+            "label": "Point the tenant’s routing entry at the new database"
+          },
+          {
+            "id": "s2",
+            "label": "Copy the tenant’s rows and start replicating its changes"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Copy and replicate first, so the pause is short; switch routing only when the copy is current; delete from the pool last, when the move is verified."
+      },
+      {
+        "id": "t533-a7",
+        "concept": "noisy-neighbour",
+        "type": "estimation",
+        "prompt": "A pool has 100 database connections and each query holds one for 50 ms. A tenant is capped at 20 connections. At most how many queries per second can that tenant run?",
+        "unit": "queries/s",
+        "target": 400,
+        "assumptions": [
+          "Each connection runs one query at a time",
+          "Queries take 50 ms each"
+        ],
+        "formula": "20 ÷ 0.05 s",
+        "workedAnswer": "20 connections ÷ 0.05 s = 400 queries/s",
+        "explanation": "Sanity check: the other tenants keep at least 80 connections, about 1,600 queries per second, however hard that one tenant pushes.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          2000,
+          20
+        ]
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t533-f1",
+        "front": "Three tenancy models?",
+        "back": "Shared tables with tenant_id, schema per tenant, database per tenant."
+      },
+      {
+        "id": "t533-f2",
+        "front": "Where does the tenant id come from?",
+        "back": "The authenticated session on the server, never the request body."
+      },
+      {
+        "id": "t533-f3",
+        "front": "Noisy neighbour fix?",
+        "back": "Per-tenant rate limits, concurrency caps, timeouts and fair scheduling."
+      }
+    ],
+    "sources": [
+      {
+        "title": "PostgreSQL: Row security policies",
+        "url": "https://www.postgresql.org/docs/current/ddl-rowsecurity.html"
+      },
+      {
+        "title": "Microsoft Learn: Tenancy models for SaaS applications",
+        "url": "https://learn.microsoft.com/en-us/azure/azure-sql/database/saas-tenancy-app-design-patterns"
+      },
+      {
+        "title": "OWASP: Multi-tenant security cheat sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Multi_Tenant_Security_Cheat_Sheet.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "tenancy-models",
+        "tenant-isolation",
+        "tenant-keys",
+        "noisy-neighbour"
+      ],
+      "mechanism": {
+        "title": "How a request stays inside one tenant",
+        "steps": [
+          "The tenant is resolved once, at authentication. The session or token identifies a user, and the server looks up which tenant that user belongs to. A user in several tenants picks one, and the server checks the membership. A tenant id that arrives in a URL, header or body is at most a hint for routing, verified against the session, and never trusted on its own.",
+          "The resolved tenant goes into the request context and from there into every data access. In pooled tables each query includes the tenant id, and keys are composite, (tenant_id, id), so even a lookup by id is scoped. The database session is told the tenant too, and a row-level security policy filters every query by it, so a forgotten condition returns nothing rather than another tenant’s rows.",
+          "The same rule covers every other store. Cache keys start with the tenant id, object storage uses a per-tenant prefix with access checks, search queries carry a tenant filter, and background jobs carry the tenant id in their payload and set it again before touching data. Logs and metrics are tagged by tenant, which also makes it possible to see who is causing load.",
+          "Shared capacity is divided on purpose. Each tenant gets a rate limit at the edge, a cap on concurrent jobs and database connections, and timeouts on expensive queries. Queues serve tenants in turn, or by weight for paid tiers, so a burst from one tenant waits behind its own work rather than everyone’s. Large tenants that still dominate can move to dedicated workers or their own database.",
+          "The tenancy model can change per tenant. A routing table maps each tenant to its database or schema, so a tenant can move from the pool to a silo by copying its data, replicating changes, pausing writes briefly and switching its routing entry. Migrations then run on the pool once and on each silo, which is why most products keep the number of silos small."
+        ]
+      },
+      "useWhen": [
+        "Software sold to many organisations from one deployment.",
+        "Products where a few large customers need stronger isolation or their own backups."
+      ],
+      "avoidWhen": [
+        "Avoid a database per tenant for thousands of small tenants; operations grow with the count.",
+        "Avoid relying on application filters alone for data that must never leak."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Model",
+          "Isolation",
+          "Cost per tenant",
+          "Migrations"
+        ],
+        "rows": [
+          [
+            "Shared tables with tenant_id",
+            "Logical, by filters and policies",
+            "Lowest",
+            "Run once"
+          ],
+          [
+            "Schema per tenant",
+            "Separate tables per tenant",
+            "Moderate",
+            "Run once per schema"
+          ],
+          [
+            "Database per tenant",
+            "Separate database",
+            "Highest",
+            "Run once per database"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Running one migration across many schemas",
+        "assumptions": [
+          "4,000 tenants, one schema each",
+          "The migration takes about 3 s per schema (an estimate)",
+          "Up to 8 run in parallel"
+        ],
+        "steps": [
+          "Run one after another: 4,000 × 3 s = 12,000 s, about 3.3 hours.",
+          "With 8 in parallel: 12,000 ÷ 8 = 1,500 s, about 25 minutes.",
+          "For those 25 minutes, some tenants are on the new schema and some on the old, so the code must work with both.",
+          "In pooled tables the same change is one migration, though on a much larger table."
+        ],
+        "result": "Per-tenant schemas multiply operational work. Budget for it, and keep code compatible with both versions while a migration rolls through."
+      },
+      "india": {
+        "title": "A billing product for small businesses and large firms",
+        "label": "Illustrative example",
+        "body": "Illustrative: an Indian invoicing and tax-filing product serves thousands of small shops from pooled tables keyed by tenant id, with row-level security as a backstop. A few large enterprise customers ask for their data in a separate database in an Indian cloud region, with their own backups and the ability to restore only their data. The product routes those tenants to dedicated databases through a routing table, and caps every tenant’s concurrent exports so month-end filing by one large customer does not slow everyone else."
+      },
+      "pitfalls": [
+        {
+          "trap": "“The UI only shows the user’s own tenant, so we are safe.”",
+          "say": "“I’d enforce the tenant on the server and in the database, since requests can be crafted.”"
+        },
+        {
+          "trap": "“A database per tenant is always the safest choice.”",
+          "say": "“It isolates best but multiplies operations; I’d pool small tenants and silo the ones that need it.”"
+        }
+      ],
+      "takeaways": [
+        "Pick a tenancy model per tenant size and contract; many products mix them.",
+        "Resolve the tenant from the session and enforce it in every query and key.",
+        "Use row-level security as a backstop for forgotten filters.",
+        "Give each tenant a fair share with limits, caps and fair queues."
+      ]
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "Choosing a tenancy model",
+      "prompt": "Pick the best fit for these constraints.",
+      "setup": [
+        "8,000 small tenants and 5 enterprise tenants",
+        "Enterprise contracts require separate backups and a restore of only their data",
+        "A small team runs operations"
+      ],
+      "choices": [
+        {
+          "id": "a",
+          "label": "Pooled tables for small tenants, a database each for the 5 enterprise ones",
+          "feedback": "Right: the cheap model covers most tenants and only five databases need separate care."
+        },
+        {
+          "id": "b",
+          "label": "A schema per tenant for all 8,005 tenants",
+          "feedback": "Isolates well, but every migration and check runs 8,005 times for a small team."
+        },
+        {
+          "id": "c",
+          "label": "Pooled tables for everyone, protected by row-level security",
+          "feedback": "Cheapest to run, but restoring one enterprise tenant means picking its rows out of a shared backup."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Mixed tenancy is common: pool the long tail for cost, and silo the few tenants whose contracts or size demand it. A routing table from tenant to database makes moving a tenant later a planned operation rather than a rewrite."
+    },
+    "seeAlso": [
+      {
+        "topicId": 306,
+        "why": "A missing tenant filter is a broken access control bug, the top web risk"
+      },
+      {
+        "topicId": 225,
+        "why": "Authorisation decides what a user may do; tenancy decides whose data they can reach"
+      },
+      {
+        "topicId": 233,
+        "why": "Per-tenant rate limits are the first line of defence against noisy neighbours"
+      }
+    ]
+  },
+  {
+    "id": 534,
+    "slug": "tail-latency-in-fan-out",
+    "region": "f2-backend",
+    "order": 30,
+    "title": "Tail Latency in Fan-out Requests",
+    "kind": "lesson",
+    "objectives": [
+      "Work out how often a fan-out request waits on at least one slow backend",
+      "Explain why the slowest call, not the average, sets the response time",
+      "Cut the tail with hedged requests, per-call deadlines and partial results"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 13,
+    "prereqIds": [
+      239
+    ],
+    "cards": [
+      {
+        "id": "t534-c1",
+        "kind": "text",
+        "title": "The slowest shard sets the pace",
+        "body": "A search query is sent to 100 index shards and the answer waits for all of them. If each shard is slower than its own p99 on 1% of calls, independently, the chance that at least one of the 100 is slow is 1 − 0.99¹⁰⁰ ≈ 63%. So most queries, including the median one, wait about as long as a shard’s p99. Fan-out turns a rare per-server delay into the normal case for the whole request.",
+        "teaches": [
+          "fanout-tail"
+        ]
+      },
+      {
+        "id": "t534-c2",
+        "kind": "text",
+        "title": "Worked example: the same 1% at fan-out 10, 50 and 100",
+        "body": "With a 1% slow rate per call: 10 calls give 1 − 0.99¹⁰ ≈ 9.6% slow requests; 50 give about 39.5%; 100 give about 63.4%. Turning it around, to keep slow requests at 1% with 100 calls, each call may be slow only about 0.01% of the time, since 1 − 0.9999¹⁰⁰ ≈ 1%. That is why large fan-out systems care about each server’s p99.9 and p99.99, not its average.",
+        "teaches": [
+          "fanout-tail"
+        ]
+      },
+      {
+        "id": "t534-c3",
+        "kind": "diagram",
+        "title": "A hedged read",
+        "body": "Send a backup copy only when the first one is already slow.",
+        "teaches": [
+          "hedging"
+        ],
+        "steps": [
+          "Send the read to replica A",
+          "Wait as long as A’s p95 latency, say 20 ms",
+          "Still no reply: send the same read to replica B",
+          "Use whichever reply arrives first and cancel the other",
+          "Only about 5% of reads are hedged, so the extra load is about 5%"
+        ]
+      },
+      {
+        "id": "t534-c4",
+        "kind": "text",
+        "title": "Deadlines, partial answers and less fan-out",
+        "body": "Give each backend call its own deadline inside the request’s budget, and decide what to do when it passes. Search and feeds can return what 98 of 100 shards found and mark the result as partial. Reduce fan-out where you can: fewer, larger shards, or route a query only to the shards that can hold matches. Keep slow requests from queueing ahead of fast ones with separate pools for expensive work.",
+        "teaches": [
+          "partial-results"
+        ]
+      },
+      {
+        "id": "t534-c5",
+        "kind": "text",
+        "title": "Trap: hedging at once, or hedging writes",
+        "body": "Sending two copies of every request doubles load, and under heavy load that makes the tail worse, not better. Hedging a write that is not idempotent, such as a payment, can apply it twice. Hedge reads and idempotent calls, wait about the p95 before sending the second copy, cap hedges at a few percent of traffic, and cancel the loser so it stops using capacity.",
+        "teaches": [
+          "hedging"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t534-a1",
+        "concept": "fanout-tail",
+        "type": "multiple_choice",
+        "prompt": "A page waits for 50 backend calls, each slow 1% of the time independently. About how often is the page slow?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "About 1%"
+          },
+          {
+            "id": "b",
+            "label": "About 5%"
+          },
+          {
+            "id": "c",
+            "label": "About 40%"
+          },
+          {
+            "id": "d",
+            "label": "About 50%"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "a: that is the per-call rate; the page waits for all 50. b: that is 5 calls’ worth, roughly 1 − 0.99⁵. c: correct, 1 − 0.99⁵⁰ ≈ 39.5%. d: simply adding 50 × 1% overstates it, because some pages have several slow calls at once."
+      },
+      {
+        "id": "t534-a2",
+        "concept": "hedging",
+        "type": "multiple_choice",
+        "prompt": "When should a hedged second request usually be sent?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "At the same moment as the first request"
+          },
+          {
+            "id": "b",
+            "label": "Only after the first request returns an error"
+          },
+          {
+            "id": "c",
+            "label": "Once the first has taken about its p95 latency"
+          },
+          {
+            "id": "d",
+            "label": "After the client’s full timeout has expired"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "a: hedging every request at once doubles the load. b: waiting for an error helps failures, not slow replies. c: correct, by then the first copy is in its slowest 5%, so a fresh copy probably finishes sooner, at about 5% extra load. d: by then the caller has given up and the hedge is useless."
+      },
+      {
+        "id": "t534-a3",
+        "concept": "hedging",
+        "type": "multiple_choice",
+        "prompt": "Which call is unsafe to hedge without extra work?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A GET for a product page"
+          },
+          {
+            "id": "b",
+            "label": "A search query across shards"
+          },
+          {
+            "id": "c",
+            "label": "A POST that charges a card"
+          },
+          {
+            "id": "d",
+            "label": "A read of one user’s settings"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "a: reads have no side effects, so a duplicate costs only capacity. b: a search is a read; duplicates are harmless. c: correct, two copies could charge twice unless the call carries an idempotency key. d: also a read."
+      },
+      {
+        "id": "t534-a4",
+        "concept": "partial-results",
+        "type": "multiple_choice",
+        "prompt": "A search fans out to 100 shards with a 50 ms deadline each, and 2 shards miss it. What do many search systems do?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Fail the whole query with a 500 error"
+          },
+          {
+            "id": "b",
+            "label": "Return the 98 shards’ results, marked partial"
+          },
+          {
+            "id": "c",
+            "label": "Wait for the 2 shards with no deadline"
+          },
+          {
+            "id": "d",
+            "label": "Retry all 100 shards from the start"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "a: failing loses 98% of good results over 2% missing. b: correct, a slightly incomplete answer on time is usually better for search and feeds. c: the query then takes as long as the slowest shard, which is the problem. d: retrying everything doubles load and still waits for the slow shards."
+      },
+      {
+        "id": "t534-a5",
+        "concept": "fanout-tail",
+        "type": "multiple_choice",
+        "prompt": "Each request touches 100 shards. To keep slow requests near 1%, roughly how often may each shard be slow?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "1% of the time"
+          },
+          {
+            "id": "b",
+            "label": "0.5% of the time"
+          },
+          {
+            "id": "c",
+            "label": "0.1% of the time"
+          },
+          {
+            "id": "d",
+            "label": "0.01% of the time"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "a: that makes about 63% of requests slow. b: about 39% slow. c: about 9.5% slow. d: correct, 1 − 0.9999¹⁰⁰ ≈ 1%, so each shard needs a hundred times fewer slow calls than the target."
+      },
+      {
+        "id": "t534-a6",
+        "concept": "hedging",
+        "type": "drag_order",
+        "prompt": "Order the steps of a hedged read.",
+        "items": [
+          {
+            "id": "s4",
+            "label": "Take the first reply that arrives"
+          },
+          {
+            "id": "s1",
+            "label": "Send the read to one replica"
+          },
+          {
+            "id": "s5",
+            "label": "Cancel the slower request"
+          },
+          {
+            "id": "s3",
+            "label": "When the timer fires, send the same read to a second replica"
+          },
+          {
+            "id": "s2",
+            "label": "Start a timer at that replica’s p95 latency"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "The timer is what keeps hedging cheap: only the slowest few percent of reads ever get a second copy."
+      },
+      {
+        "id": "t534-a7",
+        "concept": "fanout-tail",
+        "type": "estimation",
+        "prompt": "A query fans out to 200 shards, each slower than its p99 on 1% of calls, independently. What percent of queries wait on at least one slow shard?",
+        "unit": "%",
+        "target": 87,
+        "assumptions": [
+          "Shards are slow independently",
+          "1% slow rate per shard"
+        ],
+        "formula": "1 − 0.99²⁰⁰",
+        "workedAnswer": "0.99²⁰⁰ ≈ 0.134, so about 87% of queries",
+        "explanation": "Design implication: at this fan-out a shard’s p99 is roughly the query’s median, so work on shard tails pays off far more than tuning averages.",
+        "tolerance": 0.05,
+        "trapAnswers": [
+          1,
+          50
+        ]
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t534-f1",
+        "front": "Chance a fan-out of n waits on a slow call?",
+        "back": "1 − (1 − p)^n; with p = 1% and n = 100 it is about 63%."
+      },
+      {
+        "id": "t534-f2",
+        "front": "Hedged request?",
+        "back": "After about the p95 delay, send a second copy of a read; use the first reply and cancel the other."
+      },
+      {
+        "id": "t534-f3",
+        "front": "Two other tail cutters?",
+        "back": "Per-call deadlines with partial results, and less fan-out per request."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Google SRE book: Monitoring distributed systems",
+        "url": "https://sre.google/sre-book/monitoring-distributed-systems/"
+      },
+      {
+        "title": "gRPC: Request hedging",
+        "url": "https://grpc.io/docs/guides/request-hedging/"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "fanout-tail",
+        "hedging",
+        "partial-results"
+      ],
+      "mechanism": {
+        "title": "Why fan-out amplifies the tail and how hedging trims it",
+        "steps": [
+          "A fan-out request sends one call to each of n backends, such as index shards, and waits for every reply. Its latency is the maximum of n latencies, not their average. If each backend is slow with probability p, independently, the request is slow with probability 1 − (1 − p)^n. With p = 1% and n = 100 that is about 63%, so the request’s median sits near the backends’ p99.",
+          "Slow calls have ordinary causes: a garbage collection pause, a busy disk, a noisy neighbour on the same host, a queue behind one expensive request, a cache miss. They are mostly short and mostly independent between machines. That is what hedging exploits: the same request sent to a different replica a moment later will probably not hit the same bad luck.",
+          "A hedged read sends the request to one replica, waits for a delay near that replica’s p95, and if no reply has arrived sends a copy to a second replica. Whichever answers first wins and the other is cancelled. Because only the slowest 5% of reads are hedged, the extra load is about 5%, while the slowest replies are replaced by a second, usually fast, attempt.",
+          "Hedging needs safe calls and limits. The request must be a read or idempotent, the hedge rate must be capped, for example at a few percent of traffic, so it cannot double load during an incident, and cancellation must reach the server so the losing copy stops using capacity. When all replicas are slow because the whole service is overloaded, hedging cannot help and should back off.",
+          "Other tools work alongside it. A per-call deadline, taken from the request’s total budget, bounds how long any one backend can hold the response; the caller can then return a partial answer and say so. Reducing fan-out, through fewer, larger shards or routing a query only to shards that can match, shrinks n directly. Separating expensive requests into their own pool stops them queueing in front of cheap ones."
+        ]
+      },
+      "useWhen": [
+        "Requests that wait on many backends: search, feeds, dashboards, scatter-gather queries.",
+        "Read paths where a p99 target matters more than a small increase in load."
+      ],
+      "avoidWhen": [
+        "Avoid hedging writes or calls that are not idempotent.",
+        "Avoid hedging during overload; it adds load when there is none to spare."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Technique",
+          "Cuts",
+          "Costs"
+        ],
+        "rows": [
+          [
+            "Hedged requests",
+            "Slow outliers on reads",
+            "A few percent extra load"
+          ],
+          [
+            "Per-call deadline with partial results",
+            "Waiting on stragglers",
+            "Answers may be incomplete"
+          ],
+          [
+            "Less fan-out per request",
+            "The chance of hitting a slow call",
+            "Re-sharding or smarter routing"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "What hedging costs and buys",
+        "assumptions": [
+          "10,000 reads per second",
+          "Hedge delay at the p95, about 20 ms",
+          "A second attempt is fast 95% of the time, independently"
+        ],
+        "steps": [
+          "Reads still waiting after 20 ms: 5% of 10,000 = 500 per second get a second copy.",
+          "Extra load: 500 ÷ 10,000 = 5%, a little less once cancelled losers stop early.",
+          "Without hedging, 5% of reads get no reply within 20 ms, and some of those take far longer.",
+          "With hedging, a read is stuck only if the first copy passes 20 ms and the second is also in its slowest 5%: 5% × 5% = 0.25%. The rest finish in about 20 ms plus a normal reply."
+        ],
+        "result": "Hedging is cheap when slowness is random and independent; it does nothing when every replica is slow for the same reason."
+      },
+      "india": {
+        "title": "A home screen built from many services",
+        "label": "Illustrative example",
+        "body": "Illustrative: a food-delivery app’s home screen asks a dozen services for restaurants, offers, delivery estimates and recommendations. The team sets a 150 ms budget, gives each call its own deadline, and renders the screen without the recommendations block when that service misses it, marking the block to fill in later. Reads to the restaurant catalogue are hedged after their p95, while the order-placing call is never hedged and carries an idempotency key instead."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Our servers have a 10 ms average, so pages are fast.”",
+          "say": "“With fan-out the page waits for the slowest call, so I’d look at the backends’ p99 and p99.9.”"
+        },
+        {
+          "trap": "“Send every request twice and take the fastest.”",
+          "say": "“I’d hedge only after the p95 delay, cap the rate, and never hedge non-idempotent writes.”"
+        }
+      ],
+      "takeaways": [
+        "A fan-out request is as slow as its slowest call: 1 − (1 − p)^n.",
+        "At high fan-out, backend p99 becomes the request median.",
+        "Hedge reads after the p95 delay, capped and cancelled.",
+        "Deadlines with partial results and less fan-out also trim the tail."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Hedging every request",
+      "prompt": "A service sends every read to two replicas at once and uses the first reply. During a traffic spike, all replicas are at 90% CPU. What happens to its p99 latency?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "It rises, because the copies add load to busy replicas",
+          "feedback": "Right: doubled traffic deepens the queues on every replica, so both copies are slow."
+        },
+        {
+          "id": "b",
+          "label": "It falls, because one of the two copies is always fast",
+          "feedback": "Only when slowness is random; under overload every replica is slow for the same reason."
+        },
+        {
+          "id": "c",
+          "label": "It stays the same, because the extra copy is cancelled",
+          "feedback": "Cancelling happens after the winner replies; the loser has already queued and used capacity."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Hedging helps when slowness is random and capacity is spare. Wait for the p95 before hedging, cap hedges at a few percent of traffic, and turn them off when the service is overloaded."
+    },
+    "seeAlso": [
+      {
+        "topicId": 239,
+        "why": "Per-call deadlines come from the request’s total budget passed down the chain"
+      },
+      {
+        "topicId": 229,
+        "why": "Percentiles, not averages, are what reveal a fan-out tail problem"
+      },
+      {
+        "topicId": 53,
+        "why": "Timeouts, retries and circuit breakers are the other half of handling slow dependencies"
+      }
+    ]
+  },
+  {
+    "id": 535,
+    "slug": "long-running-operations-in-apis",
+    "region": "f2-backend",
+    "order": 31,
+    "title": "Long-Running Operations in APIs",
+    "kind": "lesson",
+    "objectives": [
+      "Accept slow work with 202 Accepted and a status resource the client can poll",
+      "Keep polling cheap and retries safe with Retry-After, callbacks and idempotency keys",
+      "Support cancellation, failure states and expiry of operations and their results"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [
+      227
+    ],
+    "cards": [
+      {
+        "id": "t535-c1",
+        "kind": "text",
+        "title": "Hand back a ticket, not a held connection",
+        "body": "Generating a 2 GB export can take four minutes. Holding the HTTP request open that long fails in ordinary ways: proxies and load balancers close idle connections (60 seconds is a common default), mobile networks drop, and every waiting request holds a server connection. Instead, accept the work, queue it and reply 202 Accepted with a Location header such as /operations/op_81. The client polls that URL until the operation finishes, then fetches the result.",
+        "teaches": [
+          "async-202"
+        ]
+      },
+      {
+        "id": "t535-c2",
+        "kind": "diagram",
+        "title": "Life of an operation",
+        "body": "The status resource is the record of where the work stands.",
+        "teaches": [
+          "async-202",
+          "operation-states"
+        ],
+        "steps": [
+          "POST /exports with an Idempotency-Key; reply 202 and Location: /operations/op_81",
+          "A worker picks it up: status moves from queued to running, with progress",
+          "The client polls the status URL, waiting as long as Retry-After says",
+          "Finished: status done with a link to the result, or failed with an error",
+          "The operation and its result expire after a stated time, such as 7 days"
+        ]
+      },
+      {
+        "id": "t535-c3",
+        "kind": "text",
+        "title": "Worked example: what polling costs",
+        "body": "50,000 exports a day, each running about 4 minutes. If clients poll every second, that is 240 polls each, or 12M status requests a day for 50,000 jobs. Polling every 10 seconds cuts it to 1.2M. Backing off instead (1, 2, 4, 8, 16 s, then every 30 s) needs only about a dozen polls per job, around 600,000 a day. Send Retry-After on each status reply so the server, not the client, sets the pace.",
+        "teaches": [
+          "polling"
+        ]
+      },
+      {
+        "id": "t535-c4",
+        "kind": "text",
+        "title": "Callbacks alongside the status URL",
+        "body": "A webhook on completion saves clients from polling at all, but webhooks get lost: the receiver is down, a firewall blocks it, or a retry gives up. Keep the status URL as the record and treat the callback as a hint that it is worth checking now. Sign callbacks so the receiver can tell they came from you, and include only the operation id, so a forged or replayed callback reveals nothing.",
+        "teaches": [
+          "polling"
+        ]
+      },
+      {
+        "id": "t535-c5",
+        "kind": "text",
+        "title": "Trap: a retried POST starts a second job",
+        "body": "The client’s POST times out before the 202 arrives, so it retries, and two exports run. Require an Idempotency-Key on the POST and return the same operation id for a repeat. Also plan for the unhappy endings: a cancel request moves the operation to cancelling and then cancelled, workers check for it between chunks, a worker that stops sending heartbeats gets its operation retried or marked failed, and done, failed and cancelled are final.",
+        "teaches": [
+          "async-idempotency",
+          "operation-states"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t535-a1",
+        "concept": "async-202",
+        "type": "multiple_choice",
+        "prompt": "An endpoint starts a report that takes about 3 minutes to build. What should the first response be?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "200 OK, sent once the report finishes"
+          },
+          {
+            "id": "b",
+            "label": "202 Accepted with a status URL"
+          },
+          {
+            "id": "c",
+            "label": "201 Created with an empty report body"
+          },
+          {
+            "id": "d",
+            "label": "504 Gateway Timeout, asking for a retry"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "a: the connection must stay open for 3 minutes, and proxies may close it first. b: correct, the work is accepted and the client gets somewhere to check on it. c: 201 says the resource exists now, which it does not. d: a 504 tells the client something failed, and a retry would start the work again."
+      },
+      {
+        "id": "t535-a2",
+        "concept": "polling",
+        "type": "multiple_choice",
+        "prompt": "How should a server tell clients how often to poll an operation’s status?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Close the connection when a client polls too soon"
+          },
+          {
+            "id": "b",
+            "label": "Reply 429 to every poll until the work is done"
+          },
+          {
+            "id": "c",
+            "label": "Document a fixed 1-second interval for all"
+          },
+          {
+            "id": "d",
+            "label": "Send a Retry-After header on each status reply"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "a: closing connections looks like a network error and invites fast retries. b: 429 to well-behaved clients turns normal polling into errors. c: a fixed 1-second interval creates heavy load for long jobs. d: correct, the server can lengthen the wait for long jobs or under load."
+      },
+      {
+        "id": "t535-a3",
+        "concept": "operation-states",
+        "type": "multiple_choice",
+        "prompt": "A status URL says “running” for hours because the worker crashed. What fixes this?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Clients poll more often so they notice sooner"
+          },
+          {
+            "id": "b",
+            "label": "A heartbeat timeout that retries or marks it failed"
+          },
+          {
+            "id": "c",
+            "label": "The status endpoint returns 500 while a job runs"
+          },
+          {
+            "id": "d",
+            "label": "Status records are deleted after one hour"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "a: polling faster just reads the same stale status more often. b: correct, a worker that stops heartbeating has its operation retried or moved to failed, so clients get a final state. c: a 500 tells the client the status service broke, not the job. d: deleting the record leaves the client with a 404 and no explanation."
+      },
+      {
+        "id": "t535-a4",
+        "concept": "async-idempotency",
+        "type": "multiple_choice",
+        "prompt": "A POST /exports times out before the 202 arrives, and the client retries with the same Idempotency-Key. What should happen?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A second export starts under a new id"
+          },
+          {
+            "id": "b",
+            "label": "The server replies 409 with no id"
+          },
+          {
+            "id": "c",
+            "label": "The server returns the same operation id"
+          },
+          {
+            "id": "d",
+            "label": "The first export is cancelled and restarted"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "a: that is the duplicate the key exists to prevent. b: a 409 leaves the client unable to find the job it started. c: correct, the client gets the status URL of the export that is already running. d: restarting wastes the work already done."
+      },
+      {
+        "id": "t535-a5",
+        "concept": "polling",
+        "type": "multiple_choice",
+        "prompt": "Why keep a status URL when you also send a completion webhook?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Webhooks cannot carry the result’s location"
+          },
+          {
+            "id": "b",
+            "label": "Status URLs are needed to authenticate"
+          },
+          {
+            "id": "c",
+            "label": "Clients must poll before a webhook is sent"
+          },
+          {
+            "id": "d",
+            "label": "Webhooks can be lost; the URL is the record"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "a: a webhook can carry a link, but it may never arrive. b: authentication is separate from how status is reported. c: clients that get webhooks need not poll at all on the happy path. d: correct, a client that missed the callback can still find out the result."
+      },
+      {
+        "id": "t535-a6",
+        "concept": "operation-states",
+        "type": "drag_order",
+        "prompt": "Order a long-running export from the client’s side.",
+        "items": [
+          {
+            "id": "s4",
+            "label": "See status done with a result link"
+          },
+          {
+            "id": "s1",
+            "label": "POST with an Idempotency-Key"
+          },
+          {
+            "id": "s5",
+            "label": "Download the result before it expires"
+          },
+          {
+            "id": "s3",
+            "label": "Poll, waiting as long as Retry-After says"
+          },
+          {
+            "id": "s2",
+            "label": "Receive 202 and the status URL"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "The key makes the first step safe to retry, and the expiry on the result is why the last step has a deadline."
+      },
+      {
+        "id": "t535-a7",
+        "concept": "polling",
+        "type": "estimation",
+        "prompt": "30,000 operations a day each run about 5 minutes, and clients poll every 2 seconds. Roughly how many status polls is that per day?",
+        "unit": "polls/day",
+        "target": 4500000,
+        "assumptions": [
+          "Each operation is polled from start to finish",
+          "5 minutes is 300 seconds"
+        ],
+        "formula": "30,000 × 300 ÷ 2",
+        "workedAnswer": "150 polls each × 30,000 = 4.5M polls a day",
+        "explanation": "Design implication: a Retry-After of 30 s cuts this to 300,000 polls a day, and a completion webhook cuts it to almost none for clients that can receive one.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          30000,
+          450000
+        ]
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t535-f1",
+        "front": "First response to slow work?",
+        "back": "202 Accepted with a Location header pointing at a status resource."
+      },
+      {
+        "id": "t535-f2",
+        "front": "How is polling kept cheap?",
+        "back": "Retry-After on each status reply, client backoff, and optional webhooks."
+      },
+      {
+        "id": "t535-f3",
+        "front": "Final states of an operation?",
+        "back": "done (with a result link), failed (with an error) or cancelled."
+      }
+    ],
+    "sources": [
+      {
+        "title": "RFC 9110: 202 Accepted",
+        "url": "https://www.rfc-editor.org/rfc/rfc9110#name-202-accepted"
+      },
+      {
+        "title": "RFC 9110: Retry-After",
+        "url": "https://www.rfc-editor.org/rfc/rfc9110#name-retry-after"
+      },
+      {
+        "title": "Microsoft Learn: Asynchronous Request-Reply pattern",
+        "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/async-request-reply"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "async-202",
+        "operation-states",
+        "polling",
+        "async-idempotency"
+      ],
+      "mechanism": {
+        "title": "How an API runs work that outlasts a request",
+        "steps": [
+          "The client sends the request with an Idempotency-Key. The server validates it, checks the key and stores a new operation record, with an id, a status of queued, the request parameters and an expiry time, in the same transaction that enqueues the job. It replies 202 Accepted, a Location header pointing at /operations/{id}, and a small body with the id and status. If the key was seen before, it returns the existing operation instead.",
+          "A worker takes the job, marks the operation running and updates progress as it goes, such as rows exported or a percentage. It sends heartbeats while it works. A supervisor looks for running operations whose heartbeat has stopped, then retries them if the work is idempotent or marks them failed with a reason, so no client polls a dead job forever.",
+          "Clients poll the status URL. Each reply says the status and carries a Retry-After header, short at first and longer for jobs known to be slow or when the system is busy. Clients back off between polls and stop at a final state. Clients that can receive webhooks register a callback URL and get a signed notification on completion, but the status resource remains the record they can always check.",
+          "The operation ends in one final state. done includes a link to the result, often a short-lived signed URL to a file in object storage. failed includes a machine-readable error code and a message. cancelled follows a cancel request: the API marks the operation cancelling, the worker checks for that between chunks, cleans up and marks it cancelled. A final state never changes again.",
+          "Operations and results do not live forever. The API documents how long they are kept, for example 7 days, after which the status URL returns 404 or 410 and the result file is deleted. A cleanup job enforces this. The documented limit lets clients plan, and it stops storage from growing without bound as millions of old exports pile up."
+        ]
+      },
+      "useWhen": [
+        "Exports, reports, media processing and other work that takes more than a few seconds.",
+        "Requests whose duration varies widely and can exceed proxy timeouts."
+      ],
+      "avoidWhen": [
+        "Avoid it for work that reliably finishes within about a second; a direct reply is simpler.",
+        "Avoid polling every second with no Retry-After; it creates load out of nothing."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Pattern",
+          "Client effort",
+          "Server cost",
+          "When things go wrong"
+        ],
+        "rows": [
+          [
+            "Synchronous reply",
+            "None",
+            "A held connection per request",
+            "Timeouts lose the result"
+          ],
+          [
+            "202 plus polling",
+            "Poll and back off",
+            "Status reads",
+            "Client can always check status"
+          ],
+          [
+            "202 plus webhook",
+            "Receive callbacks",
+            "Delivery and retries",
+            "Lost callbacks need a fallback"
+          ],
+          [
+            "202, polling and webhook",
+            "Callback, with polling as backup",
+            "Both",
+            "Most robust"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Held connections versus a ticket",
+        "assumptions": [
+          "1 export request arrives per second",
+          "Each export takes 240 s to build",
+          "The 202 reply takes about 50 ms"
+        ],
+        "steps": [
+          "Synchronous: by Little’s law, concurrent requests = arrival rate × time = 1 × 240 = 240 connections held open.",
+          "Each held connection also needs a worker waiting on it, and any proxy with a 60 s idle timeout will cut them first.",
+          "Asynchronous: 1 × 0.05 s = 0.05 connections busy on average for the requests themselves.",
+          "The 240 builds still run, but on queue workers whose number you choose, not on request threads."
+        ],
+        "result": "A ticket moves long work off the request path, where it no longer holds connections or depends on proxy timeouts."
+      },
+      "india": {
+        "title": "Bank statements and tax data exports",
+        "label": "Illustrative example",
+        "body": "Illustrative: an accounting app lets a firm download twelve months of transactions for all its clients ahead of the tax filing deadline. The export can take several minutes and many firms ask in the same week. The API returns 202 with a status URL, sends Retry-After of 15 seconds and then longer, and notifies the firm’s webhook when the file is ready. The result link expires after seven days, and a retried request with the same idempotency key returns the export already running instead of starting another."
+      },
+      "pitfalls": [
+        {
+          "trap": "“We just raised the load balancer timeout to 10 minutes.”",
+          "say": "“I’d return 202 with a status URL, so long work does not depend on any proxy timeout.”"
+        },
+        {
+          "trap": "“The webhook tells them when it is done.”",
+          "say": "“I’d keep a status URL as the record too, because callbacks can be lost.”"
+        }
+      ],
+      "takeaways": [
+        "Reply 202 with a status URL for work that outlasts a request.",
+        "Use Retry-After and backoff to keep polling cheap; add signed callbacks.",
+        "Require an idempotency key so a retried POST does not start a second job.",
+        "Define final states, heartbeats, cancellation and expiry."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "A slow PDF behind a load balancer",
+      "prompt": "An endpoint builds PDFs synchronously. Most take 20 s, but large ones take 90 s. The load balancer closes connections idle for 60 s. What do users with large PDFs see?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "A timeout error while the server keeps building the PDF",
+          "feedback": "Right: the load balancer gives up at 60 s, but the work continues and its result has nowhere to go."
+        },
+        {
+          "id": "b",
+          "label": "The PDF, just after a longer wait",
+          "feedback": "The connection is closed at 60 s, before the reply exists."
+        },
+        {
+          "id": "c",
+          "label": "A 202 response that the load balancer adds for them",
+          "feedback": "Load balancers do not convert slow requests into asynchronous ones."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "The user gets an error, retries and starts a second 90-second build. Return 202 with a status URL, build in a worker, and the timeout stops mattering."
+    },
+    "seeAlso": [
+      {
+        "topicId": 227,
+        "why": "The work behind a 202 runs as a background job on a queue"
+      },
+      {
+        "topicId": 224,
+        "why": "Idempotency keys make the starting POST safe to retry"
+      },
+      {
+        "topicId": 237,
+        "why": "Completion callbacks are webhooks and should be signed and retried the same way"
+      }
+    ]
+  },
+  {
+    "id": 536,
+    "slug": "testing-a-backend-service",
+    "region": "f2-backend",
+    "order": 32,
+    "title": "Testing a Service: Unit, Integration and Contract Tests",
+    "kind": "lesson",
+    "objectives": [
+      "Match unit, integration, contract and end-to-end tests to the risks they catch",
+      "Test data access against a real database instead of a mock that agrees with you",
+      "Keep tests fast and repeatable by controlling time, randomness and shared state"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 13,
+    "prereqIds": [
+      221
+    ],
+    "cards": [
+      {
+        "id": "t536-c1",
+        "kind": "text",
+        "title": "Match the test to the risk",
+        "body": "Unit tests check pure logic, such as a price or tax calculation, in milliseconds. Integration tests run your code against real dependencies, above all the database, and catch wrong SQL, missing migrations and violated constraints, in about a second each. Contract tests check that your API still gives each consumer the fields and types it relies on. End-to-end tests drive a whole user journey across services; they are slow and fail for unrelated reasons, so keep a few for the critical paths.",
+        "teaches": [
+          "test-levels"
+        ]
+      },
+      {
+        "id": "t536-c2",
+        "kind": "text",
+        "title": "Worked example: the bug a mock agreed with",
+        "body": "A sign-up handler relies on a unique constraint on email and turns the database’s unique-violation error into a 409. The unit test mocks the repository to “throw a duplicate error”, and passes. In production the driver reports the violation with a different error code from the one the handler checks, so users get a 500. Only a test against a real database, started fresh in a container and migrated with the real migrations, exercises the constraint and the actual error the driver returns.",
+        "teaches": [
+          "real-dependencies"
+        ]
+      },
+      {
+        "id": "t536-c3",
+        "kind": "diagram",
+        "title": "A consumer-driven contract test",
+        "body": "Each consumer states what it relies on; the provider checks it on every build.",
+        "teaches": [
+          "contract-tests"
+        ],
+        "steps": [
+          "The consumer records the requests it sends and the response fields it reads",
+          "Those expectations are published as a contract file",
+          "The provider’s build replays each request against the real provider",
+          "A removed field or changed type fails the provider’s build, before release",
+          "Both sides deploy knowing they still agree"
+        ]
+      },
+      {
+        "id": "t536-c4",
+        "kind": "text",
+        "title": "Flaky tests come from hidden inputs",
+        "body": "A test that sometimes fails usually reads something it does not control: the clock, random numbers, test order, data left by another test, or a real network call. Pass in a clock the test can set, seed random generators, give each test its own data (a rolled-back transaction or unique ids), and wait for a condition rather than a fixed sleep. Flakiness adds up: 400 tests that each fail 0.5% of the time make 1 − 0.995⁴⁰⁰ ≈ 86% of runs go red.",
+        "teaches": [
+          "flaky-tests"
+        ]
+      },
+      {
+        "id": "t536-c5",
+        "kind": "text",
+        "title": "Trap: chasing coverage instead of risks",
+        "body": "90% line coverage can still miss the concurrent double booking, the migration that locks a table, the timeout path and the retried request. Coverage shows which lines ran, not whether the failure cases were checked. List the ways the service can fail, such as a dependency timeout, a duplicate request, a partial write or a bad input, and write a test for each one.",
+        "teaches": [
+          "test-levels"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t536-a1",
+        "concept": "test-levels",
+        "type": "multiple_choice",
+        "prompt": "Which test best catches a wrong tax calculation for a cart?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "An end-to-end test run through the browser"
+          },
+          {
+            "id": "b",
+            "label": "A contract test against the payments API"
+          },
+          {
+            "id": "c",
+            "label": "A unit test of the price function"
+          },
+          {
+            "id": "d",
+            "label": "A load test at expected peak traffic"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "a: it could catch it, slowly, and a failure would not say which part was wrong. b: a contract checks the shape of calls between services, not the arithmetic. c: correct, pure logic is best tested directly with many cases, including rounding edges. d: load tests measure capacity, not correctness."
+      },
+      {
+        "id": "t536-a2",
+        "concept": "real-dependencies",
+        "type": "multiple_choice",
+        "prompt": "A test with a mocked database passes, but production returns 500 on duplicate sign-ups. What would have caught it?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "More unit tests around the mocked handler"
+          },
+          {
+            "id": "b",
+            "label": "A higher line-coverage threshold in CI"
+          },
+          {
+            "id": "c",
+            "label": "Running the same suite twice in a row"
+          },
+          {
+            "id": "d",
+            "label": "An integration test on a real database"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "a: more tests against the same mock repeat the same wrong assumption. b: the lines already ran; coverage cannot see the wrong error mapping. c: a deterministic test passes twice just as easily. d: correct, a real database raises the real constraint error and exposes the mapping bug."
+      },
+      {
+        "id": "t536-a3",
+        "concept": "contract-tests",
+        "type": "multiple_choice",
+        "prompt": "A provider team renames a JSON field. With consumer-driven contract tests, what fails first?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The provider’s own build"
+          },
+          {
+            "id": "b",
+            "label": "The consumer’s production traffic"
+          },
+          {
+            "id": "c",
+            "label": "The consumer’s unit tests"
+          },
+          {
+            "id": "d",
+            "label": "A nightly end-to-end run"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "a: correct, the provider replays each consumer’s expectations and the missing field fails its build before release. b: that is what happens without contracts. c: the consumer’s tests use its own stub of the provider, which still has the old field. d: an end-to-end run might notice later, if it covers that field."
+      },
+      {
+        "id": "t536-a4",
+        "concept": "flaky-tests",
+        "type": "multiple_choice",
+        "prompt": "A test checks that a token “expires in 1 hour” and fails a few times a week, always near midnight. What is the right fix?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Retry the test up to three times in CI"
+          },
+          {
+            "id": "b",
+            "label": "Inject a clock the test can control"
+          },
+          {
+            "id": "c",
+            "label": "Raise the test’s timeout to one hour"
+          },
+          {
+            "id": "d",
+            "label": "Run the suite only during working hours"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "a: retries hide the flakiness and the bug it may point to. b: correct, the code reads time from a clock the test sets, so the result no longer depends on when it runs. c: the failure is about dates, not slowness. d: avoiding midnight hides a real date-boundary bug that users will hit."
+      },
+      {
+        "id": "t536-a5",
+        "concept": "flaky-tests",
+        "type": "multiple_choice",
+        "prompt": "Tests pass one at a time but fail when the suite runs in random order. What is the likely cause?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The CI machine has too little memory"
+          },
+          {
+            "id": "b",
+            "label": "A race inside the test framework itself"
+          },
+          {
+            "id": "c",
+            "label": "Shared state left behind by another test"
+          },
+          {
+            "id": "d",
+            "label": "The database is too slow under parallel load"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "a: memory pressure fails tests regardless of order. b: possible but rare; suspect your own tests first. c: correct, one test leaves data or settings that another depends on or trips over; isolate each test’s data. d: slowness causes timeouts, which do not depend on order."
+      },
+      {
+        "id": "t536-a6",
+        "concept": "real-dependencies",
+        "type": "drag_order",
+        "prompt": "Order the steps of an isolated database integration test.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Begin a transaction for this test"
+          },
+          {
+            "id": "s5",
+            "label": "Roll back so the next test starts clean"
+          },
+          {
+            "id": "s1",
+            "label": "Start a fresh database, for example in a container"
+          },
+          {
+            "id": "s4",
+            "label": "Run the code and check the rows it wrote"
+          },
+          {
+            "id": "s2",
+            "label": "Apply the real migrations"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Real migrations prove the schema, and the rollback gives every test the same starting point without rebuilding the database."
+      },
+      {
+        "id": "t536-a7",
+        "concept": "flaky-tests",
+        "type": "estimation",
+        "prompt": "A suite has 300 tests and each fails at random 0.2% of the time, independently. Roughly what percent of runs fail at least once?",
+        "unit": "%",
+        "target": 45,
+        "assumptions": [
+          "Failures are independent",
+          "No real bugs are present"
+        ],
+        "formula": "1 − 0.998³⁰⁰",
+        "workedAnswer": "0.998³⁰⁰ ≈ 0.55, so about 45% of runs",
+        "explanation": "Sanity check: nearly half the runs go red with no real bug, so people stop trusting the suite; each flaky test is worth fixing.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          0.2,
+          60
+        ]
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t536-f1",
+        "front": "What does an integration test catch that a unit test misses?",
+        "back": "Wrong SQL, missing migrations and real constraint errors from the actual database."
+      },
+      {
+        "id": "t536-f2",
+        "front": "Consumer-driven contract?",
+        "back": "Consumers publish what they rely on; the provider’s build checks it before release."
+      },
+      {
+        "id": "t536-f3",
+        "front": "Usual causes of flaky tests?",
+        "back": "Time, randomness, test order, shared data and real network calls."
+      }
+    ],
+    "sources": [
+      {
+        "title": "Martin Fowler: The Practical Test Pyramid",
+        "url": "https://martinfowler.com/articles/practical-test-pyramid.html"
+      },
+      {
+        "title": "Martin Fowler: Consumer-Driven Contracts",
+        "url": "https://martinfowler.com/articles/consumerDrivenContracts.html"
+      },
+      {
+        "title": "Martin Fowler: Eradicating Non-Determinism in Tests",
+        "url": "https://martinfowler.com/articles/nonDeterminism.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "test-levels",
+        "real-dependencies",
+        "contract-tests",
+        "flaky-tests"
+      ],
+      "mechanism": {
+        "title": "How a backend test suite is put together",
+        "steps": [
+          "Start from risks, not layers. List what can go wrong: business rules computed wrongly, queries that return the wrong rows, a migration that breaks old data, an API change that breaks a consumer, a dependency that times out, a request that is retried. Each risk points at the cheapest kind of test that can catch it, and that kind is the one to write.",
+          "Pure logic gets unit tests: functions that take values and return values, with no database or network. Keep business rules in such functions where you can, because they can then be tested with hundreds of cases, including rounding edges and empty inputs, in well under a second. Mocks belong at the boundary of this code, and only for things that are slow or outside your control.",
+          "Data access gets integration tests against the real database engine, the same version as production, started fresh for the test run, often in a container, and built with the real migrations. Each test runs inside a transaction that is rolled back, or uses its own unique ids, so tests do not see each other’s data. These tests catch the bugs mocks cannot: SQL errors, constraint errors, wrong isolation assumptions and slow queries.",
+          "Service boundaries get contract tests. Each consumer records the requests it makes and the parts of the response it reads; the provider’s pipeline replays them on every build. A provider can then remove a field nobody reads without fear, and is stopped from removing one that someone does. A small number of end-to-end tests cover the journeys that would cost the most to break, such as sign-up and checkout.",
+          "Everything runs on every change, so speed and determinism matter. Time, randomness and identifiers are passed in so tests can fix them. Waits poll for a condition with a timeout instead of sleeping. Tests that turn out to be flaky are quarantined and fixed quickly, because a suite that fails at random teaches people to ignore red builds, and then real failures get ignored too."
+        ]
+      },
+      "useWhen": [
+        "Any service that will be changed by more than one person over time.",
+        "Services with consumers in other teams, where contracts prevent surprise breakage."
+      ],
+      "avoidWhen": [
+        "Avoid mocking the database to test queries; the mock agrees with whatever you assumed.",
+        "Avoid a large end-to-end suite as the main safety net; it is slow and fails for unrelated reasons."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Test kind",
+          "Catches",
+          "Speed",
+          "Main cost"
+        ],
+        "rows": [
+          [
+            "Unit",
+            "Logic errors",
+            "Milliseconds",
+            "Misses integration bugs"
+          ],
+          [
+            "Integration with a real database",
+            "SQL, migrations, constraints",
+            "Around a second each",
+            "Needs a database per run"
+          ],
+          [
+            "Contract",
+            "Breaking API changes",
+            "Seconds",
+            "Consumers must maintain contracts"
+          ],
+          [
+            "End-to-end",
+            "Whole-journey breaks",
+            "Tens of seconds each",
+            "Slow and flaky"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "A CI budget of 10 minutes",
+        "assumptions": [
+          "2,000 unit tests at about 5 ms each",
+          "200 integration tests at about 300 ms each",
+          "20 end-to-end tests at about 30 s each",
+          "4 parallel CI workers"
+        ],
+        "steps": [
+          "Unit: 2,000 × 5 ms = 10 s.",
+          "Integration: 200 × 0.3 s = 60 s.",
+          "End-to-end: 20 × 30 s = 600 s, ten times the other two combined.",
+          "Total 670 s, about 11 minutes on one worker; split over 4 workers, about 2.8 minutes."
+        ],
+        "result": "End-to-end tests dominate the time even when there are few of them. Keep each one for a journey that really needs it, and push the rest down to integration and unit tests."
+      },
+      "india": {
+        "title": "A payments integration tested before go-live",
+        "label": "Illustrative example",
+        "body": "Illustrative: a team adding UPI payments to an app tests its fee and refund arithmetic with unit tests, runs integration tests against a real database to check that a repeated payment callback is rejected by a unique constraint, and runs contract tests against the payment provider’s published sandbox behaviour. A handful of end-to-end tests cover pay, refund and a timed-out payment. The flakiest test turned out to depend on the time of day and was fixed by passing in a clock."
+      },
+      "pitfalls": [
+        {
+          "trap": "“We have 90% coverage, so it is well tested.”",
+          "say": "“Coverage shows which lines ran; I’d check that each failure mode, like timeouts and retries, has a test.”"
+        },
+        {
+          "trap": "“We mock the database so tests are fast.”",
+          "say": "“I’d mock it in unit tests but run data access against a real database, since that is where the bugs are.”"
+        }
+      ],
+      "takeaways": [
+        "Pick the cheapest test that can catch each risk.",
+        "Test queries and migrations against a real database.",
+        "Contract tests stop breaking API changes before release.",
+        "Control time, randomness and shared data to keep tests repeatable."
+      ]
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "A test plan for an orders service",
+      "prompt": "Pick the best fit for these constraints.",
+      "setup": [
+        "The orders service owns a relational database schema",
+        "Three other teams call its API",
+        "CI must finish in under 10 minutes"
+      ],
+      "choices": [
+        {
+          "id": "a",
+          "label": "Unit tests, real-database integration tests and consumer contracts",
+          "feedback": "Right: each risk is covered by the cheapest test that catches it, inside the time budget."
+        },
+        {
+          "id": "b",
+          "label": "A large end-to-end suite that runs all four services",
+          "feedback": "Catches cross-service breaks, but it is slow, fails for unrelated reasons and will not fit 10 minutes."
+        },
+        {
+          "id": "c",
+          "label": "Unit tests with a mocked database, for speed",
+          "feedback": "Fast, but SQL, migrations and constraints go untested, and API changes reach consumers unchecked."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Logic in unit tests, data access against a real database, and contracts for the three consumers cover the main risks in a few minutes. Add a handful of end-to-end tests for the journeys that would cost most to break."
+    },
+    "seeAlso": [
+      {
+        "topicId": 323,
+        "why": "These tests are the gates a CI/CD pipeline runs on every change"
+      },
+      {
+        "topicId": 231,
+        "why": "Contract tests are how you know an API change is still backward compatible"
+      },
+      {
+        "topicId": 240,
+        "why": "Schema compatibility checks are contract tests for messages and events"
+      }
+    ]
+  },
+  {
+    "id": 537,
+    "slug": "deleting-data-and-retention",
+    "region": "f2-backend",
+    "order": 33,
+    "title": "Deleting Data: Soft Deletes, Retention and Erasure",
+    "kind": "lesson",
+    "objectives": [
+      "Choose between hard deletes, soft deletes and anonymisation for each kind of record",
+      "Enforce retention periods with scheduled, batched purges or dropped partitions",
+      "Erase a person’s data across replicas, caches, search indexes, logs and backups"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 13,
+    "prereqIds": [
+      225
+    ],
+    "cards": [
+      {
+        "id": "t537-c1",
+        "kind": "text",
+        "title": "Soft delete, hard delete or anonymise",
+        "body": "A soft delete sets deleted_at and hides the row, so it can be undone, but every query must remember to filter it out, and a unique email blocks the person from signing up again; a partial unique index that covers only rows with deleted_at empty fixes that. A hard delete removes the row, which is simplest for privacy and hardest to undo. Anonymising keeps a record that must stay, such as an order for the accounts, but replaces the name, email and address.",
+        "teaches": [
+          "delete-modes"
+        ]
+      },
+      {
+        "id": "t537-c2",
+        "kind": "text",
+        "title": "Worked example: one erasure request, nine places",
+        "body": "A user asks to have their data erased. Their data sits in the main database tables, a read replica (which follows automatically), the cache, the search index, the analytics warehouse, object storage holding their uploads, application logs, outside processors such as the email provider, and the backups. A request that only deletes the users row leaves most of it behind. Keep a data map, a list of every system holding personal data and how to erase from each, and drive erasure from it.",
+        "teaches": [
+          "erasure"
+        ]
+      },
+      {
+        "id": "t537-c3",
+        "kind": "diagram",
+        "title": "A retention purge",
+        "body": "Old data is removed on a schedule, a little at a time, and the job proves it ran.",
+        "teaches": [
+          "retention"
+        ],
+        "steps": [
+          "Policy: delete raw access logs after 90 days",
+          "A daily job finds rows older than the cutoff using an indexed timestamp",
+          "It deletes them in batches of 5,000, pausing between batches",
+          "It records how many rows it deleted, for the audit trail",
+          "An alert fires if the oldest remaining row is past the cutoff"
+        ]
+      },
+      {
+        "id": "t537-c4",
+        "kind": "text",
+        "title": "Backups cannot be edited, so plan around them",
+        "body": "You cannot practically delete one person from last week’s backup. Two common answers: keep backups for a short, documented period and, after any restore, replay a log of erasures before the system goes live; or encrypt each person’s sensitive fields with their own key and delete the key on erasure, which makes every copy unreadable at once. That second approach is called crypto-shredding.",
+        "teaches": [
+          "erasure",
+          "crypto-shredding"
+        ]
+      },
+      {
+        "id": "t537-c5",
+        "kind": "text",
+        "title": "Trap: erasing records the law says to keep",
+        "body": "Some records must be kept for years even after a customer asks for erasure, such as invoices and payment records for tax and accounting law. Erasure then removes what is not required and anonymises or restricts what is. Write the retention period for each kind of data, with its reason, before building the delete button, and put legal holds on top for data under dispute or investigation.",
+        "teaches": [
+          "delete-modes",
+          "retention"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t537-a1",
+        "concept": "delete-modes",
+        "type": "multiple_choice",
+        "prompt": "With soft deletes, a person who deleted their account cannot sign up again with the same email. Why?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The email is still cached in the session store"
+          },
+          {
+            "id": "b",
+            "label": "Soft deletes keep the row locked until a purge"
+          },
+          {
+            "id": "c",
+            "label": "The unique index still covers the deleted row"
+          },
+          {
+            "id": "d",
+            "label": "The deleted_at column is missing an index"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "a: a session cache does not enforce uniqueness in the database. b: a soft delete is an ordinary update and holds no lasting lock. c: correct, the row still exists, so the unique email constraint blocks the new insert; a partial unique index on rows with deleted_at empty fixes it. d: a missing index slows queries but rejects nothing."
+      },
+      {
+        "id": "t537-a2",
+        "concept": "delete-modes",
+        "type": "multiple_choice",
+        "prompt": "An order must be kept for the accounts, but the customer asked to be erased. What fits?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Hard-delete the order along with the customer"
+          },
+          {
+            "id": "b",
+            "label": "Soft-delete the order so it is hidden"
+          },
+          {
+            "id": "c",
+            "label": "Refuse the request until the records expire"
+          },
+          {
+            "id": "d",
+            "label": "Anonymise the personal fields, keep the order"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "a: deleting records the law requires you to keep creates a different problem. b: a hidden row still holds all the personal data. c: the personal data that is not required can and should be removed now. d: correct, the accounting record stays and the name, email and address go."
+      },
+      {
+        "id": "t537-a3",
+        "concept": "crypto-shredding",
+        "type": "multiple_choice",
+        "prompt": "How can a person’s data be made unreadable inside backups you cannot edit?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Mark the person as deleted in the next backup"
+          },
+          {
+            "id": "b",
+            "label": "Compress the backups so the rows are unreadable"
+          },
+          {
+            "id": "c",
+            "label": "Encrypt it with their own key, then delete the key"
+          },
+          {
+            "id": "d",
+            "label": "Restore each backup to delete them, then re-save it"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "a: older backups still contain the data. b: compression is reversible by anyone. c: correct, without the key every copy of the ciphertext, including in backups, is unreadable. d: possible in principle, but restoring and rewriting every backup for each request is slow, risky and rarely done."
+      },
+      {
+        "id": "t537-a4",
+        "concept": "retention",
+        "type": "multiple_choice",
+        "prompt": "A purge deletes 40 million expired rows in one statement at midday. What is the main risk?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Long locks, a huge transaction and replica lag"
+          },
+          {
+            "id": "b",
+            "label": "The rows return after the next vacuum"
+          },
+          {
+            "id": "c",
+            "label": "The table’s indexes are dropped"
+          },
+          {
+            "id": "d",
+            "label": "Backups stop including the table"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "a: correct, one giant delete holds locks, fills the log and makes replicas fall behind, at the busiest time of day. b: vacuum reclaims space from deleted rows; it does not bring them back. c: deleting rows leaves indexes in place. d: backups include the table whatever its size."
+      },
+      {
+        "id": "t537-a5",
+        "concept": "erasure",
+        "type": "multiple_choice",
+        "prompt": "After a user is erased from the main database, their name still shows up in search results. What was missed?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Rebuilding the users table’s primary key"
+          },
+          {
+            "id": "b",
+            "label": "Removing their documents from the search index"
+          },
+          {
+            "id": "c",
+            "label": "Running a vacuum on the users table"
+          },
+          {
+            "id": "d",
+            "label": "Rotating the database user’s password"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "a: the primary key has nothing to do with the copy held by search. b: correct, the search index is a separate copy that must be erased too, which is why a data map lists it. c: vacuum reclaims space inside the database only. d: credentials do not change what data is stored."
+      },
+      {
+        "id": "t537-a6",
+        "concept": "erasure",
+        "type": "drag_order",
+        "prompt": "Order the handling of an erasure request.",
+        "items": [
+          {
+            "id": "s2",
+            "label": "Look up every system holding their data in the data map"
+          },
+          {
+            "id": "s4",
+            "label": "Record what was erased, without keeping the erased data"
+          },
+          {
+            "id": "s1",
+            "label": "Verify the requester’s identity"
+          },
+          {
+            "id": "s5",
+            "label": "Confirm completion to the person"
+          },
+          {
+            "id": "s3",
+            "label": "Delete or anonymise in each system"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Verify first so an attacker cannot erase someone else; the record proves the work was done without keeping what was erased."
+      },
+      {
+        "id": "t537-a7",
+        "concept": "retention",
+        "type": "estimation",
+        "prompt": "A log table gains 30M rows a day. The daily purge deletes 5,000 rows per batch, and each batch takes 0.2 s including its pause. How many minutes does one day’s purge take?",
+        "unit": "minutes",
+        "target": 20,
+        "assumptions": [
+          "The purge removes one day of rows",
+          "Batch time is steady"
+        ],
+        "formula": "30M ÷ 5,000 × 0.2 s ÷ 60",
+        "workedAnswer": "6,000 batches × 0.2 s = 1,200 s = 20 minutes",
+        "explanation": "Sanity check: 20 minutes a day is fine, but if batches slow to 2 s each the purge takes over 3 hours, so alert on its duration.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          2,
+          200
+        ]
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t537-f1",
+        "front": "Soft delete pitfalls?",
+        "back": "Every query must filter deleted rows, and unique constraints still see them."
+      },
+      {
+        "id": "t537-f2",
+        "front": "Crypto-shredding?",
+        "back": "Encrypt a person’s data with their own key; deleting the key erases every copy."
+      },
+      {
+        "id": "t537-f3",
+        "front": "Fast way to drop old time-based data?",
+        "back": "Partition by day or month and drop whole partitions past retention."
+      }
+    ],
+    "sources": [
+      {
+        "title": "PostgreSQL: Partial indexes",
+        "url": "https://www.postgresql.org/docs/current/indexes-partial.html"
+      },
+      {
+        "title": "PostgreSQL: Table partitioning",
+        "url": "https://www.postgresql.org/docs/current/ddl-partitioning.html"
+      },
+      {
+        "title": "OWASP: User Privacy Protection cheat sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/User_Privacy_Protection_Cheat_Sheet.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "delete-modes",
+        "retention",
+        "erasure",
+        "crypto-shredding"
+      ],
+      "mechanism": {
+        "title": "How data leaves a system on purpose",
+        "steps": [
+          "Every kind of record gets a retention rule before it is built: what it is, why it is kept, for how long, and what happens at the end, whether delete, anonymise or archive. Access logs might be kept 90 days, sessions 30 days, invoices for as long as tax law requires. The rule turns “delete old data some day” into a job with a cutoff that can be checked.",
+          "Expiry is enforced by scheduled jobs, not by hand. A purge job selects rows older than the cutoff through an indexed timestamp and deletes them in small batches with pauses, so it never holds long locks or floods replicas. For high-volume, time-ordered data, partition the table by day or month and drop whole partitions past the cutoff, which takes moments instead of hours and leaves no dead rows behind.",
+          "User-initiated deletion picks a mode per table. Records that support needs to restore for a while are soft-deleted with deleted_at and hard-deleted or anonymised after a grace period. Records that must be kept for legal reasons are anonymised: personal fields are replaced, and the business facts, such as the amount and the date, stay. Queries read through views or default filters that exclude soft-deleted rows.",
+          "Erasure must reach every copy. The data map lists each system holding personal data: main tables, caches, search indexes, the analytics warehouse, object storage, logs, queues and outside processors. The erasure workflow calls each one and records completion. Logs are the hardest, so the better fix is upstream: avoid writing personal data into logs in the first place, or log pseudonymous ids instead.",
+          "Backups are handled by policy rather than editing. Keep them for a documented, limited time; when one is restored, replay the erasure log before opening the system to users. For data that must disappear everywhere at once, encrypt it with a per-person key held in a key store and delete the key on erasure. The ciphertext left in backups, replicas and old files is then unreadable."
+        ]
+      },
+      "useWhen": [
+        "Any system holding personal data, logs or records with a legal retention period.",
+        "Products that offer users a delete-my-account option."
+      ],
+      "avoidWhen": [
+        "Avoid soft deletes as the only mechanism for personal data; hidden is not erased.",
+        "Avoid one huge DELETE for expiry; batch it or drop partitions."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Mode",
+          "Recoverable",
+          "Privacy",
+          "Main cost"
+        ],
+        "rows": [
+          [
+            "Soft delete",
+            "Yes, until purged",
+            "Data still stored",
+            "Filters on every query"
+          ],
+          [
+            "Hard delete",
+            "Only from backups",
+            "Strong",
+            "No undo"
+          ],
+          [
+            "Anonymise",
+            "Business facts only",
+            "Strong, if done fully",
+            "Must find every personal field"
+          ],
+          [
+            "Crypto-shred",
+            "No",
+            "Covers backups and copies",
+            "Key management per person"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How retention sets storage",
+        "assumptions": [
+          "30M log rows a day",
+          "About 200 bytes per row, indexes included",
+          "Retention of 90 days versus 365 days"
+        ],
+        "steps": [
+          "Per day: 30M × 200 bytes = 6 GB.",
+          "At 90 days: 6 GB × 90 = 540 GB.",
+          "At 365 days: 6 GB × 365 ≈ 2.2 TB, about four times as much.",
+          "With daily partitions, expiry is one dropped partition a day instead of 30M row deletes."
+        ],
+        "result": "The retention period is a storage and privacy decision at the same time. Shorter retention means less to store, less to secure and less to erase."
+      },
+      "india": {
+        "title": "The Digital Personal Data Protection Act, simplified",
+        "label": "Public law, simplified",
+        "body": "India’s Digital Personal Data Protection Act, 2023 gives people the right to ask for their personal data to be erased, and expects organisations to erase personal data once the purpose it was collected for is served, unless another law requires it to be kept. Tax and accounting laws can require invoices and payment records to be kept for years. A product therefore anonymises what it must keep and erases the rest. This summary is simplified; the detailed rules decide specifics, so check them with counsel."
+      },
+      "pitfalls": [
+        {
+          "trap": "“We soft-delete the user, so they are deleted.”",
+          "say": "“The data is still stored; I’d hard-delete or anonymise after a grace period and erase every copy.”"
+        },
+        {
+          "trap": "“We will just delete old rows with one query.”",
+          "say": "“I’d batch the purge or drop partitions so it does not lock tables or lag replicas.”"
+        }
+      ],
+      "takeaways": [
+        "Set a retention rule per kind of data before building it.",
+        "Purge in batches or by dropping partitions.",
+        "Soft delete is reversible but not erasure; anonymise what must be kept.",
+        "Erase every copy, and use short backup retention or crypto-shredding."
+      ]
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "Account deletion with an undo window",
+      "prompt": "Pick the best fit for these constraints.",
+      "setup": [
+        "Users can delete their accounts",
+        "Support wants 30 days to undo deletions made by mistake",
+        "The privacy policy promises erasure within 30 days"
+      ],
+      "choices": [
+        {
+          "id": "a",
+          "label": "Soft delete now, then erase or anonymise on day 30",
+          "feedback": "Right: support can undo within the window, and the promise is kept when it ends."
+        },
+        {
+          "id": "b",
+          "label": "Hard delete everything at once",
+          "feedback": "Keeps the privacy promise but leaves support nothing to restore."
+        },
+        {
+          "id": "c",
+          "label": "Soft delete and keep the rows indefinitely",
+          "feedback": "Undo works, but the erasure promise is broken and the hidden data still needs protecting."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "A grace period followed by real erasure meets both needs. Drive the final step from a scheduled job and the data map, so the cache, search index and other copies are erased too, and record that it ran."
+    },
+    "seeAlso": [
+      {
+        "topicId": 330,
+        "why": "Backup retention decides how long erased data lingers in old copies"
+      },
+      {
+        "topicId": 236,
+        "why": "Purges walk large tables in key order, the same way keyset pagination does"
+      },
+      {
+        "topicId": 229,
+        "why": "Keeping personal data out of logs makes erasure far easier"
+      }
+    ]
+  },
+  {
+    "id": 538,
+    "slug": "batch-jobs-over-large-tables",
+    "region": "f2-backend",
+    "order": 34,
+    "title": "Batch Jobs Over Millions of Rows: Chunking, Checkpoints and Throttling",
+    "kind": "lesson",
+    "objectives": [
+      "Process a large table in key-ordered chunks with a saved checkpoint",
+      "Make each chunk idempotent so a crashed job can resume safely",
+      "Throttle batch work so live traffic and replicas keep up"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 13,
+    "prereqIds": [
+      236
+    ],
+    "cards": [
+      {
+        "id": "t538-c1",
+        "kind": "text",
+        "title": "One giant transaction does not scale",
+        "body": "Backfilling a new column on 50M rows with a single UPDATE holds locks for a long time, writes one enormous transaction to the log, makes replicas fall far behind, and if it fails at 90% it rolls back everything and starts again. The same job run as thousands of small transactions keeps each lock brief, lets replicas keep pace, and turns a failure into losing one chunk instead of hours of work.",
+        "teaches": [
+          "chunking"
+        ]
+      },
+      {
+        "id": "t538-c2",
+        "kind": "diagram",
+        "title": "Key-ordered chunks with a checkpoint",
+        "body": "Each pass picks up exactly where the last one stopped.",
+        "teaches": [
+          "chunking",
+          "checkpoints"
+        ],
+        "steps": [
+          "Read the checkpoint: last id done = 1,240,000",
+          "Select the next 2,000 rows WHERE id > 1,240,000 ORDER BY id",
+          "Process them and write the results in one short transaction",
+          "Save the chunk’s last id as the new checkpoint in that same transaction",
+          "Pause if replica lag or live latency is over its limit, then repeat"
+        ]
+      },
+      {
+        "id": "t538-c3",
+        "kind": "text",
+        "title": "Worked example: how long a backfill takes",
+        "body": "50M rows in chunks of 2,000 is 25,000 chunks. At 150 ms per chunk that is 3,750 s, about an hour; adding a 100 ms pause between chunks makes it 25,000 × 0.25 s = 6,250 s, about 1.7 hours. Selecting chunks with OFFSET instead would make each chunk skip all earlier rows: chunk 20,000 reads past 40M rows before returning 2,000. Key-ordered chunks start from the index every time, so the last chunk costs the same as the first.",
+        "teaches": [
+          "chunking"
+        ]
+      },
+      {
+        "id": "t538-c4",
+        "kind": "text",
+        "title": "Idempotent chunks make restarts dull",
+        "body": "A job can crash after writing a chunk but before saving its checkpoint, unless both happen in one transaction, and then that chunk runs again. Make the work safe to repeat: set values computed from the row (SET total = price × qty) rather than adding to them, add a condition such as WHERE total IS NULL, and use upserts with unique keys. For side effects such as sending emails, record a per-row sent marker in the same transaction as the work.",
+        "teaches": [
+          "checkpoints",
+          "batch-idempotency"
+        ]
+      },
+      {
+        "id": "t538-c5",
+        "kind": "text",
+        "title": "Trap: running flat out against the primary",
+        "body": "A backfill running at full speed can take the primary database’s disk and CPU, so live p99 latency rises and replicas fall behind, which users see as their own changes disappearing for a while. Throttle it: a fixed rate, pauses whenever replica lag passes a limit such as 1 second, backing off when live latency rises, and running in quieter hours. A job that takes a day without anyone noticing beats one that takes an hour and pages the on-call engineer.",
+        "teaches": [
+          "throttling"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t538-a1",
+        "concept": "chunking",
+        "type": "multiple_choice",
+        "prompt": "Why run a 50M-row backfill in chunks of a few thousand rows?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Chunked updates use less disk in total"
+          },
+          {
+            "id": "b",
+            "label": "Short transactions keep locks and lag small"
+          },
+          {
+            "id": "c",
+            "label": "Chunks let the job skip rows it does not need"
+          },
+          {
+            "id": "d",
+            "label": "Smaller chunks reduce the total work done"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "a: the total data written is about the same. b: correct, each transaction is brief, replicas keep up, and a failure loses only one chunk. c: which rows are touched depends on the WHERE clause, not the chunking. d: chunking adds a little overhead; its value is safety, not less work."
+      },
+      {
+        "id": "t538-a2",
+        "concept": "chunking",
+        "type": "multiple_choice",
+        "prompt": "Why select each chunk with WHERE id > last_id rather than OFFSET?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "OFFSET returns rows in a random order"
+          },
+          {
+            "id": "b",
+            "label": "OFFSET cannot be combined with ORDER BY"
+          },
+          {
+            "id": "c",
+            "label": "Each chunk starts from the index, not by skipping"
+          },
+          {
+            "id": "d",
+            "label": "Keyset queries take no locks of any kind"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "a: with ORDER BY, OFFSET is ordered too; its cost is the problem. b: OFFSET is normally used with ORDER BY. c: correct, a keyset query seeks straight to the next key, while OFFSET reads and discards every earlier row, so late chunks get slower and slower. d: the writes in each chunk still take row locks."
+      },
+      {
+        "id": "t538-a3",
+        "concept": "checkpoints",
+        "type": "multiple_choice",
+        "prompt": "A job commits each chunk, then saves its checkpoint in a separate transaction, and crashes between the two. What happens on restart?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The last chunk is skipped"
+          },
+          {
+            "id": "b",
+            "label": "The last chunk is processed again"
+          },
+          {
+            "id": "c",
+            "label": "The whole job restarts from row one"
+          },
+          {
+            "id": "d",
+            "label": "The database rolls back both writes"
+          }
+        ],
+        "correctChoiceIds": [
+          "b"
+        ],
+        "explanation": "a: the checkpoint still points before the chunk, so nothing is skipped. b: correct, the work is redone, which is safe only if the chunk is idempotent; saving the checkpoint in the same transaction avoids it. c: the checkpoint is only one chunk behind. d: the chunk’s transaction had already committed."
+      },
+      {
+        "id": "t538-a4",
+        "concept": "batch-idempotency",
+        "type": "multiple_choice",
+        "prompt": "Which chunk update is safe to run twice?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "SET total = total + price × qty"
+          },
+          {
+            "id": "b",
+            "label": "SET visits = visits + 1"
+          },
+          {
+            "id": "c",
+            "label": "INSERT a copy of each row into an archive with no key"
+          },
+          {
+            "id": "d",
+            "label": "SET total = price × qty"
+          }
+        ],
+        "correctChoiceIds": [
+          "d"
+        ],
+        "explanation": "a: running it twice adds the amount twice. b: every rerun increments again. c: without a unique key, a rerun inserts duplicates. d: correct, it sets the value from the row itself, so a second run writes the same result."
+      },
+      {
+        "id": "t538-a5",
+        "concept": "throttling",
+        "type": "multiple_choice",
+        "prompt": "During a backfill, replica lag climbs to 40 s and users stop seeing their own changes. What should the job do?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Pause until lag is under a limit, then resume"
+          },
+          {
+            "id": "b",
+            "label": "Use bigger chunks to finish sooner"
+          },
+          {
+            "id": "c",
+            "label": "Switch to one large transaction"
+          },
+          {
+            "id": "d",
+            "label": "Keep going; the lag clears when it ends"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "a: correct, lag-aware throttling lets replicas catch up and keeps the job running safely. b: bigger chunks make each transaction heavier and lag worse. c: one huge transaction is the worst case for replicas. d: users suffer for the whole run, which may be hours."
+      },
+      {
+        "id": "t538-a6",
+        "concept": "checkpoints",
+        "type": "drag_order",
+        "prompt": "Order one pass of a resumable batch job.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Write the results in a short transaction"
+          },
+          {
+            "id": "s5",
+            "label": "Check replica lag and pause if needed"
+          },
+          {
+            "id": "s1",
+            "label": "Read the last saved checkpoint"
+          },
+          {
+            "id": "s4",
+            "label": "Save the chunk’s last key as the checkpoint"
+          },
+          {
+            "id": "s2",
+            "label": "Fetch the next chunk after it, in key order"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "The checkpoint brackets the work: read it first, advance it only after the chunk is written, then let the throttle decide when the next pass starts."
+      },
+      {
+        "id": "t538-a7",
+        "concept": "chunking",
+        "type": "estimation",
+        "prompt": "A job updates 12M rows in chunks of 4,000, and each chunk takes 0.3 s including its pause. About how many minutes does it run?",
+        "unit": "minutes",
+        "target": 15,
+        "assumptions": [
+          "Chunk time stays steady",
+          "No restarts"
+        ],
+        "formula": "12M ÷ 4,000 × 0.3 s ÷ 60",
+        "workedAnswer": "3,000 chunks × 0.3 s = 900 s = 15 minutes",
+        "explanation": "Sanity check: with OFFSET-based chunks the late chunks would scan millions of skipped rows each, and the same job could take many hours.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          1.5,
+          150
+        ]
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t538-f1",
+        "front": "Why chunk a backfill?",
+        "back": "Short transactions keep locks, log size and replica lag small, and failures cheap."
+      },
+      {
+        "id": "t538-f2",
+        "front": "Keyset chunk query?",
+        "back": "WHERE id > last_id ORDER BY id LIMIT n, so every chunk starts from the index."
+      },
+      {
+        "id": "t538-f3",
+        "front": "How is a batch kept from hurting live traffic?",
+        "back": "Throttle on replica lag and live latency, with pauses and a rate limit."
+      }
+    ],
+    "sources": [
+      {
+        "title": "PostgreSQL: Populating a database",
+        "url": "https://www.postgresql.org/docs/current/populate.html"
+      },
+      {
+        "title": "PostgreSQL: Monitoring replication (pg_stat_replication)",
+        "url": "https://www.postgresql.org/docs/current/monitoring-stats.html"
+      },
+      {
+        "title": "Google SRE workbook: Data processing pipelines",
+        "url": "https://sre.google/workbook/data-processing/"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "chunking",
+        "checkpoints",
+        "batch-idempotency",
+        "throttling"
+      ],
+      "mechanism": {
+        "title": "How a resumable batch job walks a big table",
+        "steps": [
+          "The job walks the table in primary-key order, or in any indexed, unique order. Each pass selects the next n rows after the last key it finished, with a condition such as WHERE id > :last ORDER BY id LIMIT 2000. Because the database seeks straight to that key in the index, every chunk costs about the same, whether it is the first or the twenty-thousandth.",
+          "Each chunk is processed and written in one short transaction. The chunk size is chosen so a transaction takes well under a second, typically a few hundred to a few thousand rows, and tuned by measuring. Small enough to keep locks brief and replicas close behind; large enough that per-transaction overhead does not dominate.",
+          "The checkpoint, the last key finished, is saved in a small job table, ideally in the same transaction as the chunk’s writes, so the two can never disagree. On restart the job reads the checkpoint and continues. If the checkpoint is saved separately, a crash can repeat one chunk, so the chunk’s work must be idempotent anyway: set values rather than increment them, filter for rows not yet done, and upsert on unique keys.",
+          "Between chunks the job checks the health of the system it is loading: replica lag, the primary’s CPU or I/O, and the p99 latency of live queries. If any is over its limit, it sleeps and checks again. A rate cap, a time-of-day window and a kill switch that stops it within one chunk give operators control without killing processes.",
+          "The job reports progress: the checkpoint, rows done, rows per second and an estimated finish time. It ends with a verification step, such as counting rows still not done, which must be zero. For schema changes the usual order is to add the new column, deploy code that writes it for new rows, backfill old rows with the job, verify, and only then make the column required or start reading from it."
+        ]
+      },
+      "useWhen": [
+        "Backfills, data migrations, re-encryption, recomputing derived columns.",
+        "Any job touching more rows than one transaction should hold."
+      ],
+      "avoidWhen": [
+        "Avoid OFFSET to page through a big table; late pages get slower and slower.",
+        "Avoid running batch work flat out on the primary during peak hours."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Approach",
+          "Cost per chunk",
+          "Restart",
+          "Impact on live traffic"
+        ],
+        "rows": [
+          [
+            "One big UPDATE",
+            "One huge transaction",
+            "From the start",
+            "Long locks and replica lag"
+          ],
+          [
+            "OFFSET chunks",
+            "Grows with position",
+            "From a page number",
+            "Rising load as it goes"
+          ],
+          [
+            "Keyset chunks with checkpoint and throttle",
+            "Flat",
+            "From the last key",
+            "Bounded by the throttle"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "OFFSET versus keyset over a large table",
+        "assumptions": [
+          "50M rows",
+          "Chunks of 2,000, so 25,000 chunks",
+          "OFFSET reads and discards every earlier row"
+        ],
+        "steps": [
+          "Keyset: each chunk reads about 2,000 rows, so about 50M row reads in total.",
+          "OFFSET: chunk k first skips (k − 1) × 2,000 rows; on average about 25M skipped rows per chunk.",
+          "Total for OFFSET: about 25,000 × 25M ≈ 6 × 10¹¹ row reads, roughly 12,500 times the keyset total.",
+          "Even at millions of rows read per second, that is days of extra work."
+        ],
+        "result": "Key-ordered chunks keep a long job’s cost linear in the table size; OFFSET makes it quadratic."
+      },
+      "india": {
+        "title": "Backfilling a column in a large payments table",
+        "label": "Illustrative example",
+        "body": "Illustrative: a payments company adds a normalised merchant category to a table of several hundred million transactions. The team adds a nullable column, deploys code that fills it for new rows, then runs a backfill in chunks of 2,000 by primary key, saving the checkpoint with each chunk and pausing whenever replica lag passes one second. The job runs for most of a day at a rate nobody notices. A final count of rows still null confirms it finished before the column is made required."
+      },
+      "pitfalls": [
+        {
+          "trap": "“We will run one UPDATE over the weekend.”",
+          "say": "“I’d chunk it by key with a checkpoint, so it can pause, resume and never lag the replicas.”"
+        },
+        {
+          "trap": "“If it crashes we will rerun it.”",
+          "say": "“I’d make each chunk idempotent, so reruns are safe and it resumes from the checkpoint.”"
+        }
+      ],
+      "takeaways": [
+        "Walk big tables in key order, in short transactions.",
+        "Save a checkpoint with each chunk so the job resumes, not restarts.",
+        "Make chunk work idempotent: set rather than increment.",
+        "Throttle on replica lag and live latency."
+      ]
+    },
+    "interactive": {
+      "kind": "tradeoff",
+      "title": "Backfilling 80M rows on a live database",
+      "prompt": "Pick the best fit for these constraints.",
+      "setup": [
+        "80M rows on the primary database need a new column filled",
+        "Users read from replicas and expect their changes within 2 s",
+        "The job may take a day"
+      ],
+      "choices": [
+        {
+          "id": "a",
+          "label": "Keyset chunks with a checkpoint, paused when replica lag passes 1 s",
+          "feedback": "Right: steady, resumable progress that never lets replicas fall behind what users notice."
+        },
+        {
+          "id": "b",
+          "label": "A single UPDATE statement run in a quiet hour",
+          "feedback": "One 80M-row transaction causes heavy lag even when quiet, and a late failure rolls back everything."
+        },
+        {
+          "id": "c",
+          "label": "Many parallel workers at full speed, to finish quickly",
+          "feedback": "Finishes sooner but floods the primary’s I/O, and replicas fall well behind the 2 s promise."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "When the job may take a day, use the day. Throttling on replica lag keeps the user-visible promise, checkpoints make restarts cheap, and key-ordered chunks keep every chunk equally fast."
+    },
+    "seeAlso": [
+      {
+        "topicId": 236,
+        "why": "Keyset chunks are keyset pagination applied to a job instead of a screen"
+      },
+      {
+        "topicId": 356,
+        "why": "Throttling a batch job is backpressure applied to your own work"
+      },
+      {
+        "topicId": 227,
+        "why": "Long backfills usually run as background jobs with retries and progress"
       }
     ]
   }

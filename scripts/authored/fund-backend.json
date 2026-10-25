@@ -154,11 +154,11 @@
      },
      {
       "id": "b",
-      "label": "Compress the response"
+      "label": "Use a faster serialiser for the response"
      },
      {
       "id": "c",
-      "label": "Add more middleware logging"
+      "label": "Move the handler to a server with more cores"
      },
      {
       "id": "d",
@@ -168,7 +168,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Twelve round trips dominate; cutting them saves most of the 420 ms."
+    "explanation": "a: a bigger pool helps concurrent requests, but these queries run one after another. b: serialising the response is a small part of the time next to 12 × 35 ms = 420 ms of round trips. c: the handler is waiting on the network, not the CPU, so more cores change nothing. d: correct, one or two queries remove most of the 420 ms of sequential round trips."
    },
    {
     "id": "t221-a4",
@@ -1051,37 +1051,32 @@
     "id": "t223-a5",
     "concept": "status-classes",
     "type": "drag_order",
-    "prompt": "Order the status classes by first digit.",
+    "prompt": "A request did not succeed. Order the questions to ask when picking its status code.",
     "items": [
      {
-      "id": "s4",
-      "label": "4xx client error"
-     },
-     {
-      "id": "s2",
-      "label": "2xx success"
-     },
-     {
-      "id": "s5",
-      "label": "5xx server error"
+      "id": "s3",
+      "label": "Does the resource not exist? 404"
      },
      {
       "id": "s1",
-      "label": "1xx informational"
+      "label": "Did the server itself fail? Pick a 5xx"
      },
      {
-      "id": "s3",
-      "label": "3xx redirection"
+      "id": "s4",
+      "label": "Is the request malformed, invalid or conflicting? 400, 422 or 409"
+     },
+     {
+      "id": "s2",
+      "label": "Is the caller unauthenticated or not allowed? 401 or 403"
      }
     ],
     "correctOrder": [
      "s1",
      "s2",
      "s3",
-     "s4",
-     "s5"
+     "s4"
     ],
-    "explanation": "The first digit gives the class."
+    "explanation": "Stop at the first match. A server fault is never reported as the client’s mistake; access is checked before existence so callers without access cannot probe which ids exist; validation and conflicts come last because they concern a resource the caller may use."
    },
    {
     "id": "t223-a6",
@@ -1283,8 +1278,8 @@
     },
     {
      "id": "b",
-     "label": "400 Bad Request",
-     "feedback": "Also acceptable in many APIs, but 422 is more specific for valid syntax with invalid content."
+     "label": "409 Conflict",
+     "feedback": "Nothing clashes with the stored state; the request’s own dates break a rule, which is a validation error."
     },
     {
      "id": "c",
@@ -1299,6 +1294,10 @@
    {
     "topicId": 8,
     "why": "REST API design at system scale"
+   },
+   {
+    "topicId": 535,
+    "why": "When work outlasts a request, 202 Accepted and a status URL take over"
    }
   ]
  },
@@ -1543,8 +1542,8 @@
     "approaches": [
      {
       "id": "p3",
-      "label": "Tell clients never to retry",
-      "description": "No duplicates sent"
+      "label": "Turn off client retries; refund any duplicates",
+      "description": "No retry logic to build"
      },
      {
       "id": "p2",
@@ -1553,7 +1552,7 @@
      },
      {
       "id": "p1",
-      "label": "Client-generated idempotency key, stored with the response for 24 hours",
+      "label": "Client-chosen idempotency key, response stored 24 h",
       "description": "Replay the first result"
      }
     ],
@@ -1740,6 +1739,10 @@
    {
     "topicId": 40,
     "why": "Idempotency in messaging and event processing"
+   },
+   {
+    "topicId": 531,
+    "why": "Money postings are where idempotent writes matter most"
    }
   ]
  },
@@ -1984,17 +1987,17 @@
     "approaches": [
      {
       "id": "p2",
-      "label": "One shared admin account",
+      "label": "One shared admin login, with refunds noted against ticket numbers",
       "description": "Simple to set up"
      },
      {
       "id": "p3",
-      "label": "Everyone is admin; trust staff",
+      "label": "Everyone gets admin; a manager reviews refunds each week",
       "description": "No friction"
      },
      {
       "id": "p1",
-      "label": "Roles with explicit permissions, a refund limit check, deny by default, and an audit log",
+      "label": "Per-person accounts with roles, a refund limit and an audit log",
       "description": "Least privilege"
      }
     ],
@@ -2827,17 +2830,17 @@
     "approaches": [
      {
       "id": "p2",
-      "label": "Send inline in the request and give up on error",
+      "label": "Send inline in the request; show the user a retry button on error",
       "description": "Simple"
      },
      {
       "id": "p3",
-      "label": "Retry immediately in a tight loop until it works",
+      "label": "Queued job retried at once, in a loop, until the provider accepts",
       "description": "Fast recovery"
      },
      {
       "id": "p1",
-      "label": "Queue with retries and exponential backoff, a message id per invoice, and a dead-letter queue",
+      "label": "Queued job: backoff retries, per-invoice message id, dead-letter queue",
       "description": "Retry safely"
      }
     ],
@@ -3019,6 +3022,10 @@
    {
     "topicId": 39,
     "why": "Delivery semantics: at-least-once vs exactly-once in depth"
+   },
+   {
+    "topicId": 535,
+    "why": "Clients learn how a queued job is going through a status resource"
    }
   ]
  },
@@ -3852,6 +3859,10 @@
    {
     "topicId": 54,
     "why": "Logs, metrics and traces across a whole system"
+   },
+   {
+    "topicId": 534,
+    "why": "Percentiles matter most when one request fans out to many servers"
    }
   ]
  },
@@ -4098,7 +4109,7 @@
     "approaches": [
      {
       "id": "p1",
-      "label": "Up to 2 retries with jittered exponential backoff, within the deadline, at the checkout layer only",
+      "label": "Up to 2 jittered backoff retries at checkout only, within the deadline",
       "description": "Bounded and spread out"
      },
      {
@@ -4108,7 +4119,7 @@
      },
      {
       "id": "p2",
-      "label": "Retry immediately up to 10 times",
+      "label": "Up to 10 immediate retries at checkout, no backoff",
       "description": "Recovers quickly from blips"
      }
     ],
@@ -5367,17 +5378,17 @@
     "approaches": [
      {
       "id": "p1",
-      "label": "Shared counter store with atomic increments; fail open with local limits for normal endpoints, fail closed for login",
+      "label": "Shared atomic counters; fail open on local limits, closed for login",
       "description": "Correct and resilient"
      },
      {
       "id": "p3",
-      "label": "Shared store; reject all traffic if it is down",
+      "label": "Shared atomic counters; reject every request while the store is down",
       "description": "Strict"
      },
      {
       "id": "p2",
-      "label": "Local counters on each server only",
+      "label": "Local counters on each server, each allowing the limit ÷ 12",
       "description": "No shared dependency"
      }
     ],
@@ -5404,7 +5415,7 @@
      "r3"
     ],
     "rationaleConflicts": {
-     "r3": "Each server still sees only a share, so the effective limit multiplies."
+     "r3": "A key’s traffic is rarely spread evenly, so it is blocked early on one server while getting extra room on others."
     },
     "explanation": "Share counters for correctness and choose fail-open or fail-closed per endpoint."
    }
