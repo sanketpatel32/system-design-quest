@@ -36,6 +36,23 @@ LINKS = [
     (527, 536, 'Unit, integration and contract tests for the services the UI calls'),
     (542, 540, 'Servers holding many long-lived connections live by these idle-timeout rules at scale'),
     (540, 542, 'Keep-alive and idle timeouts at each hop decide when a held connection is cut'),
+    # Round 3 (Databases, OS, Cloud merged)
+    (644, 507, 'Little’s Law and utilisation: the queueing maths behind pool and queue sizes'),
+    (322, 565, 'cgroups are how the orchestrator’s CPU and memory limits are enforced on the node'),
+    (589, 565, 'Requests and limits the scheduler places by become cgroup CPU shares, quotas and memory caps'),
+    (321, 649, 'Namespaces are the kernel feature that gives each container its own view of the system'),
+    (683, 549, 'The IPsec and WireGuard tunnels that site-to-site VPNs and hybrid links are built from'),
+    (683, 541, 'BGP is how routes are exchanged over hybrid links, transit hubs and direct connections'),
+    (590, 606, 'Network policies and service routing sit on the kernel’s connection tracking and stateful filtering'),
+    (587, 507, 'Little’s Law and utilisation explain why latency climbs steeply at the knee'),
+    (587, 501, 'Tail latency and fan-out: why load tests must report p99, not the average'),
+    (581, 506, 'Cells shrink the blast radius further than zones and regions alone'),
+    (586, 506, 'Cell boundaries are what a game day checks: does a failure stay inside one cell?'),
+    (690, 525, 'Real user monitoring supplies the user-facing signals worth alerting on'),
+    (687, 536, 'The unit, integration and contract tests a service’s CI pipeline runs'),
+    (687, 527, 'The front-end test mix whose speed and flakiness CI has to manage'),
+    (688, 309, 'Signed, scanned images are the supply-chain side of building infrastructure once'),
+    (540, 566, 'Every live connection holds a file descriptor, so the open-files limit caps a gateway'),
 ]
 for a, b, why in LINKS:
     sa = T[a].setdefault('seeAlso', [])

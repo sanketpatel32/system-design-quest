@@ -122,9 +122,22 @@ for qid, (labels, expl, prompt) in Q.items():
         LOG.append(f'{qid} prompt: {prompt!r}')
         q['prompt'] = prompt
 
+TEXT_REVIEW = [
+ (323, ['deep', 'india', 'body'], 'It now uses five metrics in two groups,', 'Its current guidance on dora.dev uses five metrics in two groups,'),
+]
+
+
+def reviewed(tid, path, text):
+    # TEXT_REVIEW (below) rewords part of some TEXT results, so on a rerun the TEXT fix is already in, in its reviewed form
+    for rt, rp, ro, rn in TEXT_REVIEW:
+        if rt == tid and rp == path:
+            text = text.replace(ro, rn)
+    return text
+
+
 for tid, path, old, new in TEXT:
     cur = get(BY[tid], path)
-    if new in cur:
+    if new in cur or reviewed(tid, path, new) in cur:
         continue
     assert old in cur, (tid, path, old)
     put(BY[tid], path, cur.replace(old, new))
@@ -144,9 +157,6 @@ for s in BY[323]['sources']:
         s['title'] = 'DORA: Software delivery performance metrics'
         s['url'] = 'https://dora.dev/guides/dora-metrics/'
         LOG.append('323 DORA source -> dora.dev metrics guide')
-TEXT_REVIEW = [
- (323, ['deep', 'india', 'body'], 'It now uses five metrics in two groups,', 'Its current guidance on dora.dev uses five metrics in two groups,'),
-]
 for tid, path, old, new in TEXT_REVIEW:
     cur = get(BY[tid], path)
     if new in cur:
