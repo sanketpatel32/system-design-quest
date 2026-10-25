@@ -614,7 +614,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Dual stack lets each connection use IPv6 when both sides can."
+    "explanation": "Dual stack keeps IPv4 for whatever has not moved yet and lets each connection use IPv6 when both sides can. TLS runs over either version; IPv6 is widely used on home and mobile networks, not only in data centres; and neither version is faster in general."
    },
    {
     "id": "t242-a5",
@@ -1325,7 +1325,7 @@
     "id": "t244-c6",
     "kind": "text",
     "title": "Edge case: idle connections silently dropped",
-    "body": "NATs and stateful firewalls forget mappings that carry no traffic for a while; for UDP the guideline in RFC 4787 is at least 2 minutes, and many devices use shorter values in practice. A long-lived idle connection then fails only when it is next used. Send application or TCP keepalives more often than the shortest timeout on the path.",
+    "body": "NATs and stateful firewalls forget mappings that carry no traffic for a while; for UDP the guideline in RFC 4787 is at least 2 minutes, for established TCP RFC 5382 asks for at least 2 hours 4 minutes, and many devices use shorter values in practice. A long-lived idle connection then fails only when it is next used. Send application or TCP keepalives more often than the shortest timeout on the path.",
     "teaches": [
      "routing-tables"
     ]
@@ -1386,7 +1386,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "It replaces the private source with its public address and a port it tracks."
+    "explanation": "It replaces the private source with its public address and a port it tracks. The destination stays as the client chose it; tracking connections is how NAT remembers each rewrite, not a substitute for it; and TCP sequence numbers pass through unchanged."
    },
    {
     "id": "t244-a3",
@@ -2256,7 +2256,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Caches keep the old answer until its TTL runs out."
+    "explanation": "Caches keep the old answer until its TTL runs out, so the worst case is about one TTL, here an hour. Resolvers have no 60-second minimum that overrides the TTL; restarting devices clears only their local caches, not the resolvers’; and DNS has no push to resolvers."
    },
    {
     "id": "t246-a4",
@@ -2672,7 +2672,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "The active closer waits 2×MSL before reusing the address and port pair."
+    "explanation": "The active closer waits 2×MSL before reusing the address and port pair. Who initiated the connection does not matter, only who sent the first FIN; the passive closer goes straight to CLOSED after its last ACK; and TIME_WAIT is part of every normal close, not an error path."
    },
    {
     "id": "t247-a4",
@@ -3360,7 +3360,7 @@
     "steps": [
      "Assume: a proxy connects to one backend address and port, using the IANA ephemeral range 49,152–65,535",
      "That range holds 65,535 − 49,152 + 1 = 16,384 ports",
-     "Each closed connection keeps its port in TIME_WAIT for 60 s (an illustrative value)",
+     "Each connection the proxy closes first keeps its port in TIME_WAIT for 60 s (Linux’s fixed value)",
      "Sustainable new connections: 16,384 ÷ 60 ≈ 273 per second"
     ],
     "note": "Result. Under these assumptions the proxy cannot open more than about 273 new connections a second to that backend. Operating systems choose their own ranges, but the fix is the same: reuse connections, or add backend addresses."
@@ -3492,7 +3492,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "RFC 6335; operating systems may use a different range."
+    "explanation": "RFC 6335 sets aside 49,152–65,535. Linux defaults to 32,768–60,999, which is an operating-system choice, not the IANA range; 0–1,023 are system ports and 1,024–49,151 are registered ports."
    },
    {
     "id": "t249-a4",
@@ -4764,13 +4764,13 @@
      },
      {
       "id": "d",
-      "label": "Switch the load balancer to UDP"
+      "label": "Turn on HTTP/2 between the balancer and the app"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "The app only sees plain HTTP from the proxy unless it reads the forwarded scheme."
+    "explanation": "The app only sees plain HTTP from the proxy unless it reads the forwarded scheme. Certificates on the app servers or HTTP/2 to the backend do not tell the app what the user used, and timeouts are unrelated to the scheme."
    },
    {
     "id": "t252-a5",
@@ -5138,13 +5138,13 @@
      },
      {
       "id": "d",
-      "label": "It drops to zero"
+      "label": "It drops by about half"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Bandwidth does not change propagation delay."
+    "explanation": "Bandwidth does not change propagation delay, which dominates a tiny request. Serialisation time for a few hundred bytes was already microseconds, so neither halving nor a tenth is plausible, and nothing about a faster link doubles the delay."
    },
    {
     "id": "t253-a2",
@@ -5528,7 +5528,7 @@
     "id": "t254-c6",
     "kind": "text",
     "title": "Edge case: broken IPv6 on the client’s network",
-    "body": "If a network advertises IPv6 but it does not actually work, a naive client would wait for an IPv6 connection to time out. Browsers use Happy Eyeballs (RFC 8305): they try IPv6 first and start IPv4 after a short delay if IPv6 has not connected, using whichever succeeds first, so a broken path costs tens of milliseconds instead of seconds.",
+    "body": "If a network advertises IPv6 but it does not actually work, a naive client would wait for an IPv6 connection to time out. Browsers use Happy Eyeballs (RFC 8305): they try IPv6 first and start IPv4 after a short delay if IPv6 has not connected, using whichever succeeds first, so a broken path costs about a quarter of a second (RFC 8305 recommends a 250 ms Connection Attempt Delay) instead of a long connection timeout.",
     "teaches": [
      "page-load-steps"
     ]
@@ -5845,7 +5845,7 @@
     {
      "id": "a",
      "label": "The redirect and connection setup",
-     "feedback": "Right: 290 of the 460 ms is setup work before the real request; HSTS, no redirect and a nearby edge cut it."
+     "feedback": "Right: 370 of the 460 ms (redirect 130, DNS 80, connect and TLS 160) is setup before the real request; HSTS, no redirect, a warm DNS cache and a nearby edge cut most of it."
     },
     {
      "id": "b",

@@ -1,0 +1,3539 @@
+[
+ {
+  "id": 541,
+  "slug": "bgp-and-anycast",
+  "region": "f3-networking",
+  "order": 15,
+  "title": "BGP and Anycast: Reaching the Nearest Edge",
+  "kind": "lesson",
+  "objectives": [
+   "Explain how networks announce address blocks to each other with BGP",
+   "Explain how anycast sends each user to a site that announces the same prefix",
+   "Choose between anycast and DNS-based steering for failover and long connections"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 12,
+  "prereqIds": [
+   244
+  ],
+  "cards": [
+   {
+    "id": "t541-c1",
+    "kind": "text",
+    "title": "Networks of networks agree on routes",
+    "body": "The internet is tens of thousands of independently run networks called autonomous systems (ASes), each with a number. With BGP (Border Gateway Protocol) an AS announces the address blocks it can deliver to, and each neighbour passes the announcement on, adding its own number to the AS path. A router keeps one best path per prefix, chosen first by local policy (customers before peers before paid transit) and then, among equals, by the shorter AS path. Shorter means fewer networks, not fewer kilometres or milliseconds.",
+    "teaches": [
+     "bgp"
+    ]
+   },
+   {
+    "id": "t541-c2",
+    "kind": "diagram",
+    "title": "One address announced from many cities",
+    "body": "Anycast is ordinary BGP with the same prefix announced from several places.",
+    "teaches": [
+     "anycast",
+     "anycast-failover"
+    ],
+    "steps": [
+     "Sites in Mumbai, Singapore and Frankfurt all announce 192.0.2.0/24",
+     "Each network between a user and the sites picks its own best path to that prefix",
+     "A user in Pune usually lands in Mumbai because that path wins in their ISP",
+     "If Mumbai stops announcing, routers fall back to the next-best path, perhaps Singapore",
+     "Nothing on the client changes: the address stays the same, only the route moves"
+    ]
+   },
+   {
+    "id": "t541-c3",
+    "kind": "diagram",
+    "title": "Worked example: nearest by routing, not by map",
+    "body": "Anycast picks the best BGP path, which can be a farther site.",
+    "teaches": [
+     "bgp",
+     "anycast"
+    ],
+    "steps": [
+     "Assume: a Mumbai user’s ISP reaches the Mumbai site through two transit networks (AS path length 3)",
+     "The same ISP peers directly with the operator in Singapore (AS path length 1)",
+     "BGP prefers the length-1 path, so the user is served from Singapore",
+     "Mumbai to Singapore is about 3,900 km; light in fibre covers about 200 km per ms",
+     "Round-trip floor: 2 × 3,900 ÷ 200 = 39 ms, against a few ms to the Mumbai site"
+    ],
+    "note": "Result. Under these illustrative assumptions the user pays at least 39 ms per round trip for a site that is not the closest. Operators fix this with peering in more places and with route policy, and they measure real latency per network rather than trusting the map."
+   },
+   {
+    "id": "t541-c4",
+    "kind": "text",
+    "title": "Anycast or DNS steering",
+    "body": "DNS steering (GeoDNS) answers each resolver with a different address. It can weigh sites by load and aim precisely, but it sees the resolver rather than the user, and cached answers delay failover until the TTL runs out. Anycast reacts in the routing layer with no client cache to wait for, but control is coarse: an operator can only nudge routes, for example by prepending its own AS number several times so a path looks longer. Large services often use both.",
+    "teaches": [
+     "anycast",
+     "as-path-prepending"
+    ]
+   },
+   {
+    "id": "t541-c5",
+    "kind": "text",
+    "title": "Trap: assuming the route never moves mid-connection",
+    "body": "Routes change when a link fails, an ISP changes policy or a site withdraws. Packets of an open TCP connection can then reach a different site that holds no state for it, and that site answers with a reset. Short UDP exchanges such as DNS queries are ideal for anycast; long TCP sessions work in practice because routes are mostly stable, but clients must reconnect cleanly when one breaks.",
+    "teaches": [
+     "anycast-failover"
+    ]
+   },
+   {
+    "id": "t541-c6",
+    "kind": "text",
+    "title": "ECMP spreads flows inside a site",
+    "body": "Within one anycast site, a router often has several equal-cost next hops: one per server or load balancer. Equal-cost multipath (ECMP) hashes each packet’s five-tuple (addresses, ports, protocol) to pick one, so every packet of a flow reaches the same machine. Adding or removing a server changes the hash for some flows, which is why sites drain servers before removal or use consistent hashing in the balancers behind the router.",
+    "teaches": [
+     "ecmp"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t541-a1",
+    "concept": "bgp",
+    "type": "multiple_choice",
+    "prompt": "Two paths to the same prefix tie on local policy. Which one does a BGP router usually prefer next?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The path through fewer autonomous systems"
+     },
+     {
+      "id": "b",
+      "label": "The path with the lower measured round-trip time"
+     },
+     {
+      "id": "c",
+      "label": "The path with more total link bandwidth"
+     },
+     {
+      "id": "d",
+      "label": "The path it learned most recently"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "After policy, a shorter AS path wins. BGP does not measure round-trip time or bandwidth, so b and c are not inputs to its choice; and later tie-breakers tend to favour the older, more stable path, not the newest."
+   },
+   {
+    "id": "t541-a2",
+    "concept": "anycast",
+    "type": "multiple_choice",
+    "prompt": "Several sites announce 192.0.2.0/24. What decides which site a given user reaches?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The lowest current CPU load among the sites"
+     },
+     {
+      "id": "b",
+      "label": "The route choices of networks between the user and the sites"
+     },
+     {
+      "id": "c",
+      "label": "The location of the user’s DNS resolver"
+     },
+     {
+      "id": "d",
+      "label": "A geographic distance the routers compute from the user’s IP address"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Each network on the way picks its best BGP path. Routers do not see server load; resolver location matters for GeoDNS, not anycast; and no router computes geographic distance."
+   },
+   {
+    "id": "t541-a3",
+    "concept": "anycast-failover",
+    "type": "multiple_choice",
+    "prompt": "The Mumbai site fails and withdraws its announcement. What happens to users who were reaching it?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Their routers converge on the next-best announcement, often a farther site"
+     },
+     {
+      "id": "b",
+      "label": "They keep failing until their resolver’s cached DNS answer for the service expires"
+     },
+     {
+      "id": "c",
+      "label": "Their clients pick another address from the DNS answer"
+     },
+     {
+      "id": "d",
+      "label": "Their packets queue at Mumbai until the site restarts"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "The address is unchanged, so only routing moves. DNS caches are not involved, which is the point of anycast; with one anycast address there is no other address to try; and routers forward rather than hold packets for a dead site."
+   },
+   {
+    "id": "t541-a4",
+    "concept": "anycast-failover",
+    "type": "multiple_choice",
+    "prompt": "Which workload suits plain anycast with no extra handling?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Hour-long uploads over one TCP connection"
+     },
+     {
+      "id": "b",
+      "label": "A game session held in one server’s memory"
+     },
+     {
+      "id": "c",
+      "label": "A DNS service answering short UDP queries"
+     },
+     {
+      "id": "d",
+      "label": "Sending each user to the shard with their data"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "A query and its answer finish before a route can move. Long uploads and in-memory sessions break if the route shifts; and anycast picks a site by routing, not by where a user’s data lives."
+   },
+   {
+    "id": "t541-a5",
+    "concept": "ecmp",
+    "type": "multiple_choice",
+    "prompt": "A router spreads an anycast prefix over eight servers by hashing the five-tuple. Why hash instead of rotating packet by packet?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Hashing gives each server exactly the same load"
+     },
+     {
+      "id": "b",
+      "label": "Every packet of a connection reaches the server holding its state"
+     },
+     {
+      "id": "c",
+      "label": "Routers cannot forward a single prefix to more than one next hop at a time"
+     },
+     {
+      "id": "d",
+      "label": "Hashing hides the client address from the servers"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Per-flow hashing keeps a TCP connection on one machine. Load is only roughly even, since flows differ in size; routers can forward to several next hops (that is ECMP); and the client address is still visible."
+   },
+   {
+    "id": "t541-a6",
+    "concept": "anycast-failover",
+    "type": "drag_order",
+    "prompt": "Order what happens when an anycast site fails.",
+    "items": [
+     {
+      "id": "s4",
+      "label": "Routers select their next-best path"
+     },
+     {
+      "id": "s2",
+      "label": "The site withdraws its route announcement"
+     },
+     {
+      "id": "s5",
+      "label": "New packets arrive at another site"
+     },
+     {
+      "id": "s1",
+      "label": "The site’s health check fails"
+     },
+     {
+      "id": "s3",
+      "label": "Neighbouring networks propagate the withdrawal"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Detection, withdrawal, propagation, a new best path, then traffic moves. Connections open at the failed site must reconnect."
+   },
+   {
+    "id": "t541-a7",
+    "concept": "anycast",
+    "type": "estimation",
+    "prompt": "A user is routed to a site 3,900 km away. If light in fibre covers 200 km per ms, what is the round-trip floor in ms?",
+    "unit": "ms",
+    "target": 39,
+    "assumptions": [
+     "Straight-line fibre with no queueing or detours",
+     "Round trip means there and back"
+    ],
+    "formula": "2 × 3,900 ÷ 200",
+    "workedAnswer": "7,800 km ÷ 200 km/ms = 39 ms",
+    "explanation": "Sanity check: real paths are longer than great circles and add router queues, so measured RTT is usually well above this floor; a nearby site would be a few ms.",
+    "tolerance": 0.1,
+    "trapAnswers": [
+     19.5,
+     78
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t541-f1",
+    "front": "BGP picks a path by?",
+    "back": "Local policy first, then the shorter AS path; it does not measure latency."
+   },
+   {
+    "id": "t541-f2",
+    "front": "Anycast?",
+    "back": "The same prefix announced from several sites; routing delivers each user to one of them."
+   },
+   {
+    "id": "t541-f3",
+    "front": "Anycast failover?",
+    "back": "The failing site withdraws its route; routers move to the next-best path with no DNS cache to wait for."
+   }
+  ],
+  "sources": [
+   {
+    "title": "RFC 4271: A Border Gateway Protocol 4 (BGP-4)",
+    "url": "https://www.rfc-editor.org/rfc/rfc4271"
+   },
+   {
+    "title": "RFC 4786: Operation of Anycast Services",
+    "url": "https://www.rfc-editor.org/rfc/rfc4786"
+   },
+   {
+    "title": "RFC 7094: Architectural Considerations of IP Anycast",
+    "url": "https://www.rfc-editor.org/rfc/rfc7094"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "bgp",
+    "anycast",
+    "anycast-failover"
+   ],
+   "mechanism": {
+    "title": "How a route reaches every network",
+    "steps": [
+     "An autonomous system originates a prefix, such as 192.0.2.0/24, by announcing it to its BGP neighbours over long-lived TCP sessions. The announcement carries the AS path, the list of networks it has crossed, which lets routers reject loops and compare paths. Many networks refuse IPv4 prefixes more specific than a /24, so that is the smallest block worth announcing from a site.",
+     "Each router that hears several paths to the same prefix chooses one. Business policy comes first: a network prefers routes learned from paying customers, then from settlement-free peers, then from transit providers it pays. Only when policy ties does the shorter AS path win, followed by further tie-breakers. The chosen path is passed on to neighbours, subject to export policy.",
+     "Anycast means several sites originate the same prefix. Every network independently picks one of those announcements, so users are divided among sites by the shape of the internet’s business relationships. In well-peered regions that usually means a nearby site; in poorly connected ones it can mean a distant site, as the Mumbai and Singapore example shows.",
+     "When a site fails, its routers stop announcing the prefix, ideally triggered by a health check rather than by the routers dying. The withdrawal spreads hop by hop and each network falls back to its next-best path. Convergence typically takes seconds and can take longer for some networks, but no client cache is involved, unlike DNS failover, which waits out TTLs in resolvers.",
+     "Inside a site, routers spread flows with ECMP hashing so that one connection stays on one server. Operators tune which site serves whom by announcing more specific prefixes from some sites, prepending their AS number to make a path look longer, or tagging routes with communities that ask neighbours to change preference. All of these are coarse, so precise load steering is usually done by DNS or by layer 7 balancers on top."
+    ]
+   },
+   "useWhen": [
+    "DNS servers, CDN edges and DDoS absorption, where many sites should share one address.",
+    "Failover that must not wait for DNS caches to expire."
+   ],
+   "avoidWhen": [
+    "Avoid relying on anycast alone to pin long stateful sessions to one site.",
+    "Avoid it when traffic must be split by exact percentages or by where a user’s data lives."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Approach",
+     "Failover speed",
+     "Steering precision",
+     "Fits"
+    ],
+    "rows": [
+     [
+      "Anycast",
+      "Routing convergence, no client cache",
+      "Coarse: prepends, more-specifics",
+      "DNS, CDN edges, DDoS absorption"
+     ],
+     [
+      "DNS steering",
+      "Bounded by TTL and resolver caching",
+      "Fine: per resolver, by load",
+      "Region choice, weighted rollouts"
+     ],
+     [
+      "Both together",
+      "Fast in the edge, precise per region",
+      "Fine at the region level",
+      "Large global services"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "A user sent to the wrong site",
+    "assumptions": [
+     "Mumbai site reached through two transit networks (AS path length 3)",
+     "Singapore site reached through a direct peering (AS path length 1)",
+     "About 3,900 km Mumbai to Singapore; about 200 km per ms in fibre"
+    ],
+    "steps": [
+     "BGP compares AS paths after policy: 1 beats 3, so Singapore wins.",
+     "One-way fibre floor: 3,900 ÷ 200 = 19.5 ms.",
+     "Round-trip floor: 2 × 19.5 = 39 ms, before detours and queueing.",
+     "Each request needing three round trips (TCP, TLS, request) waits at least 117 ms instead of a few ms."
+    ],
+    "result": "Anycast followed routing, not geography; better peering near Mumbai would bring the user back to the local site."
+   },
+   "india": {
+    "title": "Anycast operation in RFC 4786 and RFC 7094",
+    "label": "Official documentation",
+    "body": "RFC 4786 (Operation of Anycast Services, BCP 126) describes how operators announce one prefix from many sites, tie announcements to service health so a broken node withdraws its route, and accept that a route change can move a stateful session to another node. RFC 7094 discusses the architecture, noting that anycast suits short transactions such as DNS best and that longer TCP sessions depend on route stability. The DNS root servers are a well-known public example: a small set of addresses served from many sites worldwide."
+   },
+   "pitfalls": [
+    {
+     "trap": "“Anycast sends every user to the geographically closest site.”",
+     "say": "“Anycast sends users along their networks’ best BGP paths, which are usually nearby but depend on peering.”"
+    },
+    {
+     "trap": "“We can shift exactly 30% of Mumbai traffic with anycast.”",
+     "say": "“Anycast steering is coarse; for exact splits I’d use DNS weights or a layer 7 balancer.”"
+    }
+   ],
+   "takeaways": [
+    "BGP picks paths by policy first, then by the shorter AS path, never by measured latency.",
+    "Anycast announces one prefix from many sites; routing chooses the site.",
+    "Anycast failover is a route withdrawal, with no DNS cache to wait for.",
+    "ECMP hashing keeps each flow on one server inside a site."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Shift load away from a hot site",
+   "prompt": "Your anycast site in Mumbai is healthy but running hot, and you cannot add servers this week. You want some of its users to land in Singapore instead. What do you do?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Prepend your AS number on Mumbai’s announcements",
+     "feedback": "Right: networks that compare path length see Mumbai as farther and some move to Singapore. It is coarse; networks whose policy decides earlier ignore it."
+    },
+    {
+     "id": "b",
+     "label": "Lower the TTL on the DNS record for the service",
+     "feedback": "The service has one anycast address, so every DNS answer is the same; the TTL changes nothing about which site serves it."
+    },
+    {
+     "id": "c",
+     "label": "Withdraw the Mumbai announcement entirely",
+     "feedback": "That moves every Mumbai user, not some, and may overload Singapore in turn. Keep withdrawal for real failures."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Anycast traffic engineering works by making routes more or less attractive: AS-path prepending, more-specific prefixes or BGP communities. You cannot choose an exact fraction, which is why large services pair anycast with DNS or layer 7 steering for precise control."
+  },
+  "seeAlso": [
+   {
+    "topicId": 6,
+    "why": "DNS steering is the other way to send users to a region"
+   },
+   {
+    "topicId": 19,
+    "why": "CDN edges are the most common anycast deployment"
+   },
+   {
+    "topicId": 244,
+    "why": "Routing tables and longest-prefix match underlie every BGP decision"
+   }
+  ]
+ },
+ {
+  "id": 542,
+  "slug": "keep-alive-pools-and-idle-timeouts",
+  "region": "f3-networking",
+  "order": 16,
+  "title": "Keep-Alive, Connection Pools and Idle Timeouts",
+  "kind": "lesson",
+  "objectives": [
+   "Explain why reusing connections saves round trips and server work",
+   "Order idle timeouts across client, load balancer and server to avoid reset races",
+   "Spot load imbalance caused by long-lived HTTP/2 connections"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 12,
+  "prereqIds": [
+   247,
+   250
+  ],
+  "cards": [
+   {
+    "id": "t542-c1",
+    "kind": "text",
+    "title": "One connection, many requests",
+    "body": "HTTP/1.1 connections are persistent by default: after a response, the client may send the next request on the same connection. HTTP/2 goes further and multiplexes many requests at once on one connection. Reuse skips the TCP and TLS handshakes, the slow-start ramp and the server’s key-exchange work. Every hop also runs an idle timer, and whichever side times out first closes the connection.",
+    "teaches": [
+     "persistent-connections"
+    ]
+   },
+   {
+    "id": "t542-c2",
+    "kind": "diagram",
+    "title": "Worked example: what a cold connection costs between regions",
+    "body": "Count round trips before the first response byte.",
+    "teaches": [
+     "persistent-connections"
+    ],
+    "steps": [
+     "Assume: a service calls a dependency in another region with a 60 ms round trip, over TLS 1.3",
+     "Cold: TCP handshake 1 RTT + TLS 1 RTT + request and response 1 RTT = 3 × 60 = 180 ms",
+     "Warm (reused connection): request and response only = 60 ms",
+     "At 200 calls per second with no reuse, the dependency also runs 200 TLS key exchanges per second"
+    ],
+    "note": "Result. Reuse cuts each call from 180 ms to 60 ms in this illustrative case and removes the handshake CPU. Inside one data centre the round trips are sub-millisecond, so there the CPU and port savings matter more than the latency."
+   },
+   {
+    "id": "t542-c3",
+    "kind": "diagram",
+    "title": "The idle-timeout race behind rare 502s",
+    "body": "A load balancer reuses a connection that the backend is closing at that same moment.",
+    "teaches": [
+     "idle-timeout-race"
+    ],
+    "steps": [
+     "The balancer keeps idle connections to the backend for up to 60 s",
+     "The backend closes idle keep-alive connections after 5 s and sends a FIN",
+     "Before the FIN arrives, the balancer sends a new request on that connection",
+     "The backend’s socket is closed, so its kernel answers with a reset",
+     "The balancer has no response to forward and returns 502 to the client"
+    ]
+   },
+   {
+    "id": "t542-c4",
+    "kind": "text",
+    "title": "Order the timers from the outside in",
+    "body": "Each caller’s idle timeout should be shorter than its callee’s: client pool shorter than the balancer, balancer shorter than the backend. Then the side that sends requests is the one that closes idle connections, and it never sends on a connection the other end is closing. AWS documents this for its Application Load Balancer, recommending an application keep-alive timeout larger than the balancer’s idle timeout. If a reused connection still fails before any response, a client may retry automatically only if the request is idempotent, such as GET, PUT or DELETE.",
+    "teaches": [
+     "timeout-ordering",
+     "safe-retry"
+    ]
+   },
+   {
+    "id": "t542-c5",
+    "kind": "text",
+    "title": "Trap: long-lived connections pin load to old servers",
+    "body": "HTTP/2, gRPC and WebSocket clients hold a few connections for a long time. Behind a layer 4 balancer, which balances per connection, scaling from 4 to 8 servers leaves the new 4 nearly idle until connections recycle. Balance per request at layer 7, or cap connection age so servers send an HTTP/2 GOAWAY frame and clients reconnect gradually, landing on the new servers.",
+    "teaches": [
+     "long-lived-imbalance"
+    ]
+   },
+   {
+    "id": "t542-c6",
+    "kind": "text",
+    "title": "Sizing a pool with Little’s law",
+    "body": "Connections in use equal request rate times how long each request holds one. At 2,000 requests per second and 25 ms per request, about 2,000 × 0.025 = 50 HTTP/1.1 connections are busy on average, so a pool of 50 with headroom for bursts works. If latency doubles, the need doubles. HTTP/2 carries many streams per connection, up to the server’s advertised limit; RFC 9113 recommends allowing at least 100 concurrent streams.",
+    "teaches": [
+     "pool-sizing"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t542-a1",
+    "concept": "idle-timeout-race",
+    "type": "multiple_choice",
+    "prompt": "A balancer has a 60 s idle timeout and its backends close idle connections after 5 s. Users see rare 502s, mostly at low traffic. What is the likely cause?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The balancer runs out of source ports when traffic is light"
+     },
+     {
+      "id": "b",
+      "label": "TLS session tickets on the backend expire every 5 seconds"
+     },
+     {
+      "id": "c",
+      "label": "A backend closes a connection just as the balancer reuses it"
+     },
+     {
+      "id": "d",
+      "label": "The backend’s listen queue overflows while it is idle"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Low traffic leaves connections idle long enough for the backend’s 5 s timer to fire, and the balancer can send a request into the closing socket. Light traffic does not exhaust ports; ticket expiry forces a full handshake, not a 502; and an idle listen queue is empty."
+   },
+   {
+    "id": "t542-a2",
+    "concept": "timeout-ordering",
+    "type": "multiple_choice",
+    "prompt": "Which ordering of idle timeouts avoids that race?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Client pool < balancer < backend keep-alive"
+     },
+     {
+      "id": "b",
+      "label": "Backend keep-alive < balancer < client pool"
+     },
+     {
+      "id": "c",
+      "label": "All three set to the same value"
+     },
+     {
+      "id": "d",
+      "label": "A long balancer timeout with short client ones"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "The caller should close first at every hop. Reversing the order makes the race the norm; equal values still race when both timers fire together; and a long balancer timeout says nothing about the backend’s, which is where the race happens."
+   },
+   {
+    "id": "t542-a3",
+    "concept": "persistent-connections",
+    "type": "multiple_choice",
+    "prompt": "Why does connection reuse save more latency between regions than inside one data centre?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Handshakes cost round trips, and those are long between regions"
+     },
+     {
+      "id": "b",
+      "label": "Cross-region links do not allow TLS session resumption or tickets"
+     },
+     {
+      "id": "c",
+      "label": "Services in one data centre share a single TCP connection"
+     },
+     {
+      "id": "d",
+      "label": "Inside a data centre, a handshake sends no packets"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Each saved round trip is worth tens of ms between regions and well under one ms locally. Resumption works on any link; services do not share one connection; and a local handshake still sends packets, just quickly."
+   },
+   {
+    "id": "t542-a4",
+    "concept": "long-lived-imbalance",
+    "type": "multiple_choice",
+    "prompt": "A gRPC service scales from 4 to 8 pods behind a layer 4 balancer, yet the new pods stay nearly idle. Why?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "New pods must load their TLS certificates for an hour first"
+     },
+     {
+      "id": "b",
+      "label": "Clients keep their HTTP/2 connections, so requests stay on old pods"
+     },
+     {
+      "id": "c",
+      "label": "A layer 4 balancer sends only UDP traffic to new pods"
+     },
+     {
+      "id": "d",
+      "label": "gRPC limits each client to the set of pods that it resolved at startup"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Balancing happened when the connections opened, and they are long-lived. Certificates load in seconds; a layer 4 balancer forwards TCP as well; and gRPC clients can discover new backends, but a single long connection still pins traffic."
+   },
+   {
+    "id": "t542-a5",
+    "concept": "safe-retry",
+    "type": "multiple_choice",
+    "prompt": "A reused connection is reset before any response arrives. Which request can the client retry automatically?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "POST /payments with no idempotency key"
+     },
+     {
+      "id": "b",
+      "label": "PATCH /cart that adds one to a quantity"
+     },
+     {
+      "id": "c",
+      "label": "POST /orders that creates a new order"
+     },
+     {
+      "id": "d",
+      "label": "GET /orders/42 that reads one order"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "GET is idempotent, so a repeat cannot double an effect. The server may have processed the others before the reset, so retrying them could charge, add or create twice unless they carry an idempotency key."
+   },
+   {
+    "id": "t542-a6",
+    "concept": "idle-timeout-race",
+    "type": "drag_order",
+    "prompt": "Order the events in the idle-timeout race.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "The balancer sends a request before the FIN arrives"
+     },
+     {
+      "id": "s5",
+      "label": "The balancer returns 502 to the client"
+     },
+     {
+      "id": "s1",
+      "label": "The backend’s idle timer fires"
+     },
+     {
+      "id": "s4",
+      "label": "The backend’s kernel answers with a reset"
+     },
+     {
+      "id": "s2",
+      "label": "The backend sends a FIN and closes its socket"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "The backend closes first, the balancer sends into the gap, and the reset becomes a 502. Making the backend’s timer longer than the balancer’s removes the first step."
+   },
+   {
+    "id": "t542-a7",
+    "concept": "pool-sizing",
+    "type": "estimation",
+    "prompt": "An API gateway forwards 2,000 calls per second upstream, and each upstream call occupies its own HTTP/1.1 connection for 25 ms. What pool size matches the mean concurrency?",
+    "unit": "connections",
+    "target": 50,
+    "assumptions": [
+     "Calls are spread evenly",
+     "One request per HTTP/1.1 connection at a time"
+    ],
+    "formula": "2,000 × 0.025 s",
+    "workedAnswer": "2,000 × 0.025 = 50 connections",
+    "explanation": "Design implication: size the pool above 50 with headroom, and watch latency; at 100 ms per call the same rate needs 200 connections.",
+    "tolerance": 0.1,
+    "trapAnswers": [
+     500,
+     5,
+     80
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t542-f1",
+    "front": "Idle timeout order?",
+    "back": "Client pool < load balancer < backend keep-alive, so the caller always closes first."
+   },
+   {
+    "id": "t542-f2",
+    "front": "Rare 502s at low traffic?",
+    "back": "Often the backend closing idle connections before the balancer does."
+   },
+   {
+    "id": "t542-f3",
+    "front": "Busy connections?",
+    "back": "Request rate × time each request holds a connection (Little’s law)."
+   }
+  ],
+  "sources": [
+   {
+    "title": "RFC 9112: HTTP/1.1, section 9 Connection Management",
+    "url": "https://www.rfc-editor.org/rfc/rfc9112#section-9"
+   },
+   {
+    "title": "RFC 9113: HTTP/2",
+    "url": "https://www.rfc-editor.org/rfc/rfc9113"
+   },
+   {
+    "title": "AWS: Application Load Balancer connection idle timeout",
+    "url": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/edit-load-balancer-attributes.html#connection-idle-timeout"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "persistent-connections",
+    "idle-timeout-race",
+    "timeout-ordering"
+   ],
+   "mechanism": {
+    "title": "How a pooled connection lives and dies",
+    "steps": [
+     "A client opens a connection with a TCP handshake and, for HTTPS, a TLS handshake. Once the first response is read, the connection goes back to a pool. HTTP/1.1 treats connections as persistent unless a side sends Connection: close, so the next request to the same host can reuse it immediately with no setup round trips and no new key exchange.",
+     "Each side keeps idle connections only for a while, because each costs memory, a file descriptor and, on a balancer, a slot in its connection table. Clients have a pool idle timeout, balancers an idle timeout, and servers a keep-alive timeout. When one expires, that side closes the connection with a FIN. These timers are independent and each defaults to whatever the software chose.",
+     "Closing is not instant for the other side. The FIN takes time to arrive, and until it does the peer believes the connection is usable. If the peer sends a request in that window, it reaches a closed socket and the kernel answers with a reset. A balancer then has nothing to forward and returns 502; a client library reports a reset or an unexpected end of stream.",
+     "The fix is to make the side that sends requests close first. Set the client pool’s idle timeout below the balancer’s, and the balancer’s below the backend’s keep-alive timeout, with a few seconds of margin at each step. Clients should also retry idempotent requests once when a reused connection fails before any response, which RFC 9112 permits.",
+     "Long-lived connections create a different problem. A layer 4 balancer chooses a backend once per connection, so multiplexed HTTP/2 or gRPC traffic stays where the connection landed. New servers added by autoscaling see little traffic. Layer 7 balancing spreads individual requests; alternatively, servers cap connection age and send GOAWAY, which tells clients to finish in-flight streams and reconnect."
+    ]
+   },
+   "useWhen": [
+    "Any service calling another over HTTP many times per second.",
+    "Paths with a high round-trip time, such as cross-region calls."
+   ],
+   "avoidWhen": [
+    "Avoid very long idle timeouts on servers with few file descriptors or memory per connection.",
+    "Avoid relying on a layer 4 balancer to spread long-lived HTTP/2 or WebSocket traffic."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Hop",
+     "Timer",
+     "Rule of thumb"
+    ],
+    "rows": [
+     [
+      "Client pool",
+      "Pool idle timeout",
+      "Shortest of the three"
+     ],
+     [
+      "Load balancer",
+      "Idle timeout",
+      "Longer than the client, shorter than the backend"
+     ],
+     [
+      "Backend server",
+      "Keep-alive timeout",
+      "Longest, a few seconds above the balancer"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Cold versus warm calls across regions",
+    "assumptions": [
+     "60 ms round trip, TLS 1.3 over TCP",
+     "200 calls per second, 25 ms of server time per call"
+    ],
+    "steps": [
+     "Cold call: 3 round trips (TCP, TLS, request) = 180 ms, plus 25 ms of work = 205 ms.",
+     "Warm call: 1 round trip = 60 ms, plus 25 ms of work = 85 ms.",
+     "Busy connections when warm: 200 × 0.085 s = 17 on average.",
+     "Without reuse: 200 new connections and 200 key exchanges per second, each port then held in TIME_WAIT."
+    ],
+    "result": "Reuse cuts latency by more than half here and turns hundreds of handshakes per second into a pool of about 17 connections."
+   },
+   "india": {
+    "title": "Persistent connections in RFC 9112 and AWS load balancer guidance",
+    "label": "Official documentation",
+    "body": "RFC 9112 section 9.3 makes HTTP/1.1 connections persistent by default and explains that a client may retry an idempotent request automatically when a persistent connection closes before the response arrives, but must not do so for non-idempotent requests without knowing they are safe. AWS documentation for the Application Load Balancer describes its configurable idle timeout and recommends enabling keep-alive on targets with a keep-alive timeout greater than the load balancer’s idle timeout."
+   },
+   "pitfalls": [
+    {
+     "trap": "“The 502s are random network blips.”",
+     "say": "“Rare 502s at low traffic usually mean the backend closes idle connections before the balancer; I’d make its keep-alive longer than the balancer’s timeout.”"
+    },
+    {
+     "trap": "“We added pods, so load is spread.”",
+     "say": "“With long-lived HTTP/2 connections behind a layer 4 balancer, new pods stay idle until connections recycle.”"
+    }
+   ],
+   "takeaways": [
+    "Reusing a connection skips TCP and TLS setup and key-exchange work.",
+    "Order idle timeouts so the caller closes first: client < balancer < backend.",
+    "Retry automatically only idempotent requests after a reused connection fails.",
+    "Long-lived HTTP/2 connections need layer 7 balancing or a maximum age."
+   ]
+  },
+  "interactive": {
+   "kind": "slider",
+   "title": "What a cold connection costs",
+   "prompt": "A cold HTTPS call needs three round trips before the first response byte: TCP, TLS 1.3 and the request. Slide the round-trip time and find where cold calls blow a 200 ms budget.",
+   "model": "rtt-handshake",
+   "params": {
+    "roundTrips": 3,
+    "budgetMs": 200
+   },
+   "control": {
+    "label": "Round-trip time",
+    "min": 1,
+    "max": 150,
+    "step": 1,
+    "initial": 60,
+    "unit": "ms"
+   },
+   "takeaway": "Above about 66 ms of round trip, three round trips no longer fit in 200 ms. A reused connection needs only one, so between regions reuse is the difference between meeting the budget and missing it."
+  },
+  "seeAlso": [
+   {
+    "topicId": 274,
+    "why": "Database connection pools follow the same sizing and idle-timeout rules"
+   },
+   {
+    "topicId": 12,
+    "why": "Layer 4 versus layer 7 balancing decides how long-lived connections spread"
+   },
+   {
+    "topicId": 249,
+    "why": "Every new connection uses an ephemeral port that then waits in TIME_WAIT"
+   }
+  ]
+ },
+ {
+  "id": 543,
+  "slug": "debugging-network-connections",
+  "region": "f3-networking",
+  "order": 17,
+  "title": "Debugging a Connection: Refused, Timeout or Reset",
+  "kind": "lesson",
+  "objectives": [
+   "Read what refused, timed out and reset connections each say about the path",
+   "Walk a failing request up the layers from name to HTTP",
+   "Use traceroute, timing breakdowns and packet captures without misreading them"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 12,
+  "prereqIds": [
+   246,
+   247
+  ],
+  "cards": [
+   {
+    "id": "t543-c1",
+    "kind": "text",
+    "title": "Each failure leaves a different signature",
+    "body": "Connection refused means the host answered with a TCP reset: it is reachable, but nothing listens on that port, or a firewall rejects actively. A timeout means no answer at all: a firewall or security group drops packets, a route is wrong or the host is down. A reset on an open connection means the peer or a middlebox killed it, often an idle timeout or a crashed process. For names, NXDOMAIN says the name does not exist, while SERVFAIL says the resolver could not get an answer.",
+    "teaches": [
+     "failure-signatures"
+    ]
+   },
+   {
+    "id": "t543-c2",
+    "kind": "diagram",
+    "title": "Walk up the layers, one question each",
+    "body": "Answer each question before moving up; most outages stop at one layer.",
+    "teaches": [
+     "layered-debugging"
+    ],
+    "steps": [
+     "Name: does it resolve to the address you expect, from the same resolver the client uses?",
+     "Route: are packets reaching that address? Traceroute shows where replies stop",
+     "Port: does a TCP handshake complete, and is the failure refused or a timeout?",
+     "TLS: does the handshake finish, and does the certificate match the name?",
+     "HTTP: which status came back, and from which hop: proxy, balancer or the app?"
+    ]
+   },
+   {
+    "id": "t543-c3",
+    "kind": "diagram",
+    "title": "Worked example: reading a 3-second connect",
+    "body": "A timing breakdown splits a request into DNS, connect, TLS and first byte.",
+    "teaches": [
+     "timing-phases"
+    ],
+    "steps": [
+     "Measured: DNS 4 ms, TCP connect done at 3,010 ms, RTT to the host about 6 ms",
+     "Connect phase: 3,010 − 4 = 3,006 ms, against one 6 ms round trip expected",
+     "TCP waits 1 s before resending a lost SYN, then doubles: 1 s, then 2 s more",
+     "1 s + 2 s + 6 ms ≈ 3,006 ms: the first two SYNs were lost and the third got through"
+    ],
+    "note": "Result. Connect times clustering near 1, 3 or 7 seconds point to dropped SYNs, from a full accept queue, a firewall or a lossy path, not to slow application code. Linux gives up after about 127 seconds of such retries by default."
+   },
+   {
+    "id": "t543-c4",
+    "kind": "text",
+    "title": "traceroute works by expiring packets",
+    "body": "Traceroute sends probes with TTL 1, then 2, then 3. Each router that decrements a TTL to zero drops the probe and returns an ICMP Time Exceeded message, revealing its address and the round trip to it. Ping uses ICMP Echo, which many hosts and clouds block, so a failed ping alone does not mean a host is down; a TCP connect to the real port is the better test.",
+    "teaches": [
+     "traceroute-ttl"
+    ]
+   },
+   {
+    "id": "t543-c5",
+    "kind": "text",
+    "title": "Trap: reading a silent traceroute hop as the outage",
+    "body": "A row of asterisks means that router did not answer the probe; many routers rate-limit or ignore ICMP while forwarding traffic normally. If later hops and the destination reply, the silent hop is fine. Only when every hop after some point is silent has the path stopped there. Likewise, high latency at one middle hop that does not carry on to later hops is that router’s slow reply, not added delay.",
+    "teaches": [
+     "traceroute-ttl"
+    ]
+   },
+   {
+    "id": "t543-c6",
+    "kind": "text",
+    "title": "When to capture packets",
+    "body": "A packet capture on both ends settles arguments. If the client’s SYN leaves but never reaches the server, something on the path drops it. If the server answers with SYN-ACK that never returns, suspect an asymmetric route or a return-path firewall. If a reset appears, the capture shows who sent it. Filter captures to the one connection, and treat them as sensitive, since they can hold credentials and personal data.",
+    "teaches": [
+     "packet-capture"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t543-a1",
+    "concept": "failure-signatures",
+    "type": "multiple_choice",
+    "prompt": "Connecting to 10.0.3.7 on port 5432 fails at once with “connection refused”. What does that say?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A firewall silently dropped the SYN"
+     },
+     {
+      "id": "b",
+      "label": "The host replied, but nothing accepted that port"
+     },
+     {
+      "id": "c",
+      "label": "The name did not resolve to any address"
+     },
+     {
+      "id": "d",
+      "label": "The server’s certificate did not match"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Refused is an immediate reset from the host. A silent drop would time out instead; a name failure happens before any connection to 10.0.3.7; and certificates are checked only after TCP succeeds."
+   },
+   {
+    "id": "t543-a2",
+    "concept": "failure-signatures",
+    "type": "multiple_choice",
+    "prompt": "The same connect now hangs for about two minutes before timing out. What is the most likely cause?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The database process has stopped on a reachable host"
+     },
+     {
+      "id": "b",
+      "label": "The database rejected the client’s password"
+     },
+     {
+      "id": "c",
+      "label": "A security group or firewall drops the packets"
+     },
+     {
+      "id": "d",
+      "label": "The server’s TLS certificate has expired"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "No reply at all means packets are dropped. A stopped process on a reachable host gives refused; a bad password and an expired certificate both need a completed TCP handshake first, and fail with a clear error."
+   },
+   {
+    "id": "t543-a3",
+    "concept": "traceroute-ttl",
+    "type": "multiple_choice",
+    "prompt": "How does traceroute discover the routers along a path?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "It asks each router for its BGP routing table"
+     },
+     {
+      "id": "b",
+      "label": "It reads the list of routers published in DNS"
+     },
+     {
+      "id": "c",
+      "label": "It divides one ping’s total round-trip time by the number of hops"
+     },
+     {
+      "id": "d",
+      "label": "It sends probes with rising TTL and reads Time Exceeded replies"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Each TTL value expires one hop further, and that router reports itself. Routers do not hand out BGP tables to hosts; DNS has no router list; and hop count cannot be derived from a ping time."
+   },
+   {
+    "id": "t543-a4",
+    "concept": "traceroute-ttl",
+    "type": "multiple_choice",
+    "prompt": "Hop 6 shows “* * *” but hops 7 to 12 answer and the destination replies. What does hop 6 tell you?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "That router ignores probes but forwards traffic"
+     },
+     {
+      "id": "b",
+      "label": "Packets are being lost at hop 6"
+     },
+     {
+      "id": "c",
+      "label": "Hop 6 is the firewall blocking the service"
+     },
+     {
+      "id": "d",
+      "label": "The path loops back at hop 6"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Later hops and the destination answered, so traffic passed hop 6. Loss or a blocking firewall there would silence everything after it, and a loop shows the same addresses repeating."
+   },
+   {
+    "id": "t543-a5",
+    "concept": "timing-phases",
+    "type": "multiple_choice",
+    "prompt": "A request’s connect phase takes about 3 seconds while the round trip is 6 ms. What is the best reading?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The server took 3 seconds to build the page"
+     },
+     {
+      "id": "b",
+      "label": "Two SYNs were lost and resent after 1 s and 2 s"
+     },
+     {
+      "id": "c",
+      "label": "The TLS handshake needed hundreds of round trips"
+     },
+     {
+      "id": "d",
+      "label": "DNS answered slowly from a distant resolver"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "1 s + 2 s of retransmission backoff matches the 3 s. Page building happens after connect and TLS; TLS is a separate phase after connect; and DNS has its own, separate timing."
+   },
+   {
+    "id": "t543-a6",
+    "concept": "layered-debugging",
+    "type": "drag_order",
+    "prompt": "Order the checks when a request to a service fails.",
+    "items": [
+     {
+      "id": "s4",
+      "label": "Check the TLS handshake and certificate"
+     },
+     {
+      "id": "s1",
+      "label": "Check the name resolves to the expected address"
+     },
+     {
+      "id": "s5",
+      "label": "Check the HTTP status and which hop sent it"
+     },
+     {
+      "id": "s3",
+      "label": "Check the TCP handshake completes"
+     },
+     {
+      "id": "s2",
+      "label": "Check packets reach that address"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Each layer depends on the one below it, so a failure low down explains every symptom above it."
+   },
+   {
+    "id": "t543-a7",
+    "concept": "timing-phases",
+    "type": "estimation",
+    "prompt": "A SYN is first resent after 1 s, and each later wait doubles. If the first three SYNs are lost, how many seconds after the first does the fourth go out?",
+    "unit": "s",
+    "target": 7,
+    "assumptions": [
+     "Waits of 1 s, 2 s and 4 s between attempts",
+     "Round-trip time is negligible next to the waits"
+    ],
+    "formula": "1 + 2 + 4",
+    "workedAnswer": "1 + 2 + 4 = 7 s",
+    "explanation": "Sanity check: connect times bunched near 1, 3 and 7 seconds are a fingerprint of dropped SYNs rather than slow servers.",
+    "tolerance": 0.05,
+    "trapAnswers": [
+     3,
+     4,
+     8
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t543-f1",
+    "front": "Refused vs timeout?",
+    "back": "Refused: host replied with a reset, nothing on the port. Timeout: packets dropped, no reply."
+   },
+   {
+    "id": "t543-f2",
+    "front": "A silent traceroute hop?",
+    "back": "That router ignores probes; it matters only if every later hop is silent too."
+   },
+   {
+    "id": "t543-f3",
+    "front": "Connect takes about 3 s?",
+    "back": "Two lost SYNs, resent after 1 s and 2 s."
+   }
+  ],
+  "sources": [
+   {
+    "title": "RFC 792: Internet Control Message Protocol",
+    "url": "https://www.rfc-editor.org/rfc/rfc792"
+   },
+   {
+    "title": "RFC 6298: Computing TCP’s Retransmission Timer",
+    "url": "https://www.rfc-editor.org/rfc/rfc6298"
+   },
+   {
+    "title": "man7: tcp(7)",
+    "url": "https://man7.org/linux/man-pages/man7/tcp.7.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "failure-signatures",
+    "layered-debugging",
+    "timing-phases"
+   ],
+   "mechanism": {
+    "title": "What each layer reports when it fails",
+    "steps": [
+     "Name resolution fails before any connection exists. Query the same resolver the client uses, then the authoritative servers directly, and compare: a stale cached answer, a split-horizon record that differs inside and outside a network, or an NXDOMAIN from a typo each look different. SERVFAIL points at the resolver’s path to the authoritative servers, or at a failed DNSSEC validation.",
+     "At the network layer, a router that has no route, or a host that is administratively unreachable, may return an ICMP Destination Unreachable, which applications report as “no route to host” or “network unreachable”. More often, filters drop packets silently. Traceroute uses expiring TTLs to show how far probes get, keeping in mind that routers may ignore probes while forwarding traffic.",
+     "At the transport layer, the TCP handshake gives three outcomes. A SYN-ACK means the port is open. A reset means the host is up but refused, usually because nothing listens. Silence means a drop somewhere, and the client keeps resending the SYN with exponentially growing waits, starting from a 1 s initial retransmission timeout as RFC 6298 recommends, until it gives up.",
+     "Above TCP, TLS failures name their cause: an unknown certificate authority, a name mismatch, an expired certificate or no shared protocol version. HTTP failures need the source identified: a 502 or 504 from a proxy or balancer means the hop behind it failed or was slow, while a 500 from the application is its own error. Response headers and access logs at each hop show who answered.",
+     "Timing breakdowns tie it together. Most HTTP clients and browsers report DNS, connect, TLS, time to first byte and transfer separately. A long connect phase means network or accept-queue trouble; a long TLS phase means handshake round trips or certificate checks; a long wait for the first byte with fast setup means the server itself was slow."
+    ]
+   },
+   "useWhen": [
+    "Any failing or slow request where the cause is not yet known.",
+    "Arguments over whether “the network” or “the app” is at fault."
+   ],
+   "avoidWhen": [
+    "Avoid concluding a host is down from a failed ping alone.",
+    "Avoid treating one silent or slow middle hop in traceroute as the problem."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Symptom",
+     "Usually means",
+     "Check next"
+    ],
+    "rows": [
+     [
+      "Connection refused",
+      "Host reachable, nothing on the port",
+      "Is the service listening on that address and port?"
+     ],
+     [
+      "Connect timeout",
+      "Packets dropped on the way",
+      "Security groups, firewalls, routes"
+     ],
+     [
+      "Reset mid-connection",
+      "Peer or middlebox closed it",
+      "Idle timeouts, crashes, proxy limits"
+     ],
+     [
+      "502 or 504 from a proxy",
+      "The hop behind the proxy failed or was slow",
+      "Upstream health and timeouts"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Decoding a slow connect",
+    "assumptions": [
+     "DNS 4 ms, connect complete at 3,010 ms",
+     "Round-trip time to the server 6 ms",
+     "SYN retransmission waits of 1 s, then 2 s, then 4 s"
+    ],
+    "steps": [
+     "Connect phase: 3,010 − 4 = 3,006 ms.",
+     "Subtract one round trip: 3,006 − 6 = 3,000 ms of waiting.",
+     "3,000 ms = 1,000 ms + 2,000 ms, the first two retransmission waits.",
+     "So two SYNs were lost; a third loss would have pushed connect to about 7 s."
+    ],
+    "result": "The delay is packet loss before the connection exists, so look at accept queues, firewalls and the path, not the application."
+   },
+   "india": {
+    "title": "ICMP and TCP timers in the RFCs and the Linux manual",
+    "label": "Official documentation",
+    "body": "RFC 792 defines the ICMP Echo, Destination Unreachable and Time Exceeded messages that ping and traceroute rely on. RFC 6298 recommends an initial TCP retransmission timeout of one second, doubling on each further loss. The Linux tcp(7) manual page documents tcp_syn_retries, whose default of 6 retries corresponds to roughly 127 seconds before a connect attempt gives up, which is why a filtered port can leave a client waiting about two minutes."
+   },
+   "pitfalls": [
+    {
+     "trap": "“Ping fails, so the server is down.”",
+     "say": "“Many hosts block ICMP; I’d try a TCP connect to the real port before deciding.”"
+    },
+    {
+     "trap": "“Traceroute stops at hop 6, so hop 6 is broken.”",
+     "say": "“Hops after 6 answer, so hop 6 just ignores probes; the path is fine.”"
+    }
+   ],
+   "takeaways": [
+    "Refused means reachable with nothing listening; a timeout means packets are dropped.",
+    "Debug upward: name, route, port, TLS, then HTTP and which hop answered.",
+    "Connect times near 1, 3 or 7 seconds mean lost SYNs.",
+    "A silent traceroute hop matters only if every later hop is silent too."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Where do you look first?",
+   "prompt": "An app on host A connects to the database by IP in milliseconds. The same app on host B, in another subnet, hangs on connect until it times out. DNS is not involved. What do you check first?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "The database’s password and user grants",
+     "feedback": "Authentication happens after TCP connects, and here the connect itself never completes."
+    },
+    {
+     "id": "b",
+     "label": "Security group or firewall rules for B’s subnet",
+     "feedback": "Right: a hang with no reply means packets are dropped, and the difference between A and B is their network path and rules."
+    },
+    {
+     "id": "c",
+     "label": "The database’s TLS certificate",
+     "feedback": "TLS starts only after the TCP handshake, which never finishes from B."
+    }
+   ],
+   "correctId": "b",
+   "reveal": "A timeout is silence, so something drops packets. Refused would mean the host answered; an authentication or TLS error would mean TCP succeeded. Comparing a working source with a failing one narrows it to what differs: subnet, routes and filters."
+  },
+  "seeAlso": [
+   {
+    "topicId": 329,
+    "why": "Security groups and network ACLs are the usual cause of silent drops in a cloud network"
+   },
+   {
+    "topicId": 6,
+    "why": "How resolvers and caching behave when the name is the problem"
+   },
+   {
+    "topicId": 239,
+    "why": "Connect and request timeouts decide how long a client waits on each failure"
+   }
+  ]
+ },
+ {
+  "id": 544,
+  "slug": "packet-loss-jitter-throughput",
+  "region": "f3-networking",
+  "order": 18,
+  "title": "Packet Loss, Jitter and Single-Flow Throughput",
+  "kind": "lesson",
+  "objectives": [
+   "Estimate how loss and round-trip time cap one TCP flow with the Mathis model",
+   "Size a jitter buffer for real-time audio or video",
+   "Recognise bufferbloat and why it hurts interactive traffic"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 13,
+  "prereqIds": [
+   248,
+   253
+  ],
+  "cards": [
+   {
+    "id": "t544-c1",
+    "kind": "text",
+    "title": "Loss caps a TCP flow, not just slows it",
+    "body": "Loss-based congestion control shrinks the window after each loss and grows it again slowly, so the average window settles where growth and cuts balance. The Mathis model captures this: throughput ≈ (MSS ÷ RTT) × 1.22 ÷ √p, where p is the loss rate. Link speed does not appear. Doubling the round trip halves the rate, and four times the loss also halves it. Treat it as an estimate for classic loss-based TCP; delay-based algorithms such as BBR behave differently.",
+    "teaches": [
+     "mathis-model",
+     "loss-throughput"
+    ]
+   },
+   {
+    "id": "t544-c2",
+    "kind": "diagram",
+    "title": "Worked example: one flow on a long, slightly lossy path",
+    "body": "Plug real-looking numbers into the Mathis model.",
+    "teaches": [
+     "mathis-model"
+    ],
+    "steps": [
+     "Assume: MSS 1,460 bytes = 11,680 bits, RTT 100 ms, random loss 0.01% (p = 0.0001)",
+     "√p = 0.01, and MSS ÷ RTT = 11,680 ÷ 0.1 s = 116,800 bit/s",
+     "Throughput ≈ 116,800 × 1.22 ÷ 0.01 ≈ 14.2 Mbit/s",
+     "Same loss at 10 ms RTT: ten times more, about 142 Mbit/s"
+    ],
+    "note": "Result. One flow on this path tops out near 14 Mbit/s even on a 10 Gbit/s link. Bulk transfers across continents therefore use several parallel flows, reduce loss, or use congestion control that does not treat every loss as congestion."
+   },
+   {
+    "id": "t544-c3",
+    "kind": "text",
+    "title": "Jitter and the playout buffer",
+    "body": "Jitter is variation in delay. A real-time audio or video receiver holds packets in a jitter buffer and plays them on a steady clock, so the buffer must cover the spread of delays: if one-way delay ranges from 40 to 90 ms, about 50 ms of buffer avoids late packets, at the cost of 50 ms more latency. A packet that arrives after its playout time is as useless as a lost one, which is why media usually conceals losses instead of waiting for retransmissions.",
+    "teaches": [
+     "jitter"
+    ]
+   },
+   {
+    "id": "t544-c4",
+    "kind": "diagram",
+    "title": "How an oversized router queue becomes delay",
+    "body": "Bufferbloat: a deep queue at the bottleneck adds latency without adding throughput.",
+    "teaches": [
+     "bufferbloat"
+    ],
+    "steps": [
+     "A bulk upload sends faster than the home uplink can carry",
+     "The router’s queue fills, because loss-based TCP keeps growing until packets drop",
+     "A full 1 MB queue on a 10 Mbit/s uplink holds 8,000,000 ÷ 10,000,000 = 0.8 s of data",
+     "A call’s packets wait behind it, so the call lags by most of a second",
+     "Active queue management, such as CoDel, drops or marks early to keep the queue short"
+    ]
+   },
+   {
+    "id": "t544-c5",
+    "kind": "text",
+    "title": "Trap: buying bandwidth to fix a lossy path",
+    "body": "If loss comes from a flaky wireless hop or a bad interface rather than congestion, a faster link changes nothing for one flow, because the Mathis cap depends on loss and round trip, not capacity. Fix the loss, shorten the round trip with a closer endpoint, or split the transfer over several connections, each with its own cap. Also check the measurement: routers that rate-limit ICMP make ping report loss that real traffic does not see.",
+    "teaches": [
+     "loss-throughput",
+     "parallel-flows"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t544-a1",
+    "concept": "mathis-model",
+    "type": "multiple_choice",
+    "prompt": "Under the Mathis model, what happens to one TCP flow’s throughput if loss rises from 0.01% to 0.04% on the same path?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "It drops to about a quarter"
+     },
+     {
+      "id": "b",
+      "label": "It drops by about 0.03%"
+     },
+     {
+      "id": "c",
+      "label": "It roughly halves"
+     },
+     {
+      "id": "d",
+      "label": "It stays the same until the link fills"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Throughput scales with 1 ÷ √p; four times the loss gives √4 = 2, so half. A quarter would be a 1 ÷ p relation; the change is far larger than 0.03%; and the model has no link-capacity term."
+   },
+   {
+    "id": "t544-a2",
+    "concept": "parallel-flows",
+    "type": "multiple_choice",
+    "prompt": "A 10 Gbit/s Mumbai to Frankfurt link (RTT about 120 ms) has 0.01% random loss, and a single-connection backup crawls. Which change helps most?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Upgrade the link to 40 Gbit/s"
+     },
+     {
+      "id": "b",
+      "label": "Split the backup over several connections"
+     },
+     {
+      "id": "c",
+      "label": "Give the backup server more CPU cores"
+     },
+     {
+      "id": "d",
+      "label": "Lower the MTU to 576 bytes"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Each flow gets its own loss-limited share, so parallel flows add up until the link fills. A bigger link leaves each flow’s cap unchanged; CPU is not the limit; and a smaller MTU shrinks the MSS, which lowers the cap further."
+   },
+   {
+    "id": "t544-a3",
+    "concept": "jitter",
+    "type": "multiple_choice",
+    "prompt": "Why do voice calls usually conceal a lost packet instead of retransmitting it?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "A retransmission arrives a round trip later, after its playout time"
+     },
+     {
+      "id": "b",
+      "label": "UDP gives the receiver no way to ask the sender for a missing packet"
+     },
+     {
+      "id": "c",
+      "label": "Lost audio packets are too rare to be worth handling"
+     },
+     {
+      "id": "d",
+      "label": "A retransmission would need a new TCP handshake first"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Audio plays on a deadline, and a resend costs at least one more round trip. Applications can and sometimes do request resends over UDP; losses are common enough to need handling; and media over UDP has no TCP handshake."
+   },
+   {
+    "id": "t544-a4",
+    "concept": "bufferbloat",
+    "type": "multiple_choice",
+    "prompt": "While a big upload runs on a 10 Mbit/s home uplink, video calls lag by nearly a second. What is the likely cause?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The ISP throttles calls whenever uploads run"
+     },
+     {
+      "id": "b",
+      "label": "DNS lookups for the call servers slow down while the uplink is busy"
+     },
+     {
+      "id": "c",
+      "label": "The upload has used up the router’s NAT ports"
+     },
+     {
+      "id": "d",
+      "label": "A deep router queue holds call packets behind the upload"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "A full queue on a slow link adds hundreds of ms for everything behind it. Throttling and DNS slowness do not produce steady second-long lag during calls, and one upload uses one or a few NAT ports."
+   },
+   {
+    "id": "t544-a5",
+    "concept": "jitter",
+    "type": "multiple_choice",
+    "prompt": "Audio packets arrive with one-way delays between 40 and 90 ms. Roughly how much jitter buffer avoids late packets?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "About 40 ms"
+     },
+     {
+      "id": "b",
+      "label": "About 50 ms"
+     },
+     {
+      "id": "c",
+      "label": "About 90 ms"
+     },
+     {
+      "id": "d",
+      "label": "About 130 ms"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "The buffer covers the spread between the fastest and slowest packets: 90 − 40 = 50 ms. 40 and 90 ms are the delays themselves, and 130 ms adds them."
+   },
+   {
+    "id": "t544-a6",
+    "concept": "loss-throughput",
+    "type": "drag_order",
+    "prompt": "Sequence one tooth of the sawtooth a loss-based sender traces between drops.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "After three duplicate ACKs the sender retransmits"
+     },
+     {
+      "id": "s5",
+      "label": "The window grows again until the next loss"
+     },
+     {
+      "id": "s2",
+      "label": "The receiver sends duplicate ACKs for later segments"
+     },
+     {
+      "id": "s1",
+      "label": "A segment is lost in the network"
+     },
+     {
+      "id": "s4",
+      "label": "The sender cuts its congestion window"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Fast retransmit then a window cut; the repeating cut and slow regrowth is what the Mathis model averages."
+   },
+   {
+    "id": "t544-a7",
+    "concept": "mathis-model",
+    "type": "estimation",
+    "prompt": "One TCP flow has MSS 1,460 bytes, RTT 100 ms and random loss of 0.01%. Using throughput ≈ 1.22 × MSS ÷ (RTT × √p), about how many Mbit/s can it reach?",
+    "unit": "Mbit/s",
+    "target": 14.2,
+    "assumptions": [
+     "MSS 1,460 bytes = 11,680 bits",
+     "p = 0.0001, so √p = 0.01"
+    ],
+    "formula": "1.22 × 11,680 ÷ (0.1 × 0.01)",
+    "workedAnswer": "1.22 × 11,680 ÷ 0.001 ≈ 14,250,000 bit/s ≈ 14.2 Mbit/s",
+    "explanation": "Design implication: link speed is absent from the formula, so a faster link will not help this flow; a closer endpoint or less loss will.",
+    "tolerance": 0.1,
+    "trapAnswers": [
+     1.42,
+     142,
+     116.8
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t544-f1",
+    "front": "Mathis model?",
+    "back": "Throughput ≈ (MSS ÷ RTT) × 1.22 ÷ √p; link speed does not appear."
+   },
+   {
+    "id": "t544-f2",
+    "front": "Jitter buffer size?",
+    "back": "About the spread between the fastest and slowest packet delays."
+   },
+   {
+    "id": "t544-f3",
+    "front": "Bufferbloat?",
+    "back": "A deep queue at the bottleneck adding delay without adding throughput."
+   }
+  ],
+  "sources": [
+   {
+    "title": "Mathis et al.: The macroscopic behavior of the TCP congestion avoidance algorithm",
+    "url": "https://dl.acm.org/doi/10.1145/263932.264023"
+   },
+   {
+    "title": "RFC 7567: IETF Recommendations Regarding Active Queue Management",
+    "url": "https://www.rfc-editor.org/rfc/rfc7567"
+   },
+   {
+    "title": "RFC 3550: RTP, A Transport Protocol for Real-Time Applications",
+    "url": "https://www.rfc-editor.org/rfc/rfc3550"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "loss-throughput",
+    "mathis-model",
+    "jitter",
+    "bufferbloat"
+   ],
+   "mechanism": {
+    "title": "Why loss and delay shape what a flow can do",
+    "steps": [
+     "Classic congestion control treats each loss as a sign of congestion. On a loss the sender cuts its congestion window, by half in Reno and by about 30% in CUBIC, then grows it again by roughly one segment per round trip. Over many cycles the window saws up and down around an average that depends on how often losses happen.",
+     "The Mathis model turns that sawtooth into a formula. If losses are random with probability p, the average window is about 1.22 ÷ √p segments, and one window is sent per round trip, so throughput ≈ (MSS ÷ RTT) × 1.22 ÷ √p. Link capacity is absent: the formula is a ceiling set by loss and delay, and the link only matters once the ceiling exceeds it.",
+     "The model assumes no timeouts and enough receive window. Heavy loss causes retransmission timeouts and does worse than the formula; congestion control based on measured bandwidth and delay, such as BBR, does not cut on every loss and can do better on randomly lossy paths. It remains a good first estimate of why long, lossy paths are slow for one connection.",
+     "Real-time traffic suffers from a different failure. Audio and video packets have deadlines: a 20 ms audio frame must play at its slot. The receiver’s jitter buffer absorbs variation in delay, and its depth is pure added latency. Late packets count as lost, and codecs hide small losses by interpolation, while forward error correction adds redundancy to repair some losses without waiting.",
+     "Bufferbloat connects the two. Routers with large buffers let loss-based TCP fill them before any drop occurs, so the queue sits full and every packet waits behind it. Interactive traffic sharing the link sees the queue delay as lag. Active queue management, recommended by RFC 7567, drops or marks packets early, keeping queues short while bulk transfers still use the link fully."
+    ]
+   },
+   "useWhen": [
+    "Estimating why a single long-distance transfer is slow.",
+    "Designing real-time audio, video or game traffic over lossy or variable links."
+   ],
+   "avoidWhen": [
+    "Avoid using the Mathis model at very high loss, where timeouts dominate.",
+    "Avoid adding bandwidth before checking whether loss or delay caps the flow."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Problem",
+     "Main effect",
+     "Typical remedy"
+    ],
+    "rows": [
+     [
+      "Random loss on a long path",
+      "Caps one TCP flow",
+      "Parallel flows, closer endpoints, less loss"
+     ],
+     [
+      "Jitter",
+      "Late packets for real-time media",
+      "Jitter buffer, loss concealment"
+     ],
+     [
+      "Bufferbloat",
+      "Seconds of queueing delay",
+      "Active queue management, rate limiting at the edge"
+     ],
+     [
+      "Congestion",
+      "Loss and delay for everyone",
+      "More capacity or less traffic"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "The cap on one cross-continent flow",
+    "assumptions": [
+     "MSS 1,460 bytes, RTT 100 ms",
+     "Random loss 0.01%",
+     "A 10 Gbit/s link that is otherwise idle"
+    ],
+    "steps": [
+     "MSS ÷ RTT: 11,680 bits ÷ 0.1 s = 116,800 bit/s.",
+     "1.22 ÷ √0.0001 = 1.22 ÷ 0.01 = 122.",
+     "Throughput ≈ 116,800 × 122 ≈ 14.2 Mbit/s.",
+     "Flows needed to fill 1 Gbit/s at this cap: 1,000 ÷ 14.2 ≈ 70."
+    ],
+    "result": "Loss and round-trip time, not link speed, set the ceiling for one flow; filling the link takes many flows or less loss."
+   },
+   "india": {
+    "title": "The Mathis model and queue management guidance",
+    "label": "Official documentation",
+    "body": "Mathis, Semke, Mahdavi and Ott published the model in ACM SIGCOMM Computer Communication Review in 1997, showing that a sustained TCP flow under light to moderate loss achieves bandwidth proportional to MSS ÷ (RTT × √p), and checking it against simulations and live internet measurements. RFC 7567 recommends that network equipment use active queue management by default to avoid the persistent large queues that cause bufferbloat."
+   },
+   "pitfalls": [
+    {
+     "trap": "“The link is 10 Gbit/s, so the transfer should take seconds.”",
+     "say": "“With 100 ms RTT and 0.01% loss, one flow caps near 14 Mbit/s; I’d use parallel flows or cut the loss.”"
+    },
+    {
+     "trap": "“Calls lag, so we need a faster connection.”",
+     "say": "“If calls lag only during uploads, it is queueing delay; active queue management fixes it without more bandwidth.”"
+    }
+   ],
+   "takeaways": [
+    "One TCP flow’s ceiling ≈ (MSS ÷ RTT) × 1.22 ÷ √p, independent of link speed.",
+    "Doubling RTT halves the ceiling; four times the loss also halves it.",
+    "A jitter buffer must cover the delay spread, and its depth is added latency.",
+    "Bufferbloat is a full queue; active queue management keeps it short."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Which path is faster for one flow?",
+   "prompt": "You copy one large file over a single TCP connection. Path A has a 10 ms round trip and 0.04% loss. Path B has a 40 ms round trip and 0.01% loss. Both links are 1 Gbit/s. Which finishes first?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Path B, since it loses a quarter as many packets",
+     "feedback": "Loss enters as a square root: four times the loss costs only a factor of two, while B’s round trip is four times longer."
+    },
+    {
+     "id": "b",
+     "label": "Path A, at about twice B’s throughput",
+     "feedback": "Right: RTT × √p is 10 × 0.02 = 0.2 for A and 40 × 0.01 = 0.4 for B, so A’s ceiling is twice B’s."
+    },
+    {
+     "id": "c",
+     "label": "About the same, since both links are 1 Gbit/s",
+     "feedback": "Neither flow gets near 1 Gbit/s; loss and round trip set the ceiling, not link speed."
+    }
+   ],
+   "correctId": "b",
+   "reveal": "Throughput scales with 1 ÷ (RTT × √p). A: 10 × √0.0004 = 0.2; B: 40 × √0.0001 = 0.4. The smaller product wins by a factor of two, so the shorter path beats the cleaner one here."
+  },
+  "seeAlso": [
+   {
+    "topicId": 248,
+    "why": "Congestion windows and slow start are the mechanism the Mathis model averages"
+   },
+   {
+    "topicId": 253,
+    "why": "Latency and bandwidth are separate limits, and this lesson adds loss as a third"
+   },
+   {
+    "topicId": 5,
+    "why": "Why real-time media often prefers UDP over TCP"
+   }
+  ]
+ },
+ {
+  "id": 545,
+  "slug": "nat-traversal-stun-turn-ice",
+  "region": "f3-networking",
+  "order": 19,
+  "title": "Peer-to-Peer Connections: STUN, TURN and ICE",
+  "kind": "lesson",
+  "objectives": [
+   "Explain why two devices behind NAT cannot simply connect to each other",
+   "Describe how ICE gathers and tests candidates using STUN and TURN",
+   "Estimate the relay cost when direct paths fail"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 12,
+  "prereqIds": [
+   244,
+   249
+  ],
+  "cards": [
+   {
+    "id": "t545-c1",
+    "kind": "text",
+    "title": "Why two devices behind NAT cannot just connect",
+    "body": "A NAT creates a mapping only when a packet goes out, and it drops unsolicited packets coming in. When both peers sit behind NATs, neither can be the first to receive, and neither knows the public address and port the other’s NAT will use. Peers therefore exchange addresses through a server they can both reach, called the signalling channel; ICE leaves its format to the application.",
+    "teaches": [
+     "nat-traversal"
+    ]
+   },
+   {
+    "id": "t545-c2",
+    "kind": "diagram",
+    "title": "ICE tries every path and keeps the best",
+    "body": "Interactive Connectivity Establishment (ICE) collects possible addresses and tests them in pairs.",
+    "teaches": [
+     "ice-candidates",
+     "nat-traversal"
+    ],
+    "steps": [
+     "Gather host candidates: the device’s own addresses",
+     "Ask a STUN server for a server-reflexive candidate: the public address and port the NAT assigned",
+     "Ask a TURN server for a relayed candidate: an address on the relay",
+     "Swap candidates over signalling, then both peers send connectivity checks to each pair at once",
+     "Outbound checks open NAT mappings for the other side’s checks; the best working pair is nominated"
+    ]
+   },
+   {
+    "id": "t545-c3",
+    "kind": "text",
+    "title": "STUN discovers, TURN relays",
+    "body": "A STUN server answers one question: from what address and port do you see me? It is cheap and stays out of the media path. A TURN server allocates a relay address and forwards every packet between the peers, so it works through nearly any NAT or firewall that allows outbound traffic, including over TCP or TLS on port 443, but it carries the full media stream and adds the detour’s latency. ICE prefers direct pairs and uses the relay only when nothing direct works.",
+    "teaches": [
+     "stun",
+     "turn-relay"
+    ]
+   },
+   {
+    "id": "t545-c4",
+    "kind": "diagram",
+    "title": "Worked example: the bandwidth bill for relayed calls",
+    "body": "A relay carries both directions of every call it serves.",
+    "teaches": [
+     "turn-relay"
+    ],
+    "steps": [
+     "Assume: a one-to-one video call sends 1.5 Mbit/s in each direction",
+     "Relayed, the server receives 1.5 Mbit/s from each peer: 3 Mbit/s in",
+     "It forwards each stream to the other peer: 3 Mbit/s out",
+     "1,000 concurrent relayed calls: 1,000 × 3 = 3,000 Mbit/s = 3 Gbit/s out",
+     "One hour at that rate: 3 Gbit/s × 3,600 s ÷ 8 = 1,350 GB of egress"
+    ],
+    "note": "Result. In this illustrative case every relayed call costs real egress, while a direct call costs the operator nothing beyond signalling. That is why ICE tries direct paths first, and why relays are sized for the share of users who need them."
+   },
+   {
+    "id": "t545-c5",
+    "kind": "text",
+    "title": "Trap: expecting hole punching through every NAT",
+    "body": "Hole punching relies on the NAT reusing the same public port for a device whatever destination it talks to, which RFC 4787 calls endpoint-independent mapping. Some NATs, including some carrier-grade and enterprise ones, assign a new port for each destination. The port STUN reported is then wrong for the peer, the checks fail, and only TURN connects. Plan for relays rather than assuming direct paths.",
+    "teaches": [
+     "nat-mapping"
+    ]
+   },
+   {
+    "id": "t545-c6",
+    "kind": "text",
+    "title": "Keeping the path open once it works",
+    "body": "NAT mappings for UDP expire when idle; RFC 4787 requires at least two minutes and recommends five. A call that pauses its media, or a data channel that goes quiet, must send small keepalives well inside that window, or the mapping vanishes and packets are dropped. Mobile devices that switch networks get new addresses, so ICE restarts to find a new pair.",
+    "teaches": [
+     "nat-mapping"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t545-a1",
+    "concept": "stun",
+    "type": "multiple_choice",
+    "prompt": "What does a STUN server tell a client?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The private address of the peer it wants to call"
+     },
+     {
+      "id": "b",
+      "label": "The public address and port its NAT mapped it to"
+     },
+     {
+      "id": "c",
+      "label": "Which relay server should carry the media"
+     },
+     {
+      "id": "d",
+      "label": "The keys used to encrypt the media stream"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "STUN reflects back the address it saw. It knows nothing about the peer’s private address; relays come from TURN; and media keys are negotiated separately between the peers."
+   },
+   {
+    "id": "t545-a2",
+    "concept": "turn-relay",
+    "type": "multiple_choice",
+    "prompt": "When does ICE fall back to a TURN relay?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "When no direct candidate pair passes its checks"
+     },
+     {
+      "id": "b",
+      "label": "Whenever the two peers use different ISPs"
+     },
+     {
+      "id": "c",
+      "label": "When a call carries more than two video streams"
+     },
+     {
+      "id": "d",
+      "label": "When the STUN server is in another region"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "The relayed pair is the last resort. Different ISPs connect directly all the time; stream count does not decide the path; and STUN server location affects only discovery latency."
+   },
+   {
+    "id": "t545-a3",
+    "concept": "nat-mapping",
+    "type": "multiple_choice",
+    "prompt": "Direct calls fail for users on one mobile network. STUN shows them a different public port for each server they contact. Why do direct calls fail?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The network blocks every STUN request"
+     },
+     {
+      "id": "b",
+      "label": "Their phones have no IPv4 address at all"
+     },
+     {
+      "id": "c",
+      "label": "Their NAT keeps mappings open far too long"
+     },
+     {
+      "id": "d",
+      "label": "Their NAT maps a new port per destination"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "With endpoint-dependent mapping, the port learned from STUN differs from the one used toward the peer. A blocked STUN would give no reflexive address at all; IPv6-only phones still get candidates; and long-lived mappings help rather than hurt."
+   },
+   {
+    "id": "t545-a4",
+    "concept": "ice-candidates",
+    "type": "multiple_choice",
+    "prompt": "Which candidate types does ICE gather?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Host, server-reflexive and relayed"
+     },
+     {
+      "id": "b",
+      "label": "Primary, secondary and backup"
+     },
+     {
+      "id": "c",
+      "label": "Private, public and multicast"
+     },
+     {
+      "id": "d",
+      "label": "Unicast, anycast and broadcast"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Local addresses, the NAT’s public mapping from STUN, and a relay address from TURN. The other sets name DNS roles or address kinds, not ICE candidates."
+   },
+   {
+    "id": "t545-a5",
+    "concept": "nat-traversal",
+    "type": "multiple_choice",
+    "prompt": "Why do both peers send connectivity checks at about the same time?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Checks only count when they collide in the network"
+     },
+     {
+      "id": "b",
+      "label": "Each outbound check opens a mapping the other’s checks can use"
+     },
+     {
+      "id": "c",
+      "label": "NATs require both peers to share a clock"
+     },
+     {
+      "id": "d",
+      "label": "The peers must agree on a shared codec before any media can start"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "A NAT accepts inbound packets from an address it has just sent to, so simultaneous checks punch holes for each other. Collisions are not required; NATs keep no shared clock; and codecs are negotiated in signalling."
+   },
+   {
+    "id": "t545-a6",
+    "concept": "ice-candidates",
+    "type": "drag_order",
+    "prompt": "Order the steps of setting up a peer-to-peer connection with ICE.",
+    "items": [
+     {
+      "id": "s2",
+      "label": "Exchange candidates over signalling"
+     },
+     {
+      "id": "s4",
+      "label": "Nominate the best working pair"
+     },
+     {
+      "id": "s1",
+      "label": "Gather host, reflexive and relayed candidates"
+     },
+     {
+      "id": "s5",
+      "label": "Send media and keep the mapping alive"
+     },
+     {
+      "id": "s3",
+      "label": "Pair candidates and run connectivity checks"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Discover, exchange, test, choose, then use and keep alive."
+   },
+   {
+    "id": "t545-a7",
+    "concept": "turn-relay",
+    "type": "estimation",
+    "prompt": "A relayed one-to-one call sends 1.5 Mbit/s each way. How many Gbit/s does a TURN server send out for 1,000 such calls?",
+    "unit": "Gbit/s",
+    "target": 3,
+    "assumptions": [
+     "The relay forwards each direction once",
+     "1,000 calls are relayed at the same time"
+    ],
+    "formula": "1,000 × 2 × 1.5 Mbit/s",
+    "workedAnswer": "1,000 × 3 Mbit/s = 3,000 Mbit/s = 3 Gbit/s",
+    "explanation": "Design implication: relay capacity scales with the share of calls that need it, so a few percent more relayed users can mean several more relay servers.",
+    "tolerance": 0.05,
+    "trapAnswers": [
+     1.5,
+     6
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t545-f1",
+    "front": "STUN?",
+    "back": "Tells a client the public address and port its NAT assigned."
+   },
+   {
+    "id": "t545-f2",
+    "front": "TURN?",
+    "back": "A relay that forwards all media when no direct path works."
+   },
+   {
+    "id": "t545-f3",
+    "front": "ICE?",
+    "back": "Gathers host, reflexive and relayed candidates, tests pairs, keeps the best."
+   }
+  ],
+  "sources": [
+   {
+    "title": "RFC 8445: Interactive Connectivity Establishment (ICE)",
+    "url": "https://www.rfc-editor.org/rfc/rfc8445"
+   },
+   {
+    "title": "RFC 8489: Session Traversal Utilities for NAT (STUN)",
+    "url": "https://www.rfc-editor.org/rfc/rfc8489"
+   },
+   {
+    "title": "RFC 8656: Traversal Using Relays around NAT (TURN)",
+    "url": "https://www.rfc-editor.org/rfc/rfc8656"
+   },
+   {
+    "title": "MDN: Introduction to WebRTC protocols",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Protocols"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "nat-traversal",
+    "ice-candidates",
+    "turn-relay"
+   ],
+   "mechanism": {
+    "title": "How ICE finds a path between two NATs",
+    "steps": [
+     "Each peer starts by gathering candidates. Host candidates are its own interface addresses, useful when both peers share a network. It then sends a STUN request to a public server, which replies with the source address and port it saw, giving a server-reflexive candidate. Finally it can ask a TURN server to allocate a relay address, giving a relayed candidate.",
+     "The peers swap candidate lists through the application’s signalling channel, often a WebSocket to the app’s server. ICE does not define this channel. Each side then forms pairs of its candidates with the other’s and sorts them by priority, preferring host, then reflexive, then relayed, because direct paths are faster and cost nothing to relay.",
+     "Connectivity checks are STUN requests sent directly between the peers on each pair. When peer A sends to B’s reflexive address, A’s NAT creates a mapping that lets B’s packets in; B does the same in the other direction. If both NATs keep the same public port regardless of destination, the checks meet and the pair works. This is hole punching.",
+     "If a NAT allocates a new port per destination, the reflexive port B learned for A is not the one A’s NAT uses toward B, and checks fail. Pairs that include the relayed candidate still work, because each peer only talks outbound to the TURN server, which forwards between them. The relay costs bandwidth in both directions and adds latency.",
+     "Once a pair is nominated, media flows and the peers keep the NAT mappings warm with periodic packets. Consent checks confirm the peer still wants the traffic. If a device changes network, for example from Wi-Fi to mobile data, its candidates change and the peers run an ICE restart to find a new working pair."
+    ]
+   },
+   "useWhen": [
+    "Voice, video and data channels between browsers or apps that should not route through your servers.",
+    "Any peer-to-peer feature where users sit behind home, mobile or office NATs."
+   ],
+   "avoidWhen": [
+    "Avoid shipping without a TURN fallback; some users will have no direct path.",
+    "Avoid peer-to-peer meshes for large group calls; a media server scales better past a handful of peers."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Path",
+     "Latency",
+     "Operator cost",
+     "Works through"
+    ],
+    "rows": [
+     [
+      "Direct (host or reflexive)",
+      "Lowest",
+      "Signalling only",
+      "Most home NATs"
+     ],
+     [
+      "Relayed via TURN",
+      "Higher, via the relay",
+      "Full media bandwidth",
+      "Nearly any NAT or firewall"
+     ],
+     [
+      "Media server (not peer-to-peer)",
+      "Via the server",
+      "Full bandwidth, plus processing",
+      "Any network that reaches the server"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Relay capacity for a calling app",
+    "assumptions": [
+     "1.5 Mbit/s each way per one-to-one video call",
+     "1,000 calls need a relay at peak",
+     "Relay servers with 10 Gbit/s network cards, run at 50% for headroom"
+    ],
+    "steps": [
+     "Each relayed call: 1.5 × 2 = 3 Mbit/s out of the relay.",
+     "Peak relay egress: 1,000 × 3 Mbit/s = 3 Gbit/s.",
+     "Usable per server: 10 Gbit/s × 0.5 = 5 Gbit/s, so one server carries the load.",
+     "Spread over two regions for failure tolerance: at least two servers, one per region."
+    ],
+    "result": "Relays are cheap to run in small numbers but scale with how many users fail to connect directly, so measure that share."
+   },
+   "india": {
+    "title": "NAT traversal in the IETF standards",
+    "label": "Official documentation",
+    "body": "RFC 8445 defines ICE: candidate gathering, pairing, connectivity checks and nomination. RFC 8489 defines STUN, including how a server reports the reflexive transport address. RFC 8656 defines TURN allocations and permissions on the relay. RFC 4787 sets behavioural requirements for NATs handling UDP, recommending endpoint-independent mapping precisely so that applications such as these can reach peers without relays."
+   },
+   "pitfalls": [
+    {
+     "trap": "“STUN is enough; relays are an edge case.”",
+     "say": "“Some users sit behind NATs that map per destination, so I’d always deploy TURN and size it from the measured relay share.”"
+    },
+    {
+     "trap": "“Peer-to-peer means we pay no bandwidth.”",
+     "say": "“Direct calls cost us nothing, but every relayed call costs its full bitrate in both directions.”"
+    }
+   ],
+   "takeaways": [
+    "NATs drop unsolicited inbound packets, so peers need help to connect.",
+    "STUN finds a public mapping; TURN relays media when nothing direct works.",
+    "ICE gathers candidates, tests pairs from both sides and keeps the best.",
+    "Relay cost is twice the call bitrate per relayed call."
+   ]
+  },
+  "interactive": {
+   "kind": "tradeoff",
+   "title": "Pick a NAT-traversal setup",
+   "prompt": "You are launching one-to-one video calls in a mobile app. Users are on home Wi-Fi, mobile networks and office networks. Which setup do you ship?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "STUN only, with no relays to pay for",
+     "feedback": "Cheapest, but users behind NATs that map per destination, or offices that block UDP, cannot connect at all."
+    },
+    {
+     "id": "b",
+     "label": "ICE with STUN, plus TURN as a fallback",
+     "feedback": "Right: direct paths for most calls, and a relay for the rest, so everyone connects and you pay only for relayed calls."
+    },
+    {
+     "id": "c",
+     "label": "Relay every call through TURN servers",
+     "feedback": "Everyone connects, but you pay full bandwidth for every call and add latency even where a direct path existed."
+    }
+   ],
+   "correctId": "b",
+   "reveal": "ICE exists to get the best of both: it tries direct pairs first and falls back to the relay. Plan relay capacity from the measured share of relayed calls, and offer TURN over TCP or TLS on port 443 for networks that block UDP."
+  },
+  "seeAlso": [
+   {
+    "topicId": 244,
+    "why": "How NAT tables map private addresses and ports to public ones"
+   },
+   {
+    "topicId": 218,
+    "why": "Real-time channels on the client, often the signalling path for calls"
+   },
+   {
+    "topicId": 249,
+    "why": "UDP and port behaviour that hole punching relies on"
+   }
+  ]
+ },
+ {
+  "id": 546,
+  "slug": "email-delivery-spf-dkim-dmarc",
+  "region": "f3-networking",
+  "order": 20,
+  "title": "Email Delivery: SMTP, SPF, DKIM and DMARC",
+  "kind": "lesson",
+  "objectives": [
+   "Trace how a message moves between mail servers with SMTP and MX records",
+   "Explain what SPF, DKIM and DMARC each check, and why alignment matters",
+   "Roll out a DMARC policy without losing legitimate mail"
+  ],
+  "difficulty": 2,
+  "durationMinutes": 12,
+  "prereqIds": [
+   246
+  ],
+  "cards": [
+   {
+    "id": "t546-c1",
+    "kind": "text",
+    "title": "How a message hops between mail servers",
+    "body": "An app hands mail to its provider’s submission server, usually on port 587 with authentication. That server looks up the recipient domain’s MX records and connects to the listed mail server on port 25. The receiver answers each step with a code: 2xx accepts, 5xx rejects permanently and the sender bounces the message, 4xx means try later. RFC 5321 asks senders to wait at least 30 minutes between retries and to keep trying for at least four to five days.",
+    "teaches": [
+     "smtp-relay",
+     "email-retries"
+    ]
+   },
+   {
+    "id": "t546-c2",
+    "kind": "diagram",
+    "title": "Three checks a receiver runs",
+    "body": "SPF and DKIM authenticate domains; DMARC ties them to the From address people see.",
+    "teaches": [
+     "spf",
+     "dkim",
+     "dmarc-alignment"
+    ],
+    "steps": [
+     "SPF: is the connecting IP allowed by the SPF record of the envelope sender’s domain (MAIL FROM)?",
+     "DKIM: does the signature verify with the public key at selector._domainkey of the signing domain d=?",
+     "DMARC: did SPF or DKIM pass for a domain that aligns with the visible From domain?",
+     "If not, apply the From domain’s policy: none, quarantine or reject",
+     "Send aggregate reports to the address the domain published, so its owner sees failures"
+    ]
+   },
+   {
+    "id": "t546-c3",
+    "kind": "diagram",
+    "title": "Worked example: SPF passes but DMARC fails",
+    "body": "Passing checks for the wrong domain does not satisfy DMARC.",
+    "teaches": [
+     "dmarc-alignment"
+    ],
+    "steps": [
+     "A shop sends From: billing@shop.example through an email provider",
+     "Envelope sender is bounces@mail.provider.example: SPF passes, for provider.example",
+     "DKIM signature has d=provider.example: DKIM passes, for provider.example",
+     "Neither domain aligns with shop.example, so DMARC fails; with p=reject the mail is refused"
+    ],
+    "note": "Result. Two passing checks still fail DMARC. The fix is to sign with d=shop.example using a key the shop publishes, and to use a return-path such as bounce.shop.example, which aligns under the default relaxed rules."
+   },
+   {
+    "id": "t546-c4",
+    "kind": "text",
+    "title": "SPF stops at ten lookups",
+    "body": "RFC 7208 limits the mechanisms that cost DNS queries, such as include, a, mx and redirect, to 10 per check. Each provider’s include can contain more includes, and once the count passes 10, SPF returns a permanent error, which DMARC treats as a fail. SPF also breaks when mail is forwarded, because the forwarder’s IP is not in the original domain’s record. A DKIM signature travels with the message and survives forwarding unless the content changes, which is why DMARC needs only one of the two to pass and align.",
+    "teaches": [
+     "spf",
+     "dkim"
+    ]
+   },
+   {
+    "id": "t546-c5",
+    "kind": "text",
+    "title": "Trap: jumping straight to p=reject",
+    "body": "Companies send mail from many places: the app, a support desk, a marketing tool, payroll. Publishing p=reject first silently drops every sender that is not yet aligned. Start with p=none and a reporting address, read the aggregate reports for a few weeks, fix each legitimate sender, then move to quarantine and finally reject. DMARC is now specified in RFC 9989 (2026), which replaced RFC 7489.",
+    "teaches": [
+     "dmarc-alignment"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t546-a1",
+    "concept": "smtp-relay",
+    "type": "multiple_choice",
+    "prompt": "How does a sending mail server find where to deliver mail for someone@example.org?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "It looks up the MX records for example.org"
+     },
+     {
+      "id": "b",
+      "label": "It posts the message to example.org’s web server on port 443"
+     },
+     {
+      "id": "c",
+      "label": "It reads the delivery address from example.org’s SPF record"
+     },
+     {
+      "id": "d",
+      "label": "It asks the recipient’s ISP for a route over BGP"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "MX records name the mail servers for a domain. Web servers do not accept mail; SPF lists who may send for a domain, not where to deliver; and BGP routes packets, not messages."
+   },
+   {
+    "id": "t546-a2",
+    "concept": "email-retries",
+    "type": "multiple_choice",
+    "prompt": "A receiving server answers a delivery attempt with code 451. What should the sender do?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Bounce the message to its author at once"
+     },
+     {
+      "id": "b",
+      "label": "Resend it in a tight loop until accepted"
+     },
+     {
+      "id": "c",
+      "label": "Queue it and retry later, for days if needed"
+     },
+     {
+      "id": "d",
+      "label": "Drop it, since 4xx means the address is wrong"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "A 4xx reply is temporary, so the sender queues and retries with growing gaps. Bouncing is for 5xx; tight loops look like abuse and get blocked; and a wrong address returns a 5xx."
+   },
+   {
+    "id": "t546-a3",
+    "concept": "dmarc-alignment",
+    "type": "multiple_choice",
+    "prompt": "SPF passes for mail.provider.example, DKIM passes with d=provider.example, and the visible From is shop.example. What does DMARC conclude?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Pass, since both SPF and DKIM passed"
+     },
+     {
+      "id": "b",
+      "label": "Fail, since neither passing domain aligns with shop.example"
+     },
+     {
+      "id": "c",
+      "label": "Pass, as long as the provider’s IPs are listed in the SPF record"
+     },
+     {
+      "id": "d",
+      "label": "Neutral, since DMARC looks only at DKIM"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "DMARC needs a pass for a domain matching the From domain. Both passes are for provider.example; listing IPs does not change which domain passed; and DMARC uses both SPF and DKIM."
+   },
+   {
+    "id": "t546-a4",
+    "concept": "spf",
+    "type": "multiple_choice",
+    "prompt": "An SPF record includes six providers that together need 13 DNS lookups. What happens?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Receivers evaluate the first 10 and accept the rest"
+     },
+     {
+      "id": "b",
+      "label": "Caching makes the lookup limit not apply"
+     },
+     {
+      "id": "c",
+      "label": "SPF passes, but with a lower spam score"
+     },
+     {
+      "id": "d",
+      "label": "Evaluation hits a permanent error and SPF fails"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "Past 10 lookups RFC 7208 requires a permanent error. Receivers do not skip ahead; caching does not change the count; and a permerror is not a pass."
+   },
+   {
+    "id": "t546-a5",
+    "concept": "dkim",
+    "type": "multiple_choice",
+    "prompt": "Why does DKIM often survive mail forwarding when SPF does not?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The signature travels with the message, but SPF checks the forwarder’s IP"
+     },
+     {
+      "id": "b",
+      "label": "Forwarders sign each message again using the original sending domain’s key"
+     },
+     {
+      "id": "c",
+      "label": "Receivers turn off SPF checks for forwarded mail"
+     },
+     {
+      "id": "d",
+      "label": "DKIM checks the recipient’s domain rather than the sender’s"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "DKIM verifies content plus the signing domain’s key, wherever the message came from. Forwarders do not hold the original private key; receivers still run SPF; and DKIM verifies the signing domain, not the recipient."
+   },
+   {
+    "id": "t546-a6",
+    "concept": "dmarc-alignment",
+    "type": "drag_order",
+    "prompt": "Order a safe DMARC rollout.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "Read aggregate reports and fix unaligned senders"
+     },
+     {
+      "id": "s1",
+      "label": "Publish SPF and DKIM for every sending service"
+     },
+     {
+      "id": "s5",
+      "label": "Move the policy to reject"
+     },
+     {
+      "id": "s2",
+      "label": "Publish DMARC with p=none and a reporting address"
+     },
+     {
+      "id": "s4",
+      "label": "Move the policy to quarantine"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Authenticate, observe, fix, then tighten in steps so no legitimate sender is lost."
+   },
+   {
+    "id": "t546-a7",
+    "concept": "spf",
+    "type": "estimation",
+    "prompt": "An SPF record has include:a.example (which itself holds 2 includes), include:b.example (which holds 3), plus mx and a. How many DNS lookups count toward the limit?",
+    "unit": "lookups",
+    "target": 9,
+    "assumptions": [
+     "Each include, mx and a costs one lookup",
+     "Nested includes count too",
+     "The nested includes contain no further lookups"
+    ],
+    "formula": "(1 + 2) + (1 + 3) + 1 + 1",
+    "workedAnswer": "3 + 4 + 1 + 1 = 9 lookups",
+    "explanation": "Sanity check: nine of ten leaves room for just one more lookup, so adding another provider’s include could tip SPF into a permanent error.",
+    "tolerance": 0,
+    "trapAnswers": [
+     4,
+     5,
+     10
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t546-f1",
+    "front": "SPF checks?",
+    "back": "Whether the sending IP is allowed by the envelope sender domain’s record; at most 10 lookups."
+   },
+   {
+    "id": "t546-f2",
+    "front": "DKIM checks?",
+    "back": "A signature over the message, verified with the signing domain’s public key in DNS."
+   },
+   {
+    "id": "t546-f3",
+    "front": "DMARC adds?",
+    "back": "Alignment: SPF or DKIM must pass for the visible From domain, plus a policy and reports."
+   }
+  ],
+  "sources": [
+   {
+    "title": "RFC 5321: Simple Mail Transfer Protocol",
+    "url": "https://www.rfc-editor.org/rfc/rfc5321"
+   },
+   {
+    "title": "RFC 7208: Sender Policy Framework (SPF)",
+    "url": "https://www.rfc-editor.org/rfc/rfc7208"
+   },
+   {
+    "title": "RFC 6376: DomainKeys Identified Mail (DKIM) Signatures",
+    "url": "https://www.rfc-editor.org/rfc/rfc6376"
+   },
+   {
+    "title": "RFC 9989: Domain-Based Message Authentication, Reporting, and Conformance (DMARC)",
+    "url": "https://www.rfc-editor.org/rfc/rfc9989"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "smtp-relay",
+    "spf",
+    "dkim",
+    "dmarc-alignment"
+   ],
+   "mechanism": {
+    "title": "What happens between “send” and the inbox",
+    "steps": [
+     "An application submits a message to a mail server it is allowed to use, authenticating on the submission port. The message has two sets of addresses: the envelope, used by SMTP for routing and bounces (MAIL FROM and RCPT TO), and the headers people see, including From. They often differ, for example when a provider handles bounces on its own domain.",
+     "The sending server resolves the recipient domain’s MX records, picks the lowest preference value first, and opens an SMTP session. The receiver can reject at any step with a 5xx code or defer with a 4xx. Deferred mail stays in the sender’s queue and is retried with backoff, so a temporary problem at the receiver delays mail by minutes or hours rather than losing it.",
+     "The receiver then authenticates. SPF looks up a TXT record on the envelope sender’s domain and asks whether the connecting IP is listed, directly or through includes. DKIM finds a signature header, fetches the public key at the selector the header names, and verifies a hash over the body and chosen headers. Each produces a result for a specific domain, which may not be the one in From.",
+     "DMARC closes that gap. It looks up a policy record at _dmarc on the From domain and requires that SPF or DKIM pass for an aligned domain: the same organisational domain under relaxed alignment, or the exact domain under strict alignment. If neither aligns, the receiver applies the policy, none, quarantine or reject, though it may still use its own judgement.",
+     "DMARC also asks receivers to send aggregate reports: daily XML summaries of which IPs sent mail claiming the domain and how they fared. These reports are how a domain owner finds forgotten senders before tightening the policy, and how it spots spoofing. Transport security is separate: STARTTLS is opportunistic by default, and MTA-STS lets a domain require TLS for mail sent to it."
+    ]
+   },
+   "useWhen": [
+    "Any product that sends password resets, receipts or notifications from its own domain.",
+    "Protecting a brand domain from being spoofed in phishing."
+   ],
+   "avoidWhen": [
+    "Avoid publishing p=reject before reports show every legitimate sender aligned.",
+    "Avoid stacking provider includes until SPF passes 10 lookups."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Check",
+     "Verifies",
+     "Breaks when"
+    ],
+    "rows": [
+     [
+      "SPF",
+      "Sending IP is authorised for the envelope domain",
+      "Mail is forwarded; more than 10 lookups"
+     ],
+     [
+      "DKIM",
+      "Signature from the signing domain’s key",
+      "A list or gateway modifies the signed content"
+     ],
+     [
+      "DMARC",
+      "An aligned SPF or DKIM pass for the From domain",
+      "Senders pass only for their own domain"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Counting an SPF record",
+    "assumptions": [
+     "include:a.example holding 2 more includes",
+     "include:b.example holding 3 more includes",
+     "mx and a mechanisms on the domain itself"
+    ],
+    "steps": [
+     "Provider A: 1 lookup for the include plus 2 nested = 3.",
+     "Provider B: 1 plus 3 nested = 4.",
+     "The mx and a mechanisms: 1 each = 2.",
+     "Total 3 + 4 + 2 = 9 of the 10 allowed; one more provider include with any nesting tips it over."
+    ],
+    "result": "The record works today but is one vendor away from a permanent error, so flatten it or move a sender to its own subdomain."
+   },
+   "india": {
+    "title": "SMTP, SPF, DKIM and DMARC in the RFCs",
+    "label": "Official documentation",
+    "body": "RFC 5321 defines SMTP, MX-based delivery and the retry guidance of at least 30 minutes between attempts and four to five days before giving up. RFC 7208 defines SPF and its 10-lookup limit. RFC 6376 defines DKIM signatures and key lookup. RFC 9989, published in May 2026, is the standards-track DMARC specification that replaced RFC 7489, with RFC 9990 and RFC 9991 covering aggregate and failure reports."
+   },
+   "pitfalls": [
+    {
+     "trap": "“SPF and DKIM both pass, so DMARC is fine.”",
+     "say": "“They have to pass for a domain aligned with From; passing for the provider’s domain still fails DMARC.”"
+    },
+    {
+     "trap": "“Let’s publish p=reject today.”",
+     "say": "“I’d start at p=none, read the reports, fix each sender, then tighten.”"
+    }
+   ],
+   "takeaways": [
+    "Mail routes by MX records; 4xx means retry later, 5xx means bounce.",
+    "SPF authorises sending IPs and allows at most 10 DNS lookups.",
+    "DKIM signs the message and survives forwarding unless content changes.",
+    "DMARC needs an aligned pass for the From domain; roll out from p=none."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Where did the password resets go?",
+   "prompt": "Yesterday you changed your domain’s DMARC policy from none to reject. Today support says password-reset mails sent by your helpdesk vendor are not arriving. Your app’s own mail still arrives. What happened?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "A reject policy blocks every automated sender",
+     "feedback": "DMARC does not care whether mail is automated; your app’s mail still arrives because it is aligned."
+    },
+    {
+     "id": "b",
+     "label": "DMARC records take about a week to take effect",
+     "feedback": "A DMARC record is a DNS TXT record; it takes effect as caches expire, typically within hours."
+    },
+    {
+     "id": "c",
+     "label": "The vendor sends as your domain without aligned SPF or DKIM",
+     "feedback": "Right: the vendor’s mail passes only for its own domain, so DMARC fails and receivers now reject it."
+    }
+   ],
+   "correctId": "c",
+   "reveal": "Every service that sends as your domain needs aligned SPF or DKIM, usually by adding a DKIM key the vendor provides under your domain. Aggregate reports under p=none would have shown this sender failing before the switch."
+  },
+  "seeAlso": [
+   {
+    "topicId": 6,
+    "why": "MX, TXT and the DNS lookups every mail check depends on"
+   },
+   {
+    "topicId": 40,
+    "why": "Idempotent sends keep mail retries from producing duplicates"
+   },
+   {
+    "topicId": 246,
+    "why": "How resolvers cache the records SPF, DKIM and DMARC fetch"
+   }
+  ]
+ },
+ {
+  "id": 547,
+  "slug": "ddos-floods-and-amplification",
+  "region": "f3-networking",
+  "order": 21,
+  "title": "DDoS: Floods, Amplification and Absorption",
+  "kind": "lesson",
+  "objectives": [
+   "Tell apart volumetric, protocol and application-layer floods",
+   "Explain SYN floods, SYN cookies and reflection amplification",
+   "Decide where each kind of attack must be absorbed or filtered"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 12,
+  "prereqIds": [
+   247,
+   249
+  ],
+  "cards": [
+   {
+    "id": "t547-c1",
+    "kind": "text",
+    "title": "Three ways to exhaust a service",
+    "body": "A volumetric attack fills the pipes, measured in Gbit/s, so nothing behind the link matters. A protocol attack exhausts state in servers or middleboxes, such as half-open TCP connections or a firewall’s connection table. An application-layer attack sends valid-looking requests that are expensive to serve, such as searches or logins, measured in requests per second. Each needs a defence in a different place.",
+    "teaches": [
+     "ddos-types"
+    ]
+   },
+   {
+    "id": "t547-c2",
+    "kind": "diagram",
+    "title": "How a SYN flood fills the queue, and how SYN cookies empty it",
+    "body": "The attacker sends SYNs but never completes the handshake.",
+    "teaches": [
+     "syn-flood",
+     "syn-cookies"
+    ],
+    "steps": [
+     "The attacker sends SYNs with forged source addresses",
+     "The server stores a half-open entry and sends SYN-ACKs to the forged addresses",
+     "Entries wait for an ACK that never comes, through several SYN-ACK retries",
+     "The half-open queue fills and real clients’ SYNs are dropped",
+     "With SYN cookies the server encodes the connection details in its sequence number, stores nothing, and rebuilds the entry from a valid ACK"
+    ]
+   },
+   {
+    "id": "t547-c3",
+    "kind": "diagram",
+    "title": "Worked example: sizing a reflection attack",
+    "body": "Reflection sends a small spoofed request to a server that sends a large reply to the victim.",
+    "teaches": [
+     "amplification"
+    ],
+    "steps": [
+     "Assume: a 64-byte query with the victim’s address as source triggers a 3,200-byte answer",
+     "Amplification factor: 3,200 ÷ 64 = 50",
+     "Attackers send 1 Gbit/s of spoofed queries to many open servers",
+     "The victim receives 1 × 50 = 50 Gbit/s of answers",
+     "Against a 10 Gbit/s uplink, that is five times the capacity"
+    ],
+    "note": "Result. In this illustrative case the link is full before any packet reaches a server, so nothing on the server can help. The flood must be absorbed by networks with more capacity than the attack."
+   },
+   {
+    "id": "t547-c4",
+    "kind": "text",
+    "title": "Absorb at the edge, before your link",
+    "body": "Volumetric floods are absorbed upstream: anycast spreads them over many sites, and scrubbing services filter at a scale no single site has. Hide the origin by accepting traffic only from the CDN or proxy in front of it. Providers that apply source-address validation (BCP 38) stop their customers from sending spoofed packets, which removes reflection at its root. Application floods are handled closer in: caching, rate limits per client or key, and challenges for suspicious traffic.",
+    "teaches": [
+     "ddos-absorption",
+     "l7-flood"
+    ]
+   },
+   {
+    "id": "t547-c5",
+    "kind": "text",
+    "title": "Trap: blocking the attacking addresses",
+    "body": "In a SYN flood the source addresses are forged; in a reflection attack they belong to innocent open servers; in an application flood they may be tens of thousands of home devices. Blocking addresses one by one cannot keep up and can block real users. Filter by what the traffic is instead: drop unexpected UDP from ports 53, 123 or 11211 at the edge of a web service, rate-limit expensive endpoints, and challenge clients that look automated.",
+    "teaches": [
+     "ddos-absorption",
+     "amplification"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t547-a1",
+    "concept": "syn-flood",
+    "type": "multiple_choice",
+    "prompt": "During a SYN flood, real users cannot connect though the server’s CPU is mostly idle. Why?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Half-open entries fill the queue, so new SYNs are dropped"
+     },
+     {
+      "id": "b",
+      "label": "The server has run out of TLS session keys for new clients"
+     },
+     {
+      "id": "c",
+      "label": "The attack has taken every port on the server"
+     },
+     {
+      "id": "d",
+      "label": "Forged packets have corrupted the routing table"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "The limit is the half-open queue, not CPU. TLS has not started for half-open connections; a server port serves many connections, so ports are not used up; and forged sources do not alter routes."
+   },
+   {
+    "id": "t547-a2",
+    "concept": "syn-cookies",
+    "type": "multiple_choice",
+    "prompt": "What do SYN cookies change?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Clients must solve a puzzle before sending a SYN"
+     },
+     {
+      "id": "b",
+      "label": "The server holds no state until the client’s ACK returns"
+     },
+     {
+      "id": "c",
+      "label": "The server attaches a browser cookie to its SYN-ACK"
+     },
+     {
+      "id": "d",
+      "label": "A firewall blocks addresses that send many SYNs"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "The connection details ride in the server’s initial sequence number, so forged SYNs cost no memory. There is no client puzzle in TCP; browser cookies are an HTTP feature; and source blocking is a separate, weaker defence."
+   },
+   {
+    "id": "t547-a3",
+    "concept": "amplification",
+    "type": "multiple_choice",
+    "prompt": "Why do reflection attacks use UDP services such as DNS rather than TCP ones?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "UDP packets are always larger than TCP packets"
+     },
+     {
+      "id": "b",
+      "label": "TCP services cannot be reached from the internet"
+     },
+     {
+      "id": "c",
+      "label": "With no handshake, a forged source gets the full reply"
+     },
+     {
+      "id": "d",
+      "label": "DNS servers keep no log of who sent which query to them"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "TCP would send only a SYN-ACK to the forged address and stop, while UDP answers at once in full. Packet size depends on content, not the protocol; TCP services are reachable; and logging does not decide what gets reflected."
+   },
+   {
+    "id": "t547-a4",
+    "concept": "ddos-absorption",
+    "type": "multiple_choice",
+    "prompt": "A 300 Gbit/s flood targets a site with a 10 Gbit/s uplink. Where must it be stopped?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "In the application’s request handlers"
+     },
+     {
+      "id": "b",
+      "label": "Upstream, in networks bigger than the flood"
+     },
+     {
+      "id": "c",
+      "label": "With firewall rules on each web server"
+     },
+     {
+      "id": "d",
+      "label": "By autoscaling web servers behind the uplink"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Once the uplink is full, everything behind it starves. Handlers, host firewalls and extra servers all sit behind the saturated link."
+   },
+   {
+    "id": "t547-a5",
+    "concept": "l7-flood",
+    "type": "multiple_choice",
+    "prompt": "Valid HTTPS search requests from 50,000 home IP addresses overload the database. What fits best?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Block each attacking address by hand"
+     },
+     {
+      "id": "b",
+      "label": "Turn on SYN cookies on the web servers"
+     },
+     {
+      "id": "c",
+      "label": "Raise the uplink from 10 to 40 Gbit/s"
+     },
+     {
+      "id": "d",
+      "label": "Cache and rate-limit searches, and challenge bots"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "The cost is per request, so reduce the work per request and the number of requests per client. Hand-blocking cannot keep up; the handshakes complete, so SYN cookies do nothing; and the link is not the bottleneck."
+   },
+   {
+    "id": "t547-a6",
+    "concept": "syn-flood",
+    "type": "drag_order",
+    "prompt": "Order the stages of a SYN flood without SYN cookies.",
+    "items": [
+     {
+      "id": "s4",
+      "label": "The half-open queue fills"
+     },
+     {
+      "id": "s2",
+      "label": "The server stores half-open entries"
+     },
+     {
+      "id": "s5",
+      "label": "Real clients’ SYNs are dropped"
+     },
+     {
+      "id": "s3",
+      "label": "SYN-ACKs go to forged addresses and get no reply"
+     },
+     {
+      "id": "s1",
+      "label": "Forged SYNs arrive"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Each forged SYN costs an entry until it times out, so the queue fills and real users are turned away."
+   },
+   {
+    "id": "t547-a7",
+    "concept": "amplification",
+    "type": "estimation",
+    "prompt": "A 64-byte spoofed query triggers a 3,200-byte reply. Attackers send 1 Gbit/s of such queries. How many Gbit/s reach the victim?",
+    "unit": "Gbit/s",
+    "target": 50,
+    "assumptions": [
+     "Every query is answered",
+     "Replies all go to the victim"
+    ],
+    "formula": "1 × 3,200 ÷ 64",
+    "workedAnswer": "3,200 ÷ 64 = 50, so 1 × 50 = 50 Gbit/s",
+    "explanation": "Design implication: 50 Gbit/s is more than most single sites can take in, so defence has to live upstream, not on the servers.",
+    "tolerance": 0.05,
+    "trapAnswers": [
+     3.2,
+     64
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t547-f1",
+    "front": "Three DDoS kinds?",
+    "back": "Volumetric (fills links), protocol (exhausts state), application (expensive requests)."
+   },
+   {
+    "id": "t547-f2",
+    "front": "SYN cookies?",
+    "back": "The server stores nothing for a SYN; it rebuilds state from the returning ACK."
+   },
+   {
+    "id": "t547-f3",
+    "front": "Amplification factor?",
+    "back": "Reply size ÷ request size; the victim gets attack rate × factor."
+   }
+  ],
+  "sources": [
+   {
+    "title": "RFC 4987: TCP SYN Flooding Attacks and Common Mitigations",
+    "url": "https://www.rfc-editor.org/rfc/rfc4987"
+   },
+   {
+    "title": "RFC 2827 (BCP 38): Network Ingress Filtering",
+    "url": "https://www.rfc-editor.org/rfc/rfc2827"
+   },
+   {
+    "title": "AWS: Best Practices for DDoS Resiliency",
+    "url": "https://docs.aws.amazon.com/whitepapers/latest/aws-best-practices-ddos-resiliency/welcome.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "ddos-types",
+    "syn-flood",
+    "amplification",
+    "ddos-absorption"
+   ],
+   "mechanism": {
+    "title": "Where each flood bites and where it is stopped",
+    "steps": [
+     "Every service has a narrowest point: link capacity, a table of connection state, or the work per request. A denial-of-service attack aims at one of them. Distributed attacks use many sources, from botnets of compromised devices to reflection through innocent servers, so they cannot be stopped by blocking one sender.",
+     "A SYN flood targets the TCP handshake. For each SYN, a server normally allocates an entry, sends a SYN-ACK and waits, resending a few times. Forged SYNs never complete, so entries pile up until the queue is full and real SYNs are dropped. SYN cookies, described in RFC 4987, let the server skip the entry: it encodes the connection details and a secret-keyed hash into its initial sequence number, and rebuilds them when a valid ACK returns.",
+     "Reflection attacks forge the victim’s address as the source of small UDP queries to servers that answer with much larger replies: open DNS resolvers, time servers or misconfigured caches. The victim receives the replies from thousands of legitimate-looking servers. The amplification factor, reply size divided by request size, multiplies the attacker’s bandwidth, and spoofing is possible only where networks do not apply ingress filtering as BCP 38 recommends.",
+     "Volumetric attacks must be absorbed where capacity exceeds the flood. Anycast announces the service from many sites so the flood splits among them, and providers’ scrubbing centres drop attack traffic by protocol, port and pattern before forwarding clean traffic. The origin should accept traffic only from the edge, so attackers cannot bypass it by aiming straight at the origin’s address.",
+     "Application-layer floods look like real users and arrive over completed connections, so network filters cannot tell them apart. Defences work per request: cache expensive responses, rate-limit by client, account or key, require challenges for suspicious clients, and shed load before the database falls over. Autoscaling helps briefly but turns an attack into a large bill if no limit is set."
+    ]
+   },
+   "useWhen": [
+    "Any public service, since a modest flood can fill a small site’s link.",
+    "Designing an origin behind a CDN, load balancer or scrubbing service."
+   ],
+   "avoidWhen": [
+    "Avoid relying on per-address blocking against forged or widely distributed sources.",
+    "Avoid unlimited autoscaling as the only defence against request floods."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Attack",
+     "Exhausts",
+     "Defence"
+    ],
+    "rows": [
+     [
+      "Volumetric or reflection",
+      "Link capacity",
+      "Upstream absorption, anycast, scrubbing"
+     ],
+     [
+      "SYN flood",
+      "Half-open connection state",
+      "SYN cookies, larger queues, edge proxies"
+     ],
+     [
+      "Application flood",
+      "Work per request",
+      "Caching, rate limits, challenges, load shedding"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Can the uplink survive a reflection attack?",
+    "assumptions": [
+     "64-byte spoofed query, 3,200-byte reply",
+     "Attackers send 1 Gbit/s of queries",
+     "The site has a 10 Gbit/s uplink"
+    ],
+    "steps": [
+     "Amplification: 3,200 ÷ 64 = 50.",
+     "Arriving at the victim: 1 Gbit/s × 50 = 50 Gbit/s.",
+     "Uplink headroom: 50 ÷ 10 = 5 times over capacity.",
+     "Even with filters on the servers, 40 Gbit/s of the flood is dropped at random before reaching them, real traffic included."
+    ],
+    "result": "The site cannot defend itself behind its own uplink; the attack must be absorbed upstream by an edge or scrubbing provider."
+   },
+   "india": {
+    "title": "SYN flooding and ingress filtering in the RFCs, and AWS guidance",
+    "label": "Official documentation",
+    "body": "RFC 4987 surveys SYN flooding attacks and mitigations, including SYN caches and SYN cookies, and explains their trade-offs. RFC 2827, also known as BCP 38, asks network operators to drop packets whose source addresses could not have come from the customer network that sent them, which blocks spoofing and therefore reflection. The AWS whitepaper on DDoS resiliency recommends reducing the attack surface, absorbing volumetric attacks at edge locations and scaling to absorb application-layer floods while protecting the origin."
+   },
+   "pitfalls": [
+    {
+     "trap": "“We’ll block the attacking IPs.”",
+     "say": "“The sources are forged or innocent reflectors, so I’d filter by protocol and absorb upstream instead.”"
+    },
+    {
+     "trap": "“Autoscaling handles DDoS.”",
+     "say": "“It helps with request floods for a while, but a volumetric attack fills the link first, and unlimited scaling becomes a bill.”"
+    }
+   ],
+   "takeaways": [
+    "Volumetric floods fill links, protocol floods exhaust state, application floods exhaust work.",
+    "SYN cookies let a server keep no state until the handshake completes.",
+    "Amplification = reply size ÷ request size; spoofing makes reflection possible.",
+    "Absorb floods upstream and let the origin accept traffic only from the edge."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Attackers found your origin",
+   "prompt": "Your site sits behind a CDN, but a flood now hits the origin servers’ public address directly, bypassing the CDN. What do you do first?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Add more origin servers to absorb the traffic",
+     "feedback": "More servers behind the same link do not help once that link is full, and they cost money during the attack."
+    },
+    {
+     "id": "b",
+     "label": "Accept only the CDN’s address ranges, then move the origin",
+     "feedback": "Right: with the origin closed to everyone but the edge, direct floods are dropped upstream, and a new address the attackers do not know ends the bypass."
+    },
+    {
+     "id": "c",
+     "label": "Lower the DNS TTL on the site’s main record",
+     "feedback": "The attackers already have the origin’s address; DNS changes do not stop traffic aimed straight at it."
+    }
+   ],
+   "correctId": "b",
+   "reveal": "An origin behind an edge should accept traffic only from that edge, ideally through a private connection or firewall rules at the network level, and its address should not leak through old DNS records, mail headers or certificates. Then volumetric attacks land on the edge, which has the capacity to absorb them."
+  },
+  "seeAlso": [
+   {
+    "topicId": 41,
+    "why": "Rate limiting algorithms behind per-client limits for request floods"
+   },
+   {
+    "topicId": 19,
+    "why": "CDN edges absorb floods and hide the origin"
+   },
+   {
+    "topicId": 328,
+    "why": "Autoscaling helps briefly with request floods but needs limits"
+   }
+  ]
+ },
+ {
+  "id": 548,
+  "slug": "nagle-and-delayed-acks",
+  "region": "f3-networking",
+  "order": 22,
+  "title": "Nagle’s Algorithm and Delayed ACKs",
+  "kind": "lesson",
+  "objectives": [
+   "Explain what Nagle’s algorithm and delayed ACKs each save",
+   "Diagnose the stall when a sender writes a request in two pieces",
+   "Choose between combining writes and disabling Nagle"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 10,
+  "prereqIds": [
+   247
+  ],
+  "cards": [
+   {
+    "id": "t548-c1",
+    "kind": "text",
+    "title": "Two good ideas that collide",
+    "body": "Nagle’s algorithm (RFC 896) stops a sender from flooding the network with tiny packets: while any sent data is unacknowledged, small writes are held until an ACK arrives or a full segment builds up. A delayed ACK (RFC 1122) lets a receiver wait briefly, hoping to carry the ACK on its own reply; it must still ACK at least every second full-sized segment and within 500 ms. Each saves packets. Together they can deadlock briefly.",
+    "teaches": [
+     "nagle",
+     "delayed-ack"
+    ]
+   },
+   {
+    "id": "t548-c2",
+    "kind": "diagram",
+    "title": "Worked example: the 40 ms stall in write-write-read",
+    "body": "A client sends a request as a header write followed by a body write, then waits for the reply.",
+    "teaches": [
+     "write-write-read"
+    ],
+    "steps": [
+     "The header (200 bytes) goes out at once, since nothing is unacknowledged",
+     "The body (300 bytes) is held by Nagle, because the header is not yet ACKed",
+     "The server cannot reply without the body, so it has nothing to carry an ACK and delays it",
+     "The delayed-ACK timer fires: 40 ms is a common Linux minimum, and some systems wait 200 ms",
+     "The ACK frees the body, the server replies, and the request finishes about 40 ms late"
+    ],
+    "note": "Result. In a data centre with a 0.5 ms round trip, a call that should take about 1 ms takes about 41 ms, roughly 40 times slower, and the delay does not depend on payload size."
+   },
+   {
+    "id": "t548-c3",
+    "kind": "text",
+    "title": "Fix the write pattern first",
+    "body": "The cleanest fix is to send each message in one write: build the header and body in one buffer, or use a gather write that hands the kernel several buffers at once. Request and response protocols, such as most RPC and database clients, also set TCP_NODELAY to turn Nagle off, since they care about latency per message. With Nagle off, many tiny writes do become many tiny packets, so buffer in the application.",
+    "teaches": [
+     "tcp-nodelay"
+    ]
+   },
+   {
+    "id": "t548-c4",
+    "kind": "text",
+    "title": "Misconception: delayed ACKs are the bug",
+    "body": "Each feature helps on its own: delayed ACKs roughly halve ACK traffic on bulk transfers, and Nagle protects slow links from one-byte packets. The stall comes from the pattern, a sender that waits for an ACK the receiver will not send until it has more data. Remove the pattern with one write per message, or turn Nagle off for that socket; turning off delayed ACKs everywhere costs more and is not portable.",
+    "teaches": [
+     "delayed-ack",
+     "nagle"
+    ]
+   },
+   {
+    "id": "t548-c5",
+    "kind": "text",
+    "title": "Trap: benchmarks that only ever send one write",
+    "body": "A test that sends each request in a single write never sees the stall, so it passes, while production code with a separate header write is slow. The tell is latency stuck near 40 ms or 200 ms whatever the payload size, and in a packet capture, a gap of exactly that length before the second segment. Test with the real client library and the real message pattern.",
+    "teaches": [
+     "write-write-read"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t548-a1",
+    "concept": "nagle",
+    "type": "multiple_choice",
+    "prompt": "What does Nagle’s algorithm do?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Delays ACKs so they can ride on replies"
+     },
+     {
+      "id": "b",
+      "label": "Splits large writes into MSS-sized segments"
+     },
+     {
+      "id": "c",
+      "label": "Holds small writes while sent data is unACKed"
+     },
+     {
+      "id": "d",
+      "label": "Resends lost segments sooner than the timer"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Nagle batches small writes on the sender. Delaying ACKs is the receiver-side feature; splitting into segments happens anyway; and early resends are fast retransmit, a different mechanism."
+   },
+   {
+    "id": "t548-a2",
+    "concept": "delayed-ack",
+    "type": "multiple_choice",
+    "prompt": "Why does a receiver delay its ACKs?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "To send fewer ACKs, often carried on its reply"
+     },
+     {
+      "id": "b",
+      "label": "To slow down a sender that is too fast"
+     },
+     {
+      "id": "c",
+      "label": "To wait for the sender to send its FIN"
+     },
+     {
+      "id": "d",
+      "label": "To give the congestion window time to grow"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Combining the ACK with a reply saves packets. Slowing a sender is the receive window’s job; the FIN is unrelated; and the sender’s window grows on ACKs, so delaying them slows growth."
+   },
+   {
+    "id": "t548-a3",
+    "concept": "write-write-read",
+    "type": "multiple_choice",
+    "prompt": "Requests inside a data centre (0.5 ms round trip) take a flat 40 ms. The client writes the header and the body separately. What is the likely cause?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The server’s thread pool is too small"
+     },
+     {
+      "id": "b",
+      "label": "Nagle holds the body while the server delays its ACK"
+     },
+     {
+      "id": "c",
+      "label": "Each request sets up a new TLS session"
+     },
+     {
+      "id": "d",
+      "label": "The switches in the path add 40 ms of queueing delay"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "A flat delay matching the delayed-ACK timer, with split writes, is the classic sign. A small thread pool gives delays that grow with load; a TLS setup costs round trips, about 1 ms here; and switch queueing is microseconds to a few ms."
+   },
+   {
+    "id": "t548-a4",
+    "concept": "tcp-nodelay",
+    "type": "multiple_choice",
+    "prompt": "Which fix removes the stall without filling the network with tiny packets?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Turn off delayed ACKs on every server"
+     },
+     {
+      "id": "b",
+      "label": "Set TCP_NODELAY and keep writing byte by byte"
+     },
+     {
+      "id": "c",
+      "label": "Increase the receive window on the server"
+     },
+     {
+      "id": "d",
+      "label": "Send the header and body in one write"
+     }
+    ],
+    "correctChoiceIds": [
+     "d"
+    ],
+    "explanation": "One write per message gives Nagle nothing to hold. Disabling delayed ACKs everywhere is costly and not portable; TCP_NODELAY with byte-sized writes sends a packet per byte; and the window is not the limit."
+   },
+   {
+    "id": "t548-a5",
+    "concept": "nagle",
+    "type": "multiple_choice",
+    "prompt": "Which workload actually benefits from Nagle’s algorithm?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "An RPC service exchanging small requests and replies"
+     },
+     {
+      "id": "b",
+      "label": "A multiplayer game sending a position update every 16 ms"
+     },
+     {
+      "id": "c",
+      "label": "A remote terminal over a slow link, one key per write"
+     },
+     {
+      "id": "d",
+      "label": "A database client sending short queries"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Batching keystrokes saves many 41-byte packets on a slow link. RPC calls, game updates and database queries are latency-sensitive messages that should go out at once, which is why their clients usually set TCP_NODELAY."
+   },
+   {
+    "id": "t548-a6",
+    "concept": "write-write-read",
+    "type": "drag_order",
+    "prompt": "Order the events in the write-write-read stall.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "The server delays its ACK while waiting for the body"
+     },
+     {
+      "id": "s1",
+      "label": "The client sends the header immediately"
+     },
+     {
+      "id": "s5",
+      "label": "The body goes out and the server replies"
+     },
+     {
+      "id": "s2",
+      "label": "Nagle holds the body until the header is ACKed"
+     },
+     {
+      "id": "s4",
+      "label": "The delayed-ACK timer fires and the ACK is sent"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Each side waits for the other until the receiver’s timer breaks the tie."
+   },
+   {
+    "id": "t548-a7",
+    "concept": "nagle",
+    "type": "estimation",
+    "prompt": "A 1-byte keystroke goes in its own IPv4 packet with a 20-byte IP header and a 20-byte TCP header. What percentage of the bytes is payload?",
+    "unit": "%",
+    "target": 2.4,
+    "assumptions": [
+     "No TCP options",
+     "Link-layer framing ignored"
+    ],
+    "formula": "1 ÷ (1 + 20 + 20) × 100",
+    "workedAnswer": "1 ÷ 41 × 100 ≈ 2.4%",
+    "explanation": "Sanity check: about 98% of such a packet is header, which is the waste Nagle was designed to cut on slow links.",
+    "tolerance": 0.05,
+    "trapAnswers": [
+     4.8,
+     1,
+     5
+    ]
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t548-f1",
+    "front": "Nagle’s algorithm?",
+    "back": "Hold small writes while sent data is unacknowledged."
+   },
+   {
+    "id": "t548-f2",
+    "front": "Delayed ACK?",
+    "back": "The receiver waits briefly to carry its ACK on a reply; at least every second full segment, under 500 ms."
+   },
+   {
+    "id": "t548-f3",
+    "front": "Write-write-read fix?",
+    "back": "One write per message, or TCP_NODELAY on latency-sensitive sockets."
+   }
+  ],
+  "sources": [
+   {
+    "title": "RFC 896: Congestion Control in IP/TCP Internetworks",
+    "url": "https://www.rfc-editor.org/rfc/rfc896"
+   },
+   {
+    "title": "RFC 1122: Requirements for Internet Hosts, section 4.2.3.2",
+    "url": "https://www.rfc-editor.org/rfc/rfc1122#section-4.2.3.2"
+   },
+   {
+    "title": "man7: tcp(7)",
+    "url": "https://man7.org/linux/man-pages/man7/tcp.7.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "nagle",
+    "delayed-ack",
+    "write-write-read"
+   ],
+   "mechanism": {
+    "title": "How two packet savers create a pause",
+    "steps": [
+     "A TCP sender can send data as soon as the application writes it. On a slow, shared link in the 1980s, terminals sending one keystroke per packet spent about 40 bytes of headers on every byte typed. John Nagle’s rule, RFC 896, fixed that: if any data is in flight and unacknowledged, hold new small writes and send them together when the ACK arrives or a full segment is ready.",
+     "Receivers made a matching optimisation. Instead of acknowledging every segment at once, a receiver may wait a short time, because the application will often reply and the ACK can ride on that reply for free. RFC 1122 bounds the wait at 500 ms and requires an ACK for at least every second full-sized segment, so bulk transfers are acknowledged promptly.",
+     "The two collide when a sender writes a message in two parts and then waits for a reply. The first part goes out immediately. The second is small and data is unacknowledged, so Nagle holds it. The receiver has only part of the message, so it has no reply to send and delays its ACK. Neither side moves until the receiver’s delayed-ACK timer fires.",
+     "The timer length sets the penalty. Linux commonly uses a minimum of 40 ms, adjusting with observed round trips; other systems have used 200 ms. In a data centre with sub-millisecond round trips, the timer is many times longer than the request itself, so a service can be dozens of times slower than it should be with no sign of load.",
+     "There are two clean fixes. Write each message in a single call so there is never a held second part, which also saves system calls. Or set TCP_NODELAY on the socket so small writes go out at once, which most request and response libraries do; then the application should batch its own writes to avoid sending many tiny packets."
+    ]
+   },
+   "useWhen": [
+    "Diagnosing latency stuck near 40 ms or 200 ms for small requests.",
+    "Choosing socket options for RPC, database or game protocols."
+   ],
+   "avoidWhen": [
+    "Avoid turning off delayed ACKs system-wide as the fix.",
+    "Avoid TCP_NODELAY combined with many tiny writes per message."
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Setting",
+     "Small-write latency",
+     "Packets on the wire"
+    ],
+    "rows": [
+     [
+      "Nagle on, one write per message",
+      "Low",
+      "Few, full packets"
+     ],
+     [
+      "Nagle on, split writes",
+      "Up to the delayed-ACK timer",
+      "Few, but late"
+     ],
+     [
+      "Nagle off (TCP_NODELAY), app buffering",
+      "Low",
+      "One per message"
+     ],
+     [
+      "Nagle off, byte-by-byte writes",
+      "Low",
+      "Very many tiny packets"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "The price of a split write",
+    "assumptions": [
+     "Round-trip time 0.5 ms, server work 0.5 ms",
+     "Delayed-ACK timer 40 ms",
+     "Client writes header and body separately"
+    ],
+    "steps": [
+     "Expected latency with one write: 0.5 ms RTT + 0.5 ms work = 1 ms.",
+     "With a split write the body waits for the delayed ACK: + 40 ms.",
+     "Actual latency ≈ 41 ms, about 41 times the expected 1 ms.",
+     "A client doing 100 such calls one after another spends 4.1 s instead of 0.1 s."
+    ],
+    "result": "A pattern bug, not load, multiplies latency forty-fold; one write per message removes it."
+   },
+   "india": {
+    "title": "Nagle and delayed ACKs in the RFCs and the Linux manual",
+    "label": "Official documentation",
+    "body": "RFC 896, written by John Nagle in 1984, describes the small-packet problem and the rule of holding new data while earlier data is unacknowledged. RFC 1122 section 4.2.3.2 lets hosts delay ACKs, but requires an ACK for at least every second full-sized segment and a delay under 0.5 seconds. The Linux tcp(7) manual page documents TCP_NODELAY, which disables Nagle on a socket, and TCP_QUICKACK, which only temporarily leaves delayed-ACK mode."
+   },
+   "pitfalls": [
+    {
+     "trap": "“The network adds 40 ms.”",
+     "say": "“A flat 40 ms with split writes is Nagle meeting a delayed ACK; I’d send one write per message.”"
+    },
+    {
+     "trap": "“Just disable delayed ACKs everywhere.”",
+     "say": "“The pattern is the problem; one write per message or TCP_NODELAY on that socket fixes it without changing every host.”"
+    }
+   ],
+   "takeaways": [
+    "Nagle holds small writes while data is unacknowledged; delayed ACKs wait to ride on replies.",
+    "Write-write-read stalls until the delayed-ACK timer, often 40 ms or 200 ms.",
+    "Send each message in one write, or set TCP_NODELAY and buffer in the app.",
+    "Latency flat near the ACK timer regardless of size is the tell."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Guess the latency",
+   "prompt": "A client in the same data centre as its server (0.5 ms round trip) sends each request as two writes, a header then a body, and waits for the reply. Nagle is on, and the server delays ACKs with a 40 ms timer. The server needs 0.5 ms per request. What latency do you expect?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "About 1 ms",
+     "feedback": "That is the latency with one write per message. Here the body waits for an ACK the server is holding back."
+    },
+    {
+     "id": "b",
+     "label": "About 41 ms",
+     "feedback": "Right: Nagle holds the body until the header is acknowledged, and the server holds the ACK until its 40 ms timer fires."
+    },
+    {
+     "id": "c",
+     "label": "About 80 ms",
+     "feedback": "The timer fires once per request: after it the body goes out and the reply follows within about a millisecond."
+    }
+   ],
+   "correctId": "b",
+   "reveal": "Each side waits on the other until the delayed-ACK timer breaks the tie, so the request costs the timer plus the normal 1 ms. Combine the writes or set TCP_NODELAY, and latency drops back to about 1 ms."
+  },
+  "seeAlso": [
+   {
+    "topicId": 247,
+    "why": "TCP acknowledgements and segments, which both features change"
+   },
+   {
+    "topicId": 9,
+    "why": "RPC frameworks that set TCP_NODELAY for low-latency calls"
+   },
+   {
+    "topicId": 253,
+    "why": "Why latency, not bandwidth, dominates small request and reply messages"
+   }
+  ]
+ }
+]
