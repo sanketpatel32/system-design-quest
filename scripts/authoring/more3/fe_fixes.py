@@ -82,11 +82,11 @@ replace_str(206, 'Browsers keep at least 4 KB per cookie (RFC 6265 sets that as 
 replace_str(206, 'At least 4 KB each', 'About 4 KB each')
 
 # 208: the distractor "It blocks all cross-site requests" is rewritten by the shared
-# scripts/option-balance.json to "It blocks requests to other origins from the page", which
-# connect-src makes partly true. The label must stay as-is here or that overlay fails the build;
-# the label change is requested from the integrator. The explanation now covers every option.
+# scripts/option-balance.json. Its old target, "It blocks requests to other origins from the page",
+# was partly true (connect-src does that), so the overlay now targets a clearly false CSRF-style
+# claim. The label must stay as-is here or that overlay fails the build. The explanation covers every option.
 set_labels(208, 't208-a4', {},
-           'CSP limits which scripts the page will execute, which reduces the impact of an injection that slips past encoding. It does not encrypt anything and cannot replace server-side validation, and any limits it places on where the page sends requests are secondary to stopping the injected script from running.')
+           'CSP limits which scripts the page will execute, which reduces the impact of an injection that slips past encoding. It does not encrypt anything, cannot replace server-side validation, and cannot stop other sites from sending requests to your server; that is what CSRF defences are for.')
 
 # 216: correct answer was the only long option.
 set_labels(216, 't216-a3', {'a': 'Change both tracks to 50% widths so they match',
