@@ -7254,5 +7254,1345 @@
     "why": "APIs expose business flows to the same abuse"
    }
   ]
+ },
+ {
+  "id": 668,
+  "slug": "security-incident-response",
+  "region": "f6-security",
+  "order": 28,
+  "title": "Security Incident Response and Breach Handling",
+  "kind": "lesson",
+  "objectives": [
+   "Preserve evidence while containing an attacker who may still be inside",
+   "Scope a compromise from logs and remove persistence, not just the first foothold",
+   "Rotate credentials and meet notification duties in a planned order"
+  ],
+  "difficulty": "intermediate",
+  "durationMinutes": 15,
+  "prereqIds": [
+   575
+  ],
+  "cards": [
+   {
+    "id": "t668-c1",
+    "kind": "text",
+    "title": "An outage with an opponent",
+    "body": "An outage ends when service is restored. A security incident ends only when you know what the attacker reached, have removed every way back in, and have told the people you must tell. The attacker adapts: they may notice your response, delete logs, or use a second foothold you have not found. NIST SP 800-61 Revision 3 frames response around the CSF 2.0 functions: prepare beforehand, detect and analyse, respond (contain and eradicate), and recover, then feed lessons back into preparation. Speed matters, but acting before you understand the scope often tips off the attacker.",
+    "teaches": [
+     "ir-phases"
+    ]
+   },
+   {
+    "id": "t668-c2",
+    "kind": "text",
+    "title": "Preserve evidence before you change things",
+    "body": "Rebooting, re-imaging or deleting a suspicious file destroys the evidence that answers “how did they get in and what did they take?”. Isolate a machine at the network level but keep it running, capture memory and a disk snapshot, export the relevant logs to storage the compromised accounts cannot modify, and record hashes of what you collected. Keep a timeline in one time zone (UTC) with who did what and when. Without this, you may have to assume the worst case for notification, because you cannot prove what was not accessed.",
+    "teaches": [
+     "evidence-preservation"
+    ]
+   },
+   {
+    "id": "t668-c3",
+    "kind": "diagram",
+    "title": "Worked example: a cloud access key leaked in a public repository",
+    "body": "An alert says a long-lived access key for a deploy role was pushed to a public repository 6 hours ago.",
+    "teaches": [
+     "containment",
+     "credential-rotation",
+     "evidence-preservation"
+    ],
+    "steps": [
+     "Declare an incident, name an incident lead, and open a private channel",
+     "Export the cloud audit logs for that key and role to write-once storage",
+     "Deactivate the key, and list every call it made since it was first used",
+     "Remove anything the key created: new users, keys, roles, functions or scheduled jobs",
+     "Rotate the secrets the role could read, check data access, and decide whom to notify"
+    ]
+   },
+   {
+    "id": "t668-c4",
+    "kind": "text",
+    "title": "Misconception: revoking the leaked secret ends the incident",
+    "body": "Attackers who get a credential usually try to keep access: they create another user or key, add a trusted SSH key, grant an app access to a mailbox, or schedule a job that calls home. Revoking the first credential leaves all of that in place. Scope the incident from the audit logs, starting at the first sighting of the attacker rather than the alert, and treat everything that identity could read as exposed until the logs show otherwise. Rotate those secrets too, because copies may already be in the attacker’s hands.",
+    "teaches": [
+     "credential-rotation",
+     "containment"
+    ]
+   },
+   {
+    "id": "t668-c5",
+    "kind": "text",
+    "title": "Trap: coordinating where the attacker can listen",
+    "body": "If an administrator’s mailbox or chat account was compromised, the attacker may be reading the incident channel and will see you coming. When identity or messaging systems might be affected, coordinate on a separate channel whose accounts do not depend on the compromised identity provider, agreed in advance as part of the plan. Also avoid naming suspected hosts or accounts in tickets that many people can read until the attacker has been contained.",
+    "teaches": [
+     "containment"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t668-a1",
+    "concept": "evidence-preservation",
+    "type": "multiple_choice",
+    "prompt": "A production server is found running an unknown process that sends traffic to an unfamiliar address. What is the best first move?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Reboot it so the process stops, then read its logs afterwards"
+     },
+     {
+      "id": "b",
+      "label": "Isolate it from the network, keep it running, capture memory and disk"
+     },
+     {
+      "id": "c",
+      "label": "Re-image it from the standard build so customers are not affected"
+     },
+     {
+      "id": "d",
+      "label": "Delete the binary and watch for a few hours to see if it returns"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Isolation stops the harm while keeping memory and disk intact as evidence. Rebooting loses everything held in memory, often including the malware itself. Re-imaging destroys the evidence of how the attacker got in, so they can return the same way. Deleting the binary alerts the attacker and leaves any other foothold in place."
+   },
+   {
+    "id": "t668-a2",
+    "concept": "credential-rotation",
+    "type": "multiple_choice",
+    "prompt": "After a leaked key is deactivated, the audit log shows it called “create user” and “create access key” last night. What should happen next?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Nothing more, because the deactivated key no longer works"
+     },
+     {
+      "id": "b",
+      "label": "Turn on multi-factor sign-in for the user that owned the key"
+     },
+     {
+      "id": "c",
+      "label": "Find and remove what it created, and review all its calls"
+     },
+     {
+      "id": "d",
+      "label": "Change the administrator password and close the incident"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "The new user and key are persistence: they still work after the original key is gone, so they must be removed and the rest of the activity checked. Multi-factor sign-in does not affect keys used by programs. Changing the administrator password leaves the attacker’s new credentials working. Deactivating the first key is necessary but is only containment."
+   },
+   {
+    "id": "t668-a3",
+    "concept": "containment",
+    "type": "multiple_choice",
+    "prompt": "Signs suggest the attacker had access to an administrator’s email and chat account. Where should responders coordinate?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "In a new private channel on the same chat system"
+     },
+     {
+      "id": "b",
+      "label": "On a prepared channel that does not use the same sign-in"
+     },
+     {
+      "id": "c",
+      "label": "By email, with the subject line kept deliberately vague"
+     },
+     {
+      "id": "d",
+      "label": "In the usual incident channel, after resetting the password"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "A channel independent of the compromised identity provider cannot be read with the stolen session or credentials. A new channel on the same system can be joined or read by the compromised admin account. A vague subject line does not hide the content from someone reading the mailbox. A password reset may not end existing sessions or other footholds the attacker holds."
+   },
+   {
+    "id": "t668-a4",
+    "concept": "evidence-preservation",
+    "type": "estimation",
+    "prompt": "An intrusion began 200 days before it was detected, and logs are kept for 90 days. About what percentage of the intrusion window has no logs?",
+    "unit": "%",
+    "target": 55,
+    "assumptions": [
+     "Attacker first access: 200 days before detection",
+     "Log retention: 90 days",
+     "Logs older than 90 days are gone"
+    ],
+    "formula": "(intrusion days − retention days) / intrusion days",
+    "workedAnswer": "200 − 90 = 110 days without logs; 110 / 200 = 0.55, so about 55%.",
+    "explanation": "Design implication: when retention is shorter than a typical intrusion lasts, you cannot show what was not accessed, and notification may have to assume the worst. Keep security-relevant logs long enough to cover realistic dwell times.",
+    "tolerance": 0.1,
+    "trapAnswers": [
+     45,
+     100
+    ]
+   },
+   {
+    "id": "t668-a5",
+    "concept": "containment",
+    "type": "tradeoff",
+    "prompt": "A build server is confirmed compromised. Evidence has been captured and the attacker’s known malware identified.",
+    "constraints": [
+     "The server holds signing keys",
+     "The attacker had root access",
+     "Releases must resume within days"
+    ],
+    "approaches": [
+     {
+      "id": "p1",
+      "label": "Rebuild from a known-good source and rotate the keys it held",
+      "description": "Rebuild and rotate"
+     },
+     {
+      "id": "p2",
+      "label": "Remove the known malware and keep using the server",
+      "description": "Clean in place"
+     },
+     {
+      "id": "p3",
+      "label": "Leave it running and watch the attacker for a few weeks",
+      "description": "Monitor"
+     }
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r1",
+      "label": "A rebuild removes persistence nobody has found yet"
+     },
+     {
+      "id": "r2",
+      "label": "Keys the server held may already be copied, so they must change"
+     },
+     {
+      "id": "r3",
+      "label": "Removing the known malware returns the server to a trusted state"
+     },
+     {
+      "id": "r4",
+      "label": "Watching the attacker longer carries little risk to releases"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": {
+     "r3": "An attacker with root may have changed anything; known malware is only what you found.",
+     "r4": "Every build signed meanwhile could carry the attacker’s changes to customers."
+    },
+    "explanation": "With root on a machine that signs releases, assume anything on it could be altered and anything it held could be stolen."
+   },
+   {
+    "id": "t668-a6",
+    "concept": "ir-phases",
+    "type": "drag_order",
+    "prompt": "Order the response to a suspected leaked credential.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "Contain by disabling the credential"
+     },
+     {
+      "id": "s5",
+      "label": "Recover, monitor closely, notify and review"
+     },
+     {
+      "id": "s1",
+      "label": "Declare the incident and assign an incident lead"
+     },
+     {
+      "id": "s4",
+      "label": "Eradicate by removing persistence and rotating exposed secrets"
+     },
+     {
+      "id": "s2",
+      "label": "Preserve evidence by exporting the relevant logs"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "A named lead coordinates the rest. Logs are preserved before containment changes the picture. Disabling stops further use; eradication removes what the attacker left; recovery, notification and review close the loop."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t668-f1",
+    "front": "First move on a compromised host",
+    "back": "Isolate it from the network but keep it running, then capture memory and disk."
+   },
+   {
+    "id": "t668-f2",
+    "front": "Persistence",
+    "back": "Extra users, keys, grants or jobs an attacker creates so revoking one credential does not evict them."
+   },
+   {
+    "id": "t668-f3",
+    "front": "Out-of-band channel",
+    "back": "A prepared way to coordinate that does not depend on the compromised identity or messaging systems."
+   }
+  ],
+  "sources": [
+   {
+    "title": "NIST SP 800-61 Rev. 3: Incident Response Recommendations",
+    "url": "https://csrc.nist.gov/pubs/sp/800/61/r3/final"
+   },
+   {
+    "title": "NIST SP 800-86: Integrating Forensic Techniques into Incident Response",
+    "url": "https://csrc.nist.gov/pubs/sp/800/86/final"
+   },
+   {
+    "title": "AWS Security Incident Response Guide",
+    "url": "https://docs.aws.amazon.com/whitepapers/latest/aws-security-incident-response-guide/welcome.html"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "ir-phases",
+    "evidence-preservation",
+    "containment",
+    "credential-rotation",
+    "breach-notification"
+   ],
+   "mechanism": {
+    "title": "How a security incident is handled",
+    "steps": [
+     "Prepare before it happens: keep a written plan with roles, an out-of-band channel, contact details for legal and the people who handle regulators, log retention that covers realistic intrusion lengths, and scripts that can rotate each important secret quickly.",
+     "Detect and declare: triage the alert, and as soon as it looks real, declare an incident and name a lead. Declaring early is cheap; a late declaration loses evidence and hours.",
+     "Preserve evidence: export audit and application logs to storage the compromised identities cannot change, snapshot disks, capture memory from running hosts, and record hashes and a timeline in UTC.",
+     "Contain: cut the attacker’s access while keeping evidence, for example by isolating hosts at the network layer, disabling credentials and ending sessions. Contain all known footholds at the same moment where possible, so the attacker cannot react by moving to another.",
+     "Scope and eradicate: read the logs from the first sign of the attacker, list everything each compromised identity did and could reach, remove persistence, rotate every secret that was readable, and rebuild machines that held root-level compromise.",
+     "Recover and notify: restore from known-good sources, watch closely for the attacker’s return, decide with legal advisers whom to tell and by when (the EU GDPR expects the regulator to be told within 72 hours of becoming aware where feasible), then hold a blameless review and fund its actions."
+    ]
+   },
+   "useWhen": [
+    "Any sign that an attacker or insider accessed systems or data without permission",
+    "Leaked credentials, even if nobody is known to have used them yet"
+   ],
+   "avoidWhen": [
+    "Treating a security incident like an outage and re-imaging first",
+    "Closing the incident when the first credential is revoked"
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Phase",
+     "Goal",
+     "Common mistake"
+    ],
+    "rows": [
+     [
+      "Preserve",
+      "Keep the evidence that answers what happened",
+      "Rebooting or re-imaging before capturing anything"
+     ],
+     [
+      "Contain",
+      "Stop further access without alerting early",
+      "Blocking one foothold while others stay open"
+     ],
+     [
+      "Eradicate",
+      "Remove every way back in",
+      "Missing users, keys and jobs the attacker created"
+     ],
+     [
+      "Recover and notify",
+      "Return to trusted service and meet duties",
+      "Guessing the scope instead of proving it from logs"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "Why rotation has to be scripted",
+    "assumptions": [
+     "The compromised role could read 120 secrets",
+     "Rotating one by hand takes about 15 minutes",
+     "A scripted rotation takes about 1 minute per secret"
+    ],
+    "steps": [
+     "By hand: 120 × 15 = 1,800 minutes",
+     "1,800 / 60 = 30 hours of focused work, spread over days in practice",
+     "Scripted: 120 × 1 = 120 minutes",
+     "120 / 60 = 2 hours"
+    ],
+    "result": "In this illustrative case, scripted rotation shrinks the window in which stolen secrets still work from more than a day to about 2 hours."
+   },
+   "india": {
+    "title": "NIST and AWS guidance",
+    "label": "Official documentation",
+    "body": "NIST SP 800-61 Revision 3 places incident response inside the Cybersecurity Framework 2.0, so preparation, detection, response and recovery are treated as ongoing risk management rather than a one-off procedure. NIST SP 800-86 covers collecting and preserving evidence so that it remains trustworthy, including the order in which volatile data such as memory should be captured before it disappears. The AWS Security Incident Response Guide applies the same ideas to cloud accounts: keep audit logs in a separate account, prepare roles responders can assume, and practise isolating resources and rotating credentials before an incident forces you to."
+   },
+   "pitfalls": [
+    {
+     "trap": "Re-imaging a compromised server straight away",
+     "say": "Isolate it and capture memory and disk first, then rebuild from a known-good source."
+    },
+    {
+     "trap": "Scoping from the alert time instead of first attacker activity",
+     "say": "Search the logs back to the first sign of the attacker and scope from there."
+    },
+    {
+     "trap": "Rotating only the leaked credential",
+     "say": "Rotate every secret the compromised identity could read, and remove what it created."
+    }
+   ],
+   "takeaways": [
+    "Preserve evidence before changing anything",
+    "Contain every known foothold together",
+    "Scope from logs and remove persistence",
+    "Rotation and notification need preparation in advance"
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Is the attacker out?",
+   "prompt": "A leaked access key was deactivated 10 minutes after the alert. Logs show the key made 40 calls during the 3 hours before that, including creating a role.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Not yet: the new role may still give them access",
+     "feedback": "Right: persistence outlives the key that created it."
+    },
+    {
+     "id": "b",
+     "label": "Yes: a deactivated key cannot be used again",
+     "feedback": "True of the key, but not of the role it created."
+    },
+    {
+     "id": "c",
+     "label": "Yes, provided the key’s owner changes their password",
+     "feedback": "Passwords do not affect access keys or roles."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Review all 40 calls, delete the role and anything else it made, and rotate what the key could read before you call it contained."
+  },
+  "seeAlso": [
+   {
+    "topicId": 327,
+    "why": "Roles, mitigation and blameless reviews from operational incident response"
+   },
+   {
+    "topicId": 575,
+    "why": "Audit trails supply the evidence that scopes a compromise"
+   },
+   {
+    "topicId": 307,
+    "why": "Secret rotation must be fast and rehearsed before an incident"
+   }
+  ]
+ },
+ {
+  "id": 669,
+  "slug": "securing-ci-cd-pipelines",
+  "region": "f6-security",
+  "order": 29,
+  "title": "Securing CI/CD Pipelines",
+  "kind": "lesson",
+  "objectives": [
+   "Treat the pipeline as a privileged system that can reach production",
+   "Keep untrusted code away from secrets and write access",
+   "Replace stored cloud keys with short-lived, federated credentials"
+  ],
+  "difficulty": "intermediate",
+  "durationMinutes": 15,
+  "prereqIds": [
+   307,
+   309
+  ],
+  "cards": [
+   {
+    "id": "t669-c1",
+    "kind": "text",
+    "title": "The pipeline is a production administrator",
+    "body": "A delivery pipeline holds deploy credentials, artefact signing keys and write access to registries and repositories. Anyone who can change what the pipeline runs, whether its configuration file, a build script or a test, can act with those powers. That makes the pipeline one of the most valuable targets in an organisation. The OWASP Top 10 CI/CD Security Risks list starts with weak flow control (code reaching production without review) and includes poisoned pipeline execution, over-broad pipeline permissions and poor credential hygiene.",
+    "teaches": [
+     "pipeline-privilege"
+    ]
+   },
+   {
+    "id": "t669-c2",
+    "kind": "text",
+    "title": "Poisoned pipeline execution",
+    "body": "A pull request from an outside contributor can change a test so that it reads environment variables and sends them to an attacker’s server. If the job that runs that test has secrets or a token with write access, they leak the moment the build starts, before anyone reviews the change. The rule is to split by trust: jobs that run unreviewed code get no secrets and read-only tokens, and jobs that hold secrets run only code that has been reviewed and merged into a protected branch.",
+    "teaches": [
+     "untrusted-builds"
+    ]
+   },
+   {
+    "id": "t669-c3",
+    "kind": "diagram",
+    "title": "Worked example: replacing a stored cloud key with federation",
+    "body": "A deploy job currently uses a long-lived cloud access key stored as a pipeline secret.",
+    "teaches": [
+     "oidc-federation",
+     "pipeline-privilege"
+    ],
+    "steps": [
+     "The job asks the pipeline platform for a signed identity token (OpenID Connect)",
+     "The token carries claims such as repository, branch and target environment",
+     "The cloud trust policy accepts it only from that issuer, repository and protected branch",
+     "The cloud returns credentials that expire after about 15 minutes",
+     "The job deploys, the credentials expire, and the stored key is deleted"
+    ]
+   },
+   {
+    "id": "t669-c4",
+    "kind": "text",
+    "title": "Misconception: secrets are safe because logs mask them",
+    "body": "Pipeline platforms replace known secret values with asterisks in logs, but masking matches exact strings. Code in the job can print the secret encoded, reversed or split in two, or simply send it over the network, and masking sees nothing. Masking prevents accidents, not attacks. What protects a secret is never giving it to a job that runs code you have not reviewed, and making it short-lived so a stolen copy expires.",
+    "teaches": [
+     "untrusted-builds"
+    ]
+   },
+   {
+    "id": "t669-c5",
+    "kind": "text",
+    "title": "Trap: anyone who can push can deploy",
+    "body": "If the deploy job runs from any branch, every person with write access, and every stolen developer token, can ship to production. Protect the main branch with required review by someone other than the author, protect the pipeline configuration files with code owners, and gate production deploys on a protected environment that only accepts the main branch and may require an approval.",
+    "teaches": [
+     "branch-protection",
+     "build-deploy-separation"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t669-a1",
+    "concept": "untrusted-builds",
+    "type": "multiple_choice",
+    "prompt": "A public repository runs its test job on pull requests from forks, and that job has a deploy token in its environment. What is the main risk?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The token may be printed in the public build log unless it is masked"
+     },
+     {
+      "id": "b",
+      "label": "A pull request can change a test so it sends the token elsewhere"
+     },
+     {
+      "id": "c",
+      "label": "Fork builds run against an old commit that lacks security fixes"
+     },
+     {
+      "id": "d",
+      "label": "The extra test runs use up the build minutes quota for the month"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Any code in the pull request runs with the token, before review, so it can exfiltrate it. Masking only hides exact strings in logs and does nothing about network calls. Fork builds run the contributor’s new code, not an old commit. Build minutes are a cost issue, not a credential leak."
+   },
+   {
+    "id": "t669-a2",
+    "concept": "oidc-federation",
+    "type": "multiple_choice",
+    "prompt": "Why is federated, short-lived cloud access better than a long-lived key stored as a pipeline secret?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "There is nothing long-lived to steal, and the cloud can limit the branch"
+     },
+     {
+      "id": "b",
+      "label": "The issued credentials work only from inside the pipeline’s own runners"
+     },
+     {
+      "id": "c",
+      "label": "The token is encrypted end to end, so job logs can never reveal it"
+     },
+     {
+      "id": "d",
+      "label": "Federation removes the need for a narrowly scoped cloud role policy"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "A stolen 15-minute credential soon expires, and the trust policy can require a specific repository, branch and environment. Issued credentials can be used from anywhere until they expire, so a job can still leak them. Encryption in transit does not stop code in the job from printing a token. The role still needs least-privilege permissions; federation changes how it is reached, not what it may do."
+   },
+   {
+    "id": "t669-a3",
+    "concept": "branch-protection",
+    "type": "multiple_choice",
+    "prompt": "Developers can edit the pipeline file on any branch, and the production deploy job runs from whichever branch triggered it. What fixes this?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Ask developers to sign their commits with a personal key"
+     },
+     {
+      "id": "b",
+      "label": "Store the production credentials in a separate secrets vault"
+     },
+     {
+      "id": "c",
+      "label": "Deploy only from the protected main branch after review"
+     },
+     {
+      "id": "d",
+      "label": "Run a static analysis scan on each branch before it deploys"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "Tying production to a reviewed, protected branch means one person cannot change the pipeline and deploy on their own. Signed commits prove who wrote a change, not that anyone reviewed it. A vault still hands the credentials to whatever job asks. A scan finds some code flaws but cannot tell a malicious deploy step from a legitimate one."
+   },
+   {
+    "id": "t669-a4",
+    "concept": "oidc-federation",
+    "type": "estimation",
+    "prompt": "A stored key is rotated every 90 days; a federated credential lasts 15 minutes. If either leaks at a random moment, its average remaining life is half its lifetime. About how many times longer does a leaked stored key stay usable?",
+    "unit": "times",
+    "target": 8640,
+    "assumptions": [
+     "Stored key lifetime: 90 days",
+     "Federated credential lifetime: 15 minutes",
+     "Average remaining life is half the lifetime",
+     "1 day = 1,440 minutes"
+    ],
+    "formula": "(90 days in minutes / 2) / (15 / 2)",
+    "workedAnswer": "90 / 2 = 45 days, and 45 × 1,440 = 64,800 minutes on average. 15 / 2 = 7.5 minutes. 64,800 / 7.5 = 8,640 times longer.",
+    "explanation": "Sanity check: the halving cancels out, so this is just 90 days divided by 15 minutes: 129,600 / 15 = 8,640. Short lifetimes shrink the damage window by orders of magnitude.",
+    "tolerance": 0.1,
+    "trapAnswers": [
+     144,
+     4320
+    ]
+   },
+   {
+    "id": "t669-a5",
+    "concept": "build-deploy-separation",
+    "type": "tradeoff",
+    "prompt": "Design the pipeline for an open-source service that accepts outside contributions and deploys to a cloud account.",
+    "constraints": [
+     "Outside contributors open pull requests",
+     "Deploys need cloud write access",
+     "Maintainers want fast feedback on every change"
+    ],
+    "approaches": [
+     {
+      "id": "p1",
+      "label": "Secret-free test jobs for pull requests; deploy job only on main, in a protected environment, using federation",
+      "description": "Split by trust"
+     },
+     {
+      "id": "p2",
+      "label": "One job that tests and deploys, with secrets masked in logs",
+      "description": "Single job"
+     },
+     {
+      "id": "p3",
+      "label": "Maintainers deploy by hand from their laptops with an admin key",
+      "description": "Manual deploys"
+     }
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r1",
+      "label": "Unreviewed code never runs where a credential exists"
+     },
+     {
+      "id": "r2",
+      "label": "Production can only be reached through reviewed code on main"
+     },
+     {
+      "id": "r3",
+      "label": "Masking secrets in logs is enough to protect them"
+     },
+     {
+      "id": "r4",
+      "label": "An admin key on a laptop is safer than one in a pipeline"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": {
+     "r3": "Code in the job can send a secret over the network, which masking cannot see.",
+     "r4": "Laptops get lost and phished, and manual deploys skip review and the audit trail."
+    },
+    "explanation": "Separate jobs by how much you trust the code they run, and give credentials only to the trusted side."
+   },
+   {
+    "id": "t669-a6",
+    "concept": "build-deploy-separation",
+    "type": "drag_order",
+    "prompt": "Order a safe path from pull request to production.",
+    "items": [
+     {
+      "id": "s4",
+      "label": "Build once on main and sign the artefact with provenance"
+     },
+     {
+      "id": "s2",
+      "label": "Get approval from a reviewer other than the author"
+     },
+     {
+      "id": "s5",
+      "label": "Deploy that artefact from a protected environment using short-lived credentials"
+     },
+     {
+      "id": "s1",
+      "label": "Build and test the pull request in a job with no secrets"
+     },
+     {
+      "id": "s3",
+      "label": "Merge into the protected main branch"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "Untrusted code is tested without secrets, a second person reviews it, and only merged code is built, signed and deployed with credentials that expire soon after."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t669-f1",
+    "front": "Poisoned pipeline execution",
+    "back": "Changing code or config the pipeline runs so it acts with the pipeline’s credentials."
+   },
+   {
+    "id": "t669-f2",
+    "front": "Federated pipeline credentials",
+    "back": "A signed identity token exchanged for cloud access that expires within minutes."
+   },
+   {
+    "id": "t669-f3",
+    "front": "Split by trust",
+    "back": "Jobs running unreviewed code get no secrets; jobs with secrets run only reviewed code."
+   }
+  ],
+  "sources": [
+   {
+    "title": "OWASP Top 10 CI/CD Security Risks",
+    "url": "https://owasp.org/www-project-top-10-ci-cd-security-risks/"
+   },
+   {
+    "title": "OWASP CI/CD Security Cheat Sheet",
+    "url": "https://cheatsheetseries.owasp.org/cheatsheets/CI_CD_Security_Cheat_Sheet.html"
+   },
+   {
+    "title": "NIST SP 800-204D: Software Supply Chain Security in DevSecOps CI/CD Pipelines",
+    "url": "https://csrc.nist.gov/pubs/sp/800/204/d/final"
+   },
+   {
+    "title": "SLSA: Security levels",
+    "url": "https://slsa.dev/spec/v1.0/levels"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "pipeline-privilege",
+    "untrusted-builds",
+    "oidc-federation",
+    "branch-protection",
+    "build-deploy-separation"
+   ],
+   "mechanism": {
+    "title": "How to secure a delivery pipeline",
+    "steps": [
+     "Map what the pipeline can reach: list every credential, token and key each job receives and what it can write to, such as registries, repositories, cloud accounts and signing services. That list is the blast radius of a pipeline compromise.",
+     "Split jobs by trust: run pull requests from contributors, and especially from forks, in jobs with read-only tokens and no secrets, and keep credentials for jobs that run reviewed code from protected branches.",
+     "Use federation instead of stored keys: have jobs exchange a signed identity token for cloud credentials that last minutes, with a trust policy that names the repository, branch and environment allowed to assume each role.",
+     "Protect what reaches production: require review by someone other than the author, protect the pipeline configuration files with code owners, deploy only from the main branch, and gate production on a protected environment.",
+     "Pin and isolate build steps: reference third-party pipeline steps by an immutable version such as a commit hash, use fresh, short-lived runners so one build cannot tamper with the next, and keep build networks from reaching internal systems they do not need.",
+     "Build once and record provenance: build the artefact once on main, sign it with provenance that says which source and pipeline produced it, and have the deploy step verify that signature before releasing."
+    ]
+   },
+   "useWhen": [
+    "Any repository whose pipeline can deploy, publish or sign",
+    "Projects that accept contributions from outside the team"
+   ],
+   "avoidWhen": [
+    "Giving every job every secret for convenience",
+    "Long-lived cloud keys stored as pipeline variables"
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Control",
+     "Stops",
+     "Watch for"
+    ],
+    "rows": [
+     [
+      "Secret-free pull request jobs",
+      "Secrets stolen by unreviewed code",
+      "Triggers that run fork code with base-branch secrets"
+     ],
+     [
+      "Federated short-lived credentials",
+      "Long-lived keys leaking and staying valid",
+      "Trust policies that accept any branch"
+     ],
+     [
+      "Protected branches and environments",
+      "One person shipping unreviewed changes",
+      "Admins allowed to bypass the rules"
+     ],
+     [
+      "Pinned steps and fresh runners",
+      "Tampered dependencies and cross-build persistence",
+      "Version tags that can be moved"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "What a stored key costs to manage",
+    "assumptions": [
+     "The same cloud key is stored in 30 repositories",
+     "Updating it takes about 10 minutes per repository",
+     "Policy says rotate every quarter, 4 times a year"
+    ],
+    "steps": [
+     "One rotation: 30 × 10 = 300 minutes, which is 5 hours",
+     "Per year: 4 × 5 = 20 hours of rotation work",
+     "Each of the 30 copies is a separate place it can leak from",
+     "With federation there are 0 stored copies and nothing to rotate"
+    ],
+    "result": "In this illustrative setup, federation removes about 20 hours a year of rotation work and 30 copies of a key that could leak."
+   },
+   "india": {
+    "title": "OWASP and NIST guidance",
+    "label": "Official documentation",
+    "body": "The OWASP Top 10 CI/CD Security Risks project describes how attackers abuse pipelines, including insufficient flow control, poisoned pipeline execution, inadequate identity and access management, and insufficient credential hygiene. The OWASP CI/CD Security Cheat Sheet turns these into controls such as protected branches, isolated build environments and short-lived credentials. NIST SP 800-204D places these practices within software supply chain security, and the SLSA build levels describe how far a build platform goes towards producing provenance that cannot be forged."
+   },
+   "pitfalls": [
+    {
+     "trap": "Running fork pull requests in jobs that hold secrets",
+     "say": "Give those jobs no secrets and read-only tokens; run secret-holding jobs only on reviewed code."
+    },
+    {
+     "trap": "Trusting log masking to protect secrets",
+     "say": "Assume any code in a job can read its secrets, and keep secrets short-lived."
+    },
+    {
+     "trap": "Letting any branch deploy to production",
+     "say": "Deploy only from the protected main branch through a protected environment."
+    }
+   ],
+   "takeaways": [
+    "The pipeline holds production power; protect it like production",
+    "Unreviewed code never runs next to secrets",
+    "Prefer short-lived federated credentials to stored keys",
+    "Only reviewed code on main reaches production"
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Where does the secret go?",
+   "prompt": "A pull request edits a test to run a command that sends all environment variables to an outside server. The test job holds a registry write token, and log masking is on.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "The token reaches the attacker; masking only edits logs",
+     "feedback": "Right: the network call never touches the log."
+    },
+    {
+     "id": "b",
+     "label": "Masking blocks it, since the token value is recognised",
+     "feedback": "Masking rewrites log output only; it does not inspect network traffic."
+    },
+    {
+     "id": "c",
+     "label": "Nothing leaks until a maintainer approves the pull request",
+     "feedback": "The job ran when the pull request was opened, before review."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Give pull request jobs no secrets, so there is nothing for edited code to send."
+  },
+  "seeAlso": [
+   {
+    "topicId": 323,
+    "why": "The delivery pipeline this lesson hardens"
+   },
+   {
+    "topicId": 309,
+    "why": "Dependencies and provenance: the rest of the supply chain"
+   },
+   {
+    "topicId": 661,
+    "why": "Security tests run inside the same pipeline"
+   }
+  ]
+ },
+ {
+  "id": 670,
+  "slug": "authorization-models-rbac-abac-rebac",
+  "region": "f6-security",
+  "order": 30,
+  "title": "Authorisation Models: RBAC, ABAC and ReBAC",
+  "kind": "lesson",
+  "objectives": [
+   "Choose between role-, attribute- and relationship-based access control for a product",
+   "Recognise role explosion and combine models instead",
+   "Centralise the decision, enforce it everywhere and keep it fresh"
+  ],
+  "difficulty": "intermediate",
+  "durationMinutes": 15,
+  "prereqIds": [
+   306
+  ],
+  "cards": [
+   {
+    "id": "t670-c1",
+    "kind": "text",
+    "title": "Three ways to answer “may this user do this?”",
+    "body": "Role-based access control (RBAC) grants permissions to roles and puts users in roles: “support agents may view tickets”. Attribute-based access control (ABAC), described in NIST SP 800-162, evaluates rules over attributes of the user, the resource, the action and the context: “staff may view a record if its region matches theirs and they are on shift”. Relationship-based access control (ReBAC) derives permissions from a graph of relationships: “you may edit a document if you are an editor of the folder that contains it”, the model behind many sharing systems.",
+    "teaches": [
+     "rbac",
+     "abac",
+     "rebac"
+    ]
+   },
+   {
+    "id": "t670-c2",
+    "kind": "text",
+    "title": "Role explosion",
+    "body": "RBAC is simple until roles start encoding the resource or the context. If every project needs viewer, editor and admin roles in each region, 40 projects with 3 levels make 120 roles, and 4 regions take that to 480. Nobody can review 480 roles, so people get granted broad ones instead. When role names contain ids, places or times, those parts belong in attributes or relationships, not in more roles.",
+    "teaches": [
+     "role-explosion",
+     "rbac"
+    ]
+   },
+   {
+    "id": "t670-c3",
+    "kind": "diagram",
+    "title": "Worked example: may Priya edit document 42?",
+    "body": "A document app lets people share folders with teams; edit rights inherit from folders to the documents inside.",
+    "teaches": [
+     "rebac",
+     "abac",
+     "policy-decision-point"
+    ],
+    "steps": [
+     "The service asks the policy decision point: may user Priya perform edit on document 42?",
+     "It finds that document 42 sits in folder Finance, which is shared with team Accounts as editor",
+     "It finds that Priya is a member of team Accounts, so the relationship grants edit",
+     "It checks the attribute rule: documents under legal hold cannot be edited; this one is not",
+     "It returns allow, the service performs the edit, and the decision is logged"
+    ]
+   },
+   {
+    "id": "t670-c4",
+    "kind": "text",
+    "title": "Misconception: you must pick one model",
+    "body": "Most products mix them. Roles suit coarse job functions such as administrator or billing manager. Relationships suit per-object sharing and inheritance. Attributes suit conditions such as region, data classification, device or time. What matters more than the model is the structure: one policy decision point that answers every question with a default of deny, and enforcement points in every service and endpoint that ask it before acting, as the OWASP Authorization Cheat Sheet recommends.",
+    "teaches": [
+     "policy-decision-point"
+    ]
+   },
+   {
+    "id": "t670-c5",
+    "kind": "text",
+    "title": "Trap: deciding with stale permissions",
+    "body": "If roles are copied into a token that lasts an hour, a user removed from a role keeps that power until the token expires. Caches of relationships cause the same lag. For sensitive actions, check current permissions at decision time, keep tokens that carry permissions short-lived, and make revocation take effect before new sharing, so removing someone and then sharing a secret document cannot be applied in the wrong order.",
+    "teaches": [
+     "policy-decision-point"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t670-a1",
+    "concept": "rebac",
+    "type": "multiple_choice",
+    "prompt": "A file app lets users share individual files and folders with people and teams, and access granted on a folder applies to everything inside it. Which model fits best?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "RBAC, with a viewer and editor role created for every folder"
+     },
+     {
+      "id": "b",
+      "label": "Relationship-based, with sharing and folder links as a graph"
+     },
+     {
+      "id": "c",
+      "label": "Attribute-based, with each file tagged by its owner’s department"
+     },
+     {
+      "id": "d",
+      "label": "Copying the folder’s access list onto every file when shared"
+     }
+    ],
+    "correctChoiceIds": [
+     "b"
+    ],
+    "explanation": "Sharing and folder nesting are relationships, and inheritance is a walk up the graph. A role per folder causes role explosion. Department tags cannot express sharing with an individual person. Copying lists onto every file goes stale whenever a file moves or the folder’s sharing changes."
+   },
+   {
+    "id": "t670-a2",
+    "concept": "abac",
+    "type": "multiple_choice",
+    "prompt": "Rule: support staff may view a customer’s record only if the customer is in the agent’s region and the agent is on shift. Which model expresses this most directly?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "RBAC, with one support role for each region and shift pattern"
+     },
+     {
+      "id": "b",
+      "label": "Relationship-based, linking every agent to each customer record"
+     },
+     {
+      "id": "c",
+      "label": "Attribute-based, comparing region and shift at decision time"
+     },
+     {
+      "id": "d",
+      "label": "Access lists on each record, updated when shifts change"
+     }
+    ],
+    "correctChoiceIds": [
+     "c"
+    ],
+    "explanation": "The rule compares attributes of the user, the resource and the context, which is what ABAC evaluates. Roles per region and shift multiply quickly and still cannot see the clock. Linking agents to each customer creates millions of edges that change with every rota. Updating access lists on each shift change is slow and error-prone."
+   },
+   {
+    "id": "t670-a3",
+    "concept": "policy-decision-point",
+    "type": "multiple_choice",
+    "prompt": "A user is removed from the finance-admin role but can still export reports for the next 50 minutes. What is the most likely cause?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "Roles are copied into a token that lasts an hour"
+     },
+     {
+      "id": "b",
+      "label": "The database has not yet replicated the role change"
+     },
+     {
+      "id": "c",
+      "label": "The export endpoint does not check roles at all"
+     },
+     {
+      "id": "d",
+      "label": "The browser has cached the export page for an hour"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "A permission baked into a token lasts until the token expires, however the role changes. Database replication lag is usually seconds, not 50 minutes. If the endpoint checked no roles, access would never have stopped. A cached page does not let new export requests succeed on the server."
+   },
+   {
+    "id": "t670-a4",
+    "concept": "role-explosion",
+    "type": "estimation",
+    "prompt": "A product needs viewer, editor and admin access for each of 40 projects in each of 4 regions. How many roles does pure RBAC need?",
+    "unit": "roles",
+    "target": 480,
+    "assumptions": [
+     "40 projects",
+     "3 access levels",
+     "4 regions",
+     "One role per combination"
+    ],
+    "formula": "projects × levels × regions",
+    "workedAnswer": "40 × 3 = 120 project roles, and 120 × 4 = 480 roles.",
+    "explanation": "Design implication: roles that encode resources and places grow multiplicatively. Keep 3 roles and move project and region into relationships or attributes.",
+    "tolerance": 0.1,
+    "trapAnswers": [
+     47,
+     120
+    ]
+   },
+   {
+    "id": "t670-a5",
+    "concept": "policy-decision-point",
+    "type": "tradeoff",
+    "prompt": "Twelve services each make authorisation decisions about the same users and resources.",
+    "constraints": [
+     "Rules change monthly",
+     "Auditors ask why access was granted",
+     "Some services are written by different teams"
+    ],
+    "approaches": [
+     {
+      "id": "p1",
+      "label": "One shared policy decision point, called by every service, deny by default",
+      "description": "Central decision"
+     },
+     {
+      "id": "p2",
+      "label": "Each service writes its own checks inline in its handlers",
+      "description": "Inline checks"
+     },
+     {
+      "id": "p3",
+      "label": "Check permissions only at the API gateway, by URL path",
+      "description": "Gateway only"
+     }
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {
+      "id": "r1",
+      "label": "A rule change happens in one place and applies everywhere"
+     },
+     {
+      "id": "r2",
+      "label": "Each decision can be logged with the policy that made it"
+     },
+     {
+      "id": "r3",
+      "label": "Inline checks stay consistent because the teams share docs"
+     },
+     {
+      "id": "r4",
+      "label": "Path rules at the gateway can see which object is requested"
+     }
+    ],
+    "correctRationaleIds": [
+     "r1",
+     "r2"
+    ],
+    "distractorRationaleIds": [
+     "r3",
+     "r4"
+    ],
+    "rationaleConflicts": {
+     "r3": "Twelve copies of the rules drift apart however good the documents are.",
+     "r4": "A path shows the object id, not who owns it or how it is shared."
+    },
+    "explanation": "Decide in one place, enforce in every service, and log each decision."
+   },
+   {
+    "id": "t670-a6",
+    "concept": "policy-decision-point",
+    "type": "drag_order",
+    "prompt": "Order the steps of an authorisation check.",
+    "items": [
+     {
+      "id": "s3",
+      "label": "Load the relevant roles, relationships and attributes"
+     },
+     {
+      "id": "s1",
+      "label": "Authenticate the caller and build the subject"
+     },
+     {
+      "id": "s5",
+      "label": "Enforce the decision and log it"
+     },
+     {
+      "id": "s2",
+      "label": "Identify the action and the resource"
+     },
+     {
+      "id": "s4",
+      "label": "Evaluate the policy, denying unless a rule allows"
+     }
+    ],
+    "correctOrder": [
+     "s1",
+     "s2",
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "explanation": "You cannot decide without knowing who is asking and what for. The decision needs current data, defaults to deny, and is recorded for audit."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t670-f1",
+    "front": "RBAC",
+    "back": "Permissions attach to roles, and users are assigned roles."
+   },
+   {
+    "id": "t670-f2",
+    "front": "ABAC",
+    "back": "Rules evaluate attributes of the user, resource, action and context."
+   },
+   {
+    "id": "t670-f3",
+    "front": "ReBAC",
+    "back": "Permissions follow relationships such as owner, member and parent folder."
+   }
+  ],
+  "sources": [
+   {
+    "title": "OWASP Authorization Cheat Sheet",
+    "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html"
+   },
+   {
+    "title": "NIST SP 800-162: Guide to Attribute Based Access Control",
+    "url": "https://csrc.nist.gov/pubs/sp/800/162/upd2/final"
+   },
+   {
+    "title": "NIST: Role Based Access Control project",
+    "url": "https://csrc.nist.gov/projects/role-based-access-control"
+   }
+  ],
+  "deep": {
+   "teaches": [
+    "rbac",
+    "abac",
+    "rebac",
+    "role-explosion",
+    "policy-decision-point"
+   ],
+   "mechanism": {
+    "title": "How to design authorisation",
+    "steps": [
+     "List the questions: write down the real decisions, such as “may this user refund this order?” or “may this team see this folder?”, and the facts each one depends on. The facts tell you which model fits.",
+     "Use roles for job functions: keep a small number of roles for broad duties, such as administrator, support agent and billing manager, and review who holds each one regularly.",
+     "Use relationships for sharing and ownership: store edges such as user member of team, team editor of folder, and folder parent of document, and derive permissions by following them, so moving a document changes its access automatically.",
+     "Use attributes for conditions: express region, data classification, time, device posture or legal hold as rules over attributes, evaluated at decision time.",
+     "Centralise the decision: put the rules behind one policy decision point, a shared library or service, so every enforcement point asks the same question the same way and the default answer is deny.",
+     "Keep decisions fresh and visible: check current data for sensitive actions, keep permission-carrying tokens short-lived, and log each decision with the inputs and policy version so you can explain it later."
+    ]
+   },
+   "useWhen": [
+    "Products with sharing, teams, tenants or delegated administration",
+    "Systems where auditors ask who can access what and why"
+   ],
+   "avoidWhen": [
+    "Inventing a role for every resource, place or time window",
+    "Copying authorisation rules into every service by hand"
+   ],
+   "tradeoffs": {
+    "columns": [
+     "Model",
+     "Best for",
+     "Weak spot"
+    ],
+    "rows": [
+     [
+      "RBAC",
+      "Coarse job functions with few roles",
+      "Role explosion when roles encode resources or context"
+     ],
+     [
+      "ABAC",
+      "Conditions on region, time, classification or device",
+      "Rules that are hard to review and to list who has access"
+     ],
+     [
+      "ReBAC",
+      "Per-object sharing and inheritance",
+      "Deep graphs that make checks slow without care"
+     ],
+     [
+      "Combined, central decision",
+      "Most real products",
+      "Needs a clear owner for the policy"
+     ]
+    ]
+   },
+   "numbers": {
+    "title": "What a relationship check costs on a list page",
+    "assumptions": [
+     "Documents sit up to 6 folders deep",
+     "Each relationship lookup takes about 1 ms",
+     "A page lists 50 documents, checked one at a time"
+    ],
+    "steps": [
+     "One worst-case check: 6 lookups at 1 ms each is 6 ms",
+     "One page: 50 checks at 6 ms each is about 300 ms",
+     "A single query that filters the list by permission does the walk once",
+     "That brings the page cost back to a few lookups instead of 300"
+    ],
+    "result": "In this illustrative case, checking a 50-item list one item at a time adds about 300 ms, so relationship systems need batch or list-filtering queries."
+   },
+   "india": {
+    "title": "OWASP and NIST guidance",
+    "label": "Official documentation",
+    "body": "The OWASP Authorization Cheat Sheet recommends enforcing least privilege, denying by default, validating permissions on every request, and preferring attribute- and relationship-based models over plain RBAC when access depends on more than a job title. NIST SP 800-162 defines ABAC, covering subject, object, operation and environment attributes and how policies combine them. NIST’s RBAC project describes the standard role model, including role hierarchies and separation-of-duty constraints that stop one person holding two conflicting roles."
+   },
+   "pitfalls": [
+    {
+     "trap": "Creating a role for every project and region",
+     "say": "Keep a few roles and move projects and regions into relationships or attributes."
+    },
+    {
+     "trap": "Baking permissions into long-lived tokens",
+     "say": "Check current permissions for sensitive actions and keep such tokens short-lived."
+    },
+    {
+     "trap": "Scattering authorisation rules across services",
+     "say": "Put the rules behind one policy decision point and call it everywhere."
+    }
+   ],
+   "takeaways": [
+    "Roles for jobs, relationships for sharing, attributes for conditions",
+    "Role names with ids or places signal role explosion",
+    "Decide centrally, enforce everywhere, deny by default",
+    "Stale permissions are a real access bug"
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Which change grants access?",
+   "prompt": "Priya is an editor of folder Finance. Document 42 is moved from folder Finance into folder Legal, which only the legal team can view.",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Priya loses edit on document 42 straight away",
+     "feedback": "Right: access follows the new parent folder."
+    },
+    {
+     "id": "b",
+     "label": "Priya keeps edit, since she had it before the move",
+     "feedback": "That happens only if access was copied onto the document when it was shared."
+    },
+    {
+     "id": "c",
+     "label": "The legal team loses access to Legal’s other files",
+     "feedback": "Moving one document does not change the folder’s own sharing."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "In a relationship model, permissions are derived from current edges, so moving the document changes who can reach it."
+  },
+  "seeAlso": [
+   {
+    "topicId": 306,
+    "why": "Every model fails if an endpoint skips the check"
+   },
+   {
+    "topicId": 225,
+    "why": "Authentication and basic server-side authorisation come first"
+   },
+   {
+    "topicId": 576,
+    "why": "Tenant boundaries are the outermost authorisation rule"
+   }
+  ]
  }
 ]
