@@ -23,4 +23,30 @@ describe('per-boss rubric paths', () => {
     const g = gradeArchitecture({ nodes: [], edges: [] }, boss.boss!.rubric, 30)
     expect(g.score).toBe(0)
   })
+
+  it('every boss rubric is reachable: the reference design scores full marks with no unsafe flow', () => {
+    for (const b of bosses) {
+      const rubric = b.boss!.rubric
+      const types = new Set([
+        ...rubric.requiredCapabilities,
+        ...rubric.requiredPaths.flatMap((p) => [p.from, p.to]),
+      ])
+      const graph = {
+        nodes: [...types].map((t) => ({ id: t, type: t, label: t })),
+        edges: rubric.requiredPaths.map((p) => ({ source: p.from, target: p.to })),
+      }
+      const g = gradeArchitecture(graph, rubric, 30)
+      expect(g.feedback, `boss ${b.id}`).toEqual(['Architecture covers required paths without unsafe shortcuts.'])
+      expect(g.score, `boss ${b.id}`).toBe(30)
+    }
+  })
+
+  it('unsafe flows in boss rubrics never contradict a required path', () => {
+    for (const b of bosses) {
+      const r = b.boss!.rubric
+      for (const u of r.unsafeFlows) {
+        expect(r.requiredPaths.some((p) => p.from === u.from && p.to === u.to), `boss ${b.id} ${u.from}->${u.to}`).toBe(false)
+      }
+    }
+  })
 })

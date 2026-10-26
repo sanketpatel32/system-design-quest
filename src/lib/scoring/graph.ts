@@ -42,11 +42,19 @@ function hasPath(
   return fromNodes.some((f) => visit(f, targets))
 }
 
+// An unsafe flow is a direct edge that skips the layer in between (e.g. client wired straight to the DB).
+// Reachability is not enough: in every layered design the client eventually reaches the DB through services.
+function hasDirectEdge(
+  graph: UserGraph,
+  fromType: CanvasComponentType,
+  toType: CanvasComponentType,
+): boolean {
+  const typeOf = new Map(graph.nodes.map((n) => [n.id, n.type]))
+  return graph.edges.some((e) => typeOf.get(e.source) === fromType && typeOf.get(e.target) === toType)
+}
+
 function hasUnsafeFlow(graph: UserGraph, rubric: ArchitectureRubric): boolean {
-  for (const flow of rubric.unsafeFlows) {
-    if (hasPath(graph, flow.from, flow.to)) return true
-  }
-  return false
+  return rubric.unsafeFlows.some((flow) => hasDirectEdge(graph, flow.from, flow.to))
 }
 
 function capabilitySatisfied(

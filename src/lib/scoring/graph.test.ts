@@ -47,4 +47,23 @@ describe('graph grading', () => {
     expect(g.score).toBeLessThanOrEqual(30)
     expect(g.score).toBeGreaterThan(10)
   })
+
+  it('does not flag a layered design whose client reaches the DB only through services', () => {
+    const graph: UserGraph = {
+      nodes: [
+        { id: 'c', type: 'client', label: 'c' },
+        { id: 'lb', type: 'load_balancer', label: 'lb' },
+        { id: 's', type: 'service', label: 's' },
+        { id: 'db', type: 'sql_db', label: 'db' },
+      ],
+      edges: [
+        { source: 'c', target: 'lb' },
+        { source: 'lb', target: 's' },
+        { source: 's', target: 'db' },
+      ],
+    }
+    const g = gradeArchitecture(graph, rubric)
+    expect(g.score).toBe(30)
+    expect(g.feedback.some((f) => f.startsWith('Unsafe'))).toBe(false)
+  })
 })
