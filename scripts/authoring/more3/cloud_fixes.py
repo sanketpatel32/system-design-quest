@@ -22,8 +22,7 @@ Q = {
    'A liveness probe that checks a dependency fails for every pod at once, so the kubelet restarts them all while the database is slow, adding cold starts and reconnect load. Unready-but-running is what a readiness probe would cause. Kubernetes does not fail over regions, and the probe failure stops cached serving by restarting the process.', None),
  't322-a3': (None, 'Memory cannot be taken back from a process, so exceeding the limit gets the container OOM-killed and restarted. Slowing down is what happens at a CPU limit (throttling), swap is normally off for Kubernetes nodes, and the scheduler never moves a running pod to another node.', None),
  't322-a4': (None, 'The controller compares desired with actual replicas and creates new pods, which the scheduler places on healthy nodes. It cannot touch the failed node’s kernel, needs no approval, and never lowers the desired count; only a person or an autoscaler changes that.', None),
- 't323-a1': ({'a': 'Every change must pass automated tests before merge', 'b': 'Artefacts are built once and promoted between environments', 'c': 'Staging is a copy of production configuration'},
-   'Both practices keep main releasable with automated tests and promoted artefacts; continuous deployment also removes the manual approval and releases every passing change. Tests before merge, build-once promotion and production-like staging belong to both, so they do not tell them apart.', None),
+ # t323-a1 superseded by quality/q_cloud.py
  't323-a2': ({'a': 'Staging tests can then run in parallel with the production deploy', 'd': 'Each environment can build from its own branch'},
    'Promoting one artefact means production runs the exact bytes that passed the tests; rebuilding can pull different dependencies. Configuration still differs per environment and is injected at deploy time. Running staging tests in parallel with production defeats the gate, and per-environment branches are the drift this practice prevents.', None),
  't323-a3': (None, 'Long-lived branches drift apart, so integration problems surface late as big merges and test failures. Monthly merges mean fewer builds and slower feedback, not more, and branches use little build-server disk.', None),
@@ -46,7 +45,7 @@ Q = {
    'A typical policy pauses risky launches and spends effort on reliability until the budget recovers. Shipping as planned ignores the budget, raising the SLO makes it harder still, and lowering the SLO to clear the budget breaks the agreement it exists to protect.', None),
  't326-a4': (None, 'Burn rate is how fast the budget is spent relative to the even rate that lasts the whole window, so 10 means 30 days ÷ 10 = 3 days. It is not a percentage used, a count of incidents, or a longer-lasting budget.', None),
  't327-a1': (None, 'When errors follow a deploy, rolling back is usually the fastest way to stop the harm; diagnosis can follow. Reading the diff or adding logging extends the outage, and the postmortem comes after recovery.', None),
- 't327-a2': (None, 'The commander coordinates the response, assigns roles and makes decisions. Fixes are done by the operations lead and others, and customer updates go through the communications lead.', None),
+ # t327-a2 superseded by quality/q_cloud.py
  't327-a3': ({'d': 'Retrain the operator on the tool before they use it again'},
    'A guard in the tool prevents the same mistake by anyone. Recording an operator error, reminding people to be careful and retraining one person rely on humans never slipping, so the same failure can recur.', None),
  't327-a4': ({'a': 'So the postmortem can be finished within a day', 'b': 'So the incident does not count against the error budget', 'c': 'So no one has to own the action items afterwards'},

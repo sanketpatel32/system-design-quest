@@ -44,7 +44,7 @@ CHOICES = [
     ('t310-a3', 'a', 'To make codes longer', 'To let a code be reused once'),
     ('t310-a3', 'c', 'To skip the password', 'To resist phishing of the code'),
     ('t310-a3', 'd', 'To let users share codes', 'To lower the chance of guessing'),
-    ('t310-a4', 'd', 'Phones cannot store secrets', 'Codes can be guessed in a few tries'),
+    # t310-a4 superseded by quality/q_sec.py
 ]
 
 # Explanations rewritten so every option is accounted for
@@ -68,7 +68,6 @@ EXPLANATIONS = {
     't309-a1': 'The resolver preferred the public registry’s higher version of an internal name. Typosquatting relies on a mistyped name, a hijacked maintainer publishes under the real package, and an install script attack needs no name clash.',
     't309-a4': 'Provenance ties an artefact to your trusted build. It cannot detect a compromised builder that signs its own output, bugs in the commit, or vulnerable dependencies; those need hardened builders, review and scanning.',
     't310-a3': 'Phone clocks drift and users take time to type, so a one-step window accepts valid codes. It slightly widens the guessing window, does nothing against phishing, and servers should still reject a reused code.',
-    't310-a4': 'Attackers persuade carriers to move the number to their SIM, then receive the codes. Six-digit codes with rate limits are not practically guessable, and SMS needs no internet connection.',
 }
 
 # (topic id, dotted path, old substring, new substring): factual corrections and updates

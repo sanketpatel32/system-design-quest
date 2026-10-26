@@ -786,7 +786,7 @@
         "id": "t24-c2",
         "kind": "text",
         "title": "Denormalize for hot reads",
-        "body": "If the order page must show product name and seller name, a normalized schema needs three joins on every view. Copying those names into the order row makes the read a single lookup, at the cost of extra writes when a name changes.",
+        "body": "If the order page must show product name and seller name, a normalized schema joins three tables on every view. At 5,000 order-page views a second during a sale, copying those names into the order row makes each view a single-row read; the cost is that a seller rename must now update every one of their order rows.",
         "teaches": [
           "denormalise"
         ]
@@ -825,11 +825,11 @@
         "choices": [
           {
             "id": "a",
-            "label": "Copy product and seller names into the order rows for that page"
+            "label": "Copy product and seller names into those order rows"
           },
           {
             "id": "c",
-            "label": "Move all of the data to a document store instead"
+            "label": "Move all the data to a document store instead"
           },
           {
             "id": "d",
@@ -837,13 +837,13 @@
           },
           {
             "id": "b",
-            "label": "Denormalise every table in the whole schema at once"
+            "label": "Denormalise every table in the schema at once"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Fix the measured hot path; keep the rest normalised."
+        "explanation": "Fix the measured hot path and keep the rest normalised; the copies cost a little on rare renames. Moving everything to a document store, or denormalising the whole schema, is a rewrite for one query, and foreign keys are checked on writes; they do not slow down reads that join."
       },
       {
         "id": "t24-a2",
@@ -871,35 +871,35 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Denormalising moves cost from reads to writes."
+        "explanation": "With 10M copies, one seller rename updates every row that seller has, possibly millions, so it belongs in a background job. Reads need fewer joins, not more, and ACID guarantees and indexing are unaffected."
       },
       {
         "id": "t24-a3",
         "concept": "normalise",
         "type": "multiple_choice",
-        "prompt": "Which data should stay normalised?",
+        "prompt": "A wallet app shows the user’s balance on 6 different screens. Which data should stay in one normalised place?",
         "choices": [
           {
             "id": "c",
-            "label": "The seller name on a cached order page"
+            "label": "The display name on a cached profile card"
           },
           {
             "id": "a",
-            "label": "Account balances that must never disagree with themselves"
+            "label": "The balance used to approve payments"
           },
           {
             "id": "b",
-            "label": "The product name printed on old invoices"
+            "label": "The merchant name on past transactions"
           },
           {
             "id": "d",
-            "label": "The author name on comment listings"
+            "label": "The product name printed on old invoices"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "One copy means it cannot disagree with itself."
+        "explanation": "The balance decides whether a payment goes through, so two copies that disagree mean approving money that is not there; keep one authoritative row, updated in a transaction, and have the screens read it. Merchant names on past transactions and product names on invoices are snapshots that should not change, and a cached display name can be a little stale."
       },
       {
         "id": "t24-a4",

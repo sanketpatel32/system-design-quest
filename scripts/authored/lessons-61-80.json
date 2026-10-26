@@ -61,7 +61,7 @@
         "id": "t61-c4",
         "kind": "text",
         "title": "Trap: images as database BLOBs",
-        "body": "Storing images as BLOBs in the relational DB.",
+        "body": "Storing images as BLOBs in the relational database. At 3 MB a photo, 1M photos is 3 TB inside the tables, every backup and every replica, so restores and new replicas take hours longer. Keep the bytes in object storage and the key, owner and size in a row.",
         "teaches": [
           "blob-trap"
         ]
@@ -72,29 +72,29 @@
         "id": "t61-a1",
         "concept": "presigned",
         "type": "multiple_choice",
-        "prompt": "Why use pre-signed URLs for uploads?",
+        "prompt": "A presigned PUT URL for one photo upload ends up in a shared log. What limits the damage?",
         "choices": [
           {
             "id": "c",
-            "label": "They compress the files before they reach storage"
+            "label": "Only the user who asked for it can use it"
           },
           {
             "id": "d",
-            "label": "They replace authentication for the whole upload API"
+            "label": "The bucket rejects a second upload to it"
           },
           {
             "id": "b",
-            "label": "They make the uploaded files public to everyone forever"
+            "label": "Storage rejects uploads from a new IP"
           },
           {
             "id": "a",
-            "label": "Clients upload straight to the bucket, so large files skip your app servers"
+            "label": "It expires soon and covers one object key"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The app only signs; the bucket receives the bytes."
+        "explanation": "The signature covers the method, the bucket, the object key and an expiry, so a leaked URL can only write that one object until it expires, often within 5–15 minutes. Anyone holding it can use it, as many times as they like before expiry; storage checks no identity or IP address unless a policy adds conditions."
       },
       {
         "id": "t61-a2",
@@ -119,25 +119,25 @@
         "choices": [
           {
             "id": "d",
-            "label": "Images would load faster from Postgres than from a bucket and CDN"
+            "label": "Postgres limits each row to 1 MB of data"
           },
           {
             "id": "a",
-            "label": "It bloats the database, backups and replication; object storage is cheaper and built for it"
+            "label": "It bloats the database, backups and replicas"
           },
           {
             "id": "b",
-            "label": "Postgres cannot store binary data of any size in a column"
+            "label": "Postgres cannot store binary data in a column"
           },
           {
             "id": "c",
-            "label": "BLOB columns cannot be backed up or replicated by Postgres at all"
+            "label": "BLOB columns cannot be backed up or replicated"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Keep the database for metadata."
+        "explanation": "Every image byte then sits in the tables, the backups and each replica, while object storage is cheaper per GB and serves through a CDN. Postgres can store binary data (bytea, up to 1 GB a value) and does back it up and replicate it, which is exactly the cost."
       },
       {
         "id": "t61-a4",
@@ -201,7 +201,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Objects hold bytes; the database holds what you query."
+        "explanation": "A database row (owner, caption, object key, size) is what you filter, join and check permissions on; the object holds only bytes. One bucket per photo runs into account bucket limits, CDN configuration is for routing and caching, and metadata inside the image file cannot be queried."
       }
     ],
     "flashcards": [
@@ -2461,7 +2461,7 @@
         "id": "t71-c4",
         "kind": "text",
         "title": "A stable sort key",
-        "body": "Cursors need a unique, ordered key. created_at alone can tie, so use (created_at, id), with an index on that pair.",
+        "body": "Cursors need a unique, ordered key. created_at alone can tie: at lunch peak a food-delivery feed may get 40 orders in the same second, and a cursor on the timestamp alone skips or repeats the ones on the boundary. Use (created_at, id), with an index on that pair.",
         "teaches": [
           "sort-key"
         ]
@@ -2485,25 +2485,25 @@
         "choices": [
           {
             "id": "a",
-            "label": "The database still reads and discards 100,000 rows"
+            "label": "It reads and discards 100,000 rows first"
           },
           {
             "id": "c",
-            "label": "The response contains 100,000 rows"
+            "label": "The response holds 100,000 rows"
           },
           {
             "id": "d",
-            "label": "It locks the table"
+            "label": "It locks the table while paging through"
           },
           {
             "id": "b",
-            "label": "OFFSET disables every index"
+            "label": "OFFSET stops the index being used"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Offsets are skipped, not jumped over."
+        "explanation": "The database still reads and throws away 100,000 rows before returning 20, so each deeper page costs more. The response is still 20 rows, OFFSET takes no table lock, and an index can still supply the order; it just cannot skip ahead by a count."
       },
       {
         "id": "t71-a2",
@@ -2513,53 +2513,53 @@
         "choices": [
           {
             "id": "d",
-            "label": "The new posts appended at the bottom"
+            "label": "The new posts appended at the bottom of the feed"
           },
           {
             "id": "a",
-            "label": "Duplicates, as earlier items shift onto the next page"
+            "label": "Repeats, as earlier items shift down a page"
           },
           {
             "id": "b",
-            "label": "Nothing changes"
+            "label": "No change, since each page is fixed"
           },
           {
             "id": "c",
-            "label": "An error"
+            "label": "An error once the offsets go stale"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Inserts move everything down."
+        "explanation": "With newest-first offsets, each new post pushes everything down one place, so the last items of page 1 reappear at the top of page 2. New posts are not appended at the bottom, pages are not fixed, and offsets do not raise errors; they just point at different rows."
       },
       {
         "id": "t71-a3",
         "concept": "sort-key",
         "type": "multiple_choice",
-        "prompt": "Which cursor key is safe?",
+        "prompt": "A feed pages with WHERE (created_at, id) < cursor, newest first, 20 at a time. Which index makes each page a single seek?",
         "choices": [
           {
+            "id": "b",
+            "label": "Two indexes: one on created_at, one on id"
+          },
+          {
             "id": "a",
-            "label": "(created_at, id)"
+            "label": "One composite index on (created_at, id)"
           },
           {
             "id": "c",
-            "label": "The page number"
-          },
-          {
-            "id": "b",
-            "label": "created_at alone"
+            "label": "One index on id alone"
           },
           {
             "id": "d",
-            "label": "A random number"
+            "label": "No index; the cursor already skips rows"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Unique and ordered."
+        "explanation": "A composite index on (created_at, id) lets the database seek straight to the cursor and read the next 20 entries in order. Two separate indexes cannot give that order in one seek, an index on id alone ignores the time order, and without an index every page scans and sorts the table."
       },
       {
         "id": "t71-a4",

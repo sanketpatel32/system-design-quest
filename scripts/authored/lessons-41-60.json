@@ -506,7 +506,7 @@
         "id": "t43-c1",
         "kind": "text",
         "title": "Two-phase commit",
-        "body": "A coordinator asks every participant to prepare (lock and promise), then tells all to commit or all to abort. It gives atomicity across databases, but participants hold locks while waiting, and if the coordinator dies after prepare they are stuck.",
+        "body": "A coordinator asks every participant to prepare (lock and promise), then tells all to commit or all to abort. It gives atomicity across databases, but each commit costs at least two round trips plus a forced log write at every participant, participants hold locks while waiting, and if the coordinator dies after prepare they are stuck.",
         "teaches": [
           "2pc",
           "2pc-blocking"
@@ -551,7 +551,7 @@
         "id": "t43-c5",
         "kind": "text",
         "title": "Trap: 2PC by default",
-        "body": "Defaulting to 2PC across microservices. It ties every service’s availability together and holds locks across network calls. Prefer sagas unless you truly need atomic commit.",
+        "body": "Defaulting to 2PC across microservices. It ties every service’s availability together and holds locks across network calls. Prefer sagas unless you truly need atomic commit. Expect the follow-up “what does the user see while the saga is half done?”: show “payment pending”, not a confirmed booking.",
         "teaches": [
           "2pc-blocking"
         ]
@@ -562,29 +562,29 @@
         "id": "t43-a1",
         "concept": "2pc-blocking",
         "type": "multiple_choice",
-        "prompt": "Main drawback of two-phase commit?",
+        "prompt": "Checkout uses two-phase commit across the order, payment and inventory databases. During a sale the inventory database is slow for 30 seconds. What happens to checkout?",
         "choices": [
           {
             "id": "b",
-            "label": "It cannot guarantee atomicity across the participants"
+            "label": "Orders and payments commit; stock catches up later"
           },
           {
             "id": "c",
-            "label": "It only gives eventual consistency, never strong"
+            "label": "Checkout skips inventory and uses a cached count"
           },
           {
             "id": "d",
-            "label": "It only works with NoSQL stores, not relational ones"
+            "label": "Only stock updates slow down, not payments"
           },
           {
             "id": "a",
-            "label": "Participants hold locks and can be stuck if the coordinator fails after prepare"
+            "label": "Every checkout waits, holding locks in all three"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Blocking is the price of atomic commit."
+        "explanation": "Under 2PC nothing commits until every participant has voted, so one slow database stalls every checkout while the other two hold their locks, slowing other work on those rows too. Committing without inventory is what a saga would do, and 2PC has no cached fallback."
       },
       {
         "id": "t43-a2",
@@ -643,7 +643,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Sagas undo with new actions, in reverse order."
+        "explanation": "Each completed step is undone by a new action, in reverse order: cancel the hotel, then the flight. There is no cross-service transaction to roll back, leaving the reservations holds rooms and seats the user did not pay for, and retrying a declined card forever never ends. Compensations must be idempotent, because they can be retried too."
       },
       {
         "id": "t43-a4",
@@ -653,11 +653,11 @@
         "choices": [
           {
             "id": "c",
-            "label": "Services share one database transaction"
+            "label": "The services share one database transaction"
           },
           {
             "id": "a",
-            "label": "A booking coordinator calls flight, hotel and payment in turn and runs compensations"
+            "label": "A coordinator calls flight, hotel and payment, then compensates"
           },
           {
             "id": "d",
@@ -665,13 +665,13 @@
           },
           {
             "id": "b",
-            "label": "Each service listens for the previous service’s event and reacts"
+            "label": "Each service reacts to the previous service’s event"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "A central coordinator owns the flow."
+        "explanation": "Orchestration means one coordinator owns the flow: it calls each step and decides when to compensate. Services reacting to each other’s events is choreography, a shared transaction is not a saga at all, and a client calling services itself leaves compensation to an app that may close halfway."
       },
       {
         "id": "t43-a5",

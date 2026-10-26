@@ -9358,7 +9358,7 @@
         "id": "t24-c2",
         "kind": "text",
         "title": "Denormalize for hot reads",
-        "body": "If the order page must show product name and seller name, a normalized schema needs three joins on every view. Copying those names into the order row makes the read a single lookup, at the cost of extra writes when a name changes.",
+        "body": "If the order page must show product name and seller name, a normalized schema joins three tables on every view. At 5,000 order-page views a second during a sale, copying those names into the order row makes each view a single-row read; the cost is that a seller rename must now update every one of their order rows.",
         "teaches": [
           "denormalise"
         ]
@@ -9397,11 +9397,11 @@
         "choices": [
           {
             "id": "a",
-            "label": "Copy product and seller names into the order rows for that page"
+            "label": "Copy product and seller names into those order rows"
           },
           {
             "id": "c",
-            "label": "Move all of the data to a document store instead"
+            "label": "Move all the data to a document store instead"
           },
           {
             "id": "d",
@@ -9409,13 +9409,13 @@
           },
           {
             "id": "b",
-            "label": "Denormalise all the tables in the schema at once"
+            "label": "Denormalise every table in the schema at once"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Fix the measured hot path; keep the rest normalised."
+        "explanation": "Fix the measured hot path and keep the rest normalised; the copies cost a little on rare renames. Moving everything to a document store, or denormalising the whole schema, is a rewrite for one query, and foreign keys are checked on writes; they do not slow down reads that join."
       },
       {
         "id": "t24-a2",
@@ -9443,35 +9443,35 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Denormalising moves cost from reads to writes."
+        "explanation": "With 10M copies, one seller rename updates every row that seller has, possibly millions, so it belongs in a background job. Reads need fewer joins, not more, and ACID guarantees and indexing are unaffected."
       },
       {
         "id": "t24-a3",
         "concept": "normalise",
         "type": "multiple_choice",
-        "prompt": "Which data should stay normalised?",
+        "prompt": "A wallet app shows the user’s balance on 6 different screens. Which data should stay in one normalised place?",
         "choices": [
           {
             "id": "c",
-            "label": "The seller name on a cached order page"
+            "label": "The display name on a cached profile card"
           },
           {
             "id": "a",
-            "label": "Account balances that must never disagree with themselves"
+            "label": "The balance used to approve payments"
           },
           {
             "id": "b",
-            "label": "The product name printed on old invoices"
+            "label": "The merchant name on past transactions"
           },
           {
             "id": "d",
-            "label": "The author name on comment listings"
+            "label": "The product name printed on old invoices"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "One copy means it cannot disagree with itself."
+        "explanation": "The balance decides whether a payment goes through, so two copies that disagree mean approving money that is not there; keep one authoritative row, updated in a transaction, and have the screens read it. Merchant names on past transactions and product names on invoices are snapshots that should not change, and a cached display name can be a little stale."
       },
       {
         "id": "t24-a4",
@@ -9561,25 +9561,25 @@
         "choices": [
           {
             "id": "a",
-            "label": "The order must keep the address it was delivered to, even if the profile changes later"
+            "label": "The order must keep the address it went to"
           },
           {
             "id": "b",
-            "label": "Because joins between orders and customers are not allowed in SQL"
+            "label": "SQL does not allow joining orders and customers"
           },
           {
             "id": "c",
-            "label": "Because it makes editing a customer’s saved address much faster"
+            "label": "It makes editing a saved address much faster"
           },
           {
             "id": "d",
-            "label": "Because it removes the need for a separate customers table"
+            "label": "It removes the need for a customers table"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "It is a snapshot of a historical fact, so it never needs to be kept in sync with the profile."
+        "explanation": "It is a snapshot of a historical fact: the parcel went to that address even if the profile changes later, so it never needs syncing. SQL joins those tables fine, editing a saved address is unaffected, and customers still need their own table."
       }
     ],
     "flashcards": [
@@ -16898,7 +16898,7 @@
         "id": "t43-c1",
         "kind": "text",
         "title": "Two-phase commit",
-        "body": "A coordinator asks every participant to prepare (lock and promise), then tells all to commit or all to abort. It gives atomicity across databases, but participants hold locks while waiting, and if the coordinator dies after prepare they are stuck.",
+        "body": "A coordinator asks every participant to prepare (lock and promise), then tells all to commit or all to abort. It gives atomicity across databases, but each commit costs at least two round trips plus a forced log write at every participant, participants hold locks while waiting, and if the coordinator dies after prepare they are stuck.",
         "teaches": [
           "2pc",
           "2pc-blocking"
@@ -16943,7 +16943,7 @@
         "id": "t43-c5",
         "kind": "text",
         "title": "Trap: 2PC by default",
-        "body": "Defaulting to 2PC across microservices. It ties every service’s availability together and holds locks across network calls. Prefer sagas unless you truly need atomic commit.",
+        "body": "Defaulting to 2PC across microservices. It ties every service’s availability together and holds locks across network calls. Prefer sagas unless you truly need atomic commit. Expect the follow-up “what does the user see while the saga is half done?”: show “payment pending”, not a confirmed booking.",
         "teaches": [
           "2pc-blocking"
         ]
@@ -16954,29 +16954,29 @@
         "id": "t43-a1",
         "concept": "2pc-blocking",
         "type": "multiple_choice",
-        "prompt": "Main drawback of two-phase commit?",
+        "prompt": "Checkout uses two-phase commit across the order, payment and inventory databases. During a sale the inventory database is slow for 30 seconds. What happens to checkout?",
         "choices": [
           {
             "id": "b",
-            "label": "It cannot give atomicity across the participants"
+            "label": "Orders and payments commit; stock catches up later"
           },
           {
             "id": "c",
-            "label": "It only gives eventual consistency, not strong"
+            "label": "Checkout skips inventory and uses a cached count"
           },
           {
             "id": "d",
-            "label": "It only works with NoSQL stores, not relational ones"
+            "label": "Only stock updates slow down, not payments"
           },
           {
             "id": "a",
-            "label": "Locks stay held if the coordinator dies after prepare"
+            "label": "Every checkout waits, holding locks in all three"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Blocking is the price of atomic commit."
+        "explanation": "Under 2PC nothing commits until every participant has voted, so one slow database stalls every checkout while the other two hold their locks, slowing other work on those rows too. Committing without inventory is what a saga would do, and 2PC has no cached fallback."
       },
       {
         "id": "t43-a2",
@@ -17035,7 +17035,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Sagas undo with new actions, in reverse order."
+        "explanation": "Each completed step is undone by a new action, in reverse order: cancel the hotel, then the flight. There is no cross-service transaction to roll back, leaving the reservations holds rooms and seats the user did not pay for, and retrying a declined card forever never ends. Compensations must be idempotent, because they can be retried too."
       },
       {
         "id": "t43-a4",
@@ -17045,11 +17045,11 @@
         "choices": [
           {
             "id": "c",
-            "label": "Services share one database transaction"
+            "label": "The services share one database transaction"
           },
           {
             "id": "a",
-            "label": "A booking coordinator calls flight, hotel and payment in turn and runs compensations"
+            "label": "A coordinator calls flight, hotel and payment, then compensates"
           },
           {
             "id": "d",
@@ -17057,13 +17057,13 @@
           },
           {
             "id": "b",
-            "label": "Each service listens for the previous service’s event and reacts"
+            "label": "Each service reacts to the previous service’s event"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "A central coordinator owns the flow."
+        "explanation": "Orchestration means one coordinator owns the flow: it calls each step and decides when to compensate. Services reacting to each other’s events is choreography, a shared transaction is not a saga at all, and a client calling services itself leaves compensation to an app that may close halfway."
       },
       {
         "id": "t43-a5",
@@ -24106,7 +24106,7 @@
         "id": "t61-c4",
         "kind": "text",
         "title": "Trap: images as database BLOBs",
-        "body": "Storing images as BLOBs in the relational DB.",
+        "body": "Storing images as BLOBs in the relational database. At 3 MB a photo, 1M photos is 3 TB inside the tables, every backup and every replica, so restores and new replicas take hours longer. Keep the bytes in object storage and the key, owner and size in a row.",
         "teaches": [
           "blob-trap"
         ]
@@ -24117,29 +24117,29 @@
         "id": "t61-a1",
         "concept": "presigned",
         "type": "multiple_choice",
-        "prompt": "Why use pre-signed URLs for uploads?",
+        "prompt": "A presigned PUT URL for one photo upload ends up in a shared log. What limits the damage?",
         "choices": [
           {
             "id": "c",
-            "label": "They compress the files before they reach storage"
+            "label": "Only the user who asked for it can use it"
           },
           {
             "id": "d",
-            "label": "They replace authentication for the upload API"
+            "label": "The bucket rejects a second upload to it"
           },
           {
             "id": "b",
-            "label": "They make the uploaded files public to everyone"
+            "label": "Storage rejects uploads from a new IP"
           },
           {
             "id": "a",
-            "label": "Uploads go straight to the bucket, skipping app servers"
+            "label": "It expires soon and covers one object key"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The app only signs; the bucket receives the bytes."
+        "explanation": "The signature covers the method, the bucket, the object key and an expiry, so a leaked URL can only write that one object until it expires, often within 5–15 minutes. Anyone holding it can use it, as many times as they like before expiry; storage checks no identity or IP address unless a policy adds conditions."
       },
       {
         "id": "t61-a2",
@@ -24164,25 +24164,25 @@
         "choices": [
           {
             "id": "d",
-            "label": "Images would load faster from Postgres than from a bucket and CDN"
+            "label": "Postgres limits each row to 1 MB of data"
           },
           {
             "id": "a",
-            "label": "It bloats the database, backups and replication; object storage is cheaper and built for it"
+            "label": "It bloats the database, backups and replicas"
           },
           {
             "id": "b",
-            "label": "Postgres cannot store binary data of any size in a column"
+            "label": "Postgres cannot store binary data in a column"
           },
           {
             "id": "c",
-            "label": "BLOB columns cannot be backed up or replicated by Postgres"
+            "label": "BLOB columns cannot be backed up or replicated"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Keep the database for metadata."
+        "explanation": "Every image byte then sits in the tables, the backups and each replica, while object storage is cheaper per GB and serves through a CDN. Postgres can store binary data (bytea, up to 1 GB a value) and does back it up and replicate it, which is exactly the cost."
       },
       {
         "id": "t61-a4",
@@ -24246,7 +24246,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Objects hold bytes; the database holds what you query."
+        "explanation": "A database row (owner, caption, object key, size) is what you filter, join and check permissions on; the object holds only bytes. One bucket per photo runs into account bucket limits, CDN configuration is for routing and caching, and metadata inside the image file cannot be queried."
       },
       {
         "id": "t61-d1",
@@ -27991,7 +27991,7 @@
         "id": "t71-c4",
         "kind": "text",
         "title": "A stable sort key",
-        "body": "Cursors need a unique, ordered key. created_at alone can tie, so use (created_at, id), with an index on that pair.",
+        "body": "Cursors need a unique, ordered key. created_at alone can tie: at lunch peak a food-delivery feed may get 40 orders in the same second, and a cursor on the timestamp alone skips or repeats the ones on the boundary. Use (created_at, id), with an index on that pair.",
         "teaches": [
           "sort-key"
         ]
@@ -28015,25 +28015,25 @@
         "choices": [
           {
             "id": "a",
-            "label": "The database still reads and discards 100,000 rows"
+            "label": "It reads and discards 100,000 rows first"
           },
           {
             "id": "c",
-            "label": "The response contains 100,000 rows"
+            "label": "The response holds 100,000 rows"
           },
           {
             "id": "d",
-            "label": "It locks the table"
+            "label": "It locks the table while paging through"
           },
           {
             "id": "b",
-            "label": "OFFSET disables the indexes"
+            "label": "OFFSET stops the index being used"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Offsets are skipped, not jumped over."
+        "explanation": "The database still reads and throws away 100,000 rows before returning 20, so each deeper page costs more. The response is still 20 rows, OFFSET takes no table lock, and an index can still supply the order; it just cannot skip ahead by a count."
       },
       {
         "id": "t71-a2",
@@ -28043,53 +28043,53 @@
         "choices": [
           {
             "id": "d",
-            "label": "The new posts appended at the bottom"
+            "label": "The new posts appended at the bottom of the feed"
           },
           {
             "id": "a",
-            "label": "Duplicates, as earlier items shift onto the next page"
+            "label": "Repeats, as earlier items shift down a page"
           },
           {
             "id": "b",
-            "label": "Nothing changes"
+            "label": "No change, since each page is fixed"
           },
           {
             "id": "c",
-            "label": "An error"
+            "label": "An error once the offsets go stale"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Inserts move everything down."
+        "explanation": "With newest-first offsets, each new post pushes everything down one place, so the last items of page 1 reappear at the top of page 2. New posts are not appended at the bottom, pages are not fixed, and offsets do not raise errors; they just point at different rows."
       },
       {
         "id": "t71-a3",
         "concept": "sort-key",
         "type": "multiple_choice",
-        "prompt": "Which cursor key is safe?",
+        "prompt": "A feed pages with WHERE (created_at, id) < cursor, newest first, 20 at a time. Which index makes each page a single seek?",
         "choices": [
           {
+            "id": "b",
+            "label": "Two indexes: one on created_at, one on id"
+          },
+          {
             "id": "a",
-            "label": "(created_at, id)"
+            "label": "One composite index on (created_at, id)"
           },
           {
             "id": "c",
-            "label": "The page number"
-          },
-          {
-            "id": "b",
-            "label": "created_at alone"
+            "label": "One index on id alone"
           },
           {
             "id": "d",
-            "label": "A random number"
+            "label": "No index; the cursor already skips rows"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Unique and ordered."
+        "explanation": "A composite index on (created_at, id) lets the database seek straight to the cursor and read the next 20 entries in order. Two separate indexes cannot give that order in one seek, an index on id alone ignores the time order, and without an index every page scans and sorts the table."
       },
       {
         "id": "t71-a4",
@@ -65325,7 +65325,7 @@
         "id": "t116-c1",
         "kind": "text",
         "title": "Choosing the deep dive",
-        "body": "Pick the part most likely to break at your numbers: the hot key, the write path, the fan-out. Or ask which part the interviewer wants. Go deep on one, not shallow on five.",
+        "body": "Pick the part most likely to break at your numbers. For IRCTC Tatkal booking that is the 10:00 a.m. burst on a few thousand seats per train, not the login page. Or ask which part the interviewer wants. Spend 10–15 minutes deep on one area rather than shallow on five.",
         "teaches": [
           "pick-dive"
         ]
@@ -65334,7 +65334,7 @@
         "id": "t116-c2",
         "kind": "text",
         "title": "Trade-off sentences",
-        "body": "Use: “A or B. I choose A because requirement X; the cost is Y; I’ll mitigate with Z.” It shows judgement instead of memorised answers.",
+        "body": "Use: “A or B. I choose A because requirement X; the cost is Y; I’ll mitigate with Z.” For example: “Async replication, because checkout writes must finish in under 50 ms; the cost is losing a few seconds of writes on failover; payment records take a synchronous path.” It shows judgement instead of memorised answers.",
         "teaches": [
           "tradeoff-template"
         ]
@@ -65359,7 +65359,7 @@
         "id": "t116-c4",
         "kind": "text",
         "title": "Soften absolutes",
-        "body": "Avoid “always” and “never”. Say “for this read-heavy feed I’d cache with a short TTL”, not “caching is always right”.",
+        "body": "Avoid “always” and “never”. Say “for this read-heavy feed I’d cache with a short TTL”, not “caching is always right”. An interviewer can break an absolute with one counterexample (“even for a write-heavy ledger?”), and you spend the next five minutes retreating.",
         "teaches": [
           "absolutes"
         ]
@@ -65368,7 +65368,7 @@
         "id": "t116-c5",
         "kind": "text",
         "title": "Trap: an option with no downside",
-        "body": "Presenting one option as obviously correct with no downside. Interviewers push back until you name the cost; naming it first earns the point.",
+        "body": "Presenting one option as obviously correct with no downside. Interviewers push back until you name the cost; naming it first earns the point. Have the next answer ready too: “what breaks first if traffic grows 10×?”",
         "teaches": [
           "tradeoff-template"
         ]
@@ -65383,25 +65383,25 @@
         "choices": [
           {
             "id": "b",
-            "label": "Async replication, because it is always faster and always better for every workload"
+            "label": "Async replication, since it is faster than sync and simpler to run"
           },
           {
             "id": "a",
-            "label": "Async replication, because writes must be fast; we may lose seconds on failover, so payments use a sync path"
+            "label": "Async, for fast writes; failover may lose seconds, so payments go sync"
           },
           {
             "id": "c",
-            "label": "Kafka, because it is the industry standard that most large companies already use"
+            "label": "Kafka, since most large companies already run it in production"
           },
           {
             "id": "d",
-            "label": "Either works here; the choice does not really matter for this design at all"
+            "label": "Either works; I would go with whatever the team knows best"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Requirement, cost, mitigation."
+        "explanation": "It names the requirement (fast writes), the cost (seconds of writes lost on failover) and a mitigation (a synchronous path for payments). “Faster and simpler” names no cost, popularity is not a requirement, and “either works” skips the decision the interviewer asked you to make."
       },
       {
         "id": "t116-a2",
@@ -65443,29 +65443,29 @@
         "id": "t116-a3",
         "concept": "pick-dive",
         "type": "multiple_choice",
-        "prompt": "URL shortener at 100K redirects/s. Best deep-dive choice?",
+        "prompt": "Design IRCTC Tatkal booking: sales open at 10:00 a.m., a train has a few thousand seats, and requests in the first minute far exceed them. You have 15 minutes for one deep dive. Which?",
         "choices": [
           {
             "id": "d",
-            "label": "Which logging library the service uses"
+            "label": "The login page and its OTP flow"
           },
           {
             "id": "c",
-            "label": "The signup page and its form validation"
+            "label": "The admin tool for adding new trains"
           },
           {
             "id": "a",
-            "label": "The redirect read path and caching of hot links"
+            "label": "Seat inventory under the opening burst"
           },
           {
             "id": "b",
-            "label": "The admin dashboard for managing and editing links"
+            "label": "The PNR status page and its caching"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Dive where the numbers bite."
+        "explanation": "A burst on a small, contended seat inventory is where the design breaks: double-booked seats or a melted database. PNR status is read-heavy but easy to cache, the admin tool has a handful of users, and login matters but is a solved problem worth one sentence."
       },
       {
         "id": "t116-a4",
@@ -65475,11 +65475,11 @@
         "choices": [
           {
             "id": "b",
-            "label": "Caching is always the right answer"
+            "label": "Caching is always the right answer for reads"
           },
           {
             "id": "d",
-            "label": "Microservices always beat monoliths"
+            "label": "Microservices always beat a monolith at scale"
           },
           {
             "id": "a",
@@ -65487,13 +65487,13 @@
           },
           {
             "id": "c",
-            "label": "Never use SQL at scale"
+            "label": "Never use SQL once traffic gets large"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Scope claims to the problem."
+        "explanation": "It scopes the claim to this workload and names a choice with a limit (a short TTL). The others are absolutes an interviewer can break with one counterexample: a write-heavy ledger where a cache adds staleness, a small team for whom a monolith is simpler, or the many large systems that run on SQL."
       },
       {
         "id": "t116-a5",
@@ -65557,7 +65557,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "It names the benefit, the cost, the requirement and the decision, with a number to back it."
+        "explanation": "It names the cost (a hot row), puts a number on the load, and then decides. The others are absolutes with no cost: no database is best for every system, Redis does not scale without limit and is a weak sole system of record, and microservices bring network and operational costs of their own."
       }
     ],
     "flashcards": [
@@ -65720,7 +65720,7 @@
         "id": "t117-c1",
         "kind": "text",
         "title": "Designing before scoping",
-        "body": "Drawing boxes before knowing scale or features. Everything after rests on guesses.",
+        "body": "Drawing boxes before knowing scale or features. Ask three or four questions first: daily users, the read/write ratio, the latency target and what is out of scope. A chat app for 50 people and one for 50 million share a name, not a design.",
         "teaches": [
           "no-scope"
         ]
@@ -65729,7 +65729,7 @@
         "id": "t117-c2",
         "kind": "text",
         "title": "Over-engineering",
-        "body": "Kafka, microservices and sharding for 1,000 users. Start simple and add components when a number forces you.",
+        "body": "Kafka, microservices and sharding for 1,000 users. A single database on a modest server handles thousands of indexed queries a second, far more than 1,000 users generate. Start simple, add a component when a number forces you, and say which number would.",
         "teaches": [
           "overeng"
         ]
@@ -65738,7 +65738,7 @@
         "id": "t117-c3",
         "kind": "text",
         "title": "Unused numbers",
-        "body": "Estimating, then never using the estimate. If you computed 50K QPS, say what it means for caching and the database.",
+        "body": "Estimating, then never using the estimate. If you computed 50K read QPS, say what it means: one cache node can serve that, you would run a few for headroom and failover, and at a 90% hit rate the database sees about 5K QPS.",
         "teaches": [
           "unused-numbers"
         ]
@@ -65763,7 +65763,7 @@
         "id": "t117-c5",
         "kind": "text",
         "title": "Silent thinking",
-        "body": "Long silences leave the interviewer guessing. Think aloud, check in (“should I go deeper here?”) and accept hints.",
+        "body": "Long silences leave the interviewer guessing. Think aloud, check in (“should I go deeper here?”) and take hints. Interviewers often hint on purpose to see how you use help, so a hint picked up well works in your favour.",
         "teaches": [
           "silence"
         ]
@@ -65778,7 +65778,7 @@
         "choices": [
           {
             "id": "c",
-            "label": "Sharded Cassandra across three regions"
+            "label": "Cassandra sharded across three regions"
           },
           {
             "id": "d",
@@ -65786,17 +65786,17 @@
           },
           {
             "id": "b",
-            "label": "Kafka plus twelve microservices"
+            "label": "Kafka and twelve microservices"
           },
           {
             "id": "a",
-            "label": "One app server and one managed database, with backups"
+            "label": "One app server and a managed database"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Proportional to the load."
+        "explanation": "1,000 daily users is well under one request a second on average; one server and a managed database, with backups and a tested restore, carry that easily. Cross-region Cassandra, a service mesh and twelve microservices each add operational work that no number asks for."
       },
       {
         "id": "t117-a2",
@@ -65806,25 +65806,25 @@
         "choices": [
           {
             "id": "a",
-            "label": "Use it: say a cache is needed and roughly how many app servers"
+            "label": "Use it to size the cache and app servers"
           },
           {
             "id": "b",
-            "label": "Move on: estimation is just a phase to get through"
+            "label": "Move on; estimation is only a warm-up phase"
           },
           {
             "id": "c",
-            "label": "Re-estimate it more precisely with exact figures"
+            "label": "Re-estimate it more precisely, with exact figures"
           },
           {
             "id": "d",
-            "label": "Ask whether 50K is right and stop there"
+            "label": "Ask whether 50K is right, then stop there"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Numbers should drive decisions."
+        "explanation": "An estimate earns credit only when it changes the design: 50K reads a second means a cache in front of the database and several app servers. Treating it as a warm-up wastes it, more precision rarely changes a decision, and checking the number without using it stops halfway."
       },
       {
         "id": "t117-a3",
@@ -65852,7 +65852,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Reasoning out loud earns credit even when unsure."
+        "explanation": "Reasoning out loud lets the interviewer follow, correct or hint, and earns credit even when you are unsure. Silence hides your thinking, changing the subject looks like avoidance, and a quick unexplained pick gives them nothing to assess."
       },
       {
         "id": "t117-a4",
@@ -65902,21 +65902,21 @@
           },
           {
             "id": "d",
-            "label": "Early on, you asked what is out of scope for now"
+            "label": "Early on, you asked what is out of scope"
           },
           {
             "id": "c",
-            "label": "You stated your traffic assumptions out loud"
+            "label": "You stated your traffic assumptions aloud"
           },
           {
             "id": "a",
-            "label": "Halfway through, you learn the system only needs 10 writes a day"
+            "label": "Halfway in, you learn it gets 10 writes a day"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The design was built on guesses."
+        "explanation": "Learning the write rate halfway through means the first half was built on guesses, and probably sized for far more traffic. Asking about the read/write ratio and the scope, and stating your assumptions aloud, are what scoping looks like."
       },
       {
         "id": "t117-d1",
@@ -65926,25 +65926,25 @@
         "choices": [
           {
             "id": "a",
-            "label": "It is over-engineered; a database table or simple managed queue is enough at this rate"
+            "label": "Overkill: a table or managed queue is enough"
           },
           {
             "id": "b",
-            "label": "It is required for any event-driven system, whatever the rate"
+            "label": "Kafka is needed for any event-driven design"
           },
           {
             "id": "c",
-            "label": "It should use five brokers instead, to leave room for growth"
+            "label": "Use five brokers instead, to leave room to grow"
           },
           {
             "id": "d",
-            "label": "It is fine because Kafka is popular and widely understood"
+            "label": "Fine, because Kafka is popular and widely known"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Components should match the anchor numbers; at about 1 event per second Kafka adds cost without benefit."
+        "explanation": "At 1–12 events a second, a database table polled by a worker, or a managed queue, is plenty, while a three-broker cluster adds brokers to run, monitor and upgrade. Nothing ties events to Kafka, more brokers make it worse, and popularity is not a requirement. Have the follow-up ready: switch when the rate reaches thousands a second, or when many consumers need to replay history."
       }
     ],
     "flashcards": [
@@ -98168,29 +98168,29 @@
         "id": "t285-a1",
         "concept": "readiness",
         "type": "multiple_choice",
-        "prompt": "What does a readiness API such as epoll report?",
+        "prompt": "A server watches 5,000 sockets with epoll. The wait call returns 3 of them. What does that tell the server?",
         "choices": [
           {
             "id": "a",
-            "label": "Which threads are currently idle"
+            "label": "Three requests have been fully processed"
           },
           {
             "id": "b",
-            "label": "How much CPU each socket used"
+            "label": "Three sockets can be read or written now"
           },
           {
             "id": "c",
-            "label": "Which descriptors are ready"
+            "label": "Three threads are idle and can take work"
           },
           {
             "id": "d",
-            "label": "Which requests have finished processing"
+            "label": "Three sockets have used the most CPU"
           }
         ],
         "correctChoiceIds": [
-          "c"
+          "b"
         ],
-        "explanation": "It reports readiness; the program still does the reads and writes."
+        "explanation": "Readiness means the next read or write on those 3 descriptors will not block: data has arrived, or there is buffer space to send. The program still does the reading, parsing and handling itself; epoll knows nothing about threads, request completion or CPU use."
       },
       {
         "id": "t285-a2",
@@ -98246,7 +98246,7 @@
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "Event loops shine when connections mostly wait."
+        "explanation": "Many idle long-lived connections, such as chat or live cricket scores, need only a few KB of state each on a loop, against a thread stack each. Heavy maths and CPU-bound batch jobs gain nothing from an event loop, and a daily script has no connections to multiplex."
       },
       {
         "id": "t285-a4",
@@ -98274,7 +98274,7 @@
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "One loop uses one core; scale out with a loop per core."
+        "explanation": "One loop runs on one thread, so it uses one core; run one loop per core, often as several processes sharing the port, to use them all. A thread per connection abandons the event model, lowering priority only makes it slower, and blocking sockets would stall the loop."
       },
       {
         "id": "t285-a5",
@@ -98640,7 +98640,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Interleaving the three steps lets one write overwrite another."
+        "explanation": "Two threads can both read 5, both add 1 and both write 6, so one increment vanishes. The counter is ordinary shared memory, and threads share globals, which is the whole problem; nothing is skipping additions, the interleaving loses them."
       },
       {
         "id": "t286-a2",
@@ -98696,35 +98696,35 @@
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "Locks do not release during I/O; keep slow work outside."
+        "explanation": "The lock is held for the whole call, so every thread that needs it queues for up to 300 ms, and the lock allows only about 3 such calls a second. Locks do not time out or pause during I/O by themselves. Copy what you need under the lock, release it, then call the API."
       },
       {
         "id": "t286-a4",
         "concept": "race-condition",
         "type": "multiple_choice",
-        "prompt": "A race appears once in a million test runs. What does that suggest?",
+        "prompt": "A checkout race shows up once in a million test runs. During a sale, production handles 5 million checkouts a day. What should you expect?",
         "choices": [
           {
             "id": "a",
-            "label": "The test machine is faulty"
+            "label": "It will not appear, as tests are harsher"
           },
           {
             "id": "b",
-            "label": "It cannot happen in production"
+            "label": "Several failures a day, likely more at peak"
           },
           {
             "id": "c",
-            "label": "The compiler has a bug"
+            "label": "5 failures, one per million, every day"
           },
           {
             "id": "d",
-            "label": "A timing-dependent bug, not luck"
+            "label": "No failures, as production servers are faster"
           }
         ],
         "correctChoiceIds": [
-          "d"
+          "b"
         ],
-        "explanation": "Races depend on interleaving, which production load exercises far more."
+        "explanation": "At one in a million, 5 million checkouts is already about 5 a day, and real concurrency at peak usually makes the bad interleaving more likely, not less. A probability gives an expected count, not a fixed one, and faster or busier machines change the timing in ways that often expose races."
       },
       {
         "id": "t286-a5",
@@ -99068,7 +99068,7 @@
         "id": "t287-a1",
         "concept": "deadlock-conditions",
         "type": "multiple_choice",
-        "prompt": "Which condition does a global lock order break?",
+        "prompt": "A team fixes a deadlock by making every code path take the orders lock before the payments lock. Which of the four conditions did they remove?",
         "choices": [
           {
             "id": "a",
@@ -99090,35 +99090,35 @@
         "correctChoiceIds": [
           "b"
         ],
-        "explanation": "If all threads acquire locks in one order, no cycle can form."
+        "explanation": "Threads still hold one lock while waiting for another, the locks are still exclusive and nothing takes them away. What changed is that no thread can hold payments while waiting for orders, so a cycle cannot form. Removing hold-and-wait would mean taking both locks at once or neither."
       },
       {
         "id": "t287-a2",
         "concept": "deadlock",
         "type": "multiple_choice",
-        "prompt": "Two threads are deadlocked. What does CPU usage typically show?",
+        "prompt": "At peak, an order service stops completing orders. The process is up, its health check still answers, CPU is at 2% and the order threads are all parked waiting for locks. What is the likely cause?",
         "choices": [
           {
             "id": "a",
-            "label": "100% on both threads"
+            "label": "A deadlock between lock holders"
           },
           {
             "id": "b",
-            "label": "Near zero for those threads"
+            "label": "A livelock of threads retrying"
           },
           {
             "id": "c",
-            "label": "Rapid oscillation between them"
+            "label": "A busy loop on one core"
           },
           {
             "id": "d",
-            "label": "A kernel panic"
+            "label": "Memory used up by a leak"
           }
         ],
         "correctChoiceIds": [
-          "b"
+          "a"
         ],
-        "explanation": "Deadlocked threads sleep waiting; it is a silent hang."
+        "explanation": "Deadlocked threads sleep, so CPU drops while the process stays up and unrelated threads such as the health check still answer. A livelock and a busy loop burn CPU, and a leak shows growing memory and out-of-memory kills, not threads parked on locks. A thread dump showing each thread waiting on a lock another holds confirms it."
       },
       {
         "id": "t287-a3",
@@ -99146,7 +99146,7 @@
         "correctChoiceIds": [
           "d"
         ],
-        "explanation": "Threads are active but make no progress."
+        "explanation": "Livelock: the threads are active and burning CPU, but each backs off and retries in step with the other, so none progresses. A deadlock shows sleeping threads, priority inversion needs threads of different priorities, and a memory leak grows memory. Random jitter in the back-off breaks the lockstep."
       },
       {
         "id": "t287-a4",
@@ -99174,7 +99174,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Direction-based order lets opposite transfers form a cycle."
+        "explanation": "Ordering by direction (source first, or destination first) means transfer(X, Y) and transfer(Y, X) take the locks in opposite orders, so a cycle can form. A fixed global order such as the lower id first gives every pair one order. “Less busy” changes from moment to moment, so it is no order at all."
       },
       {
         "id": "t287-a5",
@@ -99967,63 +99967,63 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The kernel kept the pages in memory after the first read."
+        "explanation": "The kernel keeps the 2 GB of pages in memory after the first read, and with 16 GB free nothing evicts them. A drive’s own cache is tiny by comparison, and checksums and compression do not depend on whether the file was read before."
       },
       {
         "id": "t289-a2",
         "concept": "fsync",
         "type": "multiple_choice",
-        "prompt": "Which call waits until written data is on stable storage?",
+        "prompt": "A payments ledger appends each transaction to a file, then replies “success”. Power fails a second later. Which call, made before replying, makes sure the entry survives?",
         "choices": [
           {
             "id": "a",
-            "label": "close"
+            "label": "Calling close on the file"
           },
           {
             "id": "b",
-            "label": "write"
+            "label": "write returning the byte count"
           },
           {
             "id": "c",
-            "label": "open"
+            "label": "Opening the file in append mode"
           },
           {
             "id": "d",
-            "label": "fsync"
+            "label": "Calling fsync on the file"
           }
         ],
         "correctChoiceIds": [
           "d"
         ],
-        "explanation": "write and close return before the device has the data."
+        "explanation": "write returns once the bytes are in the page cache, and close only releases the descriptor; neither waits for the device. Append mode controls where bytes go, not when they reach storage. fsync waits until the data and metadata are on stable storage, so only then is it safe to reply."
       },
       {
         "id": "t289-a3",
         "concept": "atomic-rename",
         "type": "multiple_choice",
-        "prompt": "Why write to a temp file and rename it over the original?",
+        "prompt": "A service updates settings.json in place by truncating it and writing 40 KB. A crash mid-write leaves an empty file and the service will not start. What makes the update crash-safe?",
         "choices": [
           {
             "id": "a",
-            "label": "It avoids needing extra disk space"
+            "label": "Write the file in smaller 4 KB pieces"
           },
           {
             "id": "b",
-            "label": "Readers see old or new, never half"
+            "label": "Write a temp file, fsync it, rename it over"
           },
           {
             "id": "c",
-            "label": "rename skips the page cache"
+            "label": "Call close straight after the last write"
           },
           {
             "id": "d",
-            "label": "rename compresses the file"
+            "label": "Keep a copy of the settings in memory"
           }
         ],
         "correctChoiceIds": [
           "b"
         ],
-        "explanation": "rename atomically switches which file the name points to."
+        "explanation": "rename atomically switches the name to a fully written, synced file, so after a crash readers see the old settings or the new ones, never a truncated mix; fsync the directory too so the rename itself survives. Smaller writes still leave a half-written file, close does not flush to storage, and a copy in memory is gone after the crash."
       },
       {
         "id": "t289-a4",
@@ -100051,7 +100051,7 @@
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "Dirty pages may have been discarded after the failure."
+        "explanation": "Linux may already have dropped the dirty pages and cleared the error, so a second fsync can succeed with nothing written. Assume the data is lost and recover from a known-good copy or a log, as PostgreSQL does by crashing and replaying its write-ahead log. The failure can hit data, not just metadata, and the cache is no longer a safe copy."
       },
       {
         "id": "t289-a5",
@@ -102499,57 +102499,57 @@
         "id": "t305-a1",
         "concept": "oauth-roles",
         "type": "multiple_choice",
-        "prompt": "Which token tells your app who signed in?",
+        "prompt": "An app logs users in by taking whatever access token the browser sends, calling the provider’s profile API with it and trusting the email returned. What is the flaw?",
         "choices": [
           {
             "id": "a",
-            "label": "The authorisation code"
+            "label": "Another app’s token would log its holder in"
           },
           {
             "id": "b",
-            "label": "The access token"
+            "label": "Access tokens expire too fast for login"
           },
           {
             "id": "c",
-            "label": "The ID token"
+            "label": "Calling the API on each login is slow"
           },
           {
             "id": "d",
-            "label": "The refresh token"
+            "label": "Browsers cannot send access tokens"
           }
         ],
         "correctChoiceIds": [
-          "c"
+          "a"
         ],
-        "explanation": "OpenID Connect’s ID token is addressed to your app and carries the user’s identity."
+        "explanation": "An access token says the bearer may call an API, not that it was issued to your app. A malicious app that collected a user’s token could present it to you and be logged in as them. For login, validate an OpenID Connect ID token whose audience is your client id. Lifetime, speed and transport are not the problem."
       },
       {
         "id": "t305-a2",
         "concept": "pkce",
         "type": "multiple_choice",
-        "prompt": "What does PKCE protect against?",
+        "prompt": "A single-page app cannot keep a client secret. What stops someone who intercepts its authorisation code from redeeming it?",
         "choices": [
           {
             "id": "a",
-            "label": "Users choosing weak passwords"
+            "label": "The code is encrypted in the redirect URL"
           },
           {
             "id": "b",
-            "label": "Slow responses from the token endpoint"
+            "label": "Codes work only from the user’s IP address"
           },
           {
             "id": "c",
-            "label": "A stolen authorisation code being redeemed"
+            "label": "The verifier is needed, and it never left the app"
           },
           {
             "id": "d",
-            "label": "Expired certificates at the provider"
+            "label": "The state value is checked when redeeming"
           }
         ],
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "Only the app that created the verifier can redeem the code."
+        "explanation": "PKCE: the app sent only the SHA-256 hash of a random code_verifier at the start, and the token endpoint demands the verifier itself, so a stolen code alone is useless. Codes travel unencrypted in the redirect URL, providers do not bind codes to IP addresses, and state protects the callback from forgery; it is not checked at the token endpoint."
       },
       {
         "id": "t305-a3",
@@ -102583,11 +102583,11 @@
         "id": "t305-a4",
         "concept": "oauth-roles",
         "type": "multiple_choice",
-        "prompt": "Which flow does current OAuth security guidance advise against?",
+        "prompt": "An old single-page app gets tokens with the implicit flow (response_type=token). A security review asks you to replace it. What should it use?",
         "choices": [
           {
             "id": "a",
-            "label": "Refresh token rotation"
+            "label": "Client credentials, with the secret in the bundle"
           },
           {
             "id": "b",
@@ -102595,17 +102595,17 @@
           },
           {
             "id": "c",
-            "label": "Client credentials"
+            "label": "The password grant, sending the user’s password"
           },
           {
             "id": "d",
-            "label": "The implicit flow"
+            "label": "The implicit flow with shorter-lived tokens"
           }
         ],
         "correctChoiceIds": [
-          "d"
+          "b"
         ],
-        "explanation": "RFC 9700 says the implicit grant should not be used; tokens leak via URLs."
+        "explanation": "RFC 9700 says the implicit grant should not be used: tokens arrive in the URL, where history, logs and referrers can leak them. Code with PKCE keeps tokens out of URLs. A secret shipped in a browser bundle is public, the password grant hands your app the user’s password (RFC 9700 forbids it), and shorter-lived tokens still leak."
       },
       {
         "id": "t305-a5",
@@ -102957,7 +102957,7 @@
         "correctChoiceIds": [
           "d"
         ],
-        "explanation": "The server must check the caller may access that object."
+        "explanation": "The server returned order 501 without checking it belongs to the caller: an insecure direct object reference. TLS protects the connection, not the authorisation; length checks do not reject a valid id; and a larger id space only slows guessing, since ids still leak through links and logs."
       },
       {
         "id": "t306-a2",
@@ -103013,7 +103013,7 @@
         "correctChoiceIds": [
           "b"
         ],
-        "explanation": "Least privilege limits damage if the service is compromised."
+        "explanation": "Read-only access to those two tables caps what a compromised service can do: no writes and no other tables. Full admin turns any bug into total access, sharing the main app’s login inherits all its rights and muddles audit logs, and a report needs no write access."
       },
       {
         "id": "t306-a4",
@@ -103041,7 +103041,7 @@
         "correctChoiceIds": [
           "b"
         ],
-        "explanation": "A uniform 404 hides whether the id exists."
+        "explanation": "A uniform 404 for “does not exist” and “not yours” stops outsiders learning which ids exist. A stack trace leaks internals, a 403 naming the owner leaks the owner, and a 200 tells clients and caches the request succeeded."
       },
       {
         "id": "t306-a5",
@@ -103837,35 +103837,35 @@
         "correctChoiceIds": [
           "d"
         ],
-        "explanation": "Only the URL import makes the server fetch an attacker-chosen address."
+        "explanation": "Only the URL import makes the server fetch an address the attacker chooses, so it could be pointed at 169.254.169.254 or an internal admin page. Resizing a stored image, accepting an upload and showing a logo fetch nothing from a user-supplied address (uploads have their own risks)."
       },
       {
         "id": "t308-a2",
         "concept": "metadata-service",
         "type": "multiple_choice",
-        "prompt": "Why is 169.254.169.254 a common SSRF target?",
+        "prompt": "A link-preview feature fetches http://169.254.169.254/latest/meta-data/iam/security-credentials/app-role for an attacker and shows the text. What did the attacker get?",
         "choices": [
           {
             "id": "a",
-            "label": "It can hand out the machine’s cloud credentials"
+            "label": "Temporary cloud credentials for the server’s role"
           },
           {
             "id": "b",
-            "label": "It is the default gateway for traffic leaving the machine"
+            "label": "The private key of the site’s TLS certificate"
           },
           {
             "id": "c",
-            "label": "It hosts the public website"
+            "label": "The password hashes of the app’s users"
           },
           {
             "id": "d",
-            "label": "It stores user passwords"
+            "label": "Nothing, since the address is link-local"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Instance metadata services expose role credentials to the machine."
+        "explanation": "On AWS with IMDSv1, that path returns an access key, secret and session token for the instance’s role, usable from anywhere until they expire. The metadata service holds no TLS keys or user data, and link-local only means the address is not routed off the host, which is exactly why a request from the server itself reaches it."
       },
       {
         "id": "t308-a3",
@@ -104286,57 +104286,57 @@
         "id": "t309-a2",
         "concept": "provenance",
         "type": "multiple_choice",
-        "prompt": "What does a lockfile with hashes give you?",
+        "prompt": "A build on Monday and a rebuild of the same commit on Friday ship different code, because a dependency published a patch release in between. What prevents this?",
         "choices": [
           {
             "id": "a",
-            "label": "The same reviewed versions on every build"
+            "label": "Pinning only the direct dependencies"
           },
           {
             "id": "b",
-            "label": "Encrypted dependencies"
+            "label": "A committed lockfile with hashes"
           },
           {
             "id": "c",
-            "label": "Faster package downloads"
+            "label": "Running a vulnerability scan per build"
           },
           {
             "id": "d",
-            "label": "Automatic upgrades to the newest security patches"
+            "label": "Choosing the most popular versions"
           }
         ],
         "correctChoiceIds": [
-          "a"
+          "b"
         ],
-        "explanation": "Builds stop drifting to new, unreviewed releases."
+        "explanation": "A lockfile records the exact version and hash of every package, transitive ones included, so Friday’s build gets Monday’s bytes or fails. Pinning direct dependencies still lets their dependencies float, a scanner finds known vulnerabilities but does not stop drift, and popularity says nothing about which version you get."
       },
       {
         "id": "t309-a3",
         "concept": "provenance",
         "type": "multiple_choice",
-        "prompt": "What does a software bill of materials (SBOM) list?",
+        "prompt": "Which question can the SBOM for release 4.2 answer on its own?",
         "choices": [
           {
             "id": "a",
-            "label": "The tests that passed"
+            "label": "Does it contain zlib, and which version?"
           },
           {
             "id": "b",
-            "label": "The servers and regions that run the release"
+            "label": "Was it built by our CI from reviewed code?"
           },
           {
             "id": "c",
-            "label": "The components and versions in a release"
+            "label": "Is the zlib code inside it free of bugs?"
           },
           {
             "id": "d",
-            "label": "The people who wrote each line"
+            "label": "Which servers are running it right now?"
           }
         ],
         "correctChoiceIds": [
-          "c"
+          "a"
         ],
-        "explanation": "An SBOM is an inventory you can match against new vulnerability reports."
+        "explanation": "An SBOM is an inventory of components and versions, which you can match against new vulnerability reports. Who built it and from what is provenance, an inventory says nothing about bugs, and where a release runs is deployment data."
       },
       {
         "id": "t309-a4",
@@ -104720,7 +104720,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "WebAuthn signs a challenge tied to the real origin; codes can be relayed."
+        "explanation": "The passkey signs a challenge together with the origin the browser actually visited, so a signature made on the proxy’s domain is useless at the real site. SMS, authenticator and email codes are digits the user types; the proxy relays them within seconds, long before they expire."
       },
       {
         "id": "t310-a2",
@@ -104748,7 +104748,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Repeated prompts wear the user down; number matching and rate limits help."
+        "explanation": "Repeated prompts wear the user down until they approve: MFA fatigue, or prompt bombing. Number matching (typing a number shown on the login screen) and rate limits stop it. Session fixation plants a session id, credential stuffing replays leaked passwords (the attacker already has this one), and SIM swapping steals a phone number."
       },
       {
         "id": "t310-a3",
@@ -104782,29 +104782,29 @@
         "id": "t310-a4",
         "concept": "mfa",
         "type": "multiple_choice",
-        "prompt": "What makes SMS the weakest common second factor?",
+        "prompt": "A bank’s login sends a one-time code by SMS. Which risk does that add, compared with codes from an authenticator app?",
         "choices": [
           {
             "id": "a",
-            "label": "Phone numbers can be hijacked by SIM swap"
+            "label": "The number can be moved to the attacker’s SIM"
           },
           {
             "id": "b",
-            "label": "Codes are too short to type"
+            "label": "The code can be typed into a phishing page"
           },
           {
             "id": "c",
-            "label": "SMS needs an internet connection"
+            "label": "The code changes every 30 seconds"
           },
           {
             "id": "d",
-            "label": "Codes can be guessed in a few tries"
+            "label": "The code can be guessed in a few tries"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Attackers persuade carriers to move the number to their SIM, then receive the codes. Six-digit codes with rate limits are not practically guessable, and SMS needs no internet connection."
+        "explanation": "In a SIM swap the attacker persuades or bribes a carrier to move the number to their SIM, then receives every code. Both kinds of code can be typed into a phishing page, so that risk is not specific to SMS; changing every 30 seconds is how authenticator (TOTP) codes work; and six-digit codes with rate limits are not guessable in a few tries."
       },
       {
         "id": "t310-a5",
@@ -106038,29 +106038,29 @@
         "id": "t323-a1",
         "concept": "cd",
         "type": "multiple_choice",
-        "prompt": "What separates continuous deployment from continuous delivery?",
+        "prompt": "Team A’s passing builds wait for a release manager to click Deploy. Team B’s go to production automatically behind canaries. Which practice is each following?",
         "choices": [
           {
             "id": "a",
-            "label": "Every change must pass automated tests before merge"
+            "label": "A: continuous delivery; B: continuous deployment"
           },
           {
             "id": "b",
-            "label": "Artefacts are built once and promoted between environments"
+            "label": "A: continuous deployment; B: continuous delivery"
           },
           {
             "id": "c",
-            "label": "Staging is a copy of production configuration"
+            "label": "A: continuous integration only; B: delivery"
           },
           {
             "id": "d",
-            "label": "No manual approval before production"
+            "label": "Both continuous deployment, with other gates"
           }
         ],
         "correctChoiceIds": [
-          "d"
+          "a"
         ],
-        "explanation": "Both practices keep main releasable with automated tests and promoted artefacts; continuous deployment also removes the manual approval and releases every passing change. Tests before merge, build-once promotion and production-like staging belong to both, so they do not tell them apart."
+        "explanation": "Both keep main releasable; the difference is the manual approval before production. Team A has it (continuous delivery) and team B removed it (continuous deployment). A team that merges and tests but cannot release on demand is doing integration only, and a human click is exactly what continuous deployment removes."
       },
       {
         "id": "t323-a2",
@@ -107813,29 +107813,29 @@
         "id": "t327-a2",
         "concept": "incident-roles",
         "type": "multiple_choice",
-        "prompt": "What does the incident commander mainly do?",
+        "prompt": "During a payments outage, the incident commander starts logging into servers to try fixes. Why is that a problem?",
         "choices": [
           {
             "id": "a",
-            "label": "Answers each customer email about the outage"
+            "label": "Commanders lack production access by policy"
           },
           {
             "id": "b",
-            "label": "Types every fix into production"
+            "label": "Nobody is coordinating or deciding meanwhile"
           },
           {
             "id": "c",
-            "label": "Writes the code for the fix"
+            "label": "Fixes are allowed only after the postmortem"
           },
           {
             "id": "d",
-            "label": "Coordinates people and makes decisions"
+            "label": "Customers must be told before any change"
           }
         ],
         "correctChoiceIds": [
-          "d"
+          "b"
         ],
-        "explanation": "The commander coordinates the response, assigns roles and makes decisions. Fixes are done by the operations lead and others, and customer updates go through the communications lead."
+        "explanation": "The commander’s job is to coordinate people, hold the overall picture and make calls such as “roll back now”; with hands on the keyboard they lose that view and nobody is steering. Access policies vary, fixes do not wait for the postmortem, and customer updates run in parallel through the communications lead."
       },
       {
         "id": "t327-a3",

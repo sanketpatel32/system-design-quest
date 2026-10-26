@@ -1764,29 +1764,29 @@
     "id": "t285-a1",
     "concept": "readiness",
     "type": "multiple_choice",
-    "prompt": "What does a readiness API such as epoll report?",
+    "prompt": "A server watches 5,000 sockets with epoll. The wait call returns 3 of them. What does that tell the server?",
     "choices": [
      {
       "id": "a",
-      "label": "Which threads are currently idle"
+      "label": "Three requests have been fully processed"
      },
      {
       "id": "b",
-      "label": "How much CPU each socket used"
+      "label": "Three sockets can be read or written now"
      },
      {
       "id": "c",
-      "label": "Which descriptors can proceed without blocking"
+      "label": "Three threads are idle and can take work"
      },
      {
       "id": "d",
-      "label": "Which requests have finished processing"
+      "label": "Three sockets have used the most CPU"
      }
     ],
     "correctChoiceIds": [
-     "c"
+     "b"
     ],
-    "explanation": "It reports readiness; the program still does the reads and writes."
+    "explanation": "Readiness means the next read or write on those 3 descriptors will not block: data has arrived, or there is buffer space to send. The program still does the reading, parsing and handling itself; epoll knows nothing about threads, request completion or CPU use."
    },
    {
     "id": "t285-a2",
@@ -1842,7 +1842,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Event loops shine when connections mostly wait."
+    "explanation": "Many idle long-lived connections, such as chat or live cricket scores, need only a few KB of state each on a loop, against a thread stack each. Heavy maths and CPU-bound batch jobs gain nothing from an event loop, and a daily script has no connections to multiplex."
    },
    {
     "id": "t285-a4",
@@ -1870,7 +1870,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "One loop uses one core; scale out with a loop per core."
+    "explanation": "One loop runs on one thread, so it uses one core; run one loop per core, often as several processes sharing the port, to use them all. A thread per connection abandons the event model, lowering priority only makes it slower, and blocking sockets would stall the loop."
    },
    {
     "id": "t285-a5",
@@ -2236,7 +2236,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Interleaving the three steps lets one write overwrite another."
+    "explanation": "Two threads can both read 5, both add 1 and both write 6, so one increment vanishes. The counter is ordinary shared memory, and threads share globals, which is the whole problem; nothing is skipping additions, the interleaving loses them."
    },
    {
     "id": "t286-a2",
@@ -2292,35 +2292,35 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Locks do not release during I/O; keep slow work outside."
+    "explanation": "The lock is held for the whole call, so every thread that needs it queues for up to 300 ms, and the lock allows only about 3 such calls a second. Locks do not time out or pause during I/O by themselves. Copy what you need under the lock, release it, then call the API."
    },
    {
     "id": "t286-a4",
     "concept": "race-condition",
     "type": "multiple_choice",
-    "prompt": "A race appears once in a million test runs. What does that suggest?",
+    "prompt": "A checkout race shows up once in a million test runs. During a sale, production handles 5 million checkouts a day. What should you expect?",
     "choices": [
      {
       "id": "a",
-      "label": "The test machine is faulty"
+      "label": "It will not appear, as tests are harsher"
      },
      {
       "id": "b",
-      "label": "It cannot happen in production"
+      "label": "Several failures a day, likely more at peak"
      },
      {
       "id": "c",
-      "label": "The compiler has a bug"
+      "label": "5 failures, one per million, every day"
      },
      {
       "id": "d",
-      "label": "A timing-dependent bug, not luck"
+      "label": "No failures, as production servers are faster"
      }
     ],
     "correctChoiceIds": [
-     "d"
+     "b"
     ],
-    "explanation": "Races depend on interleaving, which production load exercises far more."
+    "explanation": "At one in a million, 5 million checkouts is already about 5 a day, and real concurrency at peak usually makes the bad interleaving more likely, not less. A probability gives an expected count, not a fixed one, and faster or busier machines change the timing in ways that often expose races."
    },
    {
     "id": "t286-a5",
@@ -2664,7 +2664,7 @@
     "id": "t287-a1",
     "concept": "deadlock-conditions",
     "type": "multiple_choice",
-    "prompt": "Which condition does a global lock order break?",
+    "prompt": "A team fixes a deadlock by making every code path take the orders lock before the payments lock. Which of the four conditions did they remove?",
     "choices": [
      {
       "id": "a",
@@ -2686,35 +2686,35 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "If all threads acquire locks in one order, no cycle can form."
+    "explanation": "Threads still hold one lock while waiting for another, the locks are still exclusive and nothing takes them away. What changed is that no thread can hold payments while waiting for orders, so a cycle cannot form. Removing hold-and-wait would mean taking both locks at once or neither."
    },
    {
     "id": "t287-a2",
     "concept": "deadlock",
     "type": "multiple_choice",
-    "prompt": "Two threads are deadlocked. What does CPU usage typically show?",
+    "prompt": "At peak, an order service stops completing orders. The process is up, its health check still answers, CPU is at 2% and the order threads are all parked waiting for locks. What is the likely cause?",
     "choices": [
      {
       "id": "a",
-      "label": "100% on both threads"
+      "label": "A deadlock between lock holders"
      },
      {
       "id": "b",
-      "label": "Near zero for those threads"
+      "label": "A livelock of threads retrying"
      },
      {
       "id": "c",
-      "label": "Rapid oscillation"
+      "label": "A busy loop on one core"
      },
      {
       "id": "d",
-      "label": "A kernel panic"
+      "label": "Memory used up by a leak"
      }
     ],
     "correctChoiceIds": [
-     "b"
+     "a"
     ],
-    "explanation": "Deadlocked threads sleep waiting; it is a silent hang."
+    "explanation": "Deadlocked threads sleep, so CPU drops while the process stays up and unrelated threads such as the health check still answer. A livelock and a busy loop burn CPU, and a leak shows growing memory and out-of-memory kills, not threads parked on locks. A thread dump showing each thread waiting on a lock another holds confirms it."
    },
    {
     "id": "t287-a3",
@@ -2742,7 +2742,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Threads are active but make no progress."
+    "explanation": "Livelock: the threads are active and burning CPU, but each backs off and retries in step with the other, so none progresses. A deadlock shows sleeping threads, priority inversion needs threads of different priorities, and a memory leak grows memory. Random jitter in the back-off breaks the lockstep."
    },
    {
     "id": "t287-a4",
@@ -2770,7 +2770,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Direction-based order lets opposite transfers form a cycle."
+    "explanation": "Ordering by direction (source first, or destination first) means transfer(X, Y) and transfer(Y, X) take the locks in opposite orders, so a cycle can form. A fixed global order such as the lower id first gives every pair one order. “Less busy” changes from moment to moment, so it is no order at all."
    },
    {
     "id": "t287-a5",
@@ -3563,63 +3563,63 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "The kernel kept the pages in memory after the first read."
+    "explanation": "The kernel keeps the 2 GB of pages in memory after the first read, and with 16 GB free nothing evicts them. A drive’s own cache is tiny by comparison, and checksums and compression do not depend on whether the file was read before."
    },
    {
     "id": "t289-a2",
     "concept": "fsync",
     "type": "multiple_choice",
-    "prompt": "Which call waits until written data is on stable storage?",
+    "prompt": "A payments ledger appends each transaction to a file, then replies “success”. Power fails a second later. Which call, made before replying, makes sure the entry survives?",
     "choices": [
      {
       "id": "a",
-      "label": "close"
+      "label": "Calling close on the file"
      },
      {
       "id": "b",
-      "label": "write"
+      "label": "write returning the byte count"
      },
      {
       "id": "c",
-      "label": "open"
+      "label": "Opening the file in append mode"
      },
      {
       "id": "d",
-      "label": "fsync"
+      "label": "Calling fsync on the file"
      }
     ],
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "write and close return before the device has the data."
+    "explanation": "write returns once the bytes are in the page cache, and close only releases the descriptor; neither waits for the device. Append mode controls where bytes go, not when they reach storage. fsync waits until the data and metadata are on stable storage, so only then is it safe to reply."
    },
    {
     "id": "t289-a3",
     "concept": "atomic-rename",
     "type": "multiple_choice",
-    "prompt": "Why write to a temp file and rename it over the original?",
+    "prompt": "A service updates settings.json in place by truncating it and writing 40 KB. A crash mid-write leaves an empty file and the service will not start. What makes the update crash-safe?",
     "choices": [
      {
       "id": "a",
-      "label": "It avoids needing disk space"
+      "label": "Write the file in smaller 4 KB pieces"
      },
      {
       "id": "b",
-      "label": "Readers see old or new, never half"
+      "label": "Write a temp file, fsync it, rename it over"
      },
      {
       "id": "c",
-      "label": "rename skips the page cache"
+      "label": "Call close straight after the last write"
      },
      {
       "id": "d",
-      "label": "rename compresses the file"
+      "label": "Keep a copy of the settings in memory"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "rename atomically switches which file the name points to."
+    "explanation": "rename atomically switches the name to a fully written, synced file, so after a crash readers see the old settings or the new ones, never a truncated mix; fsync the directory too so the rename itself survives. Smaller writes still leave a half-written file, close does not flush to storage, and a copy in memory is gone after the crash."
    },
    {
     "id": "t289-a4",
@@ -3647,7 +3647,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Dirty pages may have been discarded after the failure."
+    "explanation": "Linux may already have dropped the dirty pages and cleared the error, so a second fsync can succeed with nothing written. Assume the data is lost and recover from a known-good copy or a log, as PostgreSQL does by crashing and replaying its write-ahead log. The failure can hit data, not just metadata, and the cache is no longer a safe copy."
    },
    {
     "id": "t289-a5",
