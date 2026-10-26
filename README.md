@@ -20,21 +20,27 @@ Open `http://127.0.0.1:43123`.
 | `npm run test` | Vitest unit tests |
 | `npm run audit` | Assemble shards + integrity (exact dupes fail; near-dupes warn) |
 | `npm run audit:strict` | Fail on near-duplicate card/prompt text (Jaccard ≥ 0.82) |
-| `npm run content:build` | Regenerate `scripts/authored/*.json` from authoring pipeline |
+| `npm run content:build` | Re-run every lesson generator and fix script, then `quality/apply.py`, assemble and audit |
 | `npm run e2e` | Playwright tests |
 | `npm run build` | Production build to `dist/` |
 
-Regenerate topic JSON from authored shards:
+### Content pipeline
+
+`scripts/authored/*.json` is the source of truth. `npm run content:build` runs `scripts/authoring/rebuild.py`, which
+regenerates the generated lesson files (fe-more, more2, more3), re-applies each section's `*_fixes.py`,
+`integrate_fixes.py` and finally `quality/apply.py`, then assembles `src/content/generated/topics.json` and audits it.
+On a clean checkout it leaves no git diff. To change generated lessons, edit the generator or a fix script (quality edits
+go in `scripts/authoring/quality/q_*.py`), never only the JSON; hand-maintained files (lessons 1-120, bosses, tutorial,
+`deep/`, `boss-deep/`, `interactive/`) are edited in place.
 
 ```bash
-npm run content:build
-# or manually:
-python3 scripts/authoring/build-authored-content.py
-node scripts/assemble-authored.mjs
-npm run audit
+npm run content:build   # rebuild.py + assemble + audit
+npm run content:fix     # rebuild.py + assemble (no audit)
 ```
 
-Authoring sources live in `scripts/authoring/`; committed shards in `scripts/authored/`.
+The original seed (`build-authored-content.py` + `fix-content.mjs`) no longer reproduces the curated lessons 1-120 and
+bosses: it re-templates boss questions and re-shuffles choices, which is why `option-balance.json` then fails on
+`b77-dd2`. Both scripts refuse to run unless `CONTENT_SEED=1` is set; only use that to start over from specs.
 
 ## Architecture
 

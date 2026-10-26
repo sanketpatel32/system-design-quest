@@ -1,8 +1,15 @@
 #!/usr/bin/env node
 /**
- * Deterministic content repair pass over scripts/authored/*.json.
- * Idempotent: running it twice gives the same output. See README "Content fixes".
+ * LEGACY seed repair pass over the output of build-authored-content.py (lessons 1-120 and bosses).
+ * Since Oct 2026 scripts/authored/*.json is edited directly and this pass no longer reproduces it:
+ * it re-templates boss stages, re-shuffles choices and rewrites every file, undoing hand edits
+ * (e.g. option-balance.json then fails on b77-dd2). It is not part of `npm run content:build`;
+ * it only runs with CONTENT_SEED=1. See README "Content pipeline".
  */
+if (process.env.CONTENT_SEED !== '1') {
+  console.error('fix-content.mjs is the legacy seed pass and would undo edits in scripts/authored/. Use `npm run content:build`.')
+  process.exit(1)
+}
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

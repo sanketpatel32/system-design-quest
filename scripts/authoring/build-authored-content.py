@@ -65,6 +65,11 @@ def validate_unique(topics: list[dict]) -> None:
 
 
 def main() -> None:
+    # Legacy seed: the files it writes are now edited directly, so regenerating them loses those edits.
+    import os
+    if os.environ.get("CONTENT_SEED") != "1":
+        raise SystemExit("build-authored-content.py is the legacy seed and would overwrite scripts/authored/lessons-*.json, "
+                         "bosses-75-114.json and tutorial-74.json. Use `npm run content:build`.")
     AUTHORED.mkdir(parents=True, exist_ok=True)
 
     from generate_all_specs import OUT as SPECS_PATH, write_specs  # noqa: WPS433

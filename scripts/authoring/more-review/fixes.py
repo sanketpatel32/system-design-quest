@@ -1,5 +1,6 @@
 """Review fixes for Frontend 215-220 and Backend 235-240 (review: fe-be-more-review.md).
-Idempotent: run after scripts/authoring/fe-more/build.py, or on its own. Edits the authored JSON in place."""
+fe-more/build.py applies the Frontend half to freshly generated topics. The Backend half is already in
+fund-backend-more.json and is not idempotent; do not re-run it. Edits the authored JSON in place."""
 import json, os, re
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..', 'authored')
 FE, BE = os.path.join(ROOT, 'fund-frontend-more.json'), os.path.join(ROOT, 'fund-backend-more.json')
@@ -209,11 +210,22 @@ def backend(T):
     # n3
     fix(t, 'RFC 8259 notes that numbers beyond the range of IEEE 754 doubles may not be handled interoperably.', 'RFC 8259 notes that numbers beyond the range or precision of IEEE 754 doubles may not be handled interoperably; integers are exact only up to 2^53 − 1.')
 
-def run():
+def run_frontend():
     fe = json.load(open(FE)); T = {t['id']: t for t in fe}; frontend(T)
     json.dump(fe, open(FE, 'w'), indent=1, ensure_ascii=False); open(FE, 'a').write('\n')
+
+
+def run_backend():
     be = json.load(open(BE)); T = {t['id']: t for t in be}; backend(T)
     json.dump(be, open(BE, 'w'), indent=1, ensure_ascii=False); open(BE, 'a').write('\n')
 
+
 if __name__ == '__main__':
-    run(); print('review fixes applied')
+    # The Frontend half runs on freshly generated topics (fe-more/build.py calls run_frontend).
+    # The Backend half is already baked into fund-backend-more.json (its generator is not in the repo)
+    # and is not idempotent, so it only runs on request.
+    import sys
+    if '--backend' not in sys.argv:
+        raise SystemExit('Run scripts/authoring/rebuild.py (npm run content:build) instead; '
+                         'the Backend fixes are already in fund-backend-more.json (pass --backend only on a freshly generated file).')
+    run_backend(); print('backend review fixes applied')
