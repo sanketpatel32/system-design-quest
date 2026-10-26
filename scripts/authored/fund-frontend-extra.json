@@ -878,29 +878,29 @@
     "id": "t343-a2",
     "concept": "broadcast",
     "type": "multiple_choice",
-    "prompt": "Which is a direct way for tabs of one origin to message each other?",
+    "prompt": "A brokerage dashboard is open in three tabs. An order fills in one tab. What is the lightest way to update the holdings shown in the other two?",
     "choices": [
      {
       "id": "a",
-      "label": "Writing to a cookie and polling it every second"
+      "label": "Every tab polls the holdings API once a second"
      },
      {
       "id": "b",
-      "label": "Sending each message through the server"
+      "label": "Route a message through the server to each tab"
      },
      {
       "id": "c",
-      "label": "A broadcast channel all tabs subscribe to"
+      "label": "Post a small message on a broadcast channel"
      },
      {
       "id": "d",
-      "label": "Reading another tab’s memory directly"
+      "label": "Each tab re-reads a cookie once a second"
      }
     ],
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "A broadcast channel delivers messages to other same-origin contexts listening on the same name."
+    "explanation": "A broadcast channel delivers the message to every same-origin tab with no network trip; each tab then reads the new holdings from storage or refetches once. Polling from three tabs triples the load for a rare change, routing through the server adds a round trip and a connection per tab, and polling a cookie is a slow workaround from before broadcast channels."
    },
    {
     "id": "t343-a3",
@@ -956,7 +956,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Signal the change; each tab reads current data from shared storage."
+    "explanation": "Send what changed, the id and new version, and let each tab read the current value from shared storage, so out-of-order messages cannot leave a tab on an older version. Full state or every note is copied into every tab on each edit, and a session token does not belong in a message any script on the origin can receive."
    },
    {
     "id": "t343-a5",
@@ -1254,35 +1254,35 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "The element count drives style, layout and memory work in the browser."
+    "explanation": "About 50,000 elements must each be styled, laid out and kept in memory, and layout work grows with that count. The row data is typically a few hundred kilobytes, the query runs once on the server, and the icons are usually a handful of cached images."
    },
    {
     "id": "t344-a2",
     "concept": "windowing",
     "type": "multiple_choice",
-    "prompt": "What does a virtual list render?",
+    "prompt": "An order-history page lists 10,000 orders in a virtual list. A tester scrolls to order 5,000 and inspects the page. What should the DOM contain?",
     "choices": [
      {
       "id": "a",
-      "label": "The rows in the viewport plus a few above and below"
+      "label": "About 27 rows near order 5,000 inside one tall spacer"
      },
      {
       "id": "b",
-      "label": "All of the rows, with off-screen ones hidden by styles"
+      "label": "All 10,000 rows, most hidden with display: none"
      },
      {
       "id": "c",
-      "label": "The first 100 rows, then a “load more” button"
+      "label": "Rows 1 to 5,027, the early ones scrolled out of view"
      },
      {
       "id": "d",
-      "label": "One row at a time as the user taps"
+      "label": "Only the 17 rows that are fully visible, no others"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "A window of visible rows plus overscan, recalculated on scroll."
+    "explanation": "A virtual list keeps only the visible window plus overscan (about 17 + 10 rows at 48 px in an 800 px viewport) and a spacer for the full height. Hiding rows with styles keeps all 80,000 elements; keeping every row above the window grows without limit as you scroll; and with no overscan a fast flick shows blank space."
    },
    {
     "id": "t344-a3",
@@ -1310,7 +1310,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Overscan hides the gap while new rows render during fast scrolls."
+    "explanation": "Overscan rows are already rendered when a fast flick brings them into view, so no blank gap shows. The spacer, not overscan, keeps the scrollbar the right size; search engines do not see virtual rows either way; and overscan adds a few elements rather than removing any."
    },
    {
     "id": "t344-a4",
@@ -1338,7 +1338,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Unrendered rows are not in the document, so provide search and position information yourself."
+    "explanation": "Unrendered rows are not in the document, so find-in-page and screen readers cannot reach them: provide your own search and expose the list size and each row’s position. The spacer keeps the scrollbar right, rendered rows can hold links, and lazy images still work in the rows that render."
    },
    {
     "id": "t344-a5",
@@ -1620,29 +1620,29 @@
     "id": "t345-a1",
     "concept": "forced-layout",
     "type": "multiple_choice",
-    "prompt": "What forces the browser to compute layout immediately?",
+    "prompt": "Right after a script changes a card’s width, which read does not force the browser to lay out the page?",
     "choices": [
      {
       "id": "a",
-      "label": "Changing a style and then reading a size or position"
+      "label": "Reading the card’s rendered height"
      },
      {
       "id": "b",
-      "label": "Reading two sizes in a row with no changes"
+      "label": "Reading the card’s position on the page"
      },
      {
       "id": "c",
-      "label": "Changing several styles with no reads between"
+      "label": "Reading how far its container is scrolled"
      },
      {
       "id": "d",
-      "label": "Loading a stylesheet in the head before any script runs"
+      "label": "Reading a width the script saved earlier"
      }
     ],
     "correctChoiceIds": [
-     "a"
+     "d"
     ],
-    "explanation": "A read after a write needs up-to-date geometry, so layout runs at once."
+    "explanation": "Any geometry read (size, position, scroll offset) needs current layout, so after a write it forces one. A value already held in the script’s memory needs nothing from the browser, which is why measuring once before the loop and reusing the numbers removes the thrashing."
    },
    {
     "id": "t345-a2",
@@ -1670,7 +1670,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Batched reads then batched writes cost one layout instead of 200."
+    "explanation": "Batched, the loop costs one layout instead of 200, about 50 ms saved at 0.25 ms each (three dropped frames). Spreading the cards over 200 frames takes more than 3 seconds to finish, and hiding cards while resizing them one by one still interleaves reads and writes."
    },
    {
     "id": "t345-a3",
@@ -1698,7 +1698,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "If the space is already there, nothing moves when the ad arrives."
+    "explanation": "Reserved space, such as fixed dimensions or an aspect ratio on the ad slot, means nothing moves when the ad arrives. Loading it sooner only narrows the window for the shift, fading changes opacity while the layout still jumps, and showing ads after a scroll shifts content that is now on screen."
    },
    {
     "id": "t345-a4",
@@ -1726,7 +1726,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Transform-based movement does not count as a layout shift."
+    "explanation": "Moving an element with transform does not change layout, so it is not counted as a layout shift. A late image without dimensions, a font with different metrics and a banner inserted above content all move content that was already laid out."
    },
    {
     "id": "t345-a5",

