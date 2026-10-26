@@ -5,6 +5,7 @@ import { checkFundamentals, FUND_AREAS } from './audit/fund.mjs'
 import { checkStems, STEM_DUP_THRESHOLD } from './audit/stems.mjs'
 import { checkGrading, loadGlyphCheck } from './audit/grading.mjs'
 import { checkDepth, checkBossDepth, DEEP_REGIONS } from './audit/depth.mjs'
+import { checkStyle } from './audit/style.mjs'
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -185,6 +186,13 @@ console.log("Boss study briefs enforced for all boss topics")
   }
   const raw = JSON.stringify(bossTopics)
   if (/mainframe|Building custom hardware/i.test(raw)) errors.push('Boss content still contains template out-of-scope text (mainframe/custom hardware)')
+}
+// House style (docs/style-guide.md): rule breaks fail; heuristics are listed as warnings for a human to judge
+{
+  const st = checkStyle(topics)
+  errors.push(...st.errors)
+  console.log(`Style: spelling, terms, quotes and card titles clean${st.warnings.length ? `; ${st.warnings.length} style warnings${process.env.AUDIT_NOTES ? '' : ' (AUDIT_NOTES=1 to list)'}` : ''}`)
+  if (process.env.AUDIT_NOTES) st.warnings.forEach((w) => console.log(' ·', w))
 }
 // While the quiz rewrite lands region by region, failures are reported but only enforced for authored topics
 errors.push(...quiz.errors)

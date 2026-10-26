@@ -4,7 +4,7 @@
     python3 scripts/authoring/rebuild.py      (npm run content:build / content:fix call this)
 
 Order matters: generators first, then each generator's *_fixes, then integrate_fixes (cross-section links),
-then quality/apply.py last, so the quality edits always win. On a clean checkout this reproduces the
+then quality/apply.py, so the quality edits always win, then quality/style.py (house style) last. On a clean checkout this reproduces the
 committed JSON exactly (no git diff); any step that fails stops the build.
 
 Hand-maintained files (lessons-*.json, bosses-75-114.json, tutorial-74.json, fund-*.json without a
@@ -23,7 +23,8 @@ STEPS = [
     *[('more3', f'{s}.py') for s in ['sd', 'fe', 'be', 'net', 'os', 'os2', 'sec', 'db', 'cloud']],
     *[('more3', f'{s}_fixes.py') for s in ['sd', 'fe', 'be', 'net', 'os', 'sec', 'db', 'cloud']],
     ('more3', 'integrate_fixes.py'),
-    ('quality', 'apply.py'),            # always last
+    ('quality', 'apply.py'),            # quality edits win over every generator and fix
+    ('quality', 'style.py'),            # house style (spelling, terms, quotes), always last; see docs/style-guide.md
 ]
 
 
@@ -34,7 +35,7 @@ def main() -> None:
         if r.returncode:
             sys.stderr.write(r.stdout[-2000:] + r.stderr[-4000:])
             raise SystemExit(f'rebuild: {folder}/{script} failed')
-        if script == 'apply.py':
+        if folder == 'quality':
             print(r.stdout.strip())
     print(f'rebuild: {len(STEPS)} steps OK')
 

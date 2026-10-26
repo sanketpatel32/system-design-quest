@@ -17,7 +17,7 @@
       ]
     },
     "useWhen": [
-      "Small, critical, strongly consistent state: cluster membership, configuration, leader election, locks, metadata (etcd, ZooKeeper's similar Zab protocol, Consul, Kafka KRaft).",
+      "Small, critical, strongly consistent state: cluster membership, configuration, leader election, locks, metadata (etcd, ZooKeeper’s similar Zab protocol, Consul, Kafka KRaft).",
       "Replicated databases that need linearizable writes, such as CockroachDB and TiKV, which run Raft per range."
     ],
     "avoidWhen": [
@@ -65,7 +65,7 @@
         "Local disk fsync 1 ms"
       ],
       "steps": [
-        "The leader needs one follower's acknowledgement for a majority of 2 out of 3.",
+        "The leader needs one follower’s acknowledgement for a majority of 2 out of 3.",
         "The fastest follower is Hyderabad at about 20 ms, plus about 1 ms fsync on each side.",
         "Commit latency is therefore roughly 22 ms, set by the second-fastest node (counting the leader), not the slowest.",
         "If Hyderabad fails, commits wait for Singapore and latency rises to roughly 62 ms."
@@ -75,16 +75,16 @@
     "india": {
       "title": "Configuration store for a payments platform",
       "label": "Illustrative estimate",
-      "body": "A payments company might keep feature flags, routing rules for bank partners and service leadership in an etcd or ZooKeeper cluster of five nodes spread across three availability zones. If one zone goes down, the remaining nodes still form a majority of three, so a new leader is elected within about a second and configuration stays writable. Because every write goes through the Raft log, two services can never see conflicting answers to 'which node is the settlement leader'. The trade-off is that this store is slow for bulk data, so transaction records live elsewhere; only small, critical metadata goes through consensus."
+      "body": "A payments company might keep feature flags, routing rules for bank partners and service leadership in an etcd or ZooKeeper cluster of five nodes spread across three availability zones. If one zone goes down, the remaining nodes still form a majority of three, so a new leader is elected within about a second and configuration stays writable. Because every write goes through the Raft log, two services can never see conflicting answers to “which node is the settlement leader”. The trade-off is that this store is slow for bulk data, so transaction records live elsewhere; only small, critical metadata goes through consensus."
     },
     "pitfalls": [
       {
-        "trap": "Deploying a four-node consensus cluster 'for more safety'.",
-        "say": "'Four nodes need three for a majority and still tolerate only one failure; I'd use three or five.'"
+        "trap": "Deploying a four-node consensus cluster “for more safety”.",
+        "say": "“Four nodes need three for a majority and still tolerate only one failure; I’d use three or five.”"
       },
       {
         "trap": "Using consensus for every piece of data.",
-        "say": "'Consensus pays a majority round trip per write; I'd use it for metadata and leader election and keep bulk data elsewhere.'"
+        "say": "“Consensus pays a majority round trip per write; I’d use it for metadata and leader election and keep bulk data elsewhere.”"
       }
     ],
     "takeaways": [
@@ -135,7 +135,7 @@
     "mechanism": {
       "title": "Taking a distributed lock safely",
       "steps": [
-        "A client asks the lock service (etcd, ZooKeeper, or Redis with care) for lock 'invoice-job' with a lease time to live, such as 10 seconds.",
+        "A client asks the lock service (etcd, ZooKeeper, or Redis with care) for lock “invoice-job” with a lease time to live, such as 10 seconds.",
         "If granted, the service also returns a fencing token: a number that increases with every grant (in etcd the revision, in ZooKeeper the zxid or a sequence node).",
         "The holder renews the lease periodically, for example every 3 seconds, while it works.",
         "If the holder pauses (a long garbage-collection pause or a network blip) past the lease, the lease expires and another client gets the lock with a higher token.",
@@ -197,16 +197,16 @@
     "india": {
       "title": "One settlement job at a time",
       "label": "Illustrative estimate",
-      "body": "Consider a lending app that runs a nightly job to compute EMIs due and trigger NACH auto-debit instructions to banks. Running it twice would debit customers twice, which is unacceptable. The job runs on three pods for availability, but each must take a lease in etcd before starting, and every debit instruction carries the fencing token and a per-loan idempotency key. If the leader pod stalls during a long pause and a second pod takes over, the stalled pod's later writes carry the lower token and are rejected by the instruction table. The lock decides who should work, while the token and idempotency keys guarantee that no one does harm."
+      "body": "Consider a lending app that runs a nightly job to compute EMIs due and trigger NACH auto-debit instructions to banks. Running it twice would debit customers twice, which is unacceptable. The job runs on three pods for availability, but each must take a lease in etcd before starting, and every debit instruction carries the fencing token and a per-loan idempotency key. If the leader pod stalls during a long pause and a second pod takes over, the stalled pod’s later writes carry the lower token and are rejected by the instruction table. The lock decides who should work, while the token and idempotency keys guarantee that no one does harm."
     },
     "pitfalls": [
       {
-        "trap": "'I'll use Redis SETNX as a lock for payments.'",
-        "say": "'A single Redis lock can be lost on failover; for correctness I'd use etcd leases plus fencing tokens checked by the resource.'"
+        "trap": "“I’ll use Redis SETNX as a lock for payments.”",
+        "say": "“A single Redis lock can be lost on failover; for correctness I’d use etcd leases plus fencing tokens checked by the resource.”"
       },
       {
         "trap": "Assuming the lock holder knows when its lease expired.",
-        "say": "'A paused process cannot tell its lease expired, so every write carries a fencing token that the storage checks.'"
+        "say": "“A paused process cannot tell its lease expired, so every write carries a fencing token that the storage checks.”"
       }
     ],
     "takeaways": [
@@ -256,7 +256,7 @@
     "mechanism": {
       "title": "How logical clocks order events without trusting wall clocks",
       "steps": [
-        "Physical clocks drift and are corrected by NTP, so two servers may disagree by milliseconds or more; 'later timestamp' does not reliably mean 'happened later'.",
+        "Physical clocks drift and are corrected by NTP, so two servers may disagree by milliseconds or more; “later timestamp” does not reliably mean “happened later”.",
         "Lamport clock: each process keeps a counter. Increment it before each event; attach it to messages; on receive, set the counter to the maximum of local and received, plus 1.",
         "This guarantees that if A happened before B, then L(A) < L(B). The reverse is not true: L(A) < L(B) does not prove A caused B.",
         "Vector clock: each process keeps a vector with one counter per process. It increments its own entry on each event and, on receive, takes the element-wise maximum and then increments its own entry.",
@@ -315,23 +315,23 @@
         "P does a local event: P = 1. P sends message m with timestamp 2 (incremented to 2 on send).",
         "Q does two local events: Q = 1, then Q = 2.",
         "Q receives m (timestamp 2): Q = max(2, 2) plus 1 = 3.",
-        "So the receive event (3) is ordered after the send (2), as causality requires, even though Q's clock started independently."
+        "So the receive event (3) is ordered after the send (2), as causality requires, even though Q’s clock started independently."
       ],
       "result": "Lamport clocks always order a receive after its send by taking the maximum and adding one."
     },
     "india": {
       "title": "Offline edits to a shared shopping list",
       "label": "Illustrative estimate",
-      "body": "A family in Chennai shares a grocery list in an app. Amma edits 'milk ×2' to 'milk ×3' on her phone in a basement with no signal, while Appa, online, changes it to 'milk ×1'. When Amma's phone reconnects, wall-clock timestamps would let whichever phone's clock happens to be ahead silently win. With version vectors, the server sees that neither edit includes the other, so the edits are concurrent, and the app shows both values or applies a merge rule (keep the larger quantity). Detecting that a conflict exists is the clock's job; resolving it is a product decision."
+      "body": "A family in Chennai shares a grocery list in an app. Amma edits “milk ×2” to “milk ×3” on her phone in a basement with no signal, while Appa, online, changes it to “milk ×1”. When Amma’s phone reconnects, wall-clock timestamps would let whichever phone’s clock happens to be ahead silently win. With version vectors, the server sees that neither edit includes the other, so the edits are concurrent, and the app shows both values or applies a merge rule (keep the larger quantity). Detecting that a conflict exists is the clock’s job; resolving it is a product decision."
     },
     "pitfalls": [
       {
-        "trap": "'We'll order events by server timestamp.'",
-        "say": "'Server clocks skew; for causality I'd use Lamport or hybrid logical clocks, and version vectors to detect concurrent writes.'"
+        "trap": "“We’ll order events by server timestamp.”",
+        "say": "“Server clocks skew; for causality I’d use Lamport or hybrid logical clocks, and version vectors to detect concurrent writes.”"
       },
       {
         "trap": "Claiming Lamport clocks detect concurrency.",
-        "say": "'Lamport ordering is consistent with causality but cannot tell concurrent events apart; vector clocks can.'"
+        "say": "“Lamport ordering is consistent with causality but cannot tell concurrent events apart; vector clocks can.”"
       }
     ],
     "takeaways": [
@@ -383,14 +383,14 @@
       "steps": [
         "Every second (one gossip round), each node picks a few random peers and exchanges what it knows: membership, heartbeat counters, versions of metadata.",
         "Each node merges what it hears, keeping the newer version of each entry. Information spreads like an epidemic: the number of informed nodes roughly multiplies each round.",
-        "Failure detection: each node increments its own heartbeat counter; if a node's counter stops increasing in what others hear, it becomes suspect.",
+        "Failure detection: each node increments its own heartbeat counter; if a node’s counter stops increasing in what others hear, it becomes suspect.",
         "A phi-accrual detector (used by Cassandra and Akka) outputs a suspicion level from the observed distribution of heartbeat arrival times, instead of a fixed timeout, adapting to slow networks.",
-        "SWIM-style indirect probing: if node A's direct ping to B fails, A asks a few other nodes to ping B. Only if they also fail is B marked suspect, which avoids false alarms from one bad link.",
+        "SWIM-style indirect probing: if node A’s direct ping to B fails, A asks a few other nodes to ping B. Only if they also fail is B marked suspect, which avoids false alarms from one bad link.",
         "Suspect nodes get a grace period to refute (by gossiping a higher incarnation number) before being declared dead."
       ]
     },
     "useWhen": [
-      "Large clusters (hundreds to thousands of nodes) that need membership and failure information without a central coordinator: Cassandra, Consul's Serf, many service meshes.",
+      "Large clusters (hundreds to thousands of nodes) that need membership and failure information without a central coordinator: Cassandra, Consul’s Serf, many service meshes.",
       "Spreading eventually consistent metadata such as schema versions and load figures."
     ],
     "avoidWhen": [
@@ -452,12 +452,12 @@
     },
     "pitfalls": [
       {
-        "trap": "'A central server will ping every node.'",
-        "say": "'At hundreds of nodes I'd use gossip with SWIM-style indirect probes so there is no central failure point and fewer false positives.'"
+        "trap": "“A central server will ping every node.”",
+        "say": "“At hundreds of nodes I’d use gossip with SWIM-style indirect probes so there is no central failure point and fewer false positives.”"
       },
       {
         "trap": "Using gossip for leader election.",
-        "say": "'Gossip is eventually consistent; leader election needs consensus such as Raft.'"
+        "say": "“Gossip is eventually consistent; leader election needs consensus such as Raft.”"
       }
     ],
     "takeaways": [
@@ -517,7 +517,7 @@
       ]
     },
     "useWhen": [
-      "Bloom: skip disk lookups for keys that are not there (LSM SSTables), avoid cache penetration, check 'username probably taken' before hitting the database.",
+      "Bloom: skip disk lookups for keys that are not there (LSM SSTables), avoid cache penetration, check “username probably taken” before hitting the database.",
       "HyperLogLog for unique visitors; Count-Min for heavy hitters such as top search terms or abusive IPs."
     ],
     "avoidWhen": [
@@ -575,16 +575,16 @@
     "india": {
       "title": "Daily unique viewers of a streaming show",
       "label": "Illustrative estimate",
-      "body": "An OTT app wants 'unique viewers today' for each of thousands of shows across India. Exact sets of user ids would need gigabytes per popular show. A HyperLogLog per show per day takes about 12 KB in Redis, and the app can merge per-region counters to get national totals with under 1% error, which is fine for a dashboard. For billing advertisers by impressions, though, the company would use exact event logs processed in a warehouse, because an error of even 0.8% on a large invoice is real money."
+      "body": "An OTT app wants “unique viewers today” for each of thousands of shows across India. Exact sets of user ids would need gigabytes per popular show. A HyperLogLog per show per day takes about 12 KB in Redis, and the app can merge per-region counters to get national totals with under 1% error, which is fine for a dashboard. For billing advertisers by impressions, though, the company would use exact event logs processed in a warehouse, because an error of even 0.8% on a large invoice is real money."
     },
     "pitfalls": [
       {
         "trap": "Saying a Bloom filter can return false negatives.",
-        "say": "'A Bloom filter can say probably present when absent, but never absent when present.'"
+        "say": "“A Bloom filter can say probably present when absent, but never absent when present.”"
       },
       {
         "trap": "Using approximate counts for billing.",
-        "say": "'HyperLogLog is fine for dashboards; billing uses exact logs.'"
+        "say": "“HyperLogLog is fine for dashboards; billing uses exact logs.”"
       }
     ],
     "takeaways": [
@@ -620,7 +620,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "If any of the key's bits is 0, it was never added, so a negative answer is certain."
+        "explanation": "If any of the key’s bits is 0, it was never added, so a negative answer is certain."
       }
     ],
     "diagram": "Bloom (m bits, k=3): add 'ravi' -> set bits 3, 9, 14\nquery 'anu' -> bits 3, 7, 14 -> bit 7 is 0 -> definitely absent\nquery 'om'  -> bits 3, 9, 14 all 1 -> probably present (check DB)"

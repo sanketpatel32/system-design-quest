@@ -216,7 +216,7 @@
         "Peak demand of about 35,000 per second needs only one worker in theory; run several per data centre for availability.",
         "10 worker bits allow 1,024 workers, for example 5 bits of data centre and 5 bits of machine."
       ],
-      "result": "About 35,000 ids per second at peak is tiny compared with one Snowflake worker's 4 million per second; the real requirements are uniqueness and no single point of failure."
+      "result": "About 35,000 ids per second at peak is tiny compared with one Snowflake worker’s 4 million per second; the real requirements are uniqueness and no single point of failure."
     },
     "architecture": {
       "steps": [
@@ -284,7 +284,7 @@
       "steps": [
         "Partition keys with consistent hashing and virtual nodes; each key lives on the next N = 3 distinct nodes on the ring.",
         "Any node can coordinate a request: writes go to all 3 replicas and succeed after W acknowledgements; reads ask R replicas (QUORUM: R = 2, W = 2).",
-        "Each node stores data in an LSM tree (commit log, memtable, SSTables) for fast writes.",
+        "Each node stores data in an LSM-tree (commit log, memtable, SSTables) for fast writes.",
         "Conflicts are detected with version vectors or resolved with last-writer-wins timestamps, chosen per use case.",
         "Repair with hinted handoff for briefly down nodes, read repair on reads, and Merkle-tree anti-entropy in the background; gossip spreads membership."
       ],
@@ -344,7 +344,7 @@
     },
     "architecture": {
       "steps": [
-        "Clients hash each key onto a consistent-hashing ring with virtual nodes (or Redis Cluster's 16,384 hash slots) to find the owning node.",
+        "Clients hash each key onto a consistent-hashing ring with virtual nodes (or Redis Cluster’s 16,384 hash slots) to find the owning node.",
         "Each node stores keys in memory with a TTL and evicts with approximate LRU or LFU when memory is full.",
         "Each primary has a replica; on primary failure, the replica is promoted by the cluster or a sentinel quorum.",
         "Hot keys are replicated to several nodes or cached briefly in the application process to spread load.",
@@ -408,8 +408,8 @@
       "steps": [
         "Product services publish notification events (user, template, data, idempotency key) to a queue instead of calling providers.",
         "A notification service checks user preferences, opt-outs, quiet hours and frequency caps, renders the template and picks channels.",
-        "Per-channel queues feed workers for push (APNs, FCM), SMS (DLT-registered templates in India) and email, each rate-limited to the provider's limits.",
-        "Failures retry with exponential backoff; permanent failures and invalid tokens go to a DLQ and update the user's device records.",
+        "Per-channel queues feed workers for push (APNs, FCM), SMS (DLT-registered templates in India) and email, each rate-limited to the provider’s limits.",
+        "Failures retry with exponential backoff; permanent failures and invalid tokens go to a DLQ and update the user’s device records.",
         "Delivery status and clicks are recorded for analytics and to suppress duplicates within a time window."
       ],
       "diagram": "services -> event queue -> notification svc (prefs, caps, templates)\n   -> push queue -> FCM/APNs workers\n   -> SMS queue  -> SMS provider workers (rate-limited)\n   -> email queue -> email workers        failures -> retry/DLQ"
@@ -469,7 +469,7 @@
     "architecture": {
       "steps": [
         "Posting writes the post to the posts store and emits an event.",
-        "Fan-out workers push the post id into each follower's feed list in Redis, for accounts below a follower threshold.",
+        "Fan-out workers push the post id into each follower’s feed list in Redis, for accounts below a follower threshold.",
         "For celebrity accounts, posts are not pushed; the feed service fetches their recent posts at read time and merges.",
         "A ranking step scores the merged candidates (recency, affinity, engagement) before returning a page with a cursor.",
         "Likes and comments are counted asynchronously with sharded counters; the feed shows slightly stale counts."
@@ -531,7 +531,7 @@
     "architecture": {
       "steps": [
         "Tweets are stored in a sharded store keyed by tweet id (Snowflake, time-ordered), with a user_id → tweet ids index.",
-        "Fan-out on write inserts tweet ids into followers' timeline caches for ordinary accounts.",
+        "Fan-out on write inserts tweet ids into followers’ timeline caches for ordinary accounts.",
         "Celebrity tweets are merged at read time from a small per-celebrity recent list.",
         "Timeline service reads the cached list, merges celebrity tweets, hydrates tweet bodies from a tweet cache and returns a cursor page.",
         "Search and trends consume the tweet stream separately through Kafka."
@@ -593,8 +593,8 @@
     "architecture": {
       "steps": [
         "Clients keep a WebSocket (or MQTT) connection to a gateway; a session registry maps user → gateway.",
-        "Send: the sender's gateway passes the message to the chat service, which assigns a per-conversation sequence number and stores it in Cassandra-style storage keyed by (conversation, time bucket).",
-        "The chat service looks up the recipient's gateway and pushes the message; if offline, it stays queued and a push notification is sent.",
+        "Send: the sender’s gateway passes the message to the chat service, which assigns a per-conversation sequence number and stores it in Cassandra-style storage keyed by (conversation, time bucket).",
+        "The chat service looks up the recipient’s gateway and pushes the message; if offline, it stays queued and a push notification is sent.",
         "Receipts (delivered, read) are small messages flowing back the same way.",
         "Groups fan out per member; large groups use a group service that writes once and lets members pull."
       ],
@@ -843,14 +843,14 @@
         "A ride request goes to the dispatch service, which reads nearby cells, filters available drivers and ranks by estimated arrival time.",
         "Dispatch offers the ride to one driver at a time (or a few in sequence) with a short timeout.",
         "Acceptance uses a conditional write on the ride (status = requested → assigned) so two drivers cannot both get it.",
-        "During the trip, driver locations are forwarded to the rider's app; trip events go to Kafka for billing and analytics."
+        "During the trip, driver locations are forwarded to the rider’s app; trip events go to Kafka for billing and analytics."
       ],
       "diagram": "driver app -> location gateway -> geo index (city shard, cells) \nrider -> dispatch -> nearby cells -> rank by ETA -> offer -> accept (conditional write)\ntrip events -> Kafka -> billing, analytics"
     },
     "deepDives": [
       {
         "title": "No double assignment",
-        "body": "A conditional update on the ride row, or a compare-and-set on the driver's status, guarantees one winner even if two acceptances arrive together."
+        "body": "A conditional update on the ride row, or a compare-and-set on the driver’s status, guarantees one winner even if two acceptances arrive together."
       },
       {
         "title": "Hot zones",
@@ -1029,7 +1029,7 @@
         "It asks the metadata service which chunk hashes are missing, then uploads only those via presigned URLs to object storage (resumable).",
         "Once chunks are stored, the client commits a new file version: the list of chunk hashes, in a transactional metadata database.",
         "The metadata service publishes a change event; other devices, connected by long-polling or WebSocket, fetch the changed file list and download only missing chunks.",
-        "Sharing writes permission entries (user or link, role) checked on every access; conflicting edits from two devices create a 'conflicted copy'."
+        "Sharing writes permission entries (user or link, role) checked on every access; conflicting edits from two devices create a “conflicted copy”."
       ],
       "diagram": "client: chunk + hash -> metadata svc: which missing? -> upload missing chunks -> object storage\ncommit version (SQL) -> change event -> other devices sync -> download missing chunks"
     },
@@ -1088,7 +1088,7 @@
     "architecture": {
       "steps": [
         "The app creates a transaction with a unique transaction reference (idempotency key) and status INITIATED in a SQL ledger sharded by user.",
-        "The PSP sends the request to NPCI, which routes the debit to the payer's bank and the credit to the payee's bank.",
+        "The PSP sends the request to NPCI, which routes the debit to the payer’s bank and the credit to the payee’s bank.",
         "Responses move the state machine (INITIATED → PENDING → SUCCESS or FAILED); retries reuse the same reference, so no double debit.",
         "Timeouts leave the transaction PENDING; a status-check job queries NPCI and a reconciliation job compares daily settlement files.",
         "History is served from a read model; every state change is written to an append-only audit log."
@@ -1102,7 +1102,7 @@
       },
       {
         "title": "Pending states",
-        "body": "Network timeouts are common; showing 'pending, we will update you' and resolving via status checks is safer than guessing success or failure."
+        "body": "Network timeouts are common; showing “pending, we will update you” and resolving via status checks is safer than guessing success or failure."
       }
     ],
     "rubric": [
@@ -1209,8 +1209,8 @@
     },
     "architecture": {
       "steps": [
-        "Seat maps are served from a cache refreshed on every hold or release, with a short TTL for others' changes.",
-        "Holding seats is a conditional update: UPDATE seats SET status = 'HELD', held_by = ?, hold_expires = now + 10 min WHERE show_id = ? AND seat_id IN (...) AND status = 'FREE'; success only if all rows changed.",
+        "Seat maps are served from a cache refreshed on every hold or release, with a short TTL for others’ changes.",
+        "Holding seats is a conditional update: UPDATE seats SET status = 'HELD', held_by = ?, hold_expires = now + 10 min WHERE show_id = ? AND seat_id IN (…) AND status = 'FREE'; success only if all rows changed.",
         "Payment happens outside the transaction; on success, a second conditional update sets HELD → BOOKED for that holder.",
         "Expired holds are released by a sweeper or treated as free when hold_expires has passed.",
         "For huge launches, a virtual waiting room admits users in batches to protect the booking service."
@@ -1239,7 +1239,7 @@
     "requirements": {
       "functional": [
         "Search trains & availability",
-        "Book tatkal seats",
+        "Book Tatkal seats",
         "Pay, then allocate and issue PNR"
       ],
       "nonFunctional": [
@@ -1329,15 +1329,15 @@
         "Peak ≈ 4,630 × 8 ≈ 37,000 score reads per second (the quiz target is about 37,000).",
         "A Redis sorted set entry costs on the order of 100 bytes, so 10,000,000 entries ≈ 1,000,000,000 bytes, about 1 GB per contest, fine for one shard.",
         "Rank lookups and top-N reads are O(log n) in a sorted set: log2 of 10,000,000 ≈ 23 steps.",
-        "Score reads at about 37,000 per second are mostly 'my rank' and 'top 100', both cacheable for a few seconds."
+        "Score reads at about 37,000 per second are mostly “my rank” and “top 100”, both cacheable for a few seconds."
       ],
       "result": "About 37,000 score reads per second and millions of entries per contest: sorted sets per contest plus batched score updates."
     },
     "architecture": {
       "steps": [
         "Ball-by-ball events from the scoring feed go to Kafka; a points service converts them into point changes per real-world player.",
-        "Workers compute each team's new total (teams contain 11 players) and update Redis sorted sets per contest in batches with ZADD.",
-        "Top-N comes from ZREVRANGE and 'my rank' from ZREVRANK, cached for a few seconds and pushed to clients.",
+        "Workers compute each team’s new total (teams contain 11 players) and update Redis sorted sets per contest in batches with ZADD.",
+        "Top-N comes from ZREVRANGE and “my rank” from ZREVRANK, cached for a few seconds and pushed to clients.",
         "Very large contests can be split into buckets by score range, or ranks approximated during play and computed exactly at the end.",
         "Final ranks are recomputed from the authoritative scores in batch after the match before rewards are announced."
       ],
@@ -1389,7 +1389,7 @@
         "Daily keystrokes = 50,000,000 × 20 = 1,000,000,000.",
         "Average = 1,000,000,000 ÷ 86,400 ≈ 11,600 per second.",
         "Peak ≈ 11,600 × 3 ≈ 35,000 keystrokes per second (the quiz target is about 35,000).",
-        "Suggestion cache = 100,000 × 500 bytes = 50,000,000 bytes, about 50 MB, small enough for every server's memory.",
+        "Suggestion cache = 100,000 × 500 bytes = 50,000,000 bytes, about 50 MB, small enough for every server’s memory.",
         "Peak of about 35,000 keystroke requests per second is served from memory with p99 well under 50 ms.",
         "Debouncing on the client (wait about 100 ms after typing) cuts requests noticeably."
       ],
@@ -1596,7 +1596,7 @@
       },
       {
         "title": "Monitoring the monitor",
-        "body": "Alerting must keep working during incidents, so it runs separately from dashboards, with its own health checks and a dead-man's-switch alert."
+        "body": "Alerting must keep working during incidents, so it runs separately from dashboards, with its own health checks and a dead-man’s-switch alert."
       }
     ],
     "rubric": [
@@ -1703,7 +1703,7 @@
     },
     "architecture": {
       "steps": [
-        "Topics are split into partitions; each partition is an append-only log of segment files on a broker's disk, with an offset index.",
+        "Topics are split into partitions; each partition is an append-only log of segment files on a broker’s disk, with an offset index.",
         "Each partition has a leader and followers; producers write to the leader, followers fetch and stay in the in-sync replica set.",
         "With acks=all, a write is acknowledged once all in-sync replicas have it; leader election on failure picks an in-sync follower.",
         "Consumers in a group are assigned partitions and commit offsets; they can rewind to replay.",
@@ -1765,7 +1765,7 @@
     "architecture": {
       "steps": [
         "Jobs are stored in SQL with schedule, next_run_time, owner and retry policy, indexed by next_run_time.",
-        "Scheduler instances poll for due jobs and claim them with SELECT ... FOR UPDATE SKIP LOCKED or a conditional status update, so each run is claimed once.",
+        "Scheduler instances poll for due jobs and claim them with SELECT … FOR UPDATE SKIP LOCKED or a conditional status update, so each run is claimed once.",
         "Claimed runs are pushed to a queue; workers execute them and report success or failure.",
         "Failures retry with backoff up to a limit; runs that exceed a timeout are marked failed and retried; history is kept per run.",
         "next_run_time is computed after claiming, so a crashed scheduler does not skip the next occurrence."
@@ -1828,7 +1828,7 @@
       "steps": [
         "Places are stored in SQL (or a document store) with latitude, longitude, category and details.",
         "A builder creates a geohash or quadtree index (cell → place ids) and ships it to search servers; updates are applied in batches every few minutes or hours.",
-        "A search reads the user's cell and neighbours at the right precision for the radius, filters by category and open hours, and ranks by distance, rating and relevance.",
+        "A search reads the user’s cell and neighbours at the right precision for the radius, filters by category and open hours, and ranks by distance, rating and relevance.",
         "Place details for the result page come from a cache in front of the database.",
         "Writes (new places, edits) go to the database and moderation; the index catches up on the next build."
       ],
@@ -1880,7 +1880,7 @@
         "Peak = 30,000,000 ÷ 300 = 100,000 buy attempts per second (the quiz target).",
         "Attempts per unit = 30,000,000 ÷ 10,000 = 3,000, so almost every attempt must fail quickly and fairly.",
         "Inventory must never be the first thing hit; a waiting room and token admission protect it.",
-        "A single counter row taking that many conditional decrements would be a hotspot, so stock is split into, say, 20 buckets of 500 units."
+        "A single counter row taking that many conditional decrements would be a hot spot, so stock is split into, say, 20 buckets of 500 units."
       ],
       "result": "About 100,000 buy attempts per second for a few thousand units: absorb the spike at the edge and allocate stock atomically."
     },
@@ -2268,7 +2268,7 @@
       },
       {
         "title": "Fairness",
-        "body": "Per-user and per-contest queues stop one user's flood of submissions from delaying everyone else."
+        "body": "Per-user and per-contest queues stop one user’s flood of submissions from delaying everyone else."
       }
     ],
     "rubric": [
@@ -2317,7 +2317,7 @@
       "steps": [
         "Inbound SMTP servers accept mail, check SPF, DKIM and DMARC, and put messages on a queue.",
         "Workers run spam and malware filtering, then store the message body and attachments in object storage and metadata (sender, subject, labels, thread) in a store partitioned by user.",
-        "Each user's mailbox has a per-user search index updated asynchronously.",
+        "Each user’s mailbox has a per-user search index updated asynchronously.",
         "Clients list the inbox from metadata with cursor pagination and fetch bodies on open.",
         "Outbound mail is queued with retries and per-domain rate limits to protect sending reputation."
       ],
@@ -2431,17 +2431,17 @@
         "Average = 2,000,000,000 ÷ 86,400 ≈ 23,100 per second.",
         "Peak ≈ 23,100 × 5 ≈ 120,000 increments per second (the quiz target is about 120,000).",
         "Peak overall is about 120,000 increments per second across all counters, easily spread over a cluster.",
-        "One viral counter at 50,000 per second sits uncomfortably close to a single key's limit and its shard's CPU.",
+        "One viral counter at 50,000 per second sits uncomfortably close to a single key’s limit and its shard’s CPU.",
         "Splitting it into 32 sub-counters gives about 50,000 ÷ 32 ≈ 1,560 increments per second each."
       ],
-      "result": "About 120,000 increments per second overall, with single hot counters near one key's limit: shard hot counters and sum on read."
+      "result": "About 120,000 increments per second overall, with single hot counters near one key’s limit: shard hot counters and sum on read."
     },
     "architecture": {
       "steps": [
         "Increments go to a counter service, which writes to Redis with INCR on the counter key, or on one of N sub-keys chosen at random for hot counters.",
         "Reads sum the N sub-counters (cached for a second or two), so counts may lag slightly.",
         "Increments are also written to a log (Kafka) so counts can be rebuilt and persisted to a durable store periodically.",
-        "Counters become hot automatically: when a key's rate passes a threshold, the service starts spreading it over more sub-keys.",
+        "Counters become hot automatically: when a key’s rate passes a threshold, the service starts spreading it over more sub-keys.",
         "Duplicate increments (such as a double like) are prevented by storing the like itself with a unique (user, post) constraint; the counter counts accepted likes."
       ],
       "diagram": "like -> unique (user, post) insert -> counter svc -> INCR counter:post:7#r (r = 0..31)\nread -> sum 32 sub-keys (cache 1 s) | log -> Kafka -> durable store"

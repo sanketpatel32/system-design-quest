@@ -84,16 +84,16 @@
   "india": {
    "title": "Ticket checkout when some requests are slow",
    "label": "Illustrative estimate",
-   "body": "In a ticketing flow such as movie or train booking, most requests are quick (seat map, availability) but some are slow (payment confirmation that waits on a bank or UPI callback). Under round robin, a server that happens to collect several slow requests still gets its full share of new ones, its queue grows, and users see timeouts even though other servers are idle. Least connections or power of two choices sends new work to servers with fewer requests in flight, so slow calls do not pile up on one box. Separately, if seat-hold state is cached per show, consistent hashing on show ID keeps each show's state on one server, so adding servers before a big release moves only a small slice of shows."
+   "body": "In a ticketing flow such as movie or train booking, most requests are quick (seat map, availability) but some are slow (payment confirmation that waits on a bank or UPI callback). Under round robin, a server that happens to collect several slow requests still gets its full share of new ones, its queue grows, and users see timeouts even though other servers are idle. Least connections or power of two choices sends new work to servers with fewer requests in flight, so slow calls do not pile up on one box. Separately, if seat-hold state is cached per show, consistent hashing on show ID keeps each show’s state on one server, so adding servers before a big release moves only a small slice of shows."
   },
   "pitfalls": [
    {
     "trap": "Choosing round robin for everything.",
-    "say": "'Request times vary here, so I'd use least connections or power of two choices so slow requests don't pile up.'"
+    "say": "“Request times vary here, so I’d use least connections or power of two choices so slow requests don’t pile up.”"
    },
    {
     "trap": "Hashing with mod N on a cache tier that autoscales.",
-    "say": "'I'd use consistent hashing with virtual nodes so adding a server moves only about 1/N of the keys.'"
+    "say": "“I’d use consistent hashing with virtual nodes so adding a server moves only about 1/N of the keys.”"
    }
   ],
   "diagram": "round robin:    r1->A  r2->B  r3->C  r4->A ...\nleast conn:     A(12) B(3) C(7)   -> pick B\npower of two:   sample {A,C} -> A(12) vs C(7) -> pick C\nhash(user 42) -> ring position -> server B, every time",
@@ -212,16 +212,16 @@
   "india": {
    "title": "Routing a payments app by path",
    "label": "Illustrative design",
-   "body": "Consider a payments app in India with very different traffic types behind one domain: /api/upi/collect for payment requests, /api/bills for bill payments, and /static for app assets. An L7 balancer can send each path to its own pool, so a surge in bill payments on the first of the month does not starve UPI payment requests, and it can give the payment path stricter timeouts and no automatic retries (to avoid double debits) while retrying idempotent reads. In front of the L7 tier, an L4 balancer spreads raw TCP connections across many L7 instances at very low cost. Health checks on the UPI pool should test the service's own readiness, not the bank's availability, so one slow bank does not take every server out of rotation."
+   "body": "Consider a payments app in India with very different traffic types behind one domain: /api/upi/collect for payment requests, /api/bills for bill payments, and /static for app assets. An L7 balancer can send each path to its own pool, so a surge in bill payments on the first of the month does not starve UPI payment requests, and it can give the payment path stricter timeouts and no automatic retries (to avoid double debits) while retrying idempotent reads. In front of the L7 tier, an L4 balancer spreads raw TCP connections across many L7 instances at very low cost. Health checks on the UPI pool should test the service’s own readiness, not the bank’s availability, so one slow bank does not take every server out of rotation."
   },
   "pitfalls": [
    {
-    "trap": "'The load balancer will retry failed requests' for every endpoint.",
-    "say": "'Retries only for idempotent requests or ones carrying an idempotency key; a payment POST must not be blindly retried.'"
+    "trap": "“The load balancer will retry failed requests” for every endpoint.",
+    "say": "“Retries only for idempotent requests or ones carrying an idempotency key; a payment POST must not be blindly retried.”"
    },
    {
     "trap": "Health checks that test every downstream dependency.",
-    "say": "'Liveness checks the process; readiness checks it can serve. A shared downstream outage is handled by circuit breakers, not by failing every health check.'"
+    "say": "“Liveness checks the process; readiness checks it can serve. A shared downstream outage is handled by circuit breakers, not by failing every health check.”"
    }
   ],
   "diagram": "clients -> [L4 LB]  (TCP, fast)\n              |-> [L7 LB 1] --/api/upi-->   [UPI pool]\n              '-> [L7 LB 2] --/api/bills--> [bills pool]\n                            --/static-->    [CDN/origin]",
@@ -272,7 +272,7 @@
   "mechanism": {
    "title": "Same middle box, opposite sides",
    "steps": [
-    "A forward proxy sits on the client side. Clients are configured to send requests to it, and it fetches from the internet on their behalf. Servers see the proxy's IP, not the client's.",
+    "A forward proxy sits on the client side. Clients are configured to send requests to it, and it fetches from the internet on their behalf. Servers see the proxy’s IP, not the client’s.",
     "Organisations use forward proxies to enforce outbound policy (block sites, scan downloads), to log access, and to share a cache of common downloads.",
     "A reverse proxy sits on the server side. Clients think they are talking to the website; the proxy receives the request and forwards it to one of many hidden backends.",
     "The reverse proxy terminates TLS, load balances, caches responses, compresses them, enforces rate limits and hides the backend topology. Nginx, Envoy, HAProxy and CDNs are typical examples.",
@@ -340,11 +340,11 @@
   "pitfalls": [
    {
     "trap": "Mixing up forward and reverse proxies.",
-    "say": "'A forward proxy represents clients going out; a reverse proxy represents servers taking requests in.'"
+    "say": "“A forward proxy represents clients going out; a reverse proxy represents servers taking requests in.”"
    },
    {
     "trap": "Caching personalised responses at a shared proxy.",
-    "say": "'Only cache responses that are the same for everyone, or vary the cache key by the relevant header; user-specific data needs Cache-Control: private.'"
+    "say": "“Only cache responses that are the same for everyone, or vary the cache key by the relevant header; user-specific data needs Cache-Control: private.”"
    }
   ],
   "diagram": "Forward:  [employee PCs] -> [forward proxy] -> internet sites\nReverse:  internet users -> [reverse proxy / CDN] -> [app 1..N]",
@@ -395,7 +395,7 @@
   "mechanism": {
    "title": "Moving state out of the web server",
    "steps": [
-    "A stateful server keeps the user's session (login, cart, wizard progress) in its own memory. The next request must reach the same server, and a restart logs everyone out.",
+    "A stateful server keeps the user’s session (login, cart, wizard progress) in its own memory. The next request must reach the same server, and a restart logs everyone out.",
     "Sticky sessions patch this at the load balancer by pinning each user to one server (by cookie or IP hash). Load can become uneven, and a server failure still loses its sessions.",
     "A stateless server keeps nothing between requests. Each request carries a session ID cookie, and the server looks the session up in a shared store such as Redis.",
     "Alternatively, the session itself can travel in a signed token (a JWT): the server verifies the signature and reads the claims without a lookup, at the cost of harder revocation.",
@@ -451,7 +451,7 @@
    "steps": [
     "Memory = 10M sessions × 1 KB ≈ 10 GB, so about 20 GB with one replica.",
     "Lookups = 50,000 per second; a single Redis node typically serves on the order of 100,000 simple GETs per second on suitable hardware (benchmark your own), so one primary likely covers it with headroom.",
-    "Shard by session ID across 2–3 primaries anyway, to keep each node's memory small and limit the blast radius.",
+    "Shard by session ID across 2–3 primaries anyway, to keep each node’s memory small and limit the blast radius.",
     "Added latency per request ≈ one round trip inside the zone, typically well under 1 ms."
    ],
    "result": "About 10 GB of data (20 GB with replicas), 50K reads/s and sub-millisecond lookups: a small Redis cluster buys a fully stateless web tier."
@@ -459,16 +459,16 @@
   "india": {
    "title": "IRCTC-style booking when servers come and go",
    "label": "Illustrative design",
-   "body": "In a train booking flow during Tatkal, a user moves through search, seat selection, passenger details and payment within a few minutes, while the platform adds servers to absorb the 10:00 spike. If the booking wizard's progress lived in one server's memory, any scale-in, crash or deploy would throw users back to the start at the worst possible moment. Keeping the session and the in-progress booking in a shared store keyed by session ID means any server can serve the next step, and a server can be killed without users noticing. The seat hold itself lives in the inventory database with an expiry, not in the session, because it must be consistent across all users."
+   "body": "In a train booking flow during Tatkal, a user moves through search, seat selection, passenger details and payment within a few minutes, while the platform adds servers to absorb the 10:00 spike. If the booking wizard’s progress lived in one server’s memory, any scale-in, crash or deploy would throw users back to the start at the worst possible moment. Keeping the session and the in-progress booking in a shared store keyed by session ID means any server can serve the next step, and a server can be killed without users noticing. The seat hold itself lives in the inventory database with an expiry, not in the session, because it must be consistent across all users."
   },
   "pitfalls": [
    {
     "trap": "Scaling out while sessions live in server memory.",
-    "say": "'First make the tier stateless: sessions in Redis, files in object storage; then autoscale behind any balancing algorithm.'"
+    "say": "“First make the tier stateless: sessions in Redis, files in object storage; then autoscale behind any balancing algorithm.”"
    },
    {
     "trap": "Choosing JWTs without a revocation plan.",
-    "say": "'Short-lived access tokens, say 15 minutes, plus refresh tokens I can revoke server-side.'"
+    "say": "“Short-lived access tokens, say 15 minutes, plus refresh tokens I can revoke server-side.”"
    }
   ],
   "diagram": "[LB] -> [web 1] --+\n     -> [web 2] --+--> [Redis: session:abc -> {user 7, cart 91}]\n     -> [web 3] --+--> [object storage: uploads]",

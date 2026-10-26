@@ -20,7 +20,7 @@ Open `http://127.0.0.1:43123`.
 | `npm run test` | Vitest unit tests |
 | `npm run audit` | Assemble shards + integrity (exact dupes fail; near-dupes warn) |
 | `npm run audit:strict` | Fail on near-duplicate card/prompt text (Jaccard ≥ 0.82) |
-| `npm run content:build` | Re-run every lesson generator and fix script, then `quality/apply.py`, assemble and audit |
+| `npm run content:build` | Re-run every lesson generator and fix script, then `quality/apply.py` and `quality/style.py`, assemble and audit (incl. house style) |
 | `npm run e2e` | Playwright tests |
 | `npm run build` | Production build to `dist/` |
 
@@ -28,7 +28,8 @@ Open `http://127.0.0.1:43123`.
 
 `scripts/authored/*.json` is the source of truth. `npm run content:build` runs `scripts/authoring/rebuild.py`, which
 regenerates the generated lesson files (fe-more, more2, more3), re-applies each section's `*_fixes.py`,
-`integrate_fixes.py` and finally `quality/apply.py`, then assembles `src/content/generated/topics.json` and audits it.
+`integrate_fixes.py`, `quality/apply.py` and finally `quality/style.py` (house style, see
+[docs/style-guide.md](docs/style-guide.md)), then assembles `src/content/generated/topics.json` and audits it.
 On a clean checkout it leaves no git diff. To change generated lessons, edit the generator or a fix script (quality edits
 go in `scripts/authoring/quality/q_*.py`), never only the JSON; hand-maintained files (lessons 1-120, bosses, tutorial,
 `deep/`, `boss-deep/`, `interactive/`) are edited in place.

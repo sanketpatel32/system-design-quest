@@ -13,7 +13,7 @@
     "CDN edge: a point of presence near the user caches static files and cacheable API responses. A hit costs one short round trip.",
     "Reverse proxy or API gateway cache: shared responses cached in the data centre, in front of the app servers.",
     "Application cache: an in-process map (fastest, but per server and lost on restart) or a shared cache such as Redis or Memcached (one network hop, shared by all servers).",
-    "Database buffer pool: the database keeps hot pages in RAM, so even a 'database read' is often a memory read.",
+    "Database buffer pool: the database keeps hot pages in RAM, so even a “database read” is often a memory read.",
     "On a miss at every layer, the read goes to disk or to another service, and the result is stored on the way back so the next read is a hit."
    ]
   },
@@ -87,12 +87,12 @@
   },
   "pitfalls": [
    {
-    "trap": "'Add Redis' without saying what is cached or for how long.",
-    "say": "'I'd cache restaurant menus by restaurant ID for 5 minutes with explicit invalidation on menu edits; prices at checkout come from the database.'"
+    "trap": "“Add Redis” without saying what is cached or for how long.",
+    "say": "“I’d cache restaurant menus by restaurant ID for 5 minutes with explicit invalidation on menu edits; prices at checkout come from the database.”"
    },
    {
     "trap": "Caching data that must be strongly consistent.",
-    "say": "'Wallet balances are read from the primary at payment time; the cached balance is only for display.'"
+    "say": "“Wallet balances are read from the primary at payment time; the cached balance is only for display.”"
    }
   ],
   "diagram": "app cache -> CDN edge -> gateway cache -> app (in-process) -> Redis -> DB buffer pool -> disk\n  fastest, least shared  ------------------------------------------>  slowest, source of truth",
@@ -215,11 +215,11 @@
   "pitfalls": [
    {
     "trap": "Updating the cache value on write instead of deleting it.",
-    "say": "'I write the database, then delete the key. Concurrent writers can otherwise leave an older value in the cache.'"
+    "say": "“I write the database, then delete the key. Concurrent writers can otherwise leave an older value in the cache.”"
    },
    {
     "trap": "Proposing write-behind for orders or payments.",
-    "say": "'Write-behind can lose acknowledged writes, so I'd only use it for counters; orders are written to the database first.'"
+    "say": "“Write-behind can lose acknowledged writes, so I’d only use it for counters; orders are written to the database first.”"
    }
   ],
   "diagram": "cache-aside read:  app -> cache? hit -> return\n                          miss -> DB -> set cache(TTL) -> return\ncache-aside write: app -> DB -> delete cache key\nwrite-behind:      app -> cache (ack) ... batch flush -> DB",
@@ -272,8 +272,8 @@
    "title": "What happens when the cache is full and a new key arrives",
    "steps": [
     "Every cache has a memory limit. When a write would exceed it, the cache must evict something first.",
-    "LRU (least recently used) evicts the key not read for the longest time. A hash map plus a doubly linked list makes both lookup and 'move to front' O(1).",
-    "LFU (least frequently used) evicts the key with the fewest accesses, usually with counters that decay over time so yesterday's popular keys can still be evicted.",
+    "LRU (least recently used) evicts the key not read for the longest time. A hash map plus a doubly linked list makes both lookup and “move to front” O(1).",
+    "LFU (least frequently used) evicts the key with the fewest accesses, usually with counters that decay over time so yesterday’s popular keys can still be evicted.",
     "FIFO evicts the oldest inserted key regardless of use: simple, but it will evict a hot key just because it is old.",
     "TTL expiry removes keys when their time is up, independent of memory pressure. It bounds staleness rather than size.",
     "Production caches approximate: Redis samples a few keys (5 by default) and evicts the best candidate among them, which is close to true LRU or LFU at a fraction of the bookkeeping."
@@ -339,16 +339,16 @@
   "india": {
    "title": "A video catalogue during a festival release",
    "label": "Illustrative estimate",
-   "body": "Take a video streaming catalogue in India. On a normal day the popular shows stay popular for weeks, which suits LFU with decay: an occasional one-off visit to an old title should not evict a show watched by millions. On a festival weekend, though, a big new release appears and is watched heavily within hours. Pure LFU would be slower to keep it: Redis gives a new key a small starting counter (LFU_INIT_VAL, 5) so it is not evicted at once, but long-popular titles still outrank it until it gathers hits; LRU would keep it at once. Redis offers both (allkeys-lru and allkeys-lfu), and LFU's counters decay so new hits catch up quickly. Many teams measure hit rate under both policies on a replay of real traffic before choosing."
+   "body": "Take a video streaming catalogue in India. On a normal day the popular shows stay popular for weeks, which suits LFU with decay: an occasional one-off visit to an old title should not evict a show watched by millions. On a festival weekend, though, a big new release appears and is watched heavily within hours. Pure LFU would be slower to keep it: Redis gives a new key a small starting counter (LFU_INIT_VAL, 5) so it is not evicted at once, but long-popular titles still outrank it until it gathers hits; LRU would keep it at once. Redis offers both (allkeys-lru and allkeys-lfu), and LFU’s counters decay so new hits catch up quickly. Many teams measure hit rate under both policies on a replay of real traffic before choosing."
   },
   "pitfalls": [
    {
-    "trap": "'Use LRU' with no thought about the access pattern.",
-    "say": "'Popularity is stable and skewed, so LFU with decay; if a nightly batch scans the catalogue, I'd keep it from polluting the cache.'"
+    "trap": "“Use LRU” with no thought about the access pattern.",
+    "say": "“Popularity is stable and skewed, so LFU with decay; if a nightly batch scans the catalogue, I’d keep it from polluting the cache.”"
    },
    {
     "trap": "Confusing TTL with eviction.",
-    "say": "'TTL bounds staleness; the eviction policy decides what goes when memory is full. I'd set both.'"
+    "say": "“TTL bounds staleness; the eviction policy decides what goes when memory is full. I’d set both.”"
    }
   ],
   "diagram": "LRU list (most recent first):  [P9] [P2] [P7] [P1]  <- evict P1\nread P7  ->                     [P7] [P9] [P2] [P1]\ninsert P5 (full) ->             [P5] [P7] [P9] [P2]   (P1 evicted)",
@@ -404,7 +404,7 @@
     "Avalanche: many keys expire at the same moment (for example everything loaded at startup with the same 1-hour TTL), or the whole cache cluster restarts, so the database suddenly takes all the traffic.",
     "Fix the avalanche with TTL jitter (for example 60 minutes ± 10%), staggered warm-up, a replicated cache that survives node loss, and rate limiting or circuit breakers in front of the database.",
     "Penetration: requests for keys that do not exist (often from bots or bugs) always miss the cache and always hit the database.",
-    "Fix penetration by caching 'not found' results with a short TTL, validating IDs early, and putting a Bloom filter of existing IDs in front of the database."
+    "Fix penetration by caching “not found” results with a short TTL, validating IDs early, and putting a Bloom filter of existing IDs in front of the database."
    ]
   },
   "useWhen": [
@@ -414,7 +414,7 @@
   ],
   "avoidWhen": [
    "Do not hold a rebuild lock without a timeout; if the rebuilder dies, everyone waits.",
-   "Do not cache 'not found' for long on data that is about to be created (a just-placed order), or users will not see their own new item."
+   "Do not cache “not found” for long on data that is about to be created (a just-placed order), or users will not see their own new item."
   ],
   "tradeoffs": {
    "columns": [
@@ -440,7 +440,7 @@
      "Penetration",
      "Requests for missing keys",
      "Negative caching, Bloom filter, validation",
-     "Memory for filter; brief false 'not found' risk"
+     "Memory for filter; brief false “not found” risk"
     ]
    ]
   },
@@ -460,25 +460,25 @@
    "result": "One unprotected hot key can send about 10,000 identical queries to the database in 200 ms; coalescing makes it one."
   },
   "india": {
-   "title": "Sale-day banners and the 'deal of the hour'",
+   "title": "Sale-day banners and the “deal of the hour”",
    "label": "Illustrative estimate",
-   "body": "Indian e-commerce sales often feature hourly deals that open at a fixed minute, say 'deal of the hour' at 12:00. Every shopper's app requests the same deal list at that minute, and if the cached list was given a TTL ending exactly at 12:00, the expiry and the traffic spike coincide: a textbook stampede on one key. The safer design prepares the next hour's list in advance and swaps it into the cache before 12:00, uses single-flight rebuilds in case of a miss, and adds TTL jitter to everything loaded in bulk. Bots requesting random product IDs to find unlisted deals are a penetration risk, handled with negative caching, ID validation and rate limiting."
+   "body": "Indian e-commerce sales often feature hourly deals that open at a fixed minute, say “deal of the hour” at 12:00. Every shopper’s app requests the same deal list at that minute, and if the cached list was given a TTL ending exactly at 12:00, the expiry and the traffic spike coincide: a textbook stampede on one key. The safer design prepares the next hour’s list in advance and swaps it into the cache before 12:00, uses single-flight rebuilds in case of a miss, and adds TTL jitter to everything loaded in bulk. Bots requesting random product IDs to find unlisted deals are a penetration risk, handled with negative caching, ID validation and rate limiting."
   },
   "pitfalls": [
    {
-    "trap": "Treating all three problems as 'add more cache'.",
-    "say": "'Stampede is one hot key: coalesce. Avalanche is mass expiry: jitter and warm-up. Penetration is missing keys: negative cache and a Bloom filter.'"
+    "trap": "Treating all three problems as “add more cache”.",
+    "say": "“Stampede is one hot key: coalesce. Avalanche is mass expiry: jitter and warm-up. Penetration is missing keys: negative cache and a Bloom filter.”"
    },
    {
     "trap": "Using a lock without a timeout or a stale fallback.",
-    "say": "'The rebuild lock has a short timeout, and waiting readers fall back to the stale value if it's not ready.'"
+    "say": "“The rebuild lock has a short timeout, and waiting readers fall back to the stale value if it’s not ready.”"
    }
   ],
   "diagram": "t=0  key 'deals' expires\n     50K req/s --miss--> [single-flight]\n                           |-> 1 rebuild -> DB\n                           '-> others: serve stale / wait 50 ms",
   "takeaways": [
    "Stampede: many misses on one hot key; fix with coalescing, stale-while-revalidate or early refresh.",
    "Avalanche: many keys expiring together or a cache restart; fix with jitter, warm-up and replicas.",
-   "Penetration: lookups for keys that don't exist; fix with negative caching and Bloom filters.",
+   "Penetration: lookups for keys that don’t exist; fix with negative caching and Bloom filters.",
    "Always protect the database behind the cache with limits."
   ],
   "extraQuestions": [
@@ -536,7 +536,7 @@
    "Cacheable API responses that are the same for many users for a few seconds (scores, prices on listing pages, configuration)."
   ],
   "avoidWhen": [
-   "Personalised or authenticated responses without careful cache keys; a shared cache can leak one user's data to another.",
+   "Personalised or authenticated responses without careful cache keys; a shared cache can leak one user’s data to another.",
    "Data that must be exact per request (checkout totals, seat availability at booking)."
   ],
   "tradeoffs": {
@@ -582,16 +582,16 @@
   "india": {
    "title": "Live cricket at record concurrency",
    "label": "Publicly reported concurrency; bandwidth is an illustrative estimate",
-   "body": "Indian streaming services have publicly reported record live audiences for cricket: Disney+ Hotstar (JioHotstar since its February 2025 merger with JioCinema) reported about 25.3 million concurrent viewers during the 2019 World Cup semi-final between India and New Zealand, and about 35 million (3.5 crore) for India v Pakistan at the 2023 World Cup. At an illustrative average of 2 Mbit/s per viewer, 25 million viewers need about 50 Tbit/s of delivery capacity, far beyond any single origin. That load is spread across CDN PoPs, including caches placed inside Indian internet providers' networks, while the origin produces each 6-second segment once per quality level. Capacity is planned and pre-provisioned with CDN partners well before a big match, because autoscaling cannot add terabits in minutes."
+   "body": "Indian streaming services have publicly reported record live audiences for cricket: Disney+ Hotstar (JioHotstar since its February 2025 merger with JioCinema) reported about 25.3 million concurrent viewers during the 2019 World Cup semi-final between India and New Zealand, and about 35 million (3.5 crore) for India v Pakistan at the 2023 World Cup. At an illustrative average of 2 Mbit/s per viewer, 25 million viewers need about 50 Tbit/s of delivery capacity, far beyond any single origin. That load is spread across CDN PoPs, including caches placed inside Indian internet providers’ networks, while the origin produces each 6-second segment once per quality level. Capacity is planned and pre-provisioned with CDN partners well before a big match, because autoscaling cannot add terabits in minutes."
   },
   "pitfalls": [
    {
     "trap": "Relying on purges to ship new JavaScript.",
-    "say": "'Assets get content-hashed file names and a one-year max-age; index.html is short-lived and points at the new hashes.'"
+    "say": "“Assets get content-hashed file names and a one-year max-age; index.html is short-lived and points at the new hashes.”"
    },
    {
     "trap": "Serving paid video from public URLs.",
-    "say": "'The app issues short-lived signed URLs or cookies; the edge verifies the signature without calling our servers.'"
+    "say": "“The app issues short-lived signed URLs or cookies; the edge verifies the signature without calling our servers.”"
    }
   ],
   "diagram": "viewers -> [edge PoP Mumbai] --miss--> [origin shield] --miss--> [origin / packager]\nviewers -> [edge PoP Delhi ] --hit--> (served locally)",
@@ -647,8 +647,8 @@
     "Because commands are tiny in-memory operations, a single node typically serves on the order of 100,000+ simple operations per second with sub-millisecond latency, until one slow command (KEYS *, a huge SORT) blocks everyone behind it.",
     "Data structures do the work on the server: strings and counters (INCR), hashes (objects), lists (queues), sets, sorted sets (leaderboards, rate-limit windows), streams (append-only logs), plus HyperLogLog and bitmaps.",
     "Persistence is optional: RDB snapshots write the whole dataset periodically; the AOF appends every write and can fsync every second, losing at most about a second of writes on a crash.",
-    "Replication is asynchronous: a replica follows the primary's stream of writes. If the primary fails, a replica is promoted, and writes not yet replicated can be lost.",
-    "Redis Cluster splits the key space into 16,384 hash slots spread across primaries. A key's slot is CRC16(key) mod 16,384; hash tags like {user:42} keep related keys in one slot so multi-key commands still work."
+    "Replication is asynchronous: a replica follows the primary’s stream of writes. If the primary fails, a replica is promoted, and writes not yet replicated can be lost.",
+    "Redis Cluster splits the key space into 16,384 hash slots spread across primaries. A key’s slot is CRC16(key) mod 16,384; hash tags like {user:42} keep related keys in one slot so multi-key commands still work."
    ]
   },
   "useWhen": [
@@ -668,7 +668,7 @@
    "rows": [
     [
      "Data model",
-     "Rich structures (hashes, sorted sets, streams...)",
+     "Rich structures (hashes, sorted sets, streams…)",
      "Plain strings / blobs"
     ],
     [
@@ -716,18 +716,18 @@
   "pitfalls": [
    {
     "trap": "Running KEYS * or a huge range query in production.",
-    "say": "'I'd use SCAN with a cursor and keep operations bounded; one slow command blocks the single command thread.'"
+    "say": "“I’d use SCAN with a cursor and keep operations bounded; one slow command blocks the single command thread.”"
    },
    {
     "trap": "Using Redis as the system of record for money or orders.",
-    "say": "'Redis replication is asynchronous, so a failover can lose recent writes; the database is the source of truth.'"
+    "say": "“Redis replication is asynchronous, so a failover can lose recent writes; the database is the source of truth.”"
    }
   ],
   "diagram": "client -> CRC16(key) mod 16384 = slot 9842\nslots 0-5460     -> primary A (+replica)\nslots 5461-10922 -> primary B (+replica)   <- slot 9842\nslots 10923-16383-> primary C (+replica)",
   "takeaways": [
    "Redis executes commands on one thread in RAM: fast and atomic, but slow commands block everyone.",
    "Pick the data structure for the job: sorted sets for rankings, hashes for objects, streams for logs.",
-   "Replication is asynchronous; persistence is optional. Don't make Redis your only copy of critical data.",
+   "Replication is asynchronous; persistence is optional. Don’t make Redis your only copy of critical data.",
    "Redis Cluster shards keys over 16,384 slots; use hash tags to co-locate related keys."
   ],
   "extraQuestions": [
@@ -751,13 +751,13 @@
      },
      {
       "id": "d",
-      "label": "The key's first letter picks the node"
+      "label": "The key’s first letter picks the node"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Redis Cluster has 16,384 hash slots. A key's slot is CRC16(key) mod 16,384, and slots are distributed across primaries."
+    "explanation": "Redis Cluster has 16,384 hash slots. A key’s slot is CRC16(key) mod 16,384, and slots are distributed across primaries."
    }
   ]
  }

@@ -12,6 +12,10 @@ import sys
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..', 'authored')
 
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'quality'))
+from style import style  # noqa: E402  house style runs after this script, so an applied fix may be restyled
+
+
 def js(s):
     """A Python string as it appears inside a JSON string literal in these files."""
     return json.dumps(s, ensure_ascii=False)[1:-1]
@@ -110,8 +114,8 @@ def apply_text(path, text):
             continue
         o = old if old.startswith('"') else js(old)
         n = new if new.startswith('"') else js(new)
-        if text.count(n) and not text.count(o):
-            continue  # already applied
+        if (n in text or js(style(json.loads(f'"{n}"'))) in text) and o not in text:
+            continue  # already applied (possibly restyled by quality/style.py)
         assert text.count(o) == want, f'{f}: expected {want} match(es) for {old[:60]!r}, found {text.count(o)}'
         text = text.replace(o, n)
         changed = True
