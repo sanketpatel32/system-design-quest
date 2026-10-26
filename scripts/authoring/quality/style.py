@@ -78,6 +78,7 @@ def style(s):
 
 # --- Per-topic edits: exact (old, new) replacements inside that topic's strings (all authored files) ---
 FIX = {
+    75: [('(7 chars ≈ 3.5T ids)', '(7 characters ≈ 3.5 trillion IDs)')],
     1: [('Structured thinking, trade-offs, communication — not a single perfect diagram.', 'Structured thinking, trade-offs and communication, not a single perfect diagram.')],
     10: [('full-duplex connection — needed for chat', 'full-duplex connection, needed for chat')],
     30: [('Split data across nodes by key — range, hash or directory — to scale writes and storage.', 'Split data across nodes by key (range, hash or directory) to scale writes and storage.')],
