@@ -131,7 +131,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
         <Onboarding />
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 id="map-title" className="font-display text-[1.75rem] sm:text-3xl md:text-4xl" style={{ color: sp.deep }}>{questName(section.id)}</h1>
+            <h1 id="map-title" className="font-display text-[1.75rem] max-[399px]:text-[1.5rem] sm:text-3xl md:text-4xl" style={{ color: sp.deep }}>{questName(section.id)}</h1>
             <p className="text-dim mt-1 max-sm:text-sm">
               {fund ? `${doneCount} of ${total} topics cleared · ${xp} XP. ${section.blurb} Language-agnostic. Everything is open: follow the suggested order or jump to any topic.` : <>{doneCount} of {total} lessons cleared in {learningRegions.length} units · practice track: {playbookDone + bossesDone} of {1 + arenaTopics.length} (Interview Playbook and {arenaTopics.length} bosses). Everything is open; the path is just the suggested order.</>}
             </p>
