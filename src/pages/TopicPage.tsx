@@ -10,6 +10,7 @@ import { regionPalette, transitLineColor } from '../lib/design/transitTheme'
 import { Mascot } from '../components/art/Mascot'
 import { IconCheck } from '../components/icons/HudIcons'
 import { suggestionHint } from '../lib/progression/unlocks'
+import { readingMinutes } from '../lib/fun/fun'
 import { completedTopicIds, useGameStore } from '../stores/gameStore'
 
 export function TopicPage() {
@@ -56,7 +57,9 @@ export function TopicPage() {
         <header className="unit-banner flex items-center gap-4 p-4 sm:p-5" style={{ background: pal.deep, ['--banner-shadow' as string]: pal.shadow }}>
           <div className="min-w-0 flex-1">
             <h1 className="font-display text-[1.75rem] sm:text-4xl text-white mt-1 leading-tight" data-testid="topic-title">{topic.title}</h1>
-            <p className="text-sm font-extrabold text-white">{regionName} · {topicLabel(topic.id)}</p>
+            <p className="text-sm font-extrabold text-white">
+              {regionName} · {topicLabel(topic.id)} · <span data-testid="reading-time">{readingMinutes(topic)} min read</span>
+            </p>
             {topic.objectives.length > 0 && (
               <>
                 {/* Phones: goals fold away so the first card is on the first screen */}
@@ -84,6 +87,7 @@ export function TopicPage() {
           interactive={topic.interactive}
           accent={accent}
           finalAction={finalAction}
+          recap
           skipAction={
             <Link to={topic.kind === 'boss' ? `/boss/${topic.slug}` : `/quiz/${topic.slug}`} className="inline-flex min-h-[44px] items-center gap-1 text-sm font-extrabold text-teal hover:underline" data-testid="skip-to-quiz">
               {topic.kind === 'boss' ? 'Skip to boss fight' : 'Skip to quiz'}

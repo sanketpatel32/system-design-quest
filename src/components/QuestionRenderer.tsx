@@ -16,7 +16,7 @@ interface Props {
   /** Outcome of an earlier, saved attempt: shows its result without regrading */
   reveal?: { correct: boolean }
   /** Duolingo-style mode: a fixed bottom bar holds Submit, and feedback slides up as a coloured sheet */
-  sheet?: { onContinue: () => void; continueLabel: string; extra?: React.ReactNode }
+  sheet?: { onContinue: () => void; continueLabel: string; extra?: React.ReactNode; /** Byte's one-liner, e.g. a combo cheer */ reaction?: string }
   /** Mixed into the drag-order scramble so each attempt gets a new order */
   scrambleSeed?: string
 }
@@ -542,6 +542,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
                     <FeedbackMark ok={shown.correct} />
                     {shown.correct ? 'Correct' : 'Not this time'}
                   </p>
+                  {result && sheet.reaction && <p className="text-sm font-extrabold" data-testid="byte-reaction">{sheet.reaction}</p>}
                   {!/^correct\.?$/i.test(shown.feedback.trim()) && <p className="font-bold">{shown.feedback}</p>}
                   <p className="mt-1 text-[0.9375rem] leading-relaxed text-chalk">
                     <span className="font-extrabold">Why: </span>

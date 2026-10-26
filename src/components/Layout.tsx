@@ -31,12 +31,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
     prevXp.current = xp
   }, [xp])
   const { pathname } = useLocation()
-  const inQuiz = pathname.startsWith('/quiz/')
+  const inQuiz = pathname.startsWith('/quiz/') || pathname === '/play'
   const currentSection = useCurrentSection()
   // Tab title follows the section: "Frontend Quest", "Review · Backend Quest"; home is System Design Quest
   useEffect(() => {
     const quest = questName(currentSection ?? 'system-design')
-    const page = pathname === '/revision' ? 'Review' : pathname === '/cheat-sheet' ? 'Cheat sheet' : null
+    const page = pathname === '/play' ? 'Quick play' : pathname === '/revision' ? 'Review' : pathname === '/cheat-sheet' ? 'Cheat sheet' : null
     document.title = page ? `${page} · ${quest}` : quest
   }, [currentSection, pathname])
 

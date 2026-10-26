@@ -3,6 +3,8 @@ import { SECTIONS, questName, sectionPalette, sectionPath, sectionTopics, lastSe
 import { useGameStore } from '../stores/gameStore'
 import { sectionXp } from '../lib/progression/sectionXp'
 import { RegionMotif } from '../components/map/RegionMotif'
+import { Mascot } from '../components/art/Mascot'
+import { ROUND_SIZE } from '../lib/fun/fun'
 
 function Ring({ done, total, colour, id }: { done: number; total: number; colour: string; id: string }) {
   const r = 30, c = 2 * Math.PI * r, f = total ? done / total : 0
@@ -46,7 +48,16 @@ export function SectionsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-3xl md:text-4xl text-chalk">Choose a section</h1>
+        <p className="mt-1 font-bold text-dim">Everything is open. Start anywhere, or warm up with a quick round.</p>
       </div>
+      <Link to="/play" className="panel flex items-center gap-4 p-4 sm:p-5 hover:-translate-y-0.5 transition-transform" data-testid="quick-play-card">
+        <Mascot mood="happy" size={64} className="shrink-0" />
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-xl text-chalk">Quick play</span>
+          <span className="block text-sm font-bold text-dim">{ROUND_SIZE} mixed questions from every section. About 3 minutes, nothing to lose.</span>
+        </span>
+        <span className="btn-cta max-sm:hidden">Play</span>
+      </Link>
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 min-[1800px]:grid-cols-4" aria-label="Sections">
         {SECTIONS.map((s) => {
           const topics = sectionTopics(s.id)

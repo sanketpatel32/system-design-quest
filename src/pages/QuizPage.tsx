@@ -10,6 +10,8 @@ import { regionPalette } from '../lib/design/transitTheme'
 import { fireConfetti, playCelebrationSound } from '../lib/celebrate'
 import { BADGE_LABELS } from '../lib/progression/badges'
 import { INITIAL_HEARTS, PASS_PERCENT } from '../lib/scoring/quiz'
+import { byteReaction } from '../lib/fun/fun'
+import { ComboChip } from '../components/ui/ComboChip'
 import { useGameStore, useStreak } from '../stores/gameStore'
 
 type Claim = { xpGained: number; newBadges: string[] } | null
@@ -39,6 +41,10 @@ export function QuizPage() {
   const claimedRef = useRef(false)
   const [skipLessonHint, setSkipLessonHint] = useState(false)
   const [heartsNudgeHidden, setHeartsNudgeHidden] = useState(false)
+  /** Correct answers in a row this session, and the best run so far */
+  const [combo, setCombo] = useState(0)
+  const [bestCombo, setBestCombo] = useState(0)
+  const [reaction, setReaction] = useState('')
 
   useEffect(() => {
     if (topicId) startQuizAttempt(topicId)
@@ -98,6 +104,8 @@ export function QuizPage() {
     setPractice(0)
     setClaim(null)
     setAttemptSeed(Math.random().toString(36).slice(2))
+    setCombo(0)
+    setBestCombo(0)
   }
 
   readyToClaim.current = showResult && passed && !alreadyCleared && !claim
@@ -133,6 +141,7 @@ export function QuizPage() {
         >
           <div className="progress-fill" style={{ ['--fill' as string]: `${Math.max(answeredCount ? 6 : 0, (answeredCount / total) * 100)}%` }} />
         </div>
+        <ComboChip combo={combo} />
         <HeartsHud hearts={attempt.hearts} />
       </header>
 
@@ -169,7 +178,9 @@ export function QuizPage() {
             <h1 id="quiz-result" className="font-display mt-3 text-4xl text-[var(--color-hero-deep)]">
               {claim || alreadyCleared ? 'Lesson complete!' : 'You passed!'}
             </h1>
-            <p className="mt-1 text-lg font-bold text-dim">{correctCount}/{total} correct</p>
+            <p className="mt-1 text-lg font-bold text-dim">
+              {correctCount}/{total} correct{bestCombo >= 2 ? ` · best run ${bestCombo} in a row` : ''}
+            </p>
             <div className="mx-auto mt-6 grid max-w-md grid-cols-3 gap-3">
               <StatTile label="Total XP" color="var(--color-gold)" deep="var(--color-gold-deep)" value={claim ? `+${claim.xpGained}` : 'Saved'} icon={<IconGem size={28} />} />
               <StatTile label="Accuracy" color="var(--color-hero)" deep="var(--color-hero-deep)" value={`${Math.round((correctCount / total) * 100)}%`} icon={<Target />} />
@@ -262,14 +273,21 @@ export function QuizPage() {
             reveal={practice === 0 && answered ? { correct: Boolean(results[q.id]) } : undefined}
             initialAnswer={practice === 0 ? attempt.answers[q.id] : undefined}
             hotkeys={practice > 0 || !answered}
-            onSubmit={(answer) => {
+            onSubmit={(answer, r) => {
               // Stay on this question to read the feedback; the learner moves on with Continue
               setIndex(current)
-              if (practice === 0) recordQuizAnswer(topic.id, q, answer)
+              const run = r.correct ? combo + 1 : 0
+              setReaction(byteReaction(r.correct, run, `${q.id}-${attemptSeed}-${practice}`))
+              if (practice === 0) {
+                recordQuizAnswer(topic.id, q, answer)
+                setCombo(run)
+                setBestCombo((b) => Math.max(b, run))
+              }
             }}
             sheet={{
               onContinue: goNext,
               continueLabel: nextOpen === total ? 'See result' : 'Continue',
+              reaction,
               extra:
                 answered && !results[q.id] && practice === 0 ? (
                   <button type="button" className="text-sm font-extrabold underline-offset-2 hover:underline" onClick={() => setPractice((x) => x + 1)}>

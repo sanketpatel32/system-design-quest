@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { Interactive, LessonCard } from '../content/types'
 import { InteractiveBlock } from './InteractiveBlock'
 import { MascotSays } from './art/Mascot'
+import { paragraphs } from '../lib/fun/fun'
 
 /** Some imported cards carry their kind ('text', 'diagram') as a placeholder title; don't render those. */
 function hasRealTitle(card: LessonCard) {
@@ -24,6 +25,7 @@ export function LessonDeck({
   accent = 'var(--color-amber)',
   finalAction,
   skipAction,
+  recap = false,
   initialIndex = 0,
   onIndexChange,
 }: {
@@ -33,6 +35,8 @@ export function LessonDeck({
   finalAction?: ReactNode
   /** Always-available shortcut past the cards (e.g. Skip to quiz); hidden on the last card, where finalAction shows */
   skipAction?: ReactNode
+  /** On the last card, list what the lesson covered before the quiz */
+  recap?: boolean
   /** Optional experiment or decision, added as the last step before the quiz */
   interactive?: Interactive
   /** Card to open on (resume) */
@@ -48,6 +52,7 @@ export function LessonDeck({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index])
   const card = cards[index]
+  const covered = baseCards.filter(hasRealTitle)
 
   const next = useCallback(() => setIndex((i) => Math.min(cards.length - 1, i + 1)), [cards.length])
   const prev = useCallback(() => setIndex((i) => Math.max(0, i - 1)), [])
@@ -100,7 +105,11 @@ export function LessonDeck({
         {card.id === 'try-it' && interactive ? (
           <InteractiveBlock key={interactive.title} item={interactive} />
         ) : (
-          <p className="text-chalk leading-relaxed text-[1.125rem] font-semibold">{card.body}</p>
+          <div className="space-y-3">
+            {paragraphs(card.body).map((para, i) => (
+              <p key={i} className="text-chalk leading-relaxed text-[1.125rem] font-semibold">{para}</p>
+            ))}
+          </div>
         )}
         {card.steps && card.steps.length > 0 && (
           <ol className="flow mt-5" aria-label="Steps">
@@ -124,6 +133,21 @@ export function LessonDeck({
         {card.kind === 'animation' && (
           <div className="mt-4 h-1 bg-[var(--color-rail)] rounded-full overflow-hidden" aria-hidden>
             <div className="h-full w-1/3 rounded-full bg-[var(--color-amber)] animate-[slide_1.8s_ease-in-out_infinite]" style={{ animationName: 'slide' }} />
+          </div>
+        )}
+        {index === cards.length - 1 && finalAction && recap && covered.length > 1 && (
+          <div className="mt-6 rounded-2xl bg-paper-2 p-4" data-testid="lesson-recap">
+            <p className="text-sm font-extrabold text-dim">In this lesson</p>
+            <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+              {covered.map((c) => (
+                <li key={c.id}>
+                  <button type="button" className="flex min-h-[32px] w-full items-start gap-2 text-left font-bold text-chalk hover:text-teal" onClick={() => setIndex(cards.indexOf(c))}>
+                    <span aria-hidden className="mt-[0.45em] h-2 w-2 shrink-0 rounded-full" style={{ background: accent }} />
+                    {c.title}
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
         {index === cards.length - 1 && finalAction && (

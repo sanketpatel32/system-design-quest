@@ -11,6 +11,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { TopicPage } from './pages/TopicPage'
 import { useGameStore } from './stores/gameStore'
 import { SectionsPage } from './pages/SectionsPage'
+import { PlayPage } from './pages/PlayPage'
 import { isSectionId, rememberSection } from './content/sections'
 
 import { Mascot } from './components/art/Mascot'
@@ -66,6 +67,7 @@ function AppRoutes() {
       <Route path="/topic/:slug" element={<TopicPage />} />
       <Route path="/quiz/:slug" element={<QuizPage />} />
       <Route path="/boss/:slug" element={<BossPage />} />
+      <Route path="/play" element={<PlayPage />} />
       <Route path="/interview" element={<InterviewPage />} />
       <Route path="/revision" element={<RevisionPage />} />
       <Route path="/cheat-sheet" element={<CheatSheetPage />} />

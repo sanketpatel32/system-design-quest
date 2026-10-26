@@ -74,6 +74,8 @@ DesignQuest should feel like a friendly learning game: a warm light page, satura
 - **The question takes the full width**, with a large prompt and big answer tiles.
 - **A fixed white bottom bar holds Submit.**
 - **After you submit, a feedback sheet slides up from the bottom.** It is green or red, with Byte, the result, a "Why" explanation and a chunky Continue button (red when you were wrong). It also offers a practice retry.
+- **Combo chip.** From two correct answers in a row, a flame chip next to the hearts shows the run (×3) and pops on each new answer; Byte adds a one-line reaction in the sheet. The result shows the best run.
+- **Quick play (`/play`).** A short mixed round (8 by default) from every section or one section; no hearts, no xp, a summary with lessons worth a look.
 - **Celebration screen.** Happy Byte pops in, three stat tiles (Total XP, Accuracy, Streak) appear, and colourful confetti fires, followed by Continue and Back to map buttons.
 
 ## Layout

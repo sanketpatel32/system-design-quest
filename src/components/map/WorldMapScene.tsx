@@ -14,6 +14,7 @@ import { bosses as arenaTopics, BOSS_N, FUND_N, fundamentalRegions, LESSON_N as 
 
 import { SECTION_BY_ID, sectionPalette, sectionTopics, type SectionId, questName } from '../../content/sections'
 import { sectionXp } from '../../lib/progression/sectionXp'
+import { ROUND_SIZE } from '../../lib/fun/fun'
 /** Minutes: ~1 per lesson card, ~1.5 per question */
 export function topicMinutes(id: number) {
   const t = topicsById.get(id)
@@ -134,6 +135,10 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
             <p className="text-dim mt-1 max-sm:text-sm">
               {fund ? `${doneCount} of ${total} topics cleared · ${xp} XP. ${section.blurb} Language-agnostic. Everything is open: follow the suggested order or jump to any topic.` : <>{doneCount} of {total} lessons cleared in {learningRegions.length} units · practice track: {playbookDone + bossesDone} of {1 + arenaTopics.length} (Interview Playbook and {arenaTopics.length} bosses). Everything is open; the path is just the suggested order.</>}
             </p>
+            <Link to={`/play?s=${section.id}`} className="mt-1 inline-flex min-h-[44px] items-center gap-1 text-sm font-extrabold text-teal hover:underline" data-testid="section-quick-play">
+              Quick play: {ROUND_SIZE} mixed {section.name} questions
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </Link>
           </div>
           <div className="flex items-center gap-1 rounded-2xl border-2 border-[var(--color-rail)] bg-white p-1" role="group" aria-label="Map view">
             {(['path', 'list'] as const).map((v) => (
