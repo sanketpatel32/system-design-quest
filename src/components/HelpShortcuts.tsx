@@ -1,7 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useFocusTrap } from '../lib/ui/useFocusTrap'
 
 export function HelpShortcuts() {
   const [open, setOpen] = useState(false)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const close = useCallback(() => setOpen(false), [])
+  useFocusTrap(panelRef, open, close)
 
   useEffect(() => {
     const onToggle = () => setOpen((v) => !v)
@@ -13,7 +17,6 @@ export function HelpShortcuts() {
         e.preventDefault()
         setOpen((v) => !v)
       }
-      if (e.key === 'Escape') setOpen(false)
     }
     window.addEventListener('keydown', onKey)
     return () => {
@@ -33,6 +36,8 @@ export function HelpShortcuts() {
       onClick={() => setOpen(false)}
     >
       <div
+        ref={panelRef}
+        tabIndex={-1}
         className="panel anim-pop max-w-md w-full p-6 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >

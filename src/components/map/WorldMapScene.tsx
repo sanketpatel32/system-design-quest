@@ -12,7 +12,7 @@ import { IconBook, IconCastle, IconCheck, IconStar } from '../icons/HudIcons'
 
 import { bosses as arenaTopics, BOSS_N, FUND_N, fundamentalRegions, LESSON_N as STATION_N, learningRegions, playbook, PLAYBOOK_ID, topicLabel } from '../../content/numbering'
 
-import { SECTION_BY_ID, sectionPalette, sectionTopics, type SectionId, questName } from '../../content/sections'
+import { SECTION_BY_ID, sectionPalette, sectionTopics, shortName, type SectionId, questName } from '../../content/sections'
 import { sectionXp } from '../../lib/progression/sectionXp'
 import { ROUND_SIZE } from '../../lib/fun/fun'
 /** Minutes: ~1 per lesson card, ~1.5 per question */
@@ -88,7 +88,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
   const nextQuestion = nextTopic ? nextTopic.questions.findIndex((x) => !(x.id in (quizAttempts[`topic-${nextTopic.id}`]?.results ?? {}))) : -1
   const total = trackIds.length
   const doneCount = trackIds.filter((id) => completed.has(id)).length
-  const unitWord = (t: Topic) => (fund ? `Fundamentals, ${topicLabel(t.id)}` : `Unit ${learningRegions.findIndex((r) => r.id === t.region) + 1}`)
+  const unitWord = (t: Topic) => (fund ? `${shortName(section)} ${FUND_N.get(t.id) ?? ''}`.trim() : `Unit ${learningRegions.findIndex((r) => r.id === t.region) + 1}`)
   const bossesDone = arenaTopics.filter((t) => completed.has(t.id)).length
   const playbookDone = completed.has(PLAYBOOK_ID) ? 1 : 0
 
@@ -115,7 +115,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
                       ? 'Lesson read · the quiz is next'
                       : `Lesson in progress · card ${lp.card + 1} of ${nextTopic.cards.length}`
                     : fund
-                      ? `About ${topicMinutes(nextTopic.id)} min · ${doneCount} of ${total} ${section.name} topics cleared`
+                      ? `About ${topicMinutes(nextTopic.id)} min · ${doneCount} of ${total} ${shortName(section)} topics cleared`
                       : `About ${topicMinutes(nextTopic.id)} min · lesson ${STATION_N.get(nextTopic.id)} of ${total}`}
               </p>
             </div>
@@ -135,9 +135,9 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
             <p className="text-dim mt-1 max-sm:text-sm">
               {fund ? `${doneCount} of ${total} topics cleared · ${xp} XP. ${section.blurb} Language-agnostic. Everything is open: follow the suggested order or jump to any topic.` : <>{doneCount} of {total} lessons cleared in {learningRegions.length} units · practice track: {playbookDone + bossesDone} of {1 + arenaTopics.length} (Interview Playbook and {arenaTopics.length} bosses). Everything is open; the path is just the suggested order.</>}
             </p>
-            <Link to={`/play?s=${section.id}`} className="mt-1 inline-flex min-h-[44px] items-center gap-1 text-sm font-extrabold text-teal hover:underline" data-testid="section-quick-play">
-              Quick play: {ROUND_SIZE} mixed {section.name} questions
-              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <Link to={`/play?s=${section.id}`} className="mt-1 inline-block min-h-[44px] py-3 text-sm leading-5 font-extrabold text-teal hover:underline" data-testid="section-quick-play">
+              Quick play: {ROUND_SIZE} mixed {shortName(section)}{' '}
+              <span className="whitespace-nowrap">questions<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden className="ml-1 inline align-[-2px]"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
             </Link>
           </div>
           <div className="flex items-center gap-1 rounded-2xl border-2 border-[var(--color-rail)] bg-white p-1" role="group" aria-label="Map view">
@@ -211,7 +211,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
             <div>
               <p className="font-display text-xl">{doneCount ? 'Nice work!' : 'Ready when you are'}</p>
               <p className="text-dim text-sm">{doneCount} of {total} {fund ? 'topics' : 'lessons'} cleared</p>
-              <p className="text-sm font-extrabold tabular-nums" style={{ color: sp.deep }} data-testid="section-xp">{xp} XP in {section.name}</p>
+              <p className="text-sm font-extrabold tabular-nums" style={{ color: sp.deep }} data-testid="section-xp">{xp} XP in {shortName(section)}</p>
             </div>
           </div>
           <div className="progress-track mt-4" aria-hidden>
@@ -277,7 +277,7 @@ function UnitBanner({ regionId, index, done, total, title, collapsed, onToggle, 
           <div className="h-full rounded-full bg-white" style={{ width: `${(done / Math.max(1, total)) * 100}%` }} />
         </div>
         {onToggle && (
-          <button type="button" onClick={onToggle} aria-expanded={!collapsed} className="mt-1 -mb-1 inline-flex min-h-[44px] min-w-[56px] items-center justify-center rounded-xl bg-white/20 px-3 text-xs font-extrabold text-white hover:bg-white/30" data-testid={`unit-toggle-${regionId}`}>
+          <button type="button" onClick={onToggle} aria-expanded={!collapsed} className="mt-1 -mb-1 inline-flex min-h-[44px] min-w-[56px] items-center justify-center rounded-xl banner-btn px-3 text-xs font-extrabold" data-testid={`unit-toggle-${regionId}`}>
             {collapsed ? 'Show' : 'Hide'}
           </button>
         )}

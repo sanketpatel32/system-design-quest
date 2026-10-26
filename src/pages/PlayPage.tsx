@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { allTopics } from '../content/catalog'
-import { SECTIONS, isSectionId, sectionTopics } from '../content/sections'
+import { SECTIONS, isSectionId, sectionTopics, shortName } from '../content/sections'
 import { QuestionRenderer } from '../components/QuestionRenderer'
 import { Mascot } from '../components/art/Mascot'
 import { ComboChip } from '../components/ui/ComboChip'
@@ -57,9 +57,9 @@ export function PlayPage() {
       {!done && step === 0 && results.length === 0 && (
         <label className="mb-4 flex items-center gap-2 sm:hidden">
           <span className="whitespace-nowrap text-sm font-extrabold text-dim">Mix from</span>
-          <select className="field !min-h-[44px] flex-1 font-extrabold" value={section ?? ''} onChange={(e) => restart(e.target.value)} data-testid="play-mix">
+          <select className="field !min-h-[44px] min-w-0 flex-1 font-extrabold" value={section ?? ''} onChange={(e) => restart(e.target.value)} data-testid="play-mix">
             <option value="">Everything</option>
-            {SECTIONS.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            {SECTIONS.map((x) => <option key={x.id} value={x.id}>{shortName(x)}</option>)}
           </select>
         </label>
       )}
@@ -90,7 +90,7 @@ export function PlayPage() {
                 {round.map((x, i) => (results[i] ? null : (
                   <li key={x.question.id + i} className="panel flex flex-wrap items-center justify-between gap-2 p-3">
                     <span className="min-w-0 font-bold text-chalk">{x.topicTitle}</span>
-                    <Link to={`/topic/${x.topicSlug}`} className="font-extrabold text-teal hover:underline">Read the lesson</Link>
+                    <Link to={`/topic/${x.topicSlug}`} className="tap-link font-extrabold text-teal hover:underline">Read the lesson</Link>
                   </li>
                 )))}
               </ul>

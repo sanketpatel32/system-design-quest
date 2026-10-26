@@ -5,7 +5,8 @@ import { BADGE_LABELS } from '../lib/progression/badges'
 import { IconBadge, IconFlame, IconGem, NavIcon } from './icons/HudIcons'
 import { HelpShortcuts } from './HelpShortcuts'
 import { SectionSwitcher, useCurrentSection } from './brand/SectionSwitcher'
-import { questName } from '../content/sections'
+import { pageTitle } from '../lib/ui/pageTitle'
+import { useFitsRow } from '../lib/ui/useFitsRow'
 import { AccountButton } from './AccountButton'
 
 const nav = [
@@ -33,12 +34,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
   const inQuiz = pathname.startsWith('/quiz/') || pathname === '/play'
   const currentSection = useCurrentSection()
-  // Tab title follows the section: "Frontend Quest", "Review · Backend Quest"; home is System Design Quest
+  // Tab title names the page and the section: "Quiz: TLS handshake · Networking Quest"
   useEffect(() => {
-    const quest = questName(currentSection ?? 'system-design')
-    const page = pathname === '/play' ? 'Quick play' : pathname === '/revision' ? 'Review' : pathname === '/cheat-sheet' ? 'Cheat sheet' : null
-    document.title = page ? `${page} · ${quest}` : quest
+    document.title = pageTitle(pathname, currentSection)
   }, [currentSection, pathname])
+  // The XP popover closes on Escape or a click outside it
+  const hudRef = useRef<HTMLDivElement>(null)
+  const streakRef = useRef<HTMLSpanElement>(null)
+  const streakFits = useFitsRow(hudRef, streakRef)
+  useEffect(() => {
+    if (!hudOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setHudOpen(false) }
+    const onDown = (e: PointerEvent) => { if (!hudRef.current?.contains(e.target as Node)) setHudOpen(false) }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('pointerdown', onDown)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('pointerdown', onDown)
+    }
+  }, [hudOpen])
 
   // The in-app setting applies the same rules as the OS-level prefers-reduced-motion
   useEffect(() => {
@@ -66,20 +80,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <header className={`shell-header sticky top-0 z-50 short:static ${inQuiz ? 'max-lg:hidden' : ''}`} data-testid="app-header">
         <div className="max-w-[73.75rem] 2xl:max-w-[80rem] mx-auto px-3 max-[399px]:px-2 sm:px-4 py-2 flex items-center justify-between gap-3 max-[399px]:gap-1.5">
           <div className="flex shrink-0 lg:invisible"><SectionSwitcher variant="header" /></div>
-          <div className="relative flex min-w-0 items-center gap-0.5 sm:gap-1">
+          <div ref={hudRef} className="relative flex min-w-0 items-center gap-0.5 sm:gap-1">
             <button
               type="button"
               className="flex min-h-[44px] items-center gap-1"
               aria-expanded={hudOpen}
               aria-controls="hud-explainer"
-              aria-label={`Level ${level}, ${xp} xp, ${streak}-day streak${badges.length ? `, ${badges.length} badges` : ''}. Show details`}
+              aria-label={`Level ${level}, ${xp} XP, ${streak}-day streak${badges.length ? `, ${badges.length} badges` : ''}. Show details`}
               onClick={() => setHudOpen((v) => !v)}
             >
-              <span className="hud-chip text-flame-ink max-[479px]:hidden" title={`${streak}-day streak`}>
+              <span ref={streakRef} className={`hud-chip hud-streak text-flame-ink ${streakFits ? '' : 'hidden'}`} data-testid="hud-streak" title={`${streak}-day streak`}>
                 <IconFlame lit={streak > 0} />
                 <span className="tabular-nums">{streak}</span>
               </span>
-              <span className="hud-chip text-teal" title={`Level ${level} · ${xp % 500} of 500 xp to the next level`}>
+              <span className="hud-chip text-teal" title={`Level ${level} · ${xp % 500} of 500 XP to the next level`}>
                 <span className="relative inline-flex">
                   <IconGem />
                   {sparkle > 0 && (
@@ -88,10 +102,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     </span>
                   )}
                 </span>
-                <span className="tabular-nums">{xp}<span className="hidden sm:inline"> xp</span></span>
+                <span className="tabular-nums">{xp}<span className="hidden sm:inline"> XP</span></span>
               </span>
               {badges.length > 0 && (
-                <span className="hud-chip text-gold-deep inline-flex" title={`${badges.length} badge${badges.length === 1 ? "" : "s"} earned`}>
+                <span className="hud-chip text-gold-deep inline-flex max-[479px]:hidden" title={`${badges.length} badge${badges.length === 1 ? "" : "s"} earned`}>
                   <IconBadge />
                   <span className="tabular-nums">{badges.length}</span>
                 </span>
@@ -114,7 +128,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             )}
             <button
               type="button"
-              className="hud-chip text-dim px-3 hidden sm:inline-flex"
+              className="hud-chip text-dim min-w-[44px] justify-center hidden sm:inline-flex"
               data-testid="help-shortcuts-trigger"
               aria-label="Keyboard shortcuts"
               onClick={() => document.dispatchEvent(new CustomEvent('sdq-toggle-help'))}

@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { BrowserRouter, Link, Navigate, Route, Routes, useParams, useSearchParams } from 'react-router-dom'
+import { useEffect, useLayoutEffect } from 'react'
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigationType, useParams, useSearchParams } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { WorldMap } from './components/WorldMap'
 import { BossPage } from './pages/BossPage'
@@ -26,6 +26,16 @@ function NotFound() {
       <Link to="/" className="btn-cta mt-5">Back to the map</Link>
     </div>
   )
+}
+
+/** A new page starts at the top (Back keeps the browser's restored position). Runs before the map's own scroll-to-node effect. */
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  const nav = useNavigationType()
+  useLayoutEffect(() => {
+    if (nav !== 'POP') window.scrollTo(0, 0)
+  }, [pathname, nav])
+  return null
 }
 
 /** /s/:section, one map per section */
@@ -61,6 +71,8 @@ function AppRoutes() {
   }
 
   return (
+    <>
+    <ScrollToTop />
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/s/:section" element={<SectionMap />} />
@@ -74,6 +86,7 @@ function AppRoutes() {
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </>
   )
 }
 

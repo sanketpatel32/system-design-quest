@@ -111,7 +111,7 @@ export function TopicPage() {
               {prereqLinks.map((p) => (
                 <li key={p!.id} className="flex items-center gap-2">
                   {completed.has(p!.id) ? <IconCheck size={16} color="var(--color-hero-deep)" /> : <span aria-hidden className="ml-1 mr-0.5 h-2 w-2 shrink-0 rounded-full bg-rail" />}
-                  <Link className="font-bold text-teal hover:underline" to={`/topic/${p!.slug}`}>{p!.title}</Link>
+                  <Link className="tap-link font-bold text-teal hover:underline" to={`/topic/${p!.slug}`}>{p!.title}</Link>
                   {completed.has(p!.id) && <span className="sr-only">(cleared)</span>}
                 </li>
               ))}
@@ -145,7 +145,7 @@ export function TopicPage() {
           <ul className="space-y-2 text-sm font-bold">
             {topic.sources.map((s) => (
               <li key={s.url}>
-                <a className="text-teal hover:text-[var(--color-teal)] underline-offset-2 hover:underline" href={s.url} target="_blank" rel="noreferrer">
+                <a className="tap-link text-teal underline-offset-2 hover:underline" href={s.url} target="_blank" rel="noreferrer">
                   {s.title}
                 </a>
               </li>
@@ -162,7 +162,7 @@ function RelatedLink({ t, why, done }: { t: Topic; why: string; done: boolean })
   return (
     <li data-testid={`related-${t.id}`} data-done={done ? 'true' : 'false'}>
       <span className="block text-xs font-extrabold text-dim">{SECTION_BY_ID.get(sectionOfTopic(t.id))?.name}</span>
-      <Link className="font-bold text-teal hover:underline" to={`/topic/${t.slug}`}>{t.title}</Link>
+      <Link className="tap-link font-bold text-teal hover:underline" to={`/topic/${t.slug}`}>{t.title}</Link>
       {done && (
         <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-right-wash px-1.5 py-0.5 align-middle text-xs font-bold text-chalk">
           <IconCheck size={12} color="var(--color-hero-deep)" /> Cleared

@@ -7,6 +7,8 @@ export type SectionId = 'system-design' | 'frontend' | 'backend' | 'networking' 
 export type Section = {
   id: SectionId
   name: string
+  /** Name for tight spots (cards, chips, selects); defaults to name */
+  short?: string
   blurb: string
   /** Regions (units or areas) that make up the section, in map order */
   regionIds: RegionMeta['id'][]
@@ -32,7 +34,7 @@ export const ALL_SECTIONS: Section[] = [
   { id: 'backend', name: 'Backend', blurb: 'How servers handle requests, failures, jobs and limits.', regionIds: ['f2-backend'] },
   { id: 'networking', name: 'Networking', blurb: 'How packets find their way: addressing, routing, TCP, HTTP and TLS.', regionIds: ['f3-networking'] },
   { id: 'databases', name: 'Databases', blurb: 'How data is modelled, indexed, queried, made durable and replicated.', regionIds: ['f4-databases'] },
-  { id: 'os-concurrency', name: 'Operating Systems & Concurrency', blurb: 'Processes, threads, memory, scheduling and the bugs that come from sharing.', regionIds: ['f5-os'] },
+  { id: 'os-concurrency', name: 'Operating Systems & Concurrency', short: 'OS & Concurrency', blurb: 'Processes, threads, memory, scheduling and the bugs that come from sharing.', regionIds: ['f5-os'] },
   { id: 'security', name: 'Security', blurb: 'Threat models, cryptography basics, secrets, and the attacks every engineer should know.', regionIds: ['f6-security'] },
   { id: 'cloud-devops', name: 'Cloud & DevOps', blurb: 'Containers, delivery pipelines, infrastructure as code, observability and incidents.', regionIds: ['f7-cloud'] },
 ]
@@ -60,6 +62,9 @@ export function sectionPalette(id: SectionId) {
   if (id === 'system-design') return { bright: '#FF9600', deep: '#C2410C', soft: '#FFF1DB', shadow: '#9A3412' }
   return regionPalette(SECTION_BY_ID.get(id)?.regionIds[0] ?? 'r1-foundations')
 }
+
+/** "OS & Concurrency" rather than "Operating Systems & Concurrency" where space is tight */
+export const shortName = (s: Pick<Section, 'name' | 'short'>) => s.short ?? s.name
 
 export const sectionPath = (id: SectionId) => `/s/${id}`
 

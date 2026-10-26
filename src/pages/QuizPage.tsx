@@ -189,7 +189,7 @@ export function QuizPage() {
             {claim ? (
               <div className="mt-6 space-y-3">
                 <p className="text-[1.0625rem] font-bold text-chalk">
-                  {claim.xpGained > 0 ? `+${claim.xpGained} xp earned. ` : 'Already cleared before, so no new xp. '}
+                  {claim.xpGained > 0 ? `+${claim.xpGained} XP earned. ` : 'Already cleared before, so no new XP. '}
                   {next ? `Up next: ${next.title}.` : 'Unit complete!'}
                 </p>
                 {claim.newBadges.length > 0 && (
@@ -205,7 +205,7 @@ export function QuizPage() {
               </div>
             ) : (
               <div className="mt-6 space-y-3">
-                <p className="font-bold text-dim">Progress saved. You can retake this quiz for practice at any time; it won’t change your xp.</p>
+                <p className="font-bold text-dim">Progress saved. You can retake this quiz for practice at any time; it won’t change your XP.</p>
                 <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
                   {next && <Link to={`/topic/${next.slug}`} className="btn-cta min-w-[220px]">Next: {next.title}</Link>}
                   <button type="button" className="btn-quiet min-w-[220px]" onClick={retry} data-testid="practice-again">Practice again</button>
@@ -290,7 +290,7 @@ export function QuizPage() {
               reaction,
               extra:
                 answered && !results[q.id] && practice === 0 ? (
-                  <button type="button" className="text-sm font-extrabold underline-offset-2 hover:underline" onClick={() => setPractice((x) => x + 1)}>
+                  <button type="button" className="btn-text text-sm" onClick={() => setPractice((x) => x + 1)}>
                     Try again for practice
                   </button>
                 ) : practice > 0 ? (

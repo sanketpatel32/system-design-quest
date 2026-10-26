@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useFocusTrap } from '../lib/ui/useFocusTrap'
 import { createPortal } from 'react-dom'
 import diagrams from '../content/generated/diagrams.json'
 
@@ -63,21 +64,19 @@ export function DiagramFigure({ topicId, ascii, label }: { topicId: number; asci
 function DiagramViewer({ src, entry, label, onClose }: { src: string; entry: Entry; label: string; onClose: () => void }) {
   const [actual, setActual] = useState(true)
   const closeRef = useRef<HTMLButtonElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  // The trap records the opener first, then focus goes to Close
+  useFocusTrap(rootRef, true, onClose)
   useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null
     closeRef.current?.focus()
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
     return () => {
       document.body.style.overflow = prev
-      window.removeEventListener('keydown', onKey)
-      opener?.focus()
     }
-  }, [onClose])
+  }, [])
   return createPortal(
-    <div className="diagram-viewer anim-pop" role="dialog" aria-modal="true" aria-label={label} data-testid="diagram-viewer">
+    <div ref={rootRef} className="diagram-viewer anim-pop" role="dialog" aria-modal="true" aria-label={label} data-testid="diagram-viewer">
       <div className="diagram-viewer-bar">
         <span className="min-w-0 flex-1 leading-tight">
           <span className="block truncate font-extrabold text-chalk">{label}</span>

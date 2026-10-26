@@ -141,7 +141,7 @@ export function LessonDeck({
             <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
               {covered.map((c) => (
                 <li key={c.id}>
-                  <button type="button" className="flex min-h-[32px] w-full items-start gap-2 text-left font-bold text-chalk hover:text-teal" onClick={() => setIndex(cards.indexOf(c))}>
+                  <button type="button" className="flex min-h-[44px] w-full items-start gap-2 text-left font-bold text-chalk hover:text-teal" onClick={() => setIndex(cards.indexOf(c))}>
                     <span aria-hidden className="mt-[0.45em] h-2 w-2 shrink-0 rounded-full" style={{ background: accent }} />
                     {c.title}
                   </button>
