@@ -92,16 +92,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
       completed: false,
       results: {},
     }
-    if (attempt.completed || attempt.hearts <= 0) return
+    const prevResults = (attempt as { results?: Record<string, boolean> }).results ?? {}
+    // Each question is graded once per attempt (practice re-tries don't call this). Hearts never stop play.
+    if (question.id in prevResults) return
     // Blank or partial answers are not attempts: never grade them, never take a heart
     if (incompleteReason(question, answer)) return
     const grade = gradeQuestion(question, answer)
     const hearts = grade.correct ? attempt.hearts : Math.max(0, attempt.hearts - 1)
-    const results = { ...(attempt as { results?: Record<string, boolean> }).results, [question.id]: grade.correct }
+    const results = { ...prevResults, [question.id]: grade.correct }
     set({
       quizAttempts: {
         ...state.quizAttempts,
-        [key]: { ...attempt, hearts, answers: { ...attempt.answers, [question.id]: answer }, results, completed: hearts === 0 },
+        [key]: { ...attempt, hearts, answers: { ...attempt.answers, [question.id]: answer }, results, completed: false },
       },
     })
     get().recordActivity()

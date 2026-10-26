@@ -39,7 +39,7 @@ test('sections: overview rings, a map per section, and System Design unchanged',
     await page.keyboard.press('Escape')
     await expect(page.getByTestId(`area-${region}`)).toBeVisible()
     await expect(page.getByTestId(`station-${list[0]!.id}`)).toHaveAttribute('data-status', 'available')
-    await expect(page.getByTestId(`station-${list[1]!.id}`)).toHaveAttribute('data-status', 'locked')
+    await expect(page.getByTestId(`station-${list[1]!.id}`)).toHaveAttribute('data-status', 'available')
     await page.goto('/')
   }
   await page.getByTestId('section-card-system-design').click()
@@ -109,14 +109,21 @@ test('every Fundamentals area: first topic has cards, Go deeper, and a Try it, a
   }
 })
 
-test('a locked Fundamentals topic explains which topic opens it', async ({ page }) => {
+test('any Fundamentals topic is open from the start, and its quiz is one tap from the map', async ({ page }) => {
   await seed(page)
   const by = await areas(page)
   const [, list] = [...by][0]!
   await page.goto(`/s/${SECTION_OF[[...by][0]![0]]}`)
   await page.getByTestId(`station-${list[1]!.id}`).click()
-  await expect(page.getByRole('dialog', { name: list[1]!.title })).toContainText(`Clear `)
-  await expect(page.getByRole('dialog', { name: list[1]!.title })).toContainText(list[0]!.title)
+  const dialog = page.getByRole('dialog', { name: list[1]!.title })
+  await expect(dialog).not.toContainText('Clear ')
+  await dialog.getByTestId('quiz-topic').click()
+  await expect(page).toHaveURL(new RegExp(`/quiz/${list[1]!.slug}$`))
+  await expect(page.getByRole('button', { name: /^Question 1/ })).toBeVisible()
+  const last = list.at(-1)!
+  await page.goto(`/topic/${last.slug}`)
+  await expect(page.getByTestId('topic-title')).toHaveText(last.title)
+  await expect(page.getByText(/^Locked/)).toHaveCount(0)
 })
 
 test('Networking: the subnet slider reports whether a prefix fits 500 hosts', async ({ page }) => {

@@ -1,84 +1,53 @@
 import type { Topic } from '../../content/types'
 import { regions, topicsById, orderedTopicsInRegion } from '../../content/catalog'
-import { BOSS_N, bosses, FUND_FIRST, FUND_N, LESSON_N, learningRegions, PLAYBOOK_ID, topicLabel, unitOf } from '../../content/numbering'
-
-export type TopicStatus = 'locked' | 'available' | 'in_progress' | 'completed'
+import { BOSS_N, FUND_N, LESSON_N, learningRegions, PLAYBOOK_ID, topicLabel, unitOf } from '../../content/numbering'
 
 /**
- * Dev-only: open any URL with ?unlockAll=1 to unlock every topic for this tab (for screenshots and QA).
- * `import.meta.env.DEV` is false in production builds, so this is compiled out of the deployed app.
+ * Nothing is ever locked: every section, lesson, quiz and boss is open from the start, for guests and signed-in
+ * players alike. The order below is only a suggestion (the "Up next" card and the Start bubble on the map).
  */
-export function devUnlockAll(): boolean {
-  if (!import.meta.env.DEV || typeof window === 'undefined') return false
-  try {
-    const flag = new URLSearchParams(window.location.search).get('unlockAll')
-    if (flag === '1') window.sessionStorage.setItem('sdq-dev-unlock-all', '1')
-    if (flag === '0') window.sessionStorage.removeItem('sdq-dev-unlock-all')
-    return window.sessionStorage.getItem('sdq-dev-unlock-all') === '1'
-  } catch {
-    return false
-  }
-}
+export type TopicStatus = 'available' | 'in_progress' | 'completed'
 
-/** Fundamentals prerequisites still to clear (empty when the topic is open). */
+/** Real prerequisites (or, for bosses, the lessons the brief builds on) that are not cleared yet. Advice, never a gate. */
 export function missingFundPrereqs(topicId: number, completed?: Set<number>): number[] {
-  const pre = topicsById.get(topicId)?.prereqIds ?? []
+  const t = topicsById.get(topicId)
+  const pre = t?.boss?.prerequisiteTopicIds ?? t?.prereqIds ?? []
   return pre.filter((id) => !completed?.has(id))
 }
 
-/** Lesson number → topic id, to find the lesson right before a given one */
-const LESSON_BY_N = new Map([...LESSON_N].map(([id, n]) => [n, id]))
-
-export function isTopicUnlocked(topicId: number, unlockedIds: number[], completed?: Set<number>): boolean {
-  // Fundamentals: each area's first topic is open from the start, and any topic whose real prerequisites are
-  // cleared (or that has none) is open too, so revision does not force a strict line. No stored unlock is needed,
-  // so old saves just work.
-  if (devUnlockAll() || unlockedIds.includes(topicId) || FUND_FIRST.has(topicId)) return true
-  // System Design lessons added later (501+) sit mid-unit. A player who cleared that point before the lesson existed
-  // has no stored unlock for it, so open it once the lesson right before it in the numbering is cleared: exactly the
-  // unlock a new player gets, so nobody is locked out and nobody skips ahead of the unit.
-  if (topicId >= 501 && LESSON_N.has(topicId)) {
-    const prev = LESSON_BY_N.get(LESSON_N.get(topicId)! - 1)
-    if (prev !== undefined && completed?.has(prev)) return true
-  }
-  return FUND_N.has(topicId) && missingFundPrereqs(topicId, completed).length === 0
+/** Always true. Kept so older call sites and saves keep working; nothing in the app is gated. */
+export function isTopicUnlocked(_topicId?: number, _unlockedIds?: number[], _completed?: Set<number>): boolean {
+  return true
 }
 
-export function getUnlockHint(topicId: number, _completedIds: Set<number>): string {
+/** The suggested next topic in a list given in suggested order: the first one not cleared yet. */
+export function suggestedNext(idsInOrder: number[], completed: Set<number>): number | undefined {
+  return idsInOrder.find((id) => !completed.has(id))
+}
+
+/** A friendly, optional pointer for a topic that builds on lessons you haven't cleared. Empty when there's nothing to suggest. */
+export function suggestionHint(topicId: number, completed: Set<number>): string {
+  const missing = missingFundPrereqs(topicId, completed)
+  if (missing.length === 0) return ''
+  const names = missing.slice(0, 2).map((id) => topicsById.get(id)?.title ?? topicLabel(id))
+  return `Builds on ${names.join(' and ')}${missing.length > 2 ? ' and more' : ''}. Jump in anyway, or have a look at ${missing.length === 1 ? 'it' : 'them'} first.`
+}
+
+/** Where a topic sits in the suggested order, for the soft "suggested order" labels */
+export function suggestedOrderLabel(topicId: number): string {
   const topic = topicsById.get(topicId)
-  if (!topic) return 'Topic not found.'
-  const unit1Last = orderedTopicsInRegion('r1-foundations').at(-1)
-  // Arena entrance: the playbook opens when Unit 1 is cleared
-  if (topicId === PLAYBOOK_ID) {
-    return `Clear Unit 1 (finish Lesson ${unit1Last ? LESSON_N.get(unit1Last.id) : 3}: ${unit1Last?.title ?? 'the last lesson'}) to open the boss practice track (Architecture Colosseum).`
-  }
-  if (BOSS_N.has(topicId)) {
-    const n = BOSS_N.get(topicId)!
-    if (n === 1) return 'Finish the Interview Playbook to fight Boss 1.'
-    const prevBoss = bosses[n - 2]!
-    return `Defeat Boss ${n - 1} (${prevBoss.title}) to unlock Boss ${n}.`
-  }
-  if (FUND_N.has(topicId)) {
-    const missing = missingFundPrereqs(topicId, _completedIds)
-    if (missing.length === 0) return 'Open now.'
-    const names = missing.map((id) => `${topicLabel(id)} (${topicsById.get(id)?.title ?? 'a lesson'})`)
-    return `Clear ${names.join(' and ')} to unlock ${topicLabel(topicId)}; it builds on ${missing.length === 1 ? 'that lesson' : 'those lessons'}.`
-  }
-  const region = regions.find((r) => r.id === topic.region)
-  if (!region) return 'Complete the previous lesson to unlock this one.'
-  const ordered = orderedTopicsInRegion(region.id)
-  const idx = ordered.findIndex((t) => t.id === topicId)
-  if (idx > 0) {
-    const prev = ordered[idx - 1]!
-    return `Clear Lesson ${LESSON_N.get(prev.id)} (${prev.title}) to unlock Lesson ${LESSON_N.get(topicId)}.`
-  }
-  const unit = unitOf(topicId) ?? 1
-  const prevRegion = learningRegions[unit - 2]
-  const last = prevRegion ? orderedTopicsInRegion(prevRegion.id).at(-1) : undefined
-  if (last) return `Clear Unit ${unit - 1} (finish Lesson ${LESSON_N.get(last.id)}: ${last.title}) to open Unit ${unit}.`
-  return 'Complete the previous lesson to unlock this one.'
+  if (!topic) return ''
+  if (topicId === PLAYBOOK_ID) return 'Suggested after Unit 1'
+  if (BOSS_N.has(topicId)) return BOSS_N.get(topicId) === 1 ? 'Suggested after the Interview Playbook' : `Suggested after Boss ${BOSS_N.get(topicId)! - 1}`
+  if (FUND_N.has(topicId)) return `${FUND_N.get(topicId)} in the suggested order`
+  const unit = unitOf(topicId)
+  return unit ? `Unit ${unit}, lesson ${LESSON_N.get(topicId)} in the suggested order` : ''
 }
 
+/**
+ * Records the suggested-order neighbours of a cleared topic in `unlockedTopicIds`. That list no longer gates
+ * anything; it is kept (and still merged across devices) because Review uses it as "topics you've reached".
+ */
 export function computeUnlocksAfterClear(
   clearedTopicId: number,
   unlocked: number[],
@@ -131,14 +100,11 @@ export function computeUnlocksAfterClear(
 
 export function topicStatus(
   topic: Topic,
-  unlocked: number[],
+  _unlocked: number[],
   completed: Set<number>,
   inProgress: boolean,
 ): TopicStatus {
   if (completed.has(topic.id)) return 'completed'
-  if (!isTopicUnlocked(topic.id, unlocked, completed)) {
-    return 'locked'
-  }
   if (inProgress) return 'in_progress'
   return 'available'
 }

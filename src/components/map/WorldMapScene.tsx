@@ -4,11 +4,11 @@ import { Link } from 'react-router-dom'
 import { orderedTopicsInRegion, regions, topicsById } from '../../content/catalog'
 import type { Topic } from '../../content/types'
 import { regionPalette } from '../../lib/design/transitTheme'
-import { getUnlockHint, isTopicUnlocked, topicStatus } from '../../lib/progression/unlocks'
+import { suggestionHint, topicStatus } from '../../lib/progression/unlocks'
 import { useGameStore } from '../../stores/gameStore'
 import { RegionMotif } from './RegionMotif'
 import { Mascot, MascotSays } from '../art/Mascot'
-import { IconBook, IconCastle, IconCheck, IconLock, IconStar } from '../icons/HudIcons'
+import { IconBook, IconCastle, IconCheck, IconStar } from '../icons/HudIcons'
 
 import { bosses as arenaTopics, BOSS_N, FUND_N, fundamentalRegions, LESSON_N as STATION_N, learningRegions, playbook, PLAYBOOK_ID, topicLabel } from '../../content/numbering'
 
@@ -23,7 +23,6 @@ export function topicMinutes(id: number) {
 type Status = ReturnType<typeof topicStatus>
 
 const STATUS_WORD: Record<Status, string> = {
-  locked: 'locked',
   available: 'open',
   in_progress: 'in progress',
   completed: 'cleared',
@@ -52,11 +51,11 @@ function useStatuses() {
       }
     return m
   }, [unlocked, completed, quizAttempts, topicProgress, lessonProgress])
-  return { statusMap, completed, unlocked }
+  return { statusMap, completed }
 }
 
 export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: SectionId }) {
-  const { statusMap, completed, unlocked } = useStatuses()
+  const { statusMap, completed } = useStatuses()
   const quizAttempts = useGameStore((s) => s.quizAttempts)
   const lessonProgress = useGameStore((s) => s.lessonProgress)
   const topicProgress = useGameStore((s) => s.topicProgress)
@@ -77,10 +76,8 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
     requestAnimationFrame(() => document.getElementById('arena')?.scrollIntoView({ block: 'start' }))
   }
 
-  const nextId = trackIds.find((id) => {
-    const st = statusMap.get(id)
-    return st === 'available' || st === 'in_progress'
-  })
+  /** The suggested next lesson: the first one not cleared yet in the suggested order. Everything else is open too. */
+  const nextId = trackIds.find((id) => !completed.has(id))
   const nextTopic = nextId ? topicsById.get(nextId) : undefined
   /** Resume the quiz only when the learner has actually answered something */
   const resume = Boolean(nextId && Object.keys((quizAttempts[`topic-${nextId}`] as { results?: object } | undefined)?.results ?? {}).length)
@@ -93,7 +90,6 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
   const unitWord = (t: Topic) => (fund ? `Fundamentals, ${topicLabel(t.id)}` : `Unit ${learningRegions.findIndex((r) => r.id === t.region) + 1}`)
   const bossesDone = arenaTopics.filter((t) => completed.has(t.id)).length
   const playbookDone = completed.has(PLAYBOOK_ID) ? 1 : 0
-  const arenaOpen = isTopicUnlocked(PLAYBOOK_ID, unlocked) || completed.has(PLAYBOOK_ID)
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_20.625rem] 2xl:grid-cols-[minmax(0,1fr)_23rem]">
@@ -136,7 +132,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
           <div>
             <h1 id="map-title" className="font-display text-[1.75rem] sm:text-3xl md:text-4xl" style={{ color: sp.deep }}>{questName(section.id)}</h1>
             <p className="text-dim mt-1 max-sm:text-sm">
-              {fund ? `${doneCount} of ${total} topics cleared · ${xp} XP. ${section.blurb} Language-agnostic; topics open one after another.` : <>{doneCount} of {total} lessons cleared in {learningRegions.length} units · practice track: {playbookDone + bossesDone} of {1 + arenaTopics.length} (Interview Playbook and {arenaTopics.length} bosses, open after Unit 1, alongside the units)</>}
+              {fund ? `${doneCount} of ${total} topics cleared · ${xp} XP. ${section.blurb} Language-agnostic. Everything is open: follow the suggested order or jump to any topic.` : <>{doneCount} of {total} lessons cleared in {learningRegions.length} units · practice track: {playbookDone + bossesDone} of {1 + arenaTopics.length} (Interview Playbook and {arenaTopics.length} bosses). Everything is open; the path is just the suggested order.</>}
             </p>
           </div>
           <div className="flex items-center gap-1 rounded-2xl border-2 border-[var(--color-rail)] bg-white p-1" role="group" aria-label="Map view">
@@ -160,7 +156,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
             data-testid="jump-current"
             onClick={() => document.getElementById(`station-anchor-${nextTopic.id}`)?.scrollIntoView({ block: 'center' })}
           >
-            Jump to current lesson
+            Jump to suggested lesson
           </button>
         )}
         <label className="mb-6 block">
@@ -190,13 +186,13 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
                 {i === 0 && (
                   <a href="#arena" onClick={(e) => { e.preventDefault(); showBossList() }} className="flex items-center gap-3 rounded-2xl border-2 border-dashed border-gold-edge bg-gold-wash-2 px-4 py-3 text-sm font-bold text-gold-ink-2" data-testid="practice-track-signpost">
                     <IconCastle size={28} />
-                    <span className="flex-1">{arenaOpen ? 'Practice track open: the Interview Playbook and boss fights run alongside Units 2–10.' : 'After Unit 1, a boss-fight practice track opens alongside the remaining units.'}</span>
+                    <span className="flex-1">Boss fights are open any time: the Interview Playbook and {arenaTopics.length} full design problems. Suggested once Unit 1 feels comfortable.</span>
                     <span className="font-extrabold">Go</span>
                   </a>
                 )}
               </div>
             ))}
-            <ArenaUnit statusMap={statusMap} completed={completed} open={arenaOpen} all={allBosses} onShowAll={() => setAllBosses(true)} />
+            <ArenaUnit statusMap={statusMap} completed={completed} all={allBosses} onShowAll={() => setAllBosses(true)} />
           </div>
         ) : (
           <Curriculum statusMap={statusMap} needle={q.trim().toLowerCase()} fund={fund} areas={areaRegions} />
@@ -217,42 +213,34 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
             <div className="progress-fill" style={{ ['--fill' as string]: `${Math.max(4, (doneCount / total) * 100)}%` }} />
           </div>
         </section>
-        {!fund && <section className={`panel ${arenaOpen ? 'p-5' : 'p-4'}`} aria-labelledby="arena-title" data-testid="boss-sidebar">
+        {!fund && <section className="panel p-5" aria-labelledby="arena-title" data-testid="boss-sidebar">
           <div className="flex items-center gap-3">
-            <IconCastle size={arenaOpen ? 44 : 32} />
+            <IconCastle size={44} />
             <div className="min-w-0 flex-1">
               <h2 id="arena-title" className="font-display text-lg text-chalk">Boss fights</h2>
               <p className="text-sm text-dim">{bossesDone} of {arenaTopics.length} bosses beaten</p>
             </div>
           </div>
           <p className="text-sm text-dim mt-2">
-            {arenaOpen ? 'Practice track, alongside the units. Start with the Interview Playbook; bosses then unlock one after another.' : 'Practice track. Opens after Unit 1 and runs alongside the other units.'}
+            Open any time. The suggested start is the Interview Playbook, then the bosses in order, but pick whichever problem you like.
           </p>
-          {arenaOpen && <ol className="mt-3 space-y-1" data-testid="boss-sidebar-list">
+          <ol className="mt-3 space-y-1" data-testid="boss-sidebar-list">
             {arenaTopics.slice(0, 7).map((t, bi) => {
-              const bst = statusMap.get(t.id) ?? 'locked'
+              const bst = statusMap.get(t.id) ?? 'available'
               return (
                 <li key={t.id}>
-                  {bst !== 'locked' ? (
-                    <Link to={`/topic/${t.slug}`} className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-sm font-bold hover:bg-paper-3" data-testid={`boss-row-${t.id}`}>
-                      <BossPip status={bst} />
-                      <span className="text-dim tabular-nums w-6">{bi + 1}</span>
-                      <span className="truncate">{t.title}</span>
-                    </Link>
-                  ) : (
-                    <div className="flex items-center gap-2.5 px-2 py-1.5 text-sm font-bold text-dim" title="Clear the previous boss to unlock">
-                      <BossPip status={bst} />
-                      <span className="tabular-nums w-6">{bi + 1}</span>
-                      <span className="truncate">{t.title}</span>
-                      <span className="sr-only">(locked)</span>
-                    </div>
-                  )}
+                  <Link to={`/topic/${t.slug}`} className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-sm font-bold hover:bg-paper-3" data-testid={`boss-row-${t.id}`}>
+                    <BossPip status={bst} />
+                    <span className="text-dim tabular-nums w-6">{bi + 1}</span>
+                    <span className="truncate">{t.title}</span>
+                    {bst === 'completed' && <span className="sr-only">(cleared)</span>}
+                  </Link>
                 </li>
               )
             })}
-          </ol>}
+          </ol>
           <button type="button" className="mt-2 text-sm font-extrabold text-teal" onClick={showBossList} data-testid="see-all-bosses">
-            {arenaOpen ? `See all ${arenaTopics.length} bosses` : `Preview the ${arenaTopics.length} bosses`}
+            {`See all ${arenaTopics.length} bosses`}
           </button>
         </section>}
       </aside>
@@ -261,8 +249,8 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
 }
 
 function BossPip({ status }: { status: Status }) {
-  const bg = status === 'completed' ? 'var(--color-gold)' : status === 'locked' ? 'var(--color-rail)' : 'var(--color-card)'
-  return <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-full border-[3px]" style={{ background: bg, borderColor: status === 'locked' ? 'var(--color-rail)' : 'var(--color-gold-edge)' }} />
+  const bg = status === 'completed' ? 'var(--color-gold)' : 'var(--color-card)'
+  return <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-full border-[3px]" style={{ background: bg, borderColor: 'var(--color-gold-edge)' }} />
 }
 
 function UnitBanner({ regionId, index, done, total, title, collapsed, onToggle, note, kicker }: { regionId: string; index: number | null; done: number; total: number; title: string; collapsed?: boolean; onToggle?: () => void; note?: string; kicker?: string }) {
@@ -275,7 +263,7 @@ function UnitBanner({ regionId, index, done, total, title, collapsed, onToggle, 
       </span>
       <div className="min-w-0 flex-1">
         <h2 className="font-display text-xl leading-tight text-white">{title}</h2>
-        <p className="text-xs font-extrabold text-white">{kicker ?? (index === null ? 'Practice track · opens after Unit 1' : `Unit ${index + 1}`)}</p>
+        <p className="text-xs font-extrabold text-white">{kicker ?? (index === null ? 'Practice track · open any time' : `Unit ${index + 1}`)}</p>
         {note && <p className="text-sm font-bold text-white">{note}</p>}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
@@ -298,19 +286,19 @@ function Unit({ regionId, index, statusMap, completed, nextId, kicker }: { regio
   const topics = orderedTopicsInRegion(regionId as Topic['region'])
   const done = topics.filter((t) => completed.has(t.id)).length
   const hasCurrent = topics.some((t) => t.id === nextId)
-  const allLocked = topics.every((t) => (statusMap.get(t.id) ?? 'locked') === 'locked')
-  // Shorter path: finished units and units you can't open yet start folded; the current unit is always open
-  const foldByDefault = !hasCurrent && (done === topics.length || allLocked)
+  const notStarted = topics.every((t) => (statusMap.get(t.id) ?? 'available') === 'available')
+  // Shorter path: finished units and units not started yet start folded (one tap opens them); the suggested unit is always open
+  const foldByDefault = !hasCurrent && (done === topics.length || notStarted)
   const [collapsed, setCollapsed] = useState(foldByDefault)
   useEffect(() => setCollapsed(foldByDefault), [foldByDefault])
-  const note = collapsed ? (done === topics.length ? `All ${topics.length} lessons cleared` : allLocked ? `${topics.length} lessons · locked` : `${topics.length} lessons`) : undefined
+  const note = collapsed ? (done === topics.length ? `All ${topics.length} lessons cleared` : notStarted ? `${topics.length} lessons · open, tap Show` : `${topics.length} lessons`) : undefined
   return (
     <section aria-label={kicker ? `${region.name} fundamentals` : `Unit ${index + 1}: ${region.name}`} id={`unit-${regionId}`} className="scroll-mt-24" data-testid={kicker ? `area-${regionId}` : `unit-${index + 1}`} data-collapsed={collapsed}>
       <UnitBanner regionId={regionId} index={index} done={done} total={topics.length} title={region.name} collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} note={note} kicker={kicker} />
       {!collapsed && (
         <ol className="relative mx-auto mt-6 flex max-w-[26.25rem] flex-col items-center gap-6">
           {topics.map((t, j) => (
-            <PathNode key={t.id} topic={t} offset={WIND[(j + index * 3) % WIND.length]!} status={statusMap.get(t.id) ?? 'locked'} current={t.id === nextId} completed={completed} first={j === 0} />
+            <PathNode key={t.id} topic={t} offset={WIND[(j + index * 3) % WIND.length]!} status={statusMap.get(t.id) ?? 'available'} current={t.id === nextId} completed={completed} first={j === 0} />
           ))}
         </ol>
       )}
@@ -318,10 +306,9 @@ function Unit({ regionId, index, statusMap, completed, nextId, kicker }: { regio
   )
 }
 
-function ArenaUnit({ statusMap, completed, open, all, onShowAll }: { statusMap: Map<number, Status>; completed: Set<number>; open: boolean; all: boolean; onShowAll: () => void }) {
+function ArenaUnit({ statusMap, completed, all, onShowAll }: { statusMap: Map<number, Status>; completed: Set<number>; all: boolean; onShowAll: () => void }) {
   const done = arenaTopics.filter((t) => completed.has(t.id)).length
-  const [collapsed, setCollapsed] = useState(!open)
-  useEffect(() => setCollapsed(!open), [open])
+  const [collapsed, setCollapsed] = useState(false)
   const shown = all ? arenaTopics : arenaTopics.slice(0, 6)
   const isCollapsed = collapsed && !all
   return (
@@ -332,7 +319,7 @@ function ArenaUnit({ statusMap, completed, open, all, onShowAll }: { statusMap: 
         done={done}
         total={arenaTopics.length}
         title="Boss fights"
-        note={open ? 'Full design problems, scored stage by stage. Practise alongside the units.' : 'Clear Unit 1 to open. Then practise alongside the units.'}
+        note="Full design problems, scored stage by stage. Open any time."
         collapsed={isCollapsed}
         onToggle={() => setCollapsed((c) => !c)}
       />
@@ -340,10 +327,10 @@ function ArenaUnit({ statusMap, completed, open, all, onShowAll }: { statusMap: 
         <>
           <ol className="relative mx-auto mt-6 flex max-w-[26.25rem] flex-col items-center gap-6">
             {playbook && (
-              <PathNode topic={playbook} offset={0} status={statusMap.get(playbook.id) ?? 'locked'} current={false} completed={completed} />
+              <PathNode topic={playbook} offset={0} status={statusMap.get(playbook.id) ?? 'available'} current={false} completed={completed} />
             )}
             {shown.map((t, j) => (
-              <PathNode key={t.id} topic={t} offset={WIND[(j * 2) % WIND.length]!} status={statusMap.get(t.id) ?? 'locked'} current={false} completed={completed} boss />
+              <PathNode key={t.id} topic={t} offset={WIND[(j * 2) % WIND.length]!} status={statusMap.get(t.id) ?? 'available'} current={false} completed={completed} boss />
             ))}
           </ol>
           {!all && (
@@ -382,9 +369,9 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
     }
   }
   const p = regionPalette(topic.region)
-  const locked = status === 'locked'
-  const fill = locked ? 'var(--color-rail)' : boss ? 'var(--color-gold)' : p.bright
-  const shadow = locked ? 'var(--color-rail-deep)' : boss ? 'var(--color-gold-edge)' : p.shadow
+  const fill = boss ? 'var(--color-gold)' : p.bright
+  const shadow = boss ? 'var(--color-gold-edge)' : p.shadow
+  const hint = suggestionHint(topic.id, completed)
   const n = STATION_N.get(topic.id)
   const nodeLabel = boss ? `Boss ${BOSS_N.get(topic.id)}` : n ? `Lesson ${n}` : topicLabel(topic.id)
 
@@ -405,8 +392,6 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
 
   const icon = boss ? (
     <IconCastle size={40} />
-  ) : locked ? (
-    <IconLock />
   ) : status === 'completed' ? (
     <IconCheck size={34} />
   ) : first ? (
@@ -421,7 +406,7 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
       {current && !open && (
         <span className="pointer-events-none absolute bottom-[calc(100%+14px)] left-1/2 -translate-x-1/2" aria-hidden>
           <span className="bubble-bob block">
-            <span className="bubble" style={{ color: p.deep }}>Start</span>
+            <span className="bubble" style={{ color: p.deep }}>{status === 'in_progress' ? 'Continue' : 'Up next'}</span>
           </span>
         </span>
       )}
@@ -438,7 +423,7 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
       >
         {icon}
       </button>
-      <span className={`pointer-events-none absolute top-1/2 w-[7rem] sm:w-[8.25rem] -translate-y-1/2 text-[0.8125rem] font-extrabold leading-tight ${labelSide} ${locked ? 'text-dim' : 'text-chalk'}`}>
+      <span className={`pointer-events-none absolute top-1/2 w-[7rem] sm:w-[8.25rem] -translate-y-1/2 text-[0.8125rem] font-extrabold leading-tight ${labelSide} text-chalk`}>
         {topic.title}
       </span>
       {open && createPortal(
@@ -447,36 +432,36 @@ function PathNode({ topic, offset, status, current, completed, first, boss }: { 
           data-testid="node-popover"
           data-placement={pos.placement}
           className="fixed z-50 w-[min(290px,86vw)] rounded-2xl p-4 text-white"
-          style={{ left: pos.left, top: pos.top, visibility: pos.ready ? 'visible' : 'hidden', opacity: 1, background: locked ? 'var(--color-dim)' : boss ? 'var(--color-gold-deep)' : p.deep, boxShadow: `0 5px 0 ${locked ? 'var(--color-dim-shadow)' : boss ? 'var(--color-gold-shadow)' : p.shadow}, 0 12px 28px var(--color-shade-pop)` }}
+          style={{ left: pos.left, top: pos.top, visibility: pos.ready ? 'visible' : 'hidden', opacity: 1, background: boss ? 'var(--color-gold-deep)' : p.deep, boxShadow: `0 5px 0 ${boss ? 'var(--color-gold-shadow)' : p.shadow}, 0 12px 28px var(--color-shade-pop)` }}
           role="dialog"
           aria-label={topic.title}
           tabIndex={-1}
           onKeyDown={onPopKey}
         >
-          <span aria-hidden className={`absolute h-4 w-4 -translate-x-1/2 rotate-45 ${pos.placement === 'below' ? '-top-2' : '-bottom-2'}`} style={{ left: pos.arrow, background: locked ? 'var(--color-dim)' : boss ? 'var(--color-gold-deep)' : p.deep }} />
+          <span aria-hidden className={`absolute h-4 w-4 -translate-x-1/2 rotate-45 ${pos.placement === 'below' ? '-top-2' : '-bottom-2'}`} style={{ left: pos.arrow, background: boss ? 'var(--color-gold-deep)' : p.deep }} />
           <p className="font-display text-lg leading-snug">{topic.title}</p>
           <p className="text-sm font-bold text-white">
             {nodeLabel}, {STATUS_WORD[status].toLowerCase()}<br />About {topicMinutes(topic.id)} min
           </p>
-          {locked ? (
-            <p className="mt-2 text-sm font-bold">{getUnlockHint(topic.id, completed)}</p>
-          ) : (
-            <div className="mt-3 flex flex-col gap-2">
-              <Link
-                to={`/topic/${topic.slug}`}
-                data-testid={boss ? undefined : 'start-topic'}
-                className="btn-quiet btn-block"
-                style={{ color: locked ? undefined : boss ? 'var(--color-gold-deep)' : p.deep, ['--b-sh' as string]: 'var(--color-shade-press)', ['--b-bd' as string]: 'var(--color-card)' }}
-              >
-                {status === 'completed' ? 'Review lesson' : status === 'in_progress' ? 'Continue lesson' : boss ? 'Read the brief' : 'Start lesson'}
-              </Link>
-              {boss && (
-                <Link to={`/boss/${topic.slug}`} className="btn-quiet btn-block" style={{ color: 'var(--color-gold-deep)', ['--b-sh' as string]: 'var(--color-shade-press)' }}>
-                  Fight the boss
-                </Link>
-              )}
-            </div>
-          )}
+          {hint && <p className="mt-2 text-sm font-bold" data-testid="suggestion-hint">{hint}</p>}
+          <div className="mt-3 flex flex-col gap-2">
+            <Link
+              to={`/topic/${topic.slug}`}
+              data-testid={boss ? undefined : 'start-topic'}
+              className="btn-quiet btn-block"
+              style={{ color: boss ? 'var(--color-gold-deep)' : p.deep, ['--b-sh' as string]: 'var(--color-shade-press)', ['--b-bd' as string]: 'var(--color-card)' }}
+            >
+              {status === 'completed' ? 'Review lesson' : status === 'in_progress' ? 'Continue lesson' : boss ? 'Read the brief' : 'Start lesson'}
+            </Link>
+            <Link
+              to={boss ? `/boss/${topic.slug}` : `/quiz/${topic.slug}`}
+              data-testid={boss ? undefined : 'quiz-topic'}
+              className="btn-quiet btn-block"
+              style={{ color: boss ? 'var(--color-gold-deep)' : p.deep, ['--b-sh' as string]: 'var(--color-shade-press)', ['--b-bd' as string]: 'var(--color-card)' }}
+            >
+              {boss ? 'Fight the boss' : status === 'completed' ? 'Quiz me again' : 'Straight to the quiz'}
+            </Link>
+          </div>
         </div>,
         document.body,
       )}
@@ -512,10 +497,10 @@ function Onboarding() {
       </MascotSays>
       <ul className="mt-3 grid gap-3 text-[0.9375rem] sm:grid-cols-2">
         {[
-          ['Lessons', 'Each node is a short lesson, then a quiz. Pass to open the next one.', 'var(--color-hero)'],
-          ['Hearts', 'You get 3 per quiz. A wrong answer costs one; blank answers never do.', 'var(--color-heart)'],
+          ['Lessons', 'Each node is a short lesson, then a quiz. Everything is open: follow the path or jump straight to any quiz.', 'var(--color-hero)'],
+          ['Hearts', 'You get 3 per quiz. A wrong answer costs one, but running out never stops you: keep going and finish the quiz.', 'var(--color-heart)'],
           ['Review', 'Cleared topics come back as flashcards on a schedule, so they stick.', 'var(--color-gem)'],
-          ['Bosses', `A practice track that runs alongside the units: it opens after Unit 1 and you can switch between bosses and lessons at any time. ${arenaTopics.length} full design problems, each scored stage by stage (requirements, estimates, design on a canvas, deep dive).`, 'var(--color-gold)'],
+          ['Bosses', `${arenaTopics.length} full design problems, open any time and scored stage by stage (requirements, estimates, design on a canvas, deep dive). Switch between bosses and lessons whenever you like.`, 'var(--color-gold)'],
         ].map(([h, b, c]) => (
           <li key={h} className="flex gap-3 rounded-2xl bg-paper-2 p-3">
             <span aria-hidden className="mt-1 h-4 w-4 shrink-0 rounded-full" style={{ background: c }} />
@@ -551,25 +536,21 @@ function Curriculum({ statusMap, needle, fund, areas }: { statusMap: Map<number,
               </div>
               <ol className="p-2">
                 {topics.map((t) => {
-                  const st = statusMap.get(t.id) ?? 'locked'
+                  const st = statusMap.get(t.id) ?? 'available'
                   const body = (
                     <>
-                      <span aria-hidden className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold" style={{ background: st === 'locked' ? 'var(--color-paper-3)' : p.soft, color: st === 'locked' ? 'var(--color-dim)' : p.deep }}>
+                      <span aria-hidden className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold" style={{ background: p.soft, color: p.deep }}>
                         {STATION_N.get(t.id) ?? FUND_N.get(t.id) ?? (BOSS_N.has(t.id) ? `B${BOSS_N.get(t.id)}` : <IconStar size={14} color="currentColor" />)}
                       </span>
-                      <span className={`flex-1 truncate ${st === 'locked' ? 'text-dim' : 'text-chalk'}`}>{t.title}</span>
+                      <span className="flex-1 truncate text-chalk">{t.title}</span>
                       <span className={`status-chip status-${st}`}>{STATUS_WORD[st]}</span>
                     </>
                   )
                   return (
                     <li key={t.id}>
-                      {st === 'locked' ? (
-                        <div className="flex items-center gap-2 px-2 py-1.5 text-sm font-bold">{body}</div>
-                      ) : (
-                        <Link to={`/topic/${t.slug}`} className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm font-bold hover:bg-paper-3">
-                          {body}
-                        </Link>
-                      )}
+                      <Link to={`/topic/${t.slug}`} className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm font-bold hover:bg-paper-3">
+                        {body}
+                      </Link>
                     </li>
                   )
                 })}

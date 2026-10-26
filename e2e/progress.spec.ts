@@ -20,7 +20,7 @@ test('resume: map says Continue and reopens the last lesson card', async ({ page
 test('resume: an unfinished quiz continues at the first unanswered question', async ({ page }) => {
   await seed(page)
   await page.goto('/quiz/the-system-design-interview')
-  await page.getByTestId('lesson-first').getByRole('button', { name: 'Skip' }).click()
+  await page.getByTestId('lesson-first').getByRole('button', { name: 'Hide' }).click()
   await page.getByRole('radio').first().check()
   await page.getByRole('button', { name: 'Submit' }).first().click()
   await expect(page.getByText(/Not this time|Correct/).first()).toBeVisible()
@@ -43,18 +43,18 @@ test('lesson viewing: "read the lesson first" shows only until the lesson has be
   await expect(page.getByTestId('lesson-first')).toHaveCount(0)
 })
 
-test('progression copy: bosses are a parallel practice track opened after Unit 1', async ({ page }) => {
+test('progression copy: bosses are a practice track open from the start', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await seed(page)
   await expect(page.getByText(/Final unit/)).toHaveCount(0)
-  await expect(page.getByTestId('practice-track-signpost')).toContainText('After Unit 1')
-  await expect(page.getByTestId('boss-sidebar')).toContainText('Opens after Unit 1 and runs alongside')
-  await expect(page.getByTestId('boss-sidebar-list')).toHaveCount(0)
-  await page.goto('/topic/interview-playbook')
-  await expect(page.getByText(/boss practice track/)).toBeVisible()
+  await expect(page.getByTestId('practice-track-signpost')).toContainText('open any time')
+  await expect(page.getByTestId('boss-sidebar')).toContainText('Open any time')
+  await page.getByTestId('boss-sidebar-list').getByRole('link').nth(1).click()
+  await expect(page.getByTestId('topic-title')).toBeVisible()
+  await expect(page.getByText(/^Locked/)).toHaveCount(0)
 })
 
-test('shorter path: locked units fold, jump to the current lesson', async ({ page }) => {
+test('shorter path: units not started yet fold, jump to the suggested lesson', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await seed(page)
   await expect(page.getByTestId('unit-1')).toHaveAttribute('data-collapsed', 'false')

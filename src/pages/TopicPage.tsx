@@ -8,8 +8,8 @@ import { DeepLessonView } from '../components/DeepLessonView'
 import { BossDeepView } from '../components/BossDeepView'
 import { regionPalette, transitLineColor } from '../lib/design/transitTheme'
 import { Mascot } from '../components/art/Mascot'
-import { IconLock } from '../components/icons/HudIcons'
-import { getUnlockHint, topicStatus } from '../lib/progression/unlocks'
+import { IconCheck } from '../components/icons/HudIcons'
+import { suggestionHint } from '../lib/progression/unlocks'
 import { completedTopicIds, useGameStore } from '../stores/gameStore'
 
 export function TopicPage() {
@@ -35,18 +35,7 @@ export function TopicPage() {
     )
   }
 
-  const status = topicStatus(topic, state.unlockedTopicIds, completed, false)
-  if (status === 'locked') {
-    return (
-      <div className="mx-auto mt-6 max-w-lg space-y-3 panel p-6 text-center">
-        <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-rail shadow-[0_6px_0_var(--color-rail-deep)]"><IconLock size={40} color="var(--color-dim-warm)" /></div>
-        <h1 className="font-display text-3xl text-chalk">{topic.title}</h1>
-        <p className="text-sm font-extrabold text-dim">Locked · {topicLabel(topic.id)}</p>
-        <p className="font-bold text-chalk">{getUnlockHint(topic.id, completed)}</p>
-        <Link to={sectionPath(sectionOfTopic(topic.id))} className="btn-cta">Back to the map</Link>
-      </div>
-    )
-  }
+  const hint = completed.has(topic.id) ? '' : suggestionHint(topic.id, completed)
 
   const pal = regionPalette(topic.region)
   const regionName = topic.region === 'boss-arena' ? 'Boss fights' : regions.find((r) => r.id === topic.region)?.track === 'fundamentals' ? 'Fundamentals' : regions.find((r) => r.id === topic.region)?.name ?? ''
@@ -76,47 +65,54 @@ export function TopicPage() {
                     What you'll learn · {topic.objectives.length}
                   </summary>
                   <Objectives items={topic.objectives} />
+                  {hint && <p className="mt-2 text-sm font-bold text-white" data-testid="suggestion-hint-phone">{hint}</p>}
                 </details>
                 <div className="hidden sm:block"><Objectives items={topic.objectives} /></div>
               </>
             )}
           </div>
         </header>
+        {hint && (
+          <p className={`panel items-center gap-2 px-4 ${topic.objectives.length > 0 ? 'hidden sm:flex' : 'flex'} py-2.5 text-sm font-bold text-dim`} data-testid="suggestion-hint">
+            <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: pal.bright }} />
+            {hint}
+          </p>
+        )}
         <LessonDeck
           key={topic.id}
           cards={topic.cards}
           interactive={topic.interactive}
           accent={accent}
           finalAction={finalAction}
+          skipAction={
+            <Link to={topic.kind === 'boss' ? `/boss/${topic.slug}` : `/quiz/${topic.slug}`} className="inline-flex min-h-[44px] items-center gap-1 text-sm font-extrabold text-teal hover:underline" data-testid="skip-to-quiz">
+              {topic.kind === 'boss' ? 'Skip to boss fight' : 'Skip to quiz'}
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </Link>
+          }
           initialIndex={completed.has(topic.id) ? 0 : (state.lessonProgress[topic.id]?.card ?? 0)}
           onIndexChange={(i) => recordLessonCard(topic.id, i, topic.cards.length + (topic.interactive ? 1 : 0))}
         />
         {topic.deep && <DeepLessonView deep={topic.deep} accent={accent} topicId={topic.id} numbersInCards={topic.cards.some((c) => c.source === 'deep-numbers')} />}
         {topic.bossDeep && <BossDeepView brief={topic.bossDeep} accent={accent} topicId={topic.id} />}
         <div className="flex flex-wrap gap-2">
-          {topic.kind === 'boss' ? (
-            <Link to={`/boss/${topic.slug}`} className="btn-quiet">
-              Skip to boss fight
-            </Link>
-          ) : (
-            <Link to={`/quiz/${topic.slug}`} className="btn-quiet">
-              Skip to quiz
-            </Link>
-          )}
           <Link to={topic ? sectionPath(sectionOfTopic(topic.id)) : '/'} className="btn-quiet">Back to map</Link>
         </div>
       </div>
       <aside className="panel p-5 space-y-5 lg:sticky lg:top-24">
         {prereqLinks.length > 0 && (
           <div>
-            <h2 className="font-display text-lg text-chalk mb-2">Learn these first</h2>
-            <ul className="space-y-1">
+            <h2 className="font-display text-lg text-chalk mb-2">Helps to know first</h2>
+            <ul className="space-y-1" data-testid="helps-first">
               {prereqLinks.map((p) => (
-                <li key={p!.id}>
+                <li key={p!.id} className="flex items-center gap-2">
+                  {completed.has(p!.id) ? <IconCheck size={16} color="var(--color-hero-deep)" /> : <span aria-hidden className="ml-1 mr-0.5 h-2 w-2 shrink-0 rounded-full bg-rail" />}
                   <Link className="font-bold text-teal hover:underline" to={`/topic/${p!.slug}`}>{p!.title}</Link>
+                  {completed.has(p!.id) && <span className="sr-only">(cleared)</span>}
                 </li>
               ))}
             </ul>
+            <p className="mt-1 text-xs font-bold text-dim">Optional. Everything is open.</p>
           </div>
         )}
         {topic.seeAlso?.length ? (
@@ -125,7 +121,7 @@ export function TopicPage() {
             <ul className="space-y-2 text-sm">
               {topic.seeAlso.map((s) => {
                 const t = topicsById.get(s.topicId)
-                return t ? <RelatedLink key={s.topicId} t={t} why={s.why} locked={topicStatus(t, state.unlockedTopicIds, completed, false) === 'locked'} /> : null
+                return t ? <RelatedLink key={s.topicId} t={t} why={s.why} done={completed.has(t.id)} /> : null
               })}
             </ul>
           </div>
@@ -135,7 +131,7 @@ export function TopicPage() {
             <h2 className="font-display text-lg text-chalk mb-2">Go deeper in other sections</h2>
             <ul className="space-y-2 text-sm">
               {deeperIn.map(({ t, why }) => (
-                <RelatedLink key={t.id} t={t} why={why} locked={topicStatus(t, state.unlockedTopicIds, completed, false) === 'locked'} />
+                <RelatedLink key={t.id} t={t} why={why} done={completed.has(t.id)} />
               ))}
             </ul>
           </div>
@@ -157,15 +153,15 @@ export function TopicPage() {
   )
 }
 
-/** A related-lesson link that names its section and shows when the target is still locked, so it never lands on a surprise lock screen */
-function RelatedLink({ t, why, locked }: { t: Topic; why: string; locked: boolean }) {
+/** A related-lesson link that names its section and ticks lessons already cleared */
+function RelatedLink({ t, why, done }: { t: Topic; why: string; done: boolean }) {
   return (
-    <li data-testid={`related-${t.id}`} data-locked={locked ? 'true' : 'false'}>
+    <li data-testid={`related-${t.id}`} data-done={done ? 'true' : 'false'}>
       <span className="block text-xs font-extrabold text-dim">{SECTION_BY_ID.get(sectionOfTopic(t.id))?.name}</span>
       <Link className="font-bold text-teal hover:underline" to={`/topic/${t.slug}`}>{t.title}</Link>
-      {locked && (
-        <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-rail px-1.5 py-0.5 align-middle text-xs font-bold text-dim">
-          <IconLock size={12} color="var(--color-dim)" /> Locked
+      {done && (
+        <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-right-wash px-1.5 py-0.5 align-middle text-xs font-bold text-chalk">
+          <IconCheck size={12} color="var(--color-hero-deep)" /> Cleared
         </span>
       )}
       <span className="block text-dim">{why}</span>

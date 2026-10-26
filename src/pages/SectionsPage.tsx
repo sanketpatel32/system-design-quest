@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import { SECTIONS, questName, sectionPalette, sectionPath, sectionTopics, lastSection } from '../content/sections'
 import { useGameStore } from '../stores/gameStore'
 import { sectionXp } from '../lib/progression/sectionXp'
-import { isTopicUnlocked } from '../lib/progression/unlocks'
 import { RegionMotif } from '../components/map/RegionMotif'
 
 function Ring({ done, total, colour, id }: { done: number; total: number; colour: string; id: string }) {
@@ -42,7 +41,6 @@ function Banner({ id, regionIds, soft, deep, bright, done, total }: { id: string
 /** Home: every section with its own progress ring, XP and next topic */
 export function SectionsPage() {
   const topicProgress = useGameStore((s) => s.topicProgress)
-  const unlocked = useGameStore((s) => s.unlockedTopicIds)
   const last = lastSection()
   return (
     <div className="space-y-6">
@@ -53,7 +51,7 @@ export function SectionsPage() {
         {SECTIONS.map((s) => {
           const topics = sectionTopics(s.id)
           const done = topics.filter((t) => topicProgress[t.id]?.completed).length
-          const next = topics.find((t) => !topicProgress[t.id]?.completed && isTopicUnlocked(t.id, unlocked, new Set(Object.keys(topicProgress).filter((k) => topicProgress[Number(k)]?.completed).map(Number))))
+          const next = topics.find((t) => !topicProgress[t.id]?.completed)
           const p = sectionPalette(s.id)
           return (
             <li key={s.id}>

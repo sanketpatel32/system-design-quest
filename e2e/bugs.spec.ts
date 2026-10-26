@@ -74,16 +74,21 @@ test('bug 4: "See all bosses" scrolls to the full boss list on the map', async (
   await expect(page.getByTestId('see-all-bosses')).toHaveText(/40 bosses/)
 })
 
-test('bug 5: one numbering scheme and consistent lock messages', async ({ page }) => {
+test('bug 5: one numbering scheme, and nothing is locked for a new guest', async ({ page }) => {
   await seed(page)
   await expect(page.getByText(/87 lessons cleared in 10 units · practice track/)).toBeVisible()
   await page.goto('/topic/interview-playbook')
-  await expect(page.getByText(/^Clear Unit 1 \(finish Lesson 4/)).toBeVisible()
+  await expect(page.getByTestId('topic-title')).toBeVisible()
   await page.goto('/topic/pastebin')
-  await expect(page.getByText('Locked · Boss 2 of 40')).toBeVisible()
-  await expect(page.getByText('Defeat Boss 1 (URL Shortener) to unlock Boss 2.')).toBeVisible()
+  await expect(page.getByTestId('topic-title')).toBeVisible()
+  await expect(page.getByText(/Boss 2 of 40/)).toBeVisible()
+  await expect(page.getByText(/^Locked/)).toHaveCount(0)
   await page.goto('/topic/back-of-envelope-estimation')
-  await expect(page.getByText(/Clear Lesson 1 \(The System Design Interview\) to unlock Lesson 2\./)).toBeVisible()
+  await expect(page.getByText(/Card 1 of/)).toBeVisible()
+  await page.getByTestId('skip-to-quiz').click()
+  await expect(page.getByRole('button', { name: /^Question 1/ })).toBeVisible()
+  await page.goto('/boss/pastebin')
+  await expect(page.getByRole('button', { name: 'Submit boss attempt' })).toBeEnabled()
 })
 
 test('review: Again brings the card back in the same session', async ({ page }) => {

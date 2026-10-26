@@ -14,7 +14,7 @@ test('record product demo', async ({ page }) => {
   await page.waitForTimeout(2500)
   await page.getByRole('button', { name: /Next card/i }).click()
   await page.waitForTimeout(2500)
-  await page.getByRole('link', { name: /Quiz/i }).click()
+  await page.getByTestId('skip-to-quiz').click()
   await page.waitForTimeout(2500)
   await page.keyboard.press('2')
   await page.getByRole('button', { name: 'Submit' }).first().click()

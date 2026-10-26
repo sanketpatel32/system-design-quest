@@ -70,6 +70,8 @@ test('map popover keyboard order: focus moves into it, Tab continues to the next
   await page.keyboard.press('Enter')
   await expect(page.getByTestId('node-popover').getByRole('link').first()).toBeFocused()
   await page.keyboard.press('Tab')
+  await expect(page.getByTestId('node-popover').getByRole('link').last()).toBeFocused()
+  await page.keyboard.press('Tab')
   await expect(page.getByTestId('node-popover')).toHaveCount(0)
   await expect(nodes.nth(1)).toBeFocused()
   await page.keyboard.press('Shift+Tab')

@@ -30,19 +30,23 @@ const wrong = (n: number, hearts: number, done = 6) =>
     return { quizAttempts: { 'topic-1': { hearts, answers: {}, results, completed: false } } }
   }
 
-test('failure recovery: out of hearts → retry starts fresh with 3 hearts, nothing unlocked', async ({ page }) => {
+test('out of hearts is a nudge, not a lockout: the quiz carries on and can still be finished', async ({ page }) => {
   await page.goto('/s/system-design')
   await seed(page, { extra: await wrong(3, 0, 4)(page) })
   await page.goto('/quiz/the-system-design-interview')
-  await expect(page.getByText('Out of hearts')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Review the lesson' })).toBeVisible()
-  await page.getByRole('button', { name: 'Retry quiz' }).click()
-  await expect(page.getByText('Out of hearts')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: /^Question 1/ })).toBeVisible()
+  await expect(page.getByTestId('hearts-nudge')).toContainText('Out of hearts')
+  await expect(page.getByRole('heading', { name: /correct, you need/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Question 5/ })).toHaveAttribute('aria-current', 'step')
+  await page.getByTestId('hearts-nudge').getByRole('button', { name: 'Keep going' }).click()
+  await expect(page.getByTestId('hearts-nudge')).toHaveCount(0)
+  await page.getByRole('radio').first().check()
+  // Trade-off questions also want at least one reason
+  if (await page.getByRole('checkbox').count()) await page.getByRole('checkbox').first().check()
+  await page.getByRole('button', { name: 'Submit' }).first().click()
+  await expect(page.getByRole('button', { name: /^Question 5: (wrong|correct)/ })).toBeVisible()
   const st = await page.evaluate(() => JSON.parse(localStorage.getItem('sdq-progress-v3')!))
-  expect(st.quizAttempts['topic-1'].hearts).toBe(3)
-  expect(Object.keys(st.quizAttempts['topic-1'].results ?? {})).toHaveLength(0)
-  expect(st.unlockedTopicIds).not.toContain(2)
+  expect(Object.keys(st.quizAttempts['topic-1'].results ?? {})).toHaveLength(5)
+  expect(st.quizAttempts['topic-1'].hearts).toBe(0)
 })
 
 test('failure recovery: failing below 70% shows "Not cleared yet", missed ideas, and a retry', async ({ page }) => {

@@ -10,7 +10,7 @@ import type { UserGraph } from '../lib/scoring/graph'
 import { INITIAL_HEARTS } from '../lib/scoring/quiz'
 import { HeartsHud } from '../components/ui/Hud'
 import { useGameStore } from '../stores/gameStore'
-import { Mascot } from '../components/art/Mascot'
+import { Mascot, MascotSays } from '../components/art/Mascot'
 import { IconCastle } from '../components/icons/HudIcons'
 
 const RUBRIC: { key: keyof BossBreakdown; label: string; max: number }[] = [
@@ -60,7 +60,6 @@ export function BossPage() {
   }
 
   const submitBoss = () => {
-    if (hearts <= 0) return
     const allQuestions = topic.bossStages!.flatMap((s) => s.questions)
     const result = gradeBossSubmission(topic.boss!, stageResults, allQuestions, graph)
     setGrade(result)
@@ -117,10 +116,17 @@ export function BossPage() {
         </section>
       ))}
 
+      {hearts <= 0 && !submitted && (
+        <div className="panel p-4" role="status" data-testid="hearts-nudge">
+          <MascotSays mood="idle" size={64}>
+            <p className="font-extrabold text-chalk">Out of hearts, but the fight goes on.</p>
+            <p className="text-sm font-bold text-dim">Hearts just count misses. Finish the stages and submit; the score is what counts.</p>
+          </MascotSays>
+        </div>
+      )}
       {!submitted && (
         <button
           type="button"
-          disabled={hearts <= 0}
           onClick={submitBoss}
           className="btn-cta w-full sm:w-auto sm:min-w-[280px]"
         >

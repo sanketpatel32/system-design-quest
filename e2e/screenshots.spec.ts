@@ -14,7 +14,7 @@ test('capture key screens', async ({ page }) => {
   await page.waitForTimeout(600)
   await page.screenshot({ path: `${out}/02-lesson-topic.png`, fullPage: true })
 
-  await page.getByRole('link', { name: /Quiz/i }).click()
+  await page.getByTestId('skip-to-quiz').click()
   await page.waitForTimeout(500)
   await page.keyboard.press('2')
   await page.getByRole('button', { name: 'Submit' }).first().click()

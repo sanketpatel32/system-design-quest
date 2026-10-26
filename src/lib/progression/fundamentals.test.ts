@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { orderedTopicsInRegion, topicsById } from '../../content/catalog'
 import { FUND_FIRST, FUND_N, fundamentalRegions, LESSON_COUNT, LESSON_N, topicLabel } from '../../content/numbering'
 import { migrateState as migrate } from '../storage/migrate'
-import { computeUnlocksAfterClear, getUnlockHint, isTopicUnlocked } from './unlocks'
+import { computeUnlocksAfterClear, isTopicUnlocked, suggestionHint } from './unlocks'
 
 describe('Fundamentals track', () => {
   it('leaves System Design numbering and IDs untouched', () => {
@@ -11,16 +11,12 @@ describe('Fundamentals track', () => {
     for (const id of FUND_N.keys()) expect(id).toBeGreaterThanOrEqual(200)
   })
 
-  it('opens the first topic of every area without any stored unlock', () => {
-    for (const r of fundamentalRegions) {
-      const [first, second] = orderedTopicsInRegion(r.id)
-      expect(isTopicUnlocked(first!.id, [1])).toBe(true)
-      expect(isTopicUnlocked(second!.id, [1])).toBe(false)
-    }
+  it('opens every topic of every area without any stored unlock', () => {
+    for (const r of fundamentalRegions) for (const t of orderedTopicsInRegion(r.id)) expect(isTopicUnlocked(t.id, [1])).toBe(true)
     expect(FUND_FIRST.size).toBe(fundamentalRegions.length)
   })
 
-  it('unlocks topics one after another inside an area and never touches System Design', () => {
+  it('records the suggested next topic inside an area and never touches System Design', () => {
     for (const r of fundamentalRegions) {
       const line = orderedTopicsInRegion(r.id)
       line.slice(0, -1).forEach((t, i) => {
@@ -33,21 +29,19 @@ describe('Fundamentals track', () => {
     }
   })
 
-  it('labels topics by area and gives a specific unlock hint', () => {
+  it('labels topics by area and names what a topic builds on, as a suggestion', () => {
     const r = fundamentalRegions[0]!
-    const [a, b] = orderedTopicsInRegion(r.id)
+    const [a] = orderedTopicsInRegion(r.id)
     expect(topicLabel(a!.id)).toBe(`${r.name} 1`)
-    expect(getUnlockHint(b!.id, new Set())).toContain(a!.title)
+    const t = topicsById.get(251)!
+    expect(suggestionHint(251, new Set())).toContain(topicsById.get(t.prereqIds[0]!)!.title)
   })
 
-  it('opens a fundamentals topic once its real prerequisites are cleared, without the strict line', () => {
+  it('opens a fundamentals topic before its prerequisites are cleared; they are only suggested', () => {
     const t = topicsById.get(251)!
     expect(t.prereqIds).toContain(247)
-    expect(isTopicUnlocked(251, [1], new Set())).toBe(false)
-    expect(isTopicUnlocked(251, [1], new Set(t.prereqIds))).toBe(true)
-    // topics without prerequisites are open from the start
-    const open = [...FUND_N.keys()].filter((id) => (topicsById.get(id)!.prereqIds ?? []).length === 0)
-    for (const id of open) expect(isTopicUnlocked(id, [1], new Set())).toBe(true)
+    expect(isTopicUnlocked(251, [1], new Set())).toBe(true)
+    expect(suggestionHint(251, new Set(t.prereqIds))).toBe('')
     // prerequisites always point backwards inside the same area
     for (const id of FUND_N.keys()) for (const p of topicsById.get(id)!.prereqIds ?? []) {
       expect(p).toBeLessThan(id)

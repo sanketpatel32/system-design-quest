@@ -11,31 +11,14 @@ describe('System Design extra lessons (501+)', () => {
     for (const id of EXTRAS) expect(LESSON_N.has(id)).toBe(true)
     expect(unitOf(507)).toBe(1)
   })
-  it('open once the lesson right before them is cleared, even without a stored unlock', () => {
-    expect(isTopicUnlocked(501, [], new Set())).toBe(false)
-    expect(isTopicUnlocked(501, [], new Set([53]))).toBe(false)
-    expect(isTopicUnlocked(501, [], new Set([53, 54]))).toBe(true)
+  it('are open from the start, with or without a stored unlock', () => {
+    for (const id of EXTRAS) expect(isTopicUnlocked(id, [], new Set())).toBe(true)
   })
-  it('never open ahead of the unit just because their prerequisites are cleared', () => {
-    // 508 builds on 41 and 50 but sits after 506 in Unit 8
-    expect(isTopicUnlocked(508, [], new Set([41, 50]))).toBe(false)
-    expect(isTopicUnlocked(508, [], new Set([41, 50, 506]))).toBe(true)
-  })
-  it('do not lock out an existing player who cleared every original lesson before they existed', () => {
-    const done = new Set(lessonsInOrder.filter((id) => id <= 120))
-    const left = new Set(EXTRAS)
-    // keep clearing whichever extra lesson is open until none is left; a lockout would stall the loop
-    for (let guard = 0; left.size > 0 && guard < 20; guard++) {
-      for (const id of left) if (isTopicUnlocked(id, [], done)) { done.add(id); left.delete(id) }
-    }
-    expect([...left]).toEqual([])
-  })
-  it('a new player meets each one in sequence, and the old next lesson still follows it', () => {
+  it('sit in the suggested order, and the old next lesson still follows them', () => {
     for (let i = 1; i < lessonsInOrder.length; i++) {
       const id = lessonsInOrder[i]!
       if (!EXTRAS.includes(id)) continue
       const before = new Set(lessonsInOrder.slice(0, i - 1))
-      expect(isTopicUnlocked(id, [], before)).toBe(false)
       const prev = lessonsInOrder[i - 1]!
       expect(computeUnlocksAfterClear(prev, [], new Set([...before, prev]))).toContain(id)
       const next = lessonsInOrder[i + 1]

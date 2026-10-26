@@ -23,6 +23,7 @@ export function LessonDeck({
   interactive,
   accent = 'var(--color-amber)',
   finalAction,
+  skipAction,
   initialIndex = 0,
   onIndexChange,
 }: {
@@ -30,6 +31,8 @@ export function LessonDeck({
   accent?: string
   /** Rendered instead of the Next button on the last card */
   finalAction?: ReactNode
+  /** Always-available shortcut past the cards (e.g. Skip to quiz); hidden on the last card, where finalAction shows */
+  skipAction?: ReactNode
   /** Optional experiment or decision, added as the last step before the quiz */
   interactive?: Interactive
   /** Card to open on (resume) */
@@ -69,11 +72,14 @@ export function LessonDeck({
           <span className="text-sm font-extrabold text-dim tabular-nums" aria-live="polite">
             Card {index + 1} of {cards.length}
           </span>
-          {card.accent && (
-            <span className="text-xs font-extrabold rounded-full px-3 py-1" style={{ color: accent, border: `2px solid ${accent}` }}>
-              {card.accent}
-            </span>
-          )}
+          <span className="flex items-center gap-3">
+            {card.accent && (
+              <span className="text-xs font-extrabold rounded-full px-3 py-1" style={{ color: accent, border: `2px solid ${accent}` }}>
+                {card.accent}
+              </span>
+            )}
+            {skipAction && !(index === cards.length - 1 && finalAction) && skipAction}
+          </span>
         </div>
         {/* Each dot is a 44px-tall tap target around a slim bar; the negative margin keeps the visual spacing */}
         <div className="flex gap-1.5 -mt-4 mb-2">
@@ -122,7 +128,7 @@ export function LessonDeck({
         )}
         {index === cards.length - 1 && finalAction && (
           <div className="mt-6">
-            <MascotSays mood="happy" size={72}>You’ve got this! 3 hearts, and you need 70% to clear.</MascotSays>
+            <MascotSays mood="happy" size={72}>You’ve got this! 70% clears it, and running out of hearts never ends the quiz.</MascotSays>
           </div>
         )}
         <div className="flex gap-3 mt-6 border-t-2 border-[var(--color-rail)] pt-5">

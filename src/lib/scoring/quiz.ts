@@ -21,8 +21,8 @@ export function computeQuizSummary(
   const correct = questions.filter((q) => results[q.id]).length
   const percent = total === 0 ? 0 : Math.round((correct / total) * 100)
   const allAnswered = questions.every((q) => q.id in results)
-  const passedFinal =
-    allAnswered && percent >= PASS_PERCENT && hearts > 0
+  // Hearts count mistakes; they never block a pass. Running out is a nudge, not a game over.
+  const passedFinal = allAnswered && percent >= PASS_PERCENT
   return {
     total,
     correct,
