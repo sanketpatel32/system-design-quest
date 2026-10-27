@@ -108,7 +108,10 @@ export function RevisionPage() {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      <PageHero meta="Spaced repetition · switch section from the logo" title={section === 'all' ? 'Review: all sections' : `${sectionName} review`} icon="review" tone="sky"
+      <PageHero
+        meta={mode === 'missed' ? 'Missed questions come from every section' : 'Spaced repetition · switch section from the logo'}
+        title={mode === 'missed' ? 'Missed questions: all sections' : section === 'all' ? 'Review: all sections' : `${sectionName} review`}
+        icon="review" tone="sky"
         aside={<div className="rounded-2xl bg-white px-4 py-2 text-center"><p className="font-display text-3xl text-teal tabular-nums">{mode === 'missed' ? missedDue : queue.length}</p><p className="text-xs font-extrabold text-dim">due now</p></div>}>
         {mode === 'missed'
           ? 'Questions you got wrong come back on later days. Answer right to space them out; three right answers retire one.'
