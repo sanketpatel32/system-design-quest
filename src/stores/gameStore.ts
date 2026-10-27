@@ -9,6 +9,7 @@ import { defaultPersistedState, type PersistedState } from '../lib/storage/schem
 import { loadState, saveState, resetState, exportStateJson, importStateJson } from '../lib/storage/persistence'
 import type { Question } from '../content/types'
 import { gradeQuestion, incompleteReason } from '../lib/scoring/questions'
+import { recordAnswer, resetPractice } from '../lib/fun/practice'
 
 interface GameStore extends PersistedState {
   hydrated: boolean
@@ -22,6 +23,8 @@ interface GameStore extends PersistedState {
   markBossSubmission: (bossId: number, score: number, breakdown: Record<string, number>) => void
   saveBossDraft: (bossId: number, draft: PersistedState['bossProgress']['drafts'][number]) => void
   recordActivity: () => void
+  /** Quick play and review answers keep the streak alive too */
+  markActive: () => void
   /** Remember the card the learner is on; reaching the last card marks the lesson as read */
   recordLessonCard: (topicId: number, card: number, total: number) => void
   setPreferences: (p: Partial<PersistedState['preferences']>) => void
@@ -106,6 +109,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         [key]: { ...attempt, hearts, answers: { ...attempt.answers, [question.id]: answer }, results, completed: false },
       },
     })
+    recordAnswer(topicId, question.id, grade.correct)
     get().recordActivity()
     void saveState(get())
   },
@@ -257,6 +261,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   async resetProgress() {
+    resetPractice()
     const fresh = await resetState()
     set({ ...fresh, hydrated: true })
   },
@@ -266,6 +271,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const others = s.interviews.filter((i) => i.id !== session.id)
       return { interviews: [...others, session] }
     })
+    void saveState(get())
+  },
+
+  markActive() {
+    get().recordActivity()
     void saveState(get())
   },
 
