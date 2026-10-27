@@ -7,6 +7,8 @@ import { allTopics, regions, topicsById } from '../content/catalog'
 import { transitLineColor } from '../lib/design/transitTheme'
 import { AGAIN_MINUTES, isDue, scheduleNext, initialSrs } from '../lib/srs/scheduler'
 import { useGameStore } from '../stores/gameStore'
+import { MissedReview } from '../components/MissedReview'
+import { dueMistakes, recordReview, usePractice } from '../lib/fun/practice'
 
 export function RevisionPage() {
   const srs = useGameStore((s) => s.srs)
@@ -16,7 +18,15 @@ export function RevisionPage() {
   const quizAttempts = useGameStore((s) => s.quizAttempts)
   const [reviewed, setReviewed] = useState(0)
   const rateFlashcard = useGameStore((s) => s.rateFlashcard)
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
+  const mode = params.get('mode') === 'missed' ? 'missed' : 'cards'
+  const practice = usePractice()
+  const missedDue = dueMistakes(practice).length
+  const setMode = (m: 'cards' | 'missed') => setParams((prev) => {
+    const n = new URLSearchParams(prev)
+    if (m === 'missed') n.set('mode', 'missed'); else n.delete('mode')
+    return n
+  }, { replace: true })
   const sp = params.get('s') ?? undefined
   // The logo switcher picks the section (?s=…); without one, Review follows the last section visited. ?s=all reviews everything.
   const section: SectionId | 'all' = sp === 'all' ? 'all' : isSectionId(sp) ? sp : lastSection()
@@ -52,6 +62,7 @@ export function RevisionPage() {
   const rate = (rating: 'again' | 'hard' | 'good' | 'easy') => {
     if (!current) return
     rateFlashcard(current.topicId, current.flashcard.id, rating)
+    recordReview()
     const base = current.state ?? { ...initialSrs(), topicId: current.topicId, flashcardId: current.flashcard.id, history: [] }
     const next = scheduleNext({ ease: base.ease, intervalDays: base.intervalDays, dueAt: base.dueAt }, rating)
     useGameStore.setState((s) => {
@@ -98,9 +109,16 @@ export function RevisionPage() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <PageHero meta="Spaced repetition · switch section from the logo" title={section === 'all' ? 'Review: all sections' : `${sectionName} review`} icon="review" tone="sky"
-        aside={<div className="rounded-2xl bg-white px-4 py-2 text-center"><p className="font-display text-3xl text-teal tabular-nums">{queue.length}</p><p className="text-xs font-extrabold text-dim">due now</p></div>}>
-        Recall the answer, reveal it, then rate yourself. The rating decides when the card comes back.
+        aside={<div className="rounded-2xl bg-white px-4 py-2 text-center"><p className="font-display text-3xl text-teal tabular-nums">{mode === 'missed' ? missedDue : queue.length}</p><p className="text-xs font-extrabold text-dim">due now</p></div>}>
+        {mode === 'missed'
+          ? 'Questions you got wrong come back on later days. Answer right to space them out; three right answers retire one.'
+          : 'Recall the answer, reveal it, then rate yourself. The rating decides when the card comes back.'}
       </PageHero>
+      <div className="flex flex-wrap gap-2" role="group" aria-label="What to review">
+        <button type="button" className={`play-pill ${mode === 'cards' ? 'play-pill-on' : ''}`} aria-pressed={mode === 'cards'} onClick={() => setMode('cards')} data-testid="mode-cards">Flashcards · {queue.length}</button>
+        <button type="button" className={`play-pill ${mode === 'missed' ? 'play-pill-on' : ''}`} aria-pressed={mode === 'missed'} onClick={() => setMode('missed')} data-testid="mode-missed">Missed questions · {missedDue}</button>
+      </div>
+      {mode === 'missed' ? <MissedReview /> : <>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <label className="text-sm font-extrabold text-dim">
           Unit
@@ -153,6 +171,7 @@ export function RevisionPage() {
           )}
         </div>
       )}
+      </>}
     </div>
   )
 }
