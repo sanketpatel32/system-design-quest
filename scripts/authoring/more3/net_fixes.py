@@ -2,6 +2,7 @@
 
 Each fix is an exact find/replace on a JSON string value; every 'find' must occur exactly once.
 Re-running is safe: a fix whose replacement is already present is skipped.
+Fixes later superseded by a full rewrite in quality/q_net.py (t244-a2, t249-a3) were removed here.
     python3 scripts/authoring/more3/net_fixes.py
 """
 import json, os
@@ -25,15 +26,9 @@ FIXES = [
  (246, 'One-line explanation now covers every option (labels are already balanced by scripts/option-balance.json).',
   'Caches keep the old answer until its TTL runs out.',
   'Caches keep the old answer until its TTL runs out, so the worst case is about one TTL, here an hour. Resolvers have no 60-second minimum that overrides the TTL; restarting devices clears only their local caches, not the resolvers’; and DNS has no push to resolvers.'),
- (244, 'Explanation now covers every option.',
-  'It replaces the private source with its public address and a port it tracks.',
-  'It replaces the private source with its public address and a port it tracks. The destination stays as the client chose it; tracking connections is how NAT remembers each rewrite, not a substitute for it; and TCP sequence numbers pass through unchanged.'),
  (247, 'Explanation now covers every option.',
   'The active closer waits 2×MSL before reusing the address and port pair.',
   'The active closer waits 2×MSL before reusing the address and port pair. Who initiated the connection does not matter, only who sent the first FIN; the passive closer goes to CLOSED as soon as its own FIN is acknowledged; and TIME_WAIT is part of every normal close, not an error path.'),
- (249, 'Explanation now covers every option, including the Linux default range.',
-  'RFC 6335; operating systems may use a different range.',
-  'RFC 6335 sets aside 49,152–65,535. Linux defaults to 32,768–60,999, which is an operating-system choice, not the IANA range; 0–1,023 are system ports and 1,024–49,151 are registered ports.'),
  (253, 'Silly distractor “It drops to zero” replaced.',
   'It drops to zero', 'It drops by about half'),
  (253, 'Explanation now covers every option.',

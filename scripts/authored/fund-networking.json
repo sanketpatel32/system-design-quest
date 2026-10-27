@@ -530,7 +530,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "172.16.0.0/12 covers 172.16.0.0 to 172.31.255.255."
+    "explanation": "RFC 1918 reserves 10.0.0.0/8, 172.16.0.0/12 and 192.168.0.0/16. The /12 runs from 172.16.0.0 to 172.31.255.255, so 172.20.5.4 is private and 172.32.5.4 is just outside it. 192.169.1.1 is one past the 192.168 block, and 8.8.4.4 is a public resolver address."
    },
    {
     "id": "t242-a2",
@@ -586,7 +586,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Loopback traffic never leaves the host; often a local reverse proxy."
+    "explanation": "127.0.0.1 is loopback: traffic to it never leaves the machine, so the sender is another process on the same host, very often a local reverse proxy that forwards real clients. Read the client from the proxy’s forwarded header instead. A VPN, an ISP router or an office device would show their own non-loopback addresses."
    },
    {
     "id": "t242-a4",
@@ -645,7 +645,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Leading zeros first, then one “::” for the longest zero run."
+    "explanation": "Start from the full eight groups, drop leading zeros in each group, then replace the single longest run of all-zero groups with “::” (the first one if two runs tie). “::” may appear only once, or the address becomes ambiguous."
    },
    {
     "id": "t242-a6",
@@ -1358,35 +1358,35 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "10.9.1.1 is not inside 10.8.0.0/16, so /8 is the longest match."
+    "explanation": "A router picks the most specific route that contains the destination. 10.9.1.1 is outside 10.8.0.0/16 (10.8.0.0 to 10.8.255.255), so the longest match is 10.0.0.0/8. The default route is used only when nothing more specific matches, and the packet is routable because the /8 covers it."
    },
    {
     "id": "t244-a2",
     "concept": "nat",
     "type": "multiple_choice",
-    "prompt": "What does a NAT router change on an outgoing packet?",
+    "prompt": "A laptop at 192.168.1.20 opens HTTPS from port 51000 to 203.0.113.5:443 through a home router whose public address is 198.51.100.7. What source does the server see?",
     "choices": [
      {
       "id": "a",
-      "label": "The destination address and port"
+      "label": "192.168.1.20:51000, unchanged by the router"
      },
      {
       "id": "b",
-      "label": "The source address and usually the source port"
+      "label": "198.51.100.7 and a port the router tracks"
      },
      {
       "id": "c",
-      "label": "Nothing; it only forwards packets"
+      "label": "198.51.100.7:443, the same port as the server"
      },
      {
       "id": "d",
-      "label": "The TCP sequence numbers"
+      "label": "203.0.113.5 with the laptop’s original port"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "It replaces the private source with its public address and a port it tracks. The destination stays as the client chose it; tracking connections is how NAT remembers each rewrite, not a substitute for it; and TCP sequence numbers pass through unchanged."
+    "explanation": "The router rewrites the private source address to its public one and records the source port it used (often 51000 if free, otherwise another), so replies can be mapped back. Private addresses are not routed on the internet, so the server never sees 192.168.1.20. The source port has nothing to do with the server’s 443, and 203.0.113.5 is the destination, which NAT leaves alone."
    },
    {
     "id": "t244-a3",
@@ -1414,7 +1414,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Without a port forward or relay, inbound packets have nowhere to go."
+    "explanation": "A NAT creates mappings only for connections that start inside, so an inbound packet to the router’s public address has no entry telling it which device to reach. A port forward, a relay or IPv6 fixes that. Many ISPs, especially mobile ones, add carrier-grade NAT (RFC 6888) on top, so even a port forward on the home router may not help. DNS names, server permission and IP version are not the blocker."
    },
    {
     "id": "t244-a4",
@@ -1442,7 +1442,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Each router decrements TTL; traceroute relies on the resulting errors."
+    "explanation": "Every router decrements the TTL (the Hop Limit in IPv6) and discards the packet at zero, sending back an ICMP Time Exceeded message; traceroute uses those messages to map the path. Switches do not detect duplicates, the destination never receives a looping packet, and TCP retransmits from the sender on the same route, which would loop too."
    },
    {
     "id": "t244-a5",
@@ -1473,7 +1473,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "The translation table maps the public port back to the inside device."
+    "explanation": "The reply is addressed to the router’s public address and port. The router looks that port up in its translation table, rewrites the destination back to the device’s private address and port, and forwards it onto the local network. If the entry has timed out, the reply is dropped, which is why long idle connections need keepalives."
    },
    {
     "id": "t244-a6",
@@ -2178,29 +2178,29 @@
     "id": "t246-a1",
     "concept": "resolution-path",
     "type": "multiple_choice",
-    "prompt": "Which server actually holds the record for www.example.com?",
+    "prompt": "You change www.example.com’s A record at your DNS host. A resolver with nothing cached then looks it up. Which server gives it the new address?",
     "choices": [
      {
       "id": "a",
-      "label": "A root name server"
+      "label": "A root name server, after a short delay"
      },
      {
       "id": "b",
-      "label": "example.com’s authoritative name server"
+      "label": "The .com top-level domain server"
      },
      {
       "id": "c",
-      "label": "Your browser’s DNS cache"
+      "label": "The domain’s authoritative name server"
      },
      {
       "id": "d",
-      "label": "The .com top-level domain server"
+      "label": "The resolver of the user’s ISP, by push"
      }
     ],
     "correctChoiceIds": [
-     "b"
+     "c"
     ],
-    "explanation": "Root and TLD servers only refer the resolver onwards."
+    "explanation": "Root servers refer the resolver to the .com servers, which refer it to example.com’s authoritative name servers; only those hold the record, so they return the new address. The ISP’s resolver is the one doing the asking, and DNS never pushes changes to it."
    },
    {
     "id": "t246-a2",
@@ -2228,7 +2228,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "An alias follows the target name’s changes automatically."
+    "explanation": "A CNAME makes shop.example.com an alias, so resolvers follow the provider’s name and always get its current addresses. An A record freezes today’s address, MX is for mail and NS would delegate the whole name to another server. One limit: a CNAME cannot sit at the zone apex (example.com itself), because the apex needs NS and SOA records alongside."
    },
    {
     "id": "t246-a3",
@@ -2284,7 +2284,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "A truncated (TC) answer tells the client to retry over TCP; TCP support is required."
+    "explanation": "If an answer does not fit the UDP message size, the server sets the truncation (TC) bit and the client retries over TCP; large DNSSEC answers are a common cause, but DNSSEC alone does not force TCP. Zone transfers also use TCP, and RFC 7766 requires every DNS server to support it. Root-to-root lookups do not exist, and AAAA answers are usually small."
    },
    {
     "id": "t246-a5",
@@ -2320,7 +2320,7 @@
      "s4",
      "s5"
     ],
-    "explanation": "Root, then TLD, then authoritative, with caching on the way back."
+    "explanation": "The stub on the device asks the recursive resolver, which starts at a root server, is referred to a .com server, then to example.com’s authoritative server, which answers. The resolver caches each referral and the answer for their TTLs, so the next lookup usually skips straight to the end."
    },
    {
     "id": "t246-a6",
@@ -3436,63 +3436,63 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "The server side of the tuple is the same; the client side differs."
+    "explanation": "A TCP connection is identified by four values: client address, client port, server address and server port. All 10,000 share the server’s address and port 443, but each client address and port pair is different. The server does not hand out new ports per connection, arrival order identifies nothing, and IP headers carry no session id."
    },
    {
     "id": "t249-a2",
     "concept": "udp",
     "type": "multiple_choice",
-    "prompt": "Which does UDP provide?",
+    "prompt": "A team ships device telemetry over UDP. On a congested link, 2% of datagrams vanish and some arrive out of order. What did UDP itself guarantee?",
     "choices": [
      {
       "id": "a",
-      "label": "In-order delivery"
+      "label": "Lost datagrams are resent after a short timeout"
      },
      {
       "id": "b",
-      "label": "Congestion control"
+      "label": "Datagrams are delivered in the order they were sent"
      },
      {
       "id": "c",
-      "label": "Retransmission of lost datagrams"
+      "label": "Only ports and a checksum on what does arrive"
      },
      {
       "id": "d",
-      "label": "Port numbers and a checksum"
+      "label": "The sender slows down when the link is congested"
      }
     ],
     "correctChoiceIds": [
-     "d"
+     "c"
     ],
-    "explanation": "Everything else is left to the application."
+    "explanation": "UDP adds ports and a checksum to IP and nothing else: no retransmission, no ordering and no congestion control. The application must number its messages, tolerate loss or resend what matters, and pace itself, or use a protocol such as QUIC that builds those on top of UDP."
    },
    {
     "id": "t249-a3",
     "concept": "ephemeral-ports",
     "type": "multiple_choice",
-    "prompt": "Which IANA range is set aside for dynamic (ephemeral) ports?",
+    "prompt": "A Linux service with default settings opens many short connections to one database address and port. New connections start failing at about 28,000 open sockets. What sets that number?",
     "choices": [
      {
       "id": "a",
-      "label": "1,024–49,151"
+      "label": "TCP allows about 28,000 connections per server port"
      },
      {
       "id": "b",
-      "label": "0–1,023"
+      "label": "Linux’s default ephemeral range, 32,768–60,999"
      },
      {
       "id": "c",
-      "label": "32,768–65,535 on every system"
+      "label": "IANA caps each address at 28,000 connections"
      },
      {
       "id": "d",
-      "label": "49,152–65,535"
+      "label": "Ports above 49,152 are reserved for servers"
      }
     ],
     "correctChoiceIds": [
-     "d"
+     "b"
     ],
-    "explanation": "RFC 6335 sets aside 49,152–65,535. Linux defaults to 32,768–60,999, which is an operating-system choice, not the IANA range; 0–1,023 are system ports and 1,024–49,151 are registered ports."
+    "explanation": "Each connection to the same destination needs a distinct local port, and Linux picks them from 32,768–60,999 by default: 28,232 ports. Closed connections also hold their port in TIME_WAIT for a while. Widen the range, add source addresses or reuse connections. The IANA dynamic range is 49,152–65,535 (RFC 6335), but that is advice, not a cap, and a server port has no such limit."
    },
    {
     "id": "t249-a4",
@@ -3520,7 +3520,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Real-time media prefers fresh data over complete data."
+    "explanation": "By the time a lost audio packet could be resent, its moment has passed, and TCP would hold back every later byte until the resend arrived, freezing the call. Over UDP the app plays the next packet and conceals the gap. UDP is not encrypted by itself (apps add DTLS or SRTP), it never retransmits, and TCP can carry media, just with stalls on loss."
    },
    {
     "id": "t249-a5",
@@ -3556,7 +3556,7 @@
      "s4",
      "s5"
     ],
-    "explanation": "Bind, listen and accept are the server-side sequence."
+    "explanation": "A server creates a socket, binds it to an address and port, marks it listening, and then accepts connections; each accept returns a new socket for that one client, which it reads and writes while the listening socket keeps accepting others."
    },
    {
     "id": "t249-a6",
@@ -3858,35 +3858,35 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "TCP delivers bytes in order, below HTTP/2’s streams."
+    "explanation": "HTTP/2 multiplexes streams over one TCP connection, and TCP hands bytes to the application only in order. A lost packet holds back all later bytes, from every stream, until it is retransmitted. The connection does not downgrade or skip data. HTTP/3 fixes this because QUIC orders bytes per stream."
    },
    {
     "id": "t250-a2",
     "concept": "http-versions",
     "type": "multiple_choice",
-    "prompt": "Which transport does HTTP/3 use?",
+    "prompt": "A corporate firewall blocks all outbound UDP except DNS. What happens to HTTP/3 for its users?",
     "choices": [
      {
       "id": "a",
-      "label": "WebSockets"
+      "label": "Pages fail until the firewall allows UDP"
      },
      {
       "id": "b",
-      "label": "SCTP"
+      "label": "HTTP/3 switches to running over TCP"
      },
      {
       "id": "c",
-      "label": "TCP with TLS 1.3"
+      "label": "Browsers fall back to HTTP/2 or 1.1 over TCP"
      },
      {
       "id": "d",
-      "label": "QUIC over UDP"
+      "label": "Only the first request of each page uses HTTP/3"
      }
     ],
     "correctChoiceIds": [
-     "d"
+     "c"
     ],
-    "explanation": "RFC 9114 maps HTTP onto QUIC (RFC 9000)."
+    "explanation": "HTTP/3 runs on QUIC, which runs over UDP (RFC 9114, RFC 9000), so with UDP blocked the QUIC attempt fails and browsers keep using the TCP connection with HTTP/2 or HTTP/1.1. Nothing breaks, it is just slower on lossy links. HTTP/3 has no TCP mode, and browsers usually learn about HTTP/3 from a TCP response first anyway."
    },
    {
     "id": "t250-a3",
@@ -3914,7 +3914,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Parallel connections were the only way to fetch in parallel."
+    "explanation": "HTTP/1.1 carries one request and response at a time per connection (pipelining was rarely usable), so browsers opened several connections, by convention about six per host, to fetch in parallel. No TLS or server rule set that number, and the specification never required six."
    },
    {
     "id": "t250-a4",
@@ -3942,7 +3942,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "TCP connections are tied to the address and port four-tuple; QUIC is not."
+    "explanation": "A TCP connection is tied to its four-tuple, so a new IP address after switching networks means a new connection for HTTP/1.1 and HTTP/2. QUIC identifies connections by connection ids, so HTTP/3 can migrate to the new path and carry on. Multiplexing and plain text do not survive an address change."
    },
    {
     "id": "t250-a5",
@@ -4664,29 +4664,29 @@
     "id": "t252-a1",
     "concept": "proxy-kinds",
     "type": "multiple_choice",
-    "prompt": "A company routes all employee web traffic through one gateway that filters sites. What kind of proxy is it?",
+    "prompt": "Which of these jobs needs a forward proxy rather than a reverse proxy?",
     "choices": [
      {
       "id": "a",
-      "label": "A forward proxy"
+      "label": "Filtering which outside sites employees can reach"
      },
      {
       "id": "b",
-      "label": "A DNS resolver"
+      "label": "Terminating TLS in front of your own API servers"
      },
      {
       "id": "c",
-      "label": "A reverse proxy"
+      "label": "Spreading requests across your app servers"
      },
      {
       "id": "d",
-      "label": "A load balancer"
+      "label": "Caching your product images near your users"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "It acts on behalf of clients going out."
+    "explanation": "A forward proxy acts for clients going out, so it can filter and log the sites they visit. The other three act for your servers, in front of them: terminating TLS, balancing load and caching your content are reverse-proxy, load-balancer and CDN jobs."
    },
    {
     "id": "t252-a2",
@@ -4714,7 +4714,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "The rightmost entry was added by your trusted proxy; earlier ones came from the client."
+    "explanation": "Each proxy appends the address it received the connection from. Your one trusted load balancer appended 198.51.100.9, the address that connected to it, so that is the client. The leftmost entry arrived inside the request and could have been typed by anyone. The load balancer’s own address is not in the header; it is the TCP source the app sees."
    },
    {
     "id": "t252-a3",
@@ -4742,7 +4742,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "TLS runs end to end inside the tunnel."
+    "explanation": "CONNECT names the host and port in the clear, and the proxy relays the bytes, so it sees the destination, timing and volume (and usually the name in the TLS handshake’s SNI). Everything inside TLS, the path, query string, headers, cookies and bodies, stays encrypted end to end unless the company installs its own certificate to intercept."
    },
    {
     "id": "t252-a4",
@@ -4806,7 +4806,7 @@
      "s4",
      "s5"
     ],
-    "explanation": "CONNECT sets up a tunnel; TLS is end to end."
+    "explanation": "The client asks the proxy to CONNECT to host:443, the proxy opens the TCP connection and replies 200, and from then on it only relays bytes: the client runs TLS with the real host through the tunnel and sends encrypted requests. Because TLS is end to end, the certificate checked is the host’s, not the proxy’s."
    },
    {
     "id": "t252-a6",
@@ -4866,7 +4866,7 @@
      "r3": "Clients can put anything there before the first proxy appends.",
      "r4": "Behind proxies it is your load balancer, so every user shares one limit."
     },
-    "explanation": "Walk X-Forwarded-For from the right, skipping only proxies you trust; the first untrusted address is the client."
+    "explanation": "The TCP source is your load balancer, so every client would share one limit, and the leftmost entry is whatever an attacker writes. Trusting exactly your CDN and load balancer, and reading X-Forwarded-For from the right past those hops, yields the address the CDN saw, which is the real client."
    }
   ],
   "flashcards": [
@@ -5571,7 +5571,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "DNS, TCP and TLS again, then the request"
+      "label": "A DNS lookup, new TCP and TLS handshakes, then the request"
      },
      {
       "id": "b",
@@ -5589,7 +5589,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "The 300 s TTL has run out, so the name is looked up again, and a closed connection must be reopened with TCP and TLS (a session ticket can make TLS cheaper, not free). TCP connections are not cached, and no-cache means the browser must check the HTML with the server before using its copy."
+    "explanation": "After 300 s the browser and operating system have dropped the name, so it is looked up again; a shared resolver may still answer quickly from its own cache if someone else asked recently, but the lookup happens. A closed connection must be reopened with TCP and TLS (a session ticket makes TLS cheaper, not free). Connections are not cached once closed, and no-cache means the browser must revalidate the HTML with the server before using its copy, often getting a 304."
    },
    {
     "id": "t254-a3",

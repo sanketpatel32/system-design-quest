@@ -20,7 +20,13 @@ P = {
    't116-a4': {'choices': [('b', 'Caching is always the right answer for reads'), ('d', 'Microservices always beat a monolith at scale'), ('a', 'For this read-heavy feed, I’d cache with a short TTL'), ('c', 'Never use SQL once traffic gets large')],
     'correct': 'a',
     'explanation': 'It scopes the claim to this workload and names a choice with a limit (a short TTL). The others are absolutes an interviewer can break with one counterexample: a write-heavy ledger where a cache adds staleness, a small team for whom a monolith is simpler, or the many large systems that run on SQL.'},
-   't116-d1': {'explanation': 'It names the cost (a hot row), puts a number on the load, and then decides. The others are absolutes with no cost: no database is best for every system, Redis does not scale without limit and is a weak sole system of record, and microservices bring network and operational costs of their own.'},
+   't116-d1': {
+     'choices': [('a', '“A conditional update in PostgreSQL queues writers on one hot row; at our 100/s per train that is fine, so I choose it”'),
+                 ('b', '“PostgreSQL is the best database, so I always pick it for every system I design”'),
+                 ('c', '“Redis scales infinitely, so I put everything in Redis and skip the database”'),
+                 ('d', '“We should always use microservices, because they scale better than monoliths”')],
+     'correct': 'a',
+     'explanation': 'It names the cost (writers take turns on one row), puts a number on the load, and then decides. Each writer holds the row until its commit is flushed, around a millisecond and more with a synchronous replica, so one row tops out somewhere in the hundreds to low thousands of updates a second; 100/s leaves headroom, while several hundred would call for a load test or split counters. The others are absolutes with no cost: no database is best for every system, Redis does not scale without limit and is a weak sole system of record, and microservices bring network and operational costs of their own.'},
   },
  },
  117: {
@@ -105,7 +111,7 @@ P = {
    't61-a1': {'prompt': 'A presigned PUT URL for one photo upload ends up in a shared log. What limits the damage?',
     'choices': [('c', 'Only the user who asked for it can use it'), ('d', 'The bucket rejects a second upload to it'), ('b', 'Storage rejects uploads from a new IP'), ('a', 'It expires soon and covers one object key')],
     'correct': 'a',
-    'explanation': 'The signature covers the method, the bucket, the object key and an expiry, so a leaked URL can only write that one object until it expires, often within 5–15 minutes. Anyone holding it can use it, as many times as they like before expiry; storage checks no identity or IP address unless a policy adds conditions.'},
+    'explanation': 'The signature covers the method, the bucket, the object key and an expiry, so a leaked URL can only write that one object until it expires. The app chooses that expiry when signing: minutes is typical (one common SDK defaults to 15), S3 allows up to 7 days, and a URL signed with temporary credentials dies when they do. Anyone holding it can use it, as many times as they like before expiry; storage checks no identity or IP address unless a policy adds conditions.'},
    't61-a3': {'choices': [('d', 'Postgres limits each row to 1 MB of data'), ('a', 'It bloats the database, backups and replicas'), ('b', 'Postgres cannot store binary data in a column'), ('c', 'BLOB columns cannot be backed up or replicated')],
     'correct': 'a',
     'explanation': 'Every image byte then sits in the tables, the backups and each replica, while object storage is cheaper per GB and serves through a CDN. Postgres can store binary data (bytea, up to 1 GB a value) and does back it up and replicate it, which is exactly the cost.'},
