@@ -3,6 +3,7 @@
 // exists on the server (Vercel env). The blob is gzipped + base64 to stay under Clerk's 8 KB limit.
 import { createClerkClient, verifyToken } from '@clerk/backend'
 import { gzipSync, gunzipSync } from 'node:zlib'
+import { MAX_BODY_BYTES, validateProgress } from './_validate.js'
 
 const LIMIT = 7000 // bytes of encoded blob; Clerk caps all metadata at 8 KB
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } })
@@ -44,11 +45,16 @@ export async function GET(request) {
 export async function PUT(request) {
   const a = await auth(request)
   if (a.error) return a.error
+  if (Number(request.headers.get('content-length') || 0) > MAX_BODY_BYTES) return json(413, { error: 'request too large' })
   let body
-  try { body = await request.json() } catch { return json(400, { error: 'invalid JSON' }) }
-  const p = body?.progress
-  if (!p || typeof p !== 'object' || p.v !== 1 || typeof p.t !== 'object') return json(400, { error: 'unexpected progress format' })
-  const enc = gzipSync(Buffer.from(JSON.stringify(p), 'utf8'), { level: 9 }).toString('base64')
+  try {
+    const text = await request.text()
+    if (text.length > MAX_BODY_BYTES) return json(413, { error: 'request too large' })
+    body = JSON.parse(text)
+  } catch { return json(400, { error: 'invalid JSON' }) }
+  const checked = validateProgress(body?.progress)
+  if (!checked.ok) return json(400, { error: 'unexpected progress format', field: checked.error })
+  const enc = gzipSync(Buffer.from(JSON.stringify(checked.value), 'utf8'), { level: 9 }).toString('base64')
   if (enc.length > LIMIT) return json(413, { error: 'progress too large for cloud save', bytes: enc.length })
   const at = new Date().toISOString()
   try {
