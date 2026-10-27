@@ -112,7 +112,6 @@ LABEL = {
 }
 # explanations that only restated the keyed answer, rewritten to give the reason
 EXPLAIN = {
-    16: {'Both stores are written synchronously.': 'The write returns only after both the cache and the database have it, so a read never sees an old value, but every write pays two round trips.'},
     17: {'Least recently used.': 'LRU (least recently used) tracks access order and drops the entry at the cold end; LFU counts uses instead, and FIFO ignores access entirely.',
          'FIFO ignores access entirely.': 'FIFO keeps a queue in insertion order, so a key read a million times is evicted as soon as it is the oldest; that is why LRU usually beats it.'},
     20: {'Critical caches need replicas.': 'With no replica the whole hot set vanishes on restart, every read misses, and the database takes the full load until the cache warms again.'},

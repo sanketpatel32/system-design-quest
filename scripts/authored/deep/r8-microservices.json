@@ -378,7 +378,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "5 seconds × 3 failures = 15 seconds of detection time."
+        "explanation": "5 s × 3 failures ≈ 15 s, and during that window calls to the dead instance fail, so callers need retries to another instance. Faster checks shorten the window but risk marking slow instances dead."
       }
     ],
     "diagram": "pod -> registers/ready -> [ registry / k8s endpoints ]\ncaller -> payments.svc (DNS/VIP) -> kube-proxy -> ready pod"
@@ -614,25 +614,25 @@
         "choices": [
           {
             "id": "a",
-            "label": "A distributed trace"
+            "label": "A distributed trace of that request"
           },
           {
             "id": "b",
-            "label": "A CPU utilisation metric"
+            "label": "The payment service’s CPU metric"
           },
           {
             "id": "c",
-            "label": "The deploy history"
+            "label": "The payment service’s p99 latency"
           },
           {
             "id": "d",
-            "label": "A Bloom filter"
+            "label": "The payment service’s error log"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Traces record spans per service with timings, assembled by a shared trace id."
+        "explanation": "A trace records each service’s span with its start and duration under one trace id, so it shows that this request spent 3.2 s in payments. A p99 latency or CPU chart summarises many requests and cannot point to this one, and an error log shows nothing if the call was slow but succeeded."
       }
     ],
     "diagram": "gateway (trace 7f3a) -> orders [span 120 ms] -> payments [span 3.2 s] -> bank API (timeout, retry)\n alert on p99 metric -> open trace 7f3a -> grep logs trace_id=7f3a"
@@ -1014,7 +1014,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "During a gradual rollout both versions are live, so schema changes must stay compatible with both."
+        "explanation": "During a canary v1 and v2 run against the same database, so a plain rename breaks whichever version expects the other name. Expand-and-contract keeps both working throughout. Databases can rename columns in place; that is the problem, not the fix. It does not speed up the rollout, and it is independent of whether you use flags."
       }
     ],
     "diagram": "deploy v2 dark --> flag on: staff --> 1% --> 5% --> 25% --> 100% --> delete flag\n          metrics guardrails breached at any step --> flag off / shift traffic back"
@@ -1140,7 +1140,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Readiness decides whether the pod receives traffic; liveness decides whether to restart it."
+        "explanation": "A failing readiness probe removes the pod from the Service’s endpoints, so it gets no traffic until the cache is warm, without restarting it. A liveness probe would restart it, possibly before it ever finishes loading; Kubernetes cannot guess when an app is ready, and the autoscaler changes the replica count, not routing."
       }
     ],
     "diagram": "Deployment (replicas: 14, image: v2) -> ReplicaSet -> pods\ncontroller loop: desired 14 vs actual 13 -> create 1\nrolling: +4 new (ready?) -> remove old -> repeat"

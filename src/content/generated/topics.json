@@ -928,7 +928,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "A bigger box is simple but finite, and it is still one box."
+        "explanation": "A bigger machine is simple, but the largest instance is a hard ceiling and it is still one machine whose failure takes the service down. Bigger machines add memory and disk too, load balancers route to any size, and the app does not have to change to run on a larger box."
       },
       {
         "id": "t3-a3",
@@ -956,7 +956,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Copies only raise availability where failures are independent and traffic is routed away from the dead one."
+        "explanation": "Four app servers mean one can fail while the others carry the load, so that tier is far more available. Every request still needs the one primary database, so its failure stops everything. Availability does not multiply by the server count, and round robin alone sends traffic to dead servers unless health checks remove them."
       },
       {
         "id": "t3-a4",
@@ -2530,7 +2530,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "An L7 balancer can only route on paths it can read. Re-encrypt to services with mTLS if needed."
+        "explanation": "A layer-7 balancer routes on the HTTP path, which it can read only after decrypting, so TLS terminates there (or at the edge in front of it), with re-encryption or mTLS to the services if needed. Terminating only at backends hides the path, databases do not speak HTTP, and dropping TLS anywhere exposes traffic to anyone on that network."
       },
       {
         "id": "t7-a2",
@@ -2558,7 +2558,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "TLS secures the connection, not the application."
+        "explanation": "TLS encrypts and protects the connection and proves the server’s identity. It does not say who the user is, does not stop SQL injection (the server decrypts the payload and runs it), and says nothing about data at rest in the database or backups."
       },
       {
         "id": "t7-a3",
@@ -2642,7 +2642,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Authentication of the server is one of TLS’s three guarantees, with confidentiality and integrity."
+        "explanation": "A trusted certificate authority vouched that the key in the certificate belongs to that domain, and the handshake proves the server holds the matching private key, so the browser knows it reached the real site and not an impostor. A certificate makes nothing faster, says nothing about the server’s code, and does not log the user in."
       },
       {
         "id": "t7-d1",
@@ -2670,7 +2670,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "TLS 1.3 0-RTT data is encrypted but has no replay protection by itself, so only idempotent requests should use it."
+        "explanation": "An attacker who records 0-RTT early data can resend it, and the server cannot tell the copy from the original, so a payment could run twice. Early data is encrypted, runs over TCP as well as QUIC, and certificates are still checked, so only replay is the problem; send only idempotent requests as early data."
       }
     ],
     "flashcards": [
@@ -2911,7 +2911,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Repeating a PUT leaves the same state; POST creates something new each time unless you add idempotency keys."
+        "explanation": "PUT replaces the resource at a known URL with the full order, so sending it twice leaves the same state. POST asks the server to create something, so a retry can create a second order or a second item unless the API accepts an idempotency key."
       },
       {
         "id": "t8-a2",
@@ -2939,7 +2939,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Status codes are part of the contract; 201 plus Location tells the client where the resource lives."
+        "explanation": "201 Created with a Location header tells the client the order exists and where it lives. 200 with an error field hides the outcome in the body, 204 gives the client no id to use, and a 302 is for browsers navigating, not an API reporting creation."
       },
       {
         "id": "t8-a3",
@@ -2967,7 +2967,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Resources are nouns; the HTTP method is the verb."
+        "explanation": "REST names resources in the path and uses the HTTP method as the verb, so fetching order 42 is GET /v1/orders/42. Verbs in the path (getOrder, fetch, delete) duplicate the method, and a GET that deletes breaks caches and crawlers that assume GET is safe."
       },
       {
         "id": "t8-a4",
@@ -2995,7 +2995,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Cursors stay stable as rows are inserted and do not scan skipped rows."
+        "explanation": "A cursor says “after this id”, so new orders arriving at the top do not shift the pages, and the database seeks straight to the position. Page 2,500 with an offset reads and discards 49,980 rows and shows duplicates or gaps as rows arrive. Returning all 50,000 is slow and heavy, and only the newest 20 hides the rest of the history."
       },
       {
         "id": "t8-a5",
@@ -3026,7 +3026,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Validate before creating; return the new resource’s location."
+        "explanation": "The client sends POST /v1/orders, the server validates the body before touching the database, creates the order, and returns 201 Created with the new order’s Location. Validating first means a bad request costs nothing and leaves no half-made order."
       },
       {
         "id": "t8-d1",
@@ -5392,7 +5392,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In-memory state breaks as soon as requests can land on different instances."
+        "explanation": "With carts in each server’s memory, a request that lands on the other server finds no cart. Move carts to a shared store or the database. Databases handle two servers easily, a balancer that strips cookies breaks every login, not only carts, and round robin spreads requests rather than concentrating them."
       },
       {
         "id": "t14-a2",
@@ -5420,7 +5420,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Pinning users ties their state to one machine."
+        "explanation": "Pinning users to instances spreads load unevenly when some users are heavy, and when an instance dies or is redeployed its users lose their sessions. Sticky sessions add no extra round trip, work alongside health checks, and need a cookie rather than a JWT."
       },
       {
         "id": "t14-a3",
@@ -5448,7 +5448,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Shared or client-held state lets any instance serve any request."
+        "explanation": "If session state lives in a shared store such as Redis, or in a signed token the client sends back, any instance can serve any request and instances can be replaced freely. In-memory state without stickiness loses sessions on every hop, a load balancer is not a session store, and local disk files are just as tied to one server."
       },
       {
         "id": "t14-a4",
@@ -5484,7 +5484,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "The instance holds nothing between requests."
+        "explanation": "The client sends its session cookie, the balancer picks any instance, the instance loads the session from Redis, handles the request and writes any changes back. Nothing stays on the instance between requests, so it can be replaced at any time."
       },
       {
         "id": "t14-a5",
@@ -5537,7 +5537,7 @@
         "rationaleConflicts": {
           "r3": "Pinning users makes load uneven as busy sessions pile up on some instances."
         },
-        "explanation": "An external store keeps instances disposable."
+        "explanation": "Rolling deploys restart instances every day, so sticky sessions would log users out on each restart and skew load towards long-lived instances. A Redis session store keeps instances disposable and lets the balancer spread traffic evenly, for about a millisecond per request to fetch the session."
       },
       {
         "id": "t14-d1",
@@ -6197,7 +6197,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Write-behind acknowledges before the database has the data."
+        "explanation": "Write-behind acknowledges once the cache has the write and flushes to the database later, so a cache crash loses whatever has not been flushed. Write-through writes the database before replying, and cache-aside writes the database directly, with or without a short TTL, so the cache holds only copies."
       },
       {
         "id": "t16-a2",
@@ -6225,7 +6225,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The write returns only after both the cache and the database have it, so a read never sees an old value, but every write pays two round trips."
+        "explanation": "Write-through updates the database and the cache on every write before replying, so reads usually see fresh data; races between concurrent writers or a failure between the two updates can still leave a stale entry, so keep a TTL. The cost is two writes on each request. Buffered writes are write-behind, writing only to the cache skips durability, and new keys can still miss."
       },
       {
         "id": "t16-a3",
@@ -6261,7 +6261,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "The application, not the cache, loads data on a miss."
+        "explanation": "The app reads the cache, misses, reads the database, sets the value in the cache with a TTL and returns it. The application, not the cache, loads data, so the cache can be a plain key-value store, and the TTL bounds how long a stale copy can survive."
       },
       {
         "id": "t16-a4",
@@ -6314,7 +6314,7 @@
         "rationaleConflicts": {
           "r3": "Write-behind speeds up writes and risks losing them; it does nothing for read freshness."
         },
-        "explanation": "Read-heavy and staleness-tolerant is the classic cache-aside case."
+        "explanation": "Reads outnumber writes 100 to 1 and a few seconds of staleness is fine, so cache-aside with a TTL serves almost every read from memory while the database stays the source of truth. Write-through adds work to every write for freshness nobody needs, and write-behind risks losing catalogue edits."
       },
       {
         "id": "t16-a5",
@@ -6342,7 +6342,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Durability matters more than write speed for money."
+        "explanation": "Write-behind acknowledges before the database has the write, so a cache crash can lose ledger entries that users were told succeeded. Reads do not wait for flushes, the cache remains useful for reads, and there is no blanket rule against storing payment data in Redis; the problem is durability."
       },
       {
         "id": "t16-d1",
@@ -6370,7 +6370,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Five seconds of unflushed writes: 5 × 20,000 = 100,000 likes."
+        "explanation": "20,000 likes/s × 5 s ≈ 100,000 likes unflushed in the worst case. 20,000 is only one second, 4,000 is a fifth of a second, and none would require the writes to reach the database before acknowledging."
       }
     ],
     "flashcards": [
@@ -9056,7 +9056,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Leftmost prefix: the query must constrain city first."
+        "explanation": "A composite index is sorted by city first, then created_at within each city, so city = 'Pune' jumps to Pune and the date range scans a contiguous slice. A filter on created_at alone or on status cannot use the sort order, and the OR needs rows that match either condition, which one composite index cannot serve on its own."
       },
       {
         "id": "t23-a2",
@@ -9084,7 +9084,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Indexes trade write cost and storage for faster reads."
+        "explanation": "Each index is another sorted structure, so every insert, and every update of an indexed column, writes to all five, adding latency, WAL and storage. Planning gets slightly harder but that is minor, indexes do not prevent sharding, and the cost continues for as long as they exist."
       },
       {
         "id": "t23-a3",
@@ -9112,7 +9112,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "LSM-trees turn writes into sequential appends."
+        "explanation": "An LSM-tree buffers writes in memory and flushes them as sorted files, so heavy write streams such as event logs become sequential appends. Reads can touch several files, so mostly-read data, small in-memory tables and complex joins favour a B-tree database."
       },
       {
         "id": "t23-a4",
@@ -9148,7 +9148,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Faster reads, slower writes."
+        "explanation": "A query filters on a column, and without an index the database scans every row. A B-tree on that column makes lookups take a few page reads (log time), and from then on every write also updates the index: faster reads, paid for by writes."
       },
       {
         "id": "t23-a5",
@@ -9193,7 +9193,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Three levels cover 8 million keys; four cover 1.6 billion, which exceeds 500 million."
+        "explanation": "200 keys a page gives 200, 40,000, 8 million and 1.6 billion entries for one to four levels, so 500 million needs four. Two levels hold only 40,000, nine would need a far smaller fan-out, and 500 levels would be a list, not a tree."
       }
     ],
     "flashcards": [
@@ -9784,7 +9784,7 @@
       {
         "id": "t25-c4",
         "kind": "text",
-        "title": "Durability",
+        "title": "Durability: the log reaches disk before commit returns",
         "body": "Commit returns only after the change is in the write-ahead log on disk, and with synchronous replication on a replica too. After a crash the database replays the log.",
         "teaches": [
           "durability"
@@ -11038,7 +11038,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Route a user’s reads to the leader briefly after they write."
+        "explanation": "The write reached the leader, but the refresh was read from a replica that had not applied it yet: replication lag. Read-your-writes fixes it, by reading from the leader for a short while after a user writes, or from a replica known to have caught up. A constraint failure would have returned an error, a lost write would not reappear seconds later, and session expiry logs the user out rather than hiding a review."
       },
       {
         "id": "t28-a2",
@@ -11066,7 +11066,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Async is fast because it does not wait."
+        "explanation": "The leader acknowledges before replicas have the change, so if it dies, writes in flight (often under a second’s worth) are lost on failover. Waiting for replicas is synchronous replication, replicas still serve reads, and split brain comes from a bad failover, not from each write."
       },
       {
         "id": "t28-a3",
@@ -11094,7 +11094,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Two leaders can accept the same key at once."
+        "explanation": "Two leaders can accept writes to the same row at the same moment, so the system needs a rule to resolve the conflict: last write wins, merging, or asking the user. Multi-leader avoids a global lock, replicas still serve reads, and lag gets worse, not impossible."
       },
       {
         "id": "t28-a4",
@@ -11130,7 +11130,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Replica reads lag by the shipping time."
+        "explanation": "The client writes to the leader, which records the change in its log, ships the log to the replicas, and each replica applies it in order. Reads from replicas see the change only after it is applied, which is the replication lag."
       },
       {
         "id": "t28-a5",
@@ -11178,7 +11178,7 @@
         "rationaleConflicts": {
           "r3": "It makes them slower; the leader waits for the replica’s acknowledgement."
         },
-        "explanation": "Pay latency for durability where money is involved."
+        "explanation": "Synchronous replication makes each commit wait for the replica in the other zone, a few milliseconds, so a failover loses no acknowledged payment. Asynchronous replication is faster but can lose the last moments of payments when the leader dies."
       },
       {
         "id": "t28-d1",
@@ -11206,7 +11206,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Writes acknowledged but not yet replicated: 2,000 × 0.3 = 600."
+        "explanation": "2,000 writes/s × 0.3 s of lag ≈ 600 writes acknowledged but not yet on the replica. None would need synchronous replication, 6 and 2,000,000 are off by factors of 100 and 3,000."
       }
     ],
     "flashcards": [
@@ -12603,7 +12603,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Selling the same seat twice is worse than a brief error."
+        "explanation": "If two sides of a partition both sell the last seat, two fans hold one seat and someone must be refunded and turned away at the gate, so seat inventory should refuse or delay sales until the sides agree. A like count, a view counter or a recommendation that is briefly wrong costs nothing, so those stay available and reconcile later."
       },
       {
         "id": "t32-a2",
@@ -12631,7 +12631,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "You cannot opt out of partitions."
+        "explanation": "Networks drop and delay messages whether you plan for it or not, so partition tolerance is not optional, and CAP only forces a choice while a partition lasts: refuse some requests (C) or answer with possibly stale data (A). More replicas mean more links that can be cut, a fast network still partitions, and the theorem applies to any replicated store, SQL or not."
       },
       {
         "id": "t32-a3",
@@ -12662,7 +12662,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "The choice only bites during the partition."
+        "explanation": "In normal operation the system can be both consistent and available. When a partition cuts nodes off, each side must either reject requests it cannot confirm (CP) or serve them with possibly stale data (AP). When the network heals, an AP system reconciles divergent writes; a CP system simply resumes."
       },
       {
         "id": "t32-a4",
@@ -12710,7 +12710,7 @@
         "rationaleConflicts": {
           "r3": "AP serves possibly stale data; users can see different counts until the partition heals."
         },
-        "explanation": "Choose AP where staleness is cheap."
+        "explanation": "A like counter that is off by a few for the length of a partition harms nobody, while rejecting likes is visible to every user on the cut-off side. Accepting them and merging later (counters merge by adding) is the right posture; CP would buy exactness nobody needs."
       },
       {
         "id": "t32-a5",
@@ -12719,26 +12719,26 @@
         "prompt": "During a partition, a CP system will:",
         "choices": [
           {
-            "id": "d",
-            "label": "Promote a leader on both sides so requests succeed"
-          },
-          {
-            "id": "c",
-            "label": "Accept writes on both sides and merge conflicts later"
+            "id": "a",
+            "label": "Reject or delay some requests rather than return stale data"
           },
           {
             "id": "b",
             "label": "Return possibly stale data so that each node stays available"
           },
           {
-            "id": "a",
-            "label": "Reject or delay some requests rather than return stale data"
+            "id": "c",
+            "label": "Accept writes on both sides and merge conflicts later"
+          },
+          {
+            "id": "d",
+            "label": "Let both sides elect a leader so that requests succeed"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Consistency first, at the cost of availability."
+        "explanation": "A CP system answers only when it can be sure the answer is current, so the side without a majority refuses or delays requests. Returning stale data and accepting writes on both sides are AP behaviours, and two leaders is split brain, which a CP system prevents with a majority quorum."
       },
       {
         "id": "t32-d1",
@@ -12766,7 +12766,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "CP gives up availability on the cut-off side to avoid an inconsistent answer."
+        "explanation": "A node cut off from the ledger leader cannot know the current balance, so a CP design refuses or delays the payment and the client can retry. Approving from a cached balance or approving now and reconciling later risks spending money twice, which is the AP choice, and silently dropping the request is neither: the client must get an answer, even an error."
       }
     ],
     "flashcards": [
@@ -13009,7 +13009,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The E/L half covers normal operation."
+        "explanation": "CAP covers only partitions. PACELC adds the everyday case: even with a healthy network, waiting for replicas to agree costs latency, so a system picks low latency (L) or consistency (C). It does not add a third partition choice, avoid partitions, or say anything about durability."
       },
       {
         "id": "t33-a2",
@@ -13037,7 +13037,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Available under partition, low latency otherwise."
+        "explanation": "With default settings (for example consistency level ONE) Cassandra keeps serving during a partition and answers from the nearest replica normally, so it is usually labelled PA/EL. Higher consistency levels such as QUORUM move individual requests towards C at the cost of latency."
       },
       {
         "id": "t33-a3",
@@ -13065,7 +13065,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Spend latency on consistency only where staleness hurts."
+        "explanation": "A product description a few seconds old harms nobody, so the local replica answers in milliseconds. Reading from a leader in another region, or a quorum across three regions, adds tens to hundreds of milliseconds per read for freshness nobody notices, and blocking until replication is idle could wait forever on a busy system."
       },
       {
         "id": "t33-a4",
@@ -13113,7 +13113,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "The answer differs by feature."
+        "explanation": "The same read, a price from Mumbai, can go to the local replica (fast, maybe stale) or the leader in Singapore (slower, fresh). The right choice depends on the feature: browsing takes the local replica, checkout takes the leader."
       },
       {
         "id": "t33-d1",
@@ -13127,21 +13127,21 @@
           },
           {
             "id": "b",
-            "label": "EL: it chooses latency"
+            "label": "EL: it chooses latency in the else case"
           },
           {
             "id": "c",
-            "label": "PA: it chooses availability during any network partitions"
+            "label": "PA: it chooses availability during a partition"
           },
           {
             "id": "d",
-            "label": "Not a distributed database"
+            "label": "PC/EL: consistent only while partitioned"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Waiting for a quorum when there is no partition trades latency for consistency, which is EC."
+        "explanation": "Waiting for a cross-region majority when nothing is wrong spends latency to stay consistent, which is EC. EL would answer before replicas agree, and the question says nothing about behaviour during a partition, so PA and PC labels are guesses; PC/EL would also contradict the waiting it does every day."
       }
     ],
     "flashcards": [
@@ -17369,26 +17369,26 @@
         "prompt": "A service writes an order to its database, then publishes to Kafka, and crashes in between. Result?",
         "choices": [
           {
-            "id": "d",
-            "label": "Both are lost"
-          },
-          {
-            "id": "c",
-            "label": "The database retries the publish on its own"
+            "id": "a",
+            "label": "The order exists but no event was published"
           },
           {
             "id": "b",
-            "label": "Kafka rolls back the order"
+            "label": "Kafka rolls the order back on its own"
           },
           {
-            "id": "a",
-            "label": "The order exists but no event was published"
+            "id": "c",
+            "label": "The event is sent, but the order is lost"
+          },
+          {
+            "id": "d",
+            "label": "Both the order and the event are lost"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Two separate writes are not atomic."
+        "explanation": "The database commit finished before the crash and the publish never ran, so the order exists but downstream services never hear of it. Two separate systems are written separately, with nothing to make them atomic. Kafka knows nothing about the order, and the order was committed first, so it survives."
       },
       {
         "id": "t44-a2",
@@ -17416,7 +17416,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "One local transaction, then an at-least-once relay."
+        "explanation": "The event goes into an outbox table in the same local transaction as the order, so both commit or neither does; a relay then publishes outbox rows and marks them sent. Publishing first just reverses the failure, two-phase commit between a database and Kafka is rarely available and slow, and retrying from memory loses the event if the process dies."
       },
       {
         "id": "t44-a3",
@@ -17452,7 +17452,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "The relay runs after commit."
+        "explanation": "BEGIN, insert the order and its outbox event, COMMIT; only after the commit does the relay read unsent rows, publish them and mark them sent. A crash between publish and marking republishes, so delivery is at least once."
       },
       {
         "id": "t44-a4",
@@ -17480,7 +17480,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The log already has every committed change."
+        "explanation": "Change data capture tails the database’s own change log (the PostgreSQL WAL or MySQL binlog), which already holds every committed change in order. Polling with SELECT * misses intermediate updates and loads the database, intercepting HTTP misses changes made any other way, and relying on developers to publish is the dual write again."
       },
       {
         "id": "t44-a5",
@@ -17489,26 +17489,26 @@
         "prompt": "The relay publishes an event, then crashes before marking it sent. What happens next?",
         "choices": [
           {
-            "id": "c",
-            "label": "The database rolls back the order"
+            "id": "a",
+            "label": "It republishes, so consumers must be idempotent"
           },
           {
             "id": "b",
-            "label": "The event is lost"
+            "label": "The event is lost and must be sent by hand"
+          },
+          {
+            "id": "c",
+            "label": "The database rolls back the original order"
           },
           {
             "id": "d",
-            "label": "Kafka removes the duplicate itself"
-          },
-          {
-            "id": "a",
-            "label": "It republishes, so consumers must be idempotent"
+            "label": "Kafka drops the duplicate before consumers see it"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "At-least-once relays create duplicates."
+        "explanation": "The row is still unmarked, so the restarted relay publishes it again and consumers see the event twice. That is at-least-once delivery, so consumers deduplicate by event id. Nothing is lost, the order committed long ago, and an idempotent Kafka producer deduplicates retries within one producer session, not a republish from a new process."
       },
       {
         "id": "t44-d1",
@@ -17518,25 +17518,25 @@
         "choices": [
           {
             "id": "a",
-            "label": "Writing the event to an outbox table in the same transaction"
+            "label": "Write the event to an outbox table in the same transaction"
           },
           {
             "id": "b",
-            "label": "Publishing first, then updating the database"
+            "label": "Publish the event first, then update the database"
           },
           {
             "id": "c",
-            "label": "Increasing Kafka retention"
+            "label": "Retry the publish in memory until Kafka accepts it"
           },
           {
             "id": "d",
-            "label": "Using a bigger database server"
+            "label": "Wrap the database write and the publish in a try block"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The outbox makes the event part of the same atomic commit; a relay publishes it afterwards."
+        "explanation": "The outbox makes the event part of the same atomic commit as the update, and a relay publishes it afterwards. Publishing first fails the other way, an event for an update that never happened. In-memory retries and try blocks die with the process, which is the failure in question."
       }
     ],
     "flashcards": [
@@ -20561,7 +20561,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Callers need current, healthy addresses."
+        "explanation": "Instances are created, moved and killed by autoscaling and deploys, so their addresses change all the time; callers need a current list of healthy instances. Encrypting traffic, storing data and versioning APIs are separate concerns handled by TLS, databases and API design."
       },
       {
         "id": "t52-a2",
@@ -20570,8 +20570,8 @@
         "prompt": "An instance crashes without deregistering. How does the registry notice?",
         "choices": [
           {
-            "id": "d",
-            "label": "Callers edit the registry by hand"
+            "id": "a",
+            "label": "Its heartbeats stop and its entry expires"
           },
           {
             "id": "b",
@@ -20579,17 +20579,17 @@
           },
           {
             "id": "c",
-            "label": "It does not notice"
+            "label": "The next deploy rebuilds the registry"
           },
           {
-            "id": "a",
-            "label": "Its heartbeats stop and its entry expires"
+            "id": "d",
+            "label": "Callers report it after their first failed call"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Heartbeats plus expiry clean up dead entries."
+        "explanation": "A registry keeps an entry only while the instance renews it with heartbeats (or passes health checks), so a crashed instance’s entry lapses after a few missed intervals. A crashed process cannot send a goodbye, waiting for the next deploy could take days, and callers do not normally write to the registry; they retry another instance."
       },
       {
         "id": "t52-a3",
@@ -20617,7 +20617,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The picking happens outside the client."
+        "explanation": "In server-side discovery the caller sends to one stable address and a load balancer or proxy picks a healthy instance. Querying a registry such as Consul and choosing yourself is client-side discovery, a config file of IPs is static configuration, and broadcasting addresses to every caller does not scale."
       },
       {
         "id": "t52-a4",
@@ -20653,7 +20653,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Registration comes first."
+        "explanation": "An instance registers when it starts and keeps renewing with heartbeats; a caller looks the service up, gets the healthy instances and calls one, usually caching the list briefly. Registration must come first, or there is nothing to find."
       },
       {
         "id": "t52-a5",
@@ -20681,7 +20681,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The Service tracks ready pods behind one name."
+        "explanation": "A Service gives a set of pods one stable DNS name and virtual IP and keeps its endpoint list in step with the pods that pass readiness. A ConfigMap would need editing on every pod change, a replica count says how many pods exist, not where, and a liveness probe restarts pods without routing anything."
       },
       {
         "id": "t52-d1",
@@ -20709,7 +20709,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "5 seconds × 3 failures = 15 seconds of detection time."
+        "explanation": "5 s × 3 failures ≈ 15 s, and during that window calls to the dead instance fail, so callers need retries to another instance. Faster checks shorten the window but risk marking slow instances dead."
       }
     ],
     "flashcards": [
@@ -20885,7 +20885,7 @@
       {
         "id": "t53-c1",
         "kind": "text",
-        "title": "Timeouts",
+        "title": "Timeouts shorter than the caller’s deadline",
         "body": "Every outbound call needs a timeout shorter than the caller’s own deadline. Without one, threads wait forever on a hung dependency and the caller runs out of threads too.",
         "teaches": [
           "timeouts"
@@ -20894,7 +20894,7 @@
       {
         "id": "t53-c2",
         "kind": "text",
-        "title": "Retries",
+        "title": "Retries: few, idempotent, with backoff and jitter",
         "body": "Retry only idempotent operations, a few times, with exponential backoff and jitter. Retries at every layer multiply: 3 attempts at each of 3 layers is up to 27 calls.",
         "teaches": [
           "retries"
@@ -20928,7 +20928,7 @@
       {
         "id": "t53-c5",
         "kind": "text",
-        "title": "Bulkheads",
+        "title": "Bulkheads: a separate pool per dependency",
         "body": "Give each dependency its own pool of threads or connections, so a slow recommendations service cannot use up the pool checkout needs.",
         "teaches": [
           "bulkhead"
@@ -21363,29 +21363,29 @@
         "id": "t54-a2",
         "concept": "red",
         "type": "multiple_choice",
-        "prompt": "RED metrics for a service are:",
+        "prompt": "The checkout service’s dashboard must show its health at a glance using the RED method. Which three numbers does it show?",
         "choices": [
           {
             "id": "a",
-            "label": "Rate, errors, duration"
-          },
-          {
-            "id": "d",
-            "label": "Retries, exceptions, deploys"
+            "label": "Rate, errors and duration of requests"
           },
           {
             "id": "b",
-            "label": "Requests, events, disks"
+            "label": "Requests, events and disk use"
           },
           {
             "id": "c",
-            "label": "Reads, edits, deletes"
+            "label": "Reads, edits and deletes per table"
+          },
+          {
+            "id": "d",
+            "label": "Retries, exceptions and deploys per day"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Service-level health in three numbers."
+        "explanation": "RED tracks what callers see: request rate, the share that fail, and how long they take (as percentiles such as p99). Disk use belongs to USE, which covers resources. Per-table reads and edits, and counts of deploys or retries, are useful elsewhere but do not say whether checkout is healthy."
       },
       {
         "id": "t54-a3",
@@ -21413,7 +21413,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "USE (utilisation, saturation, errors) is for resources."
+        "explanation": "USE describes resources: utilisation, saturation and errors. The disk’s I/O queue depth is saturation, work waiting because the disk is busy. API request rate and p99 latency are RED signals for a service, and deploys are events, not a resource measure."
       },
       {
         "id": "t54-a4",
@@ -21449,7 +21449,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "The trace id ties it together."
+        "explanation": "The first service gives the request a trace id and passes it on every call; each service logs with it and records spans; metrics are aggregated from the same events; dashboards and alerts read the metrics, and a slow request can be followed from an alert to its trace and logs."
       },
       {
         "id": "t54-a5",
@@ -21462,22 +21462,22 @@
             "label": "Huge volume and cost, and hard to query"
           },
           {
-            "id": "d",
-            "label": "Metrics become inaccurate"
+            "id": "b",
+            "label": "Requests slow down because logging blocks"
           },
           {
             "id": "c",
-            "label": "Traces stop working"
+            "label": "Traces lose their spans under the load"
           },
           {
-            "id": "b",
-            "label": "Logs become too short"
+            "id": "d",
+            "label": "Metrics get less accurate as logs grow"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Structure and sample logs."
+        "explanation": "DEBUG in production multiplies log volume, and storage and indexing bills, while free text cannot be filtered reliably by field. Use structured logs at INFO, with sampling for chatty paths. Logging can slow requests if writes are synchronous, but the main problem here is cost and queryability; traces and metrics are separate pipelines."
       },
       {
         "id": "t54-d1",
@@ -21487,25 +21487,25 @@
         "choices": [
           {
             "id": "a",
-            "label": "A distributed trace"
+            "label": "A distributed trace of that request"
           },
           {
             "id": "b",
-            "label": "A CPU utilisation metric"
+            "label": "The payment service’s CPU metric"
           },
           {
             "id": "c",
-            "label": "The deploy history"
+            "label": "The payment service’s p99 latency"
           },
           {
             "id": "d",
-            "label": "A Bloom filter"
+            "label": "The payment service’s error log"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Traces record spans per service with timings, assembled by a shared trace id."
+        "explanation": "A trace records each service’s span with its start and duration under one trace id, so it shows that this request spent 3.2 s in payments. A p99 latency or CPU chart summarises many requests and cannot point to this one, and an error log shows nothing if the call was slow but succeeded."
       }
     ],
     "flashcards": [
@@ -22552,7 +22552,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "They proved who they are; they lacked permission for this action."
+        "explanation": "The agent logged in successfully, so authentication worked; the refund was refused because their role does not cover another region’s orders, which is an authorisation decision. TLS protects the connection, and a rate limit blocks volume, not a single permitted-looking request."
       },
       {
         "id": "t57-a2",
@@ -22580,7 +22580,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Nothing server-side remembers them."
+        "explanation": "A JWT is checked by its signature alone, so once issued it stays valid until it expires, even after logout or a password change. Short lifetimes, refresh tokens or a deny list limit that. JWTs are verified with a public key and no call to the auth server, need no sticky sessions, and can carry plenty of claims."
       },
       {
         "id": "t57-a3",
@@ -22608,7 +22608,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Server state makes revocation easy."
+        "explanation": "A server-side session is a row in a store, so deleting it ends access on the next request, which matters when a bank must cut off a stolen session at once. Sessions do need storage, usually travel in a cookie, and require each service to look the session up, which is the price of that control."
       },
       {
         "id": "t57-a4",
@@ -22644,7 +22644,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Short access tokens, longer refresh tokens."
+        "explanation": "The user logs in (say with an OTP), the server verifies it and issues a short-lived access token (minutes) with a longer-lived refresh token, APIs are called with the access token, and when it expires the client uses the refresh token to get a new one without logging in again."
       },
       {
         "id": "t57-a5",
@@ -22672,7 +22672,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "UI checks are convenience; the service enforces."
+        "explanation": "Only the service that owns orders knows whether this user may refund this order, and it must check on every request because roles and ownership change. Hiding the button stops honest users only, a check at login cannot know which order comes later, and a CDN has no view of order ownership."
       },
       {
         "id": "t57-d1",
@@ -22700,7 +22700,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The user was correctly authenticated, but the service did not check that the order belongs to them."
+        "explanation": "The user really is logged in, so authentication passed; the service never checked that the order belongs to them, which is a broken object-level authorisation check (an insecure direct object reference). TLS and rate limiting are working as designed and do not decide who may see which order."
       }
     ],
     "flashcards": [
@@ -23738,7 +23738,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Parameters keep data from being parsed as SQL."
+        "explanation": "A parameterised query sends the SQL and the input separately, so the input is always treated as data and can never change the query. Stripping quotes misses other encodings and breaks names like O’Brien, hiding errors only hides the evidence, and a stored procedure that concatenates the same string is just as injectable."
       },
       {
         "id": "t60-a2",
@@ -23766,7 +23766,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Code and images get copied; secrets must not travel with them."
+        "explanation": "A secrets manager stores the key encrypted, controls who can read it, logs each access and supports rotation; the app fetches it at runtime. A private repository, a Docker image and a mobile app are all copied widely, so anyone with a copy has the key, and obfuscation in an app can be reversed in minutes."
       },
       {
         "id": "t60-a3",
@@ -23794,7 +23794,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Limit what a compromise can do."
+        "explanation": "A reporting service that only reads should have read access only to the tables it uses, so stolen credentials cannot change or delete orders. The admin account, spare write access or the checkout account all hand an attacker far more than reporting needs."
       },
       {
         "id": "t60-a4",
@@ -23830,7 +23830,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Each layer catches what the previous missed."
+        "explanation": "TLS at the edge protects the connection, rate limits and a firewall shed abusive traffic cheaply, authentication establishes who is calling, authorisation decides what they may do, and validation with parameterised queries keeps their input from turning into code. Each layer stops something the earlier ones let through."
       },
       {
         "id": "t60-a5",
@@ -23858,35 +23858,35 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "TLS is one layer of several."
+        "explanation": "TLS protects data in transit and nothing else. An attacker can still call the API over HTTPS with a stolen token, someone else’s order id or an injection payload, so authentication, authorisation, input validation and rate limits are all still needed. Certificates and a CDN firewall do not change that."
       },
       {
         "id": "t60-d1",
         "type": "multiple_choice",
         "concept": "least-privilege",
-        "prompt": "A reporting service's database user can only SELECT from three tables. Which principle is this?",
+        "prompt": "A dashboard’s database password leaks in a public log. That account was granted SELECT on three tables only. How far can whoever finds it get?",
         "choices": [
           {
             "id": "a",
-            "label": "Least privilege"
+            "label": "Read those three tables, and nothing else"
           },
           {
             "id": "b",
-            "label": "Eventual consistency"
+            "label": "Read and change every table in the database"
           },
           {
             "id": "c",
-            "label": "Idempotency"
+            "label": "Read the three tables and drop them"
           },
           {
             "id": "d",
-            "label": "Sharding"
+            "label": "Nothing, because the reads are encrypted"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Granting only the access a component needs limits damage if it is compromised."
+        "explanation": "That is least privilege at work: the stolen account can read three tables, a real leak but a bounded one, and cannot change, drop or reach anything else. Encryption in transit does not stop someone holding valid credentials from reading."
       }
     ],
     "flashcards": [
@@ -24511,7 +24511,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Spread copies across failure domains."
+        "explanation": "A rack shares a power feed and a top-of-rack switch, so losing it takes every copy on it. HDFS’s default policy puts the first replica on the writer’s node and the other two on two nodes of a different rack, so a rack failure always leaves a copy. Cross-rack copies make writes slower, not faster, use the same storage, and racks hold many DataNodes."
       },
       {
         "id": "t62-a2",
@@ -24539,7 +24539,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Every file costs NameNode memory, and HDFS is built for big scans."
+        "explanation": "Every file and block costs about 150 bytes of NameNode memory, so millions of tiny files exhaust it, and HDFS is built for streaming big files, not millisecond lookups. Nightly scans of 50 TB, large Parquet files and raw clickstream archives are exactly what it is built for."
       },
       {
         "id": "t62-a3",
@@ -24570,7 +24570,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "The NameNode only handles metadata."
+        "explanation": "The client asks the NameNode which DataNodes hold each block, then streams the blocks directly from those DataNodes, preferring the nearest. File data never passes through the NameNode, which is why one NameNode can serve a large cluster."
       },
       {
         "id": "t62-a4",
@@ -24598,7 +24598,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "DataNodes store the blocks."
+        "explanation": "The NameNode holds the namespace in memory: directories, files, their blocks and where each block’s replicas live. The block data itself sits on DataNodes, user credentials come from Kerberos or another system, and it tracks every block, not only new ones."
       },
       {
         "id": "t62-a5",
@@ -24643,7 +24643,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "1,048,576 ÷ 128 = 8,192 blocks; with replication factor 3 there are 24,576 replicas."
+        "explanation": "1,048,576 MB ÷ 128 MB = 8,192 blocks, and with replication factor 3 the cluster stores 24,576 block replicas. 1,024 would be 1 GB blocks, 128 is the block size itself, and 24,576 counts replicas, not blocks."
       }
     ],
     "flashcards": [
@@ -26451,26 +26451,26 @@
         "prompt": "A user stands at the edge of a geohash cell. Why also search the neighbouring cells?",
         "choices": [
           {
-            "id": "c",
-            "label": "Geohash requires 9 cells"
-          },
-          {
             "id": "a",
             "label": "A restaurant 50 m away can sit just across the boundary"
           },
           {
             "id": "b",
-            "label": "Neighbouring cells are already cached"
+            "label": "Neighbouring cells are usually already in the cache"
+          },
+          {
+            "id": "c",
+            "label": "Geohash cells overlap, so points appear in several"
           },
           {
             "id": "d",
-            "label": "To balance load across shards"
+            "label": "Searching nine cells spreads the load across shards"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Cells are arbitrary lines on the map."
+        "explanation": "Cell boundaries are arbitrary lines, so a restaurant 50 m away can fall in the next cell with a different prefix. Searching the user’s cell and its 8 neighbours covers that, then exact distance filters the candidates. Geohash cells tile the map without overlap, caching is not the reason, and the search is about correctness, not load."
       },
       {
         "id": "t67-a2",
@@ -26498,7 +26498,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Adaptive cells keep candidate counts even."
+        "explanation": "A quadtree splits a cell only where it holds too many points, so cells are tiny in Mumbai and huge over the Thar desert, and every query sees a similar number of candidates. A fixed grid gives either crowded cells in cities or millions of empty ones. Quadtrees need extra memory for their nodes, give straight-line not road distances, and grids store both coordinates."
       },
       {
         "id": "t67-a3",
@@ -26529,7 +26529,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Coarse filter, then exact check."
+        "explanation": "Find the user’s cell at a size near 2 km, add its 8 neighbours so boundary cases are covered, fetch the candidates in those cells, then compute exact distances, drop anything beyond 2 km and sort."
       },
       {
         "id": "t67-a4",
@@ -26557,7 +26557,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "A shared prefix means a shared cell."
+        "explanation": "Each geohash character narrows the cell, so a long shared prefix means both points sit in the same small cell and are close. The reverse does not hold: two points either side of a cell edge can be metres apart with different prefixes, which is why searches add neighbouring cells. Prefixes say nothing about direction and are not random."
       },
       {
         "id": "t67-a5",
@@ -26610,7 +26610,7 @@
         "rationaleConflicts": {
           "r3": "Computing distance to every restaurant per request is far too slow at this scale."
         },
-        "explanation": "Index space so queries stay local."
+        "explanation": "An index that splits space so each query reads only nearby cells keeps lookups local whether the city is dense or sparse. Large fixed cells return thousands of candidates in Mumbai, and scanning every restaurant reads millions of rows for each search."
       },
       {
         "id": "t67-d1",
@@ -26638,7 +26638,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Cell edges split nearby points; the neighbours cover that, then exact distance filters the candidates."
+        "explanation": "Close points can sit across a cell boundary and have different prefixes, so the 8 neighbours cover them; exact distance then filters the candidates. Reading nine cells makes queries bigger, not the index smaller, geohashes work alone as cells, and distances are still computed."
       }
     ],
     "flashcards": [
@@ -27175,7 +27175,7 @@
       {
         "id": "t69-c1",
         "kind": "text",
-        "title": "Blue-green",
+        "title": "Blue-green: two environments, one router switch",
         "body": "Run two full environments. Deploy to the idle one (green), test it, then switch the router from blue to green. Rollback is switching back. It needs double capacity during the switch, and database changes must work for both.",
         "teaches": [
           "blue-green"
@@ -27184,7 +27184,7 @@
       {
         "id": "t69-c2",
         "kind": "text",
-        "title": "Canary",
+        "title": "Canary: a small share of real traffic first",
         "body": "Send a small share of traffic (1%, then 5%, 25%) to the new version and watch error rates and latency. Roll back automatically if they get worse. It catches problems only real traffic shows.",
         "teaches": [
           "canary"
@@ -27230,29 +27230,29 @@
         "id": "t69-a1",
         "concept": "canary",
         "type": "multiple_choice",
-        "prompt": "What does a canary release do?",
+        "prompt": "A team ships v2 of the search service. How does a canary release limit the damage if v2 is bad?",
         "choices": [
           {
             "id": "a",
             "label": "Sends a small share of traffic to v2 and compares its error rate"
           },
           {
-            "id": "c",
-            "label": "Tests only in staging"
-          },
-          {
             "id": "b",
             "label": "Switches all traffic at once, then rolls back if many users complain"
           },
           {
+            "id": "c",
+            "label": "Tests v2 only in staging before any user sees it"
+          },
+          {
             "id": "d",
-            "label": "Deploys to all servers at 2 AM"
+            "label": "Deploys v2 everywhere at night when traffic is lowest"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Real traffic, limited blast radius."
+        "explanation": "A canary gives v2 a small slice of real traffic, say 1%, and compares its errors and latency with v1 over the same minutes, so a bad build hurts few users and is caught by metrics, not complaints. Switching everyone waits for users to notice, staging never sees real traffic, and a night-time deploy still reaches every user at once."
       },
       {
         "id": "t69-a2",
@@ -27261,26 +27261,26 @@
         "prompt": "In blue-green, how do you roll back?",
         "choices": [
           {
-            "id": "b",
-            "label": "Redeploy the old build to each server"
+            "id": "a",
+            "label": "Point the router back to the old environment"
           },
           {
-            "id": "d",
-            "label": "Wait for the next release"
+            "id": "b",
+            "label": "Redeploy the old build to each server"
           },
           {
             "id": "c",
             "label": "Restore the database from last night’s backup"
           },
           {
-            "id": "a",
-            "label": "Point the router back to the old environment"
+            "id": "d",
+            "label": "Keep both live and ship a hotfix to the new one"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The old environment is still running."
+        "explanation": "In blue-green the old environment keeps running untouched, so rollback is just switching the router back, usually in seconds. Redeploying the old build is what a rolling update must do, restoring last night’s backup would discard a day of data (and code rollback does not need it), and a hotfix leaves users on the broken version while you write it."
       },
       {
         "id": "t69-a3",
@@ -27293,22 +27293,22 @@
             "label": "Flip its kill-switch flag off"
           },
           {
+            "id": "b",
+            "label": "Roll back the whole release everywhere"
+          },
+          {
             "id": "c",
-            "label": "Hotfix and redeploy"
+            "label": "Write a hotfix and redeploy it"
           },
           {
             "id": "d",
-            "label": "Add servers"
-          },
-          {
-            "id": "b",
-            "label": "Roll back the release everywhere"
+            "label": "Restart every app instance"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Flags change behaviour without a deploy."
+        "explanation": "A kill-switch flag turns the widget off within seconds, without a build or a deploy, and leaves the rest of the release in place. A rollback also removes every other change in the release and takes a deploy, a hotfix takes longer still, and restarting instances brings the same crashing widget back."
       },
       {
         "id": "t69-a4",
@@ -27339,7 +27339,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Grow only while metrics hold."
+        "explanation": "Run v2 beside v1, send it a small share such as 1%, compare its errors and latency with v1 over the same period, and widen in steps (25%, then 100%) only while the numbers hold. Any failed comparison sends the share back to zero."
       },
       {
         "id": "t69-a5",
@@ -27370,7 +27370,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Every step works with the previous code version."
+        "explanation": "Expand, then contract: add the new column, write both, backfill and switch reads to the new column, and drop the old one only when no running version reads it. At every step both the old and new code work, so a rolling deploy or a canary never breaks."
       },
       {
         "id": "t69-d1",
@@ -27398,7 +27398,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "During a gradual rollout both versions are live, so schema changes must stay compatible with both."
+        "explanation": "During a canary v1 and v2 run against the same database, so a plain rename breaks whichever version expects the other name. Expand-and-contract keeps both working throughout. Databases can rename columns in place; that is the problem, not the fix. It does not speed up the rollout, and it is independent of whether you use flags."
       }
     ],
     "flashcards": [
@@ -27638,7 +27638,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Dependency checks belong in readiness, which only stops traffic."
+        "explanation": "A failed liveness probe restarts the container, so if it checks the database, a database blip restarts every pod at once and they loop. Dependency checks belong in readiness, which only stops traffic to the pod until the database is back. Image size and rollout speed do not cause synchronised restarts."
       },
       {
         "id": "t70-a2",
@@ -27666,7 +27666,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Controllers restore the declared state."
+        "explanation": "Once the node is marked unreachable, its pods are evicted after a grace period (300 s by default), and the controller that owns them creates replacements on healthy nodes. Kubernetes cannot restart a dead machine, does not wait indefinitely, and does not move traffic to another cluster on its own. Run spare replicas across nodes so those minutes do not matter."
       },
       {
         "id": "t70-a3",
@@ -27702,7 +27702,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Old pods leave only after new ones are ready."
+        "explanation": "After the new image is pushed, the Deployment creates a new pod, waits for its readiness probe to pass, lets the Service send it traffic, and only then removes one old pod; it repeats until all pods are new. Removing an old pod first would cut capacity during the deploy."
       },
       {
         "id": "t70-a4",
@@ -27730,7 +27730,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "No guest OS boot."
+        "explanation": "A container is an isolated process on the host’s already-running kernel, so starting it is like starting a program, while a VM must boot a whole guest operating system. Containers do have a network stack and a filesystem, and they run on VMs as well as bare metal."
       },
       {
         "id": "t70-a5",
@@ -27758,7 +27758,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Reconciliation loops close the gap."
+        "explanation": "The Deployment’s controller continually compares the declared 5 replicas with what is running, sees 4 and starts a fifth. Nobody needs to reapply anything, the other pods are left alone, and the Deployment itself is not deleted."
       },
       {
         "id": "t70-d1",
@@ -27786,7 +27786,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Readiness decides whether the pod receives traffic; liveness decides whether to restart it."
+        "explanation": "A failing readiness probe removes the pod from the Service’s endpoints, so it gets no traffic until the cache is warm, without restarting it. A liveness probe would restart it, possibly before it ever finishes loading; Kubernetes cannot guess when an app is ready, and the autoscaler changes the replica count, not routing."
       }
     ],
     "flashcards": [
@@ -66190,7 +66190,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Decision plus reason."
+        "explanation": "Good narration states a decision and the reason that drives it, ideally with a number, so the interviewer can follow and challenge it. Describing boxes says what, not why, and “Netflix does it” or “everyone uses Redis” borrow a reason that may not fit these requirements."
       },
       {
         "id": "t118-a2",
@@ -66218,7 +66218,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Honesty plus reasoning beats bluffing."
+        "explanation": "Saying you have not used it, then naming what you need (say, durable writes at 5,000/s and range queries by time), shows reasoning the interviewer can map onto that database. Bluffing collapses under one follow-up question, refusing ignores their lead, and changing the subject looks evasive."
       },
       {
         "id": "t118-a3",
@@ -66246,7 +66246,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Start simple, then grow."
+        "explanation": "A thousand users fit on one server and one database, so start there and add parts only when a number demands them. Multi-region, microservices with Kafka and sharding solve problems these users do not have, and each adds cost you would have to justify."
       },
       {
         "id": "t118-a4",
@@ -66282,7 +66282,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Each step answers a specific bottleneck."
+        "explanation": "Start with one server; add a load balancer and stateless app servers when one machine is not enough; add a cache and CDN when reads dominate; add read replicas when the database is read-bound; shard and go multi-region last, when writes or geography demand it."
       },
       {
         "id": "t118-a5",
@@ -66338,7 +66338,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Evolving step by step shows why each component exists rather than presenting an unexplained final picture."
+        "explanation": "A simple design that already works gives every later addition a reason: the cache appears because reads are 100× writes, the shard because writes exceed one machine. Diagram size is not the point, complex designs can be right when the numbers call for them, and the step-by-step approach invites trade-off discussion rather than avoiding it."
       }
     ],
     "flashcards": [
@@ -87878,7 +87878,7 @@
           },
           {
             "id": "b",
-            "label": "Linux’s default ephemeral range, 32,768–60,999"
+            "label": "The OS ephemeral port range, 32,768–60,999"
           },
           {
             "id": "c",
@@ -90392,7 +90392,7 @@
           },
           {
             "id": "b",
-            "label": "The delete fails while orders still reference customer 7"
+            "label": "It is refused, because orders point to customer 7"
           },
           {
             "id": "c",
@@ -93913,7 +93913,7 @@
       {
         "id": "t269-c4",
         "kind": "text",
-        "title": "Checkpoints",
+        "title": "Checkpoints bound how much log recovery replays",
         "body": "A checkpoint flushes all changed data pages and records how far the log has been applied. Recovery only replays from the last checkpoint, so more frequent checkpoints mean faster recovery but more write work during normal running.",
         "teaches": [
           "crash-recovery"

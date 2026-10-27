@@ -314,7 +314,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Spread copies across failure domains."
+        "explanation": "A rack shares a power feed and a top-of-rack switch, so losing it takes every copy on it. HDFS’s default policy puts the first replica on the writer’s node and the other two on two nodes of a different rack, so a rack failure always leaves a copy. Cross-rack copies make writes slower, not faster, use the same storage, and racks hold many DataNodes."
       },
       {
         "id": "t62-a2",
@@ -342,7 +342,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Every file costs NameNode memory, and HDFS is built for big scans."
+        "explanation": "Every file and block costs about 150 bytes of NameNode memory, so millions of tiny files exhaust it, and HDFS is built for streaming big files, not millisecond lookups. Nightly scans of 50 TB, large Parquet files and raw clickstream archives are exactly what it is built for."
       },
       {
         "id": "t62-a3",
@@ -373,7 +373,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "The NameNode only handles metadata."
+        "explanation": "The client asks the NameNode which DataNodes hold each block, then streams the blocks directly from those DataNodes, preferring the nearest. File data never passes through the NameNode, which is why one NameNode can serve a large cluster."
       },
       {
         "id": "t62-a4",
@@ -401,7 +401,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "DataNodes store the blocks."
+        "explanation": "The NameNode holds the namespace in memory: directories, files, their blocks and where each block’s replicas live. The block data itself sits on DataNodes, user credentials come from Kerberos or another system, and it tracks every block, not only new ones."
       },
       {
         "id": "t62-a5",
@@ -1512,26 +1512,26 @@
         "prompt": "A user stands at the edge of a geohash cell. Why also search the neighbouring cells?",
         "choices": [
           {
-            "id": "c",
-            "label": "Geohash requires exactly 9 cells"
-          },
-          {
             "id": "a",
             "label": "A restaurant 50 m away can sit just across the boundary"
           },
           {
             "id": "b",
-            "label": "Neighbouring cells are already cached"
+            "label": "Neighbouring cells are usually already in the cache"
+          },
+          {
+            "id": "c",
+            "label": "Geohash cells overlap, so points appear in several"
           },
           {
             "id": "d",
-            "label": "To balance load across shards"
+            "label": "Searching nine cells spreads the load across shards"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Cells are arbitrary lines on the map."
+        "explanation": "Cell boundaries are arbitrary lines, so a restaurant 50 m away can fall in the next cell with a different prefix. Searching the user’s cell and its 8 neighbours covers that, then exact distance filters the candidates. Geohash cells tile the map without overlap, caching is not the reason, and the search is about correctness, not load."
       },
       {
         "id": "t67-a2",
@@ -1559,7 +1559,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Adaptive cells keep candidate counts even."
+        "explanation": "A quadtree splits a cell only where it holds too many points, so cells are tiny in Mumbai and huge over the Thar desert, and every query sees a similar number of candidates. A fixed grid gives either crowded cells in cities or millions of empty ones. Quadtrees need extra memory for their nodes, give straight-line not road distances, and grids store both coordinates."
       },
       {
         "id": "t67-a3",
@@ -1590,7 +1590,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Coarse filter, then exact check."
+        "explanation": "Find the user’s cell at a size near 2 km, add its 8 neighbours so boundary cases are covered, fetch the candidates in those cells, then compute exact distances, drop anything beyond 2 km and sort."
       },
       {
         "id": "t67-a4",
@@ -1618,7 +1618,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "A shared prefix means a shared cell."
+        "explanation": "Each geohash character narrows the cell, so a long shared prefix means both points sit in the same small cell and are close. The reverse does not hold: two points either side of a cell edge can be metres apart with different prefixes, which is why searches add neighbouring cells. Prefixes say nothing about direction and are not random."
       },
       {
         "id": "t67-a5",
@@ -1671,7 +1671,7 @@
         "rationaleConflicts": {
           "r3": "Computing distance to every restaurant per request is far too slow at this scale."
         },
-        "explanation": "Index space so queries stay local."
+        "explanation": "An index that splits space so each query reads only nearby cells keeps lookups local whether the city is dense or sparse. Large fixed cells return thousands of candidates in Mumbai, and scanning every restaurant reads millions of rows for each search."
       }
     ],
     "flashcards": [
@@ -1943,7 +1943,7 @@
       {
         "id": "t69-c1",
         "kind": "text",
-        "title": "Blue-green",
+        "title": "Blue-green: two environments, one router switch",
         "body": "Run two full environments. Deploy to the idle one (green), test it, then switch the router from blue to green. Rollback is switching back. It needs double capacity during the switch, and database changes must work for both.",
         "teaches": [
           "blue-green"
@@ -1952,7 +1952,7 @@
       {
         "id": "t69-c2",
         "kind": "text",
-        "title": "Canary",
+        "title": "Canary: a small share of real traffic first",
         "body": "Send a small share of traffic (1%, then 5%, 25%) to the new version and watch error rates and latency. Roll back automatically if they get worse. It catches problems only real traffic shows.",
         "teaches": [
           "canary"
@@ -1998,29 +1998,29 @@
         "id": "t69-a1",
         "concept": "canary",
         "type": "multiple_choice",
-        "prompt": "What does a canary release do?",
+        "prompt": "A team ships v2 of the search service. How does a canary release limit the damage if v2 is bad?",
         "choices": [
           {
             "id": "a",
             "label": "Sends a small share of traffic to v2 and compares its error rate"
           },
           {
-            "id": "c",
-            "label": "Tests only in staging"
+            "id": "b",
+            "label": "Switches all traffic at once, then rolls back if many users complain"
           },
           {
-            "id": "b",
-            "label": "Switches all traffic at once and rolls back if users complain"
+            "id": "c",
+            "label": "Tests v2 only in staging before any user sees it"
           },
           {
             "id": "d",
-            "label": "Deploys to every server at 2 AM"
+            "label": "Deploys v2 everywhere at night when traffic is lowest"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Real traffic, limited blast radius."
+        "explanation": "A canary gives v2 a small slice of real traffic, say 1%, and compares its errors and latency with v1 over the same minutes, so a bad build hurts few users and is caught by metrics, not complaints. Switching everyone waits for users to notice, staging never sees real traffic, and a night-time deploy still reaches every user at once."
       },
       {
         "id": "t69-a2",
@@ -2029,26 +2029,26 @@
         "prompt": "In blue-green, how do you roll back?",
         "choices": [
           {
-            "id": "b",
-            "label": "Redeploy the old build to every server"
+            "id": "a",
+            "label": "Point the router back to the old environment"
           },
           {
-            "id": "d",
-            "label": "Wait for the next release"
+            "id": "b",
+            "label": "Redeploy the old build to each server"
           },
           {
             "id": "c",
-            "label": "Restore the database from backup"
+            "label": "Restore the database from last night’s backup"
           },
           {
-            "id": "a",
-            "label": "Point the router back to the old environment"
+            "id": "d",
+            "label": "Keep both live and ship a hotfix to the new one"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The old environment is still running."
+        "explanation": "In blue-green the old environment keeps running untouched, so rollback is just switching the router back, usually in seconds. Redeploying the old build is what a rolling update must do, restoring last night’s backup would discard a day of data (and code rollback does not need it), and a hotfix leaves users on the broken version while you write it."
       },
       {
         "id": "t69-a3",
@@ -2058,25 +2058,25 @@
         "choices": [
           {
             "id": "a",
-            "label": "Turn it off with its kill-switch flag"
-          },
-          {
-            "id": "c",
-            "label": "Hotfix and redeploy"
-          },
-          {
-            "id": "d",
-            "label": "Add servers"
+            "label": "Flip its kill-switch flag off"
           },
           {
             "id": "b",
-            "label": "Roll back the whole release"
+            "label": "Roll back the whole release everywhere"
+          },
+          {
+            "id": "c",
+            "label": "Write a hotfix and redeploy it"
+          },
+          {
+            "id": "d",
+            "label": "Restart every app instance"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Flags change behaviour without a deploy."
+        "explanation": "A kill-switch flag turns the widget off within seconds, without a build or a deploy, and leaves the rest of the release in place. A rollback also removes every other change in the release and takes a deploy, a hotfix takes longer still, and restarting instances brings the same crashing widget back."
       },
       {
         "id": "t69-a4",
@@ -2107,7 +2107,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Grow only while metrics hold."
+        "explanation": "Run v2 beside v1, send it a small share such as 1%, compare its errors and latency with v1 over the same period, and widen in steps (25%, then 100%) only while the numbers hold. Any failed comparison sends the share back to zero."
       },
       {
         "id": "t69-a5",
@@ -2138,7 +2138,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Every step works with the previous code version."
+        "explanation": "Expand, then contract: add the new column, write both, backfill and switch reads to the new column, and drop the old one only when no running version reads it. At every step both the old and new code work, so a rolling deploy or a canary never breaks."
       }
     ],
     "flashcards": [
@@ -2256,7 +2256,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Dependency checks belong in readiness, which only stops traffic."
+        "explanation": "A failed liveness probe restarts the container, so if it checks the database, a database blip restarts every pod at once and they loop. Dependency checks belong in readiness, which only stops traffic to the pod until the database is back. Image size and rollout speed do not cause synchronised restarts."
       },
       {
         "id": "t70-a2",
@@ -2284,7 +2284,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Controllers restore the declared state."
+        "explanation": "Once the node is marked unreachable, its pods are evicted after a grace period (300 s by default), and the controller that owns them creates replacements on healthy nodes. Kubernetes cannot restart a dead machine, does not wait indefinitely, and does not move traffic to another cluster on its own. Run spare replicas across nodes so those minutes do not matter."
       },
       {
         "id": "t70-a3",
@@ -2320,7 +2320,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Old pods leave only after new ones are ready."
+        "explanation": "After the new image is pushed, the Deployment creates a new pod, waits for its readiness probe to pass, lets the Service send it traffic, and only then removes one old pod; it repeats until all pods are new. Removing an old pod first would cut capacity during the deploy."
       },
       {
         "id": "t70-a4",
@@ -2348,7 +2348,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "No guest OS boot."
+        "explanation": "A container is an isolated process on the host’s already-running kernel, so starting it is like starting a program, while a VM must boot a whole guest operating system. Containers do have a network stack and a filesystem, and they run on VMs as well as bare metal."
       },
       {
         "id": "t70-a5",
@@ -2376,7 +2376,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Reconciliation loops close the gap."
+        "explanation": "The Deployment’s controller continually compares the declared 5 replicas with what is running, sees 4 and starts a fifth. Nobody needs to reapply anything, the other pods are left alone, and the Deployment itself is not deleted."
       }
     ],
     "flashcards": [

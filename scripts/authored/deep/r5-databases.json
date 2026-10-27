@@ -379,7 +379,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Three levels cover 8 million keys; four cover 1.6 billion, which exceeds 500 million."
+        "explanation": "200 keys a page gives 200, 40,000, 8 million and 1.6 billion entries for one to four levels, so 500 million needs four. Two levels hold only 40,000, nine would need a far smaller fan-out, and 500 levels would be a list, not a tree."
       }
     ],
     "diagram": "B-tree:  [root] -> [internal] -> [leaf: keys + row pointers]   (3-4 levels)\nLSM:     write -> WAL + memtable -> flush -> SSTable L0 -> compaction -> L1, L2 ..."
@@ -995,7 +995,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Writes acknowledged but not yet replicated: 2,000 × 0.3 = 600."
+        "explanation": "2,000 writes/s × 0.3 s of lag ≈ 600 writes acknowledged but not yet on the replica. None would need synchronous replication, 6 and 2,000,000 are off by factors of 100 and 3,000."
       }
     ],
     "diagram": "client --write--> LEADER --log--> follower 1 (sync ack)\n                        \\--log--> follower 2 (async)\nreads --> followers (may lag) | own recent writes --> leader"
@@ -1495,7 +1495,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "CP gives up availability on the cut-off side to avoid an inconsistent answer."
+        "explanation": "A node cut off from the ledger leader cannot know the current balance, so a CP design refuses or delays the payment and the client can retry. Approving from a cached balance or approving now and reconciling later risks spending money twice, which is the AP choice, and silently dropping the request is neither: the client must get an answer, even an error."
       }
     ],
     "diagram": "  side A  ==X== side B\nwrite x=2 at A | read x at B -> CP: error/wait  |  AP: return x=1 (stale)"
@@ -1608,21 +1608,21 @@
           },
           {
             "id": "b",
-            "label": "EL: it chooses latency"
+            "label": "EL: it chooses latency in the else case"
           },
           {
             "id": "c",
-            "label": "PA: it chooses availability during partitions"
+            "label": "PA: it chooses availability during a partition"
           },
           {
             "id": "d",
-            "label": "Not a distributed database"
+            "label": "PC/EL: consistent only while partitioned"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Waiting for a quorum when there is no partition trades latency for consistency, which is EC."
+        "explanation": "Waiting for a cross-region majority when nothing is wrong spends latency to stay consistent, which is EC. EL would answer before replicas agree, and the question says nothing about behaviour during a partition, so PA and PC labels are guesses; PC/EL would also contradict the waiting it does every day."
       }
     ],
     "diagram": "Partition?  yes -> choose A or C\n            no  -> choose L (answer locally) or C (wait for quorum)"

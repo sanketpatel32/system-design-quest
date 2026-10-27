@@ -622,7 +622,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Leftmost prefix: the query must constrain city first."
+        "explanation": "A composite index is sorted by city first, then created_at within each city, so city = 'Pune' jumps to Pune and the date range scans a contiguous slice. A filter on created_at alone or on status cannot use the sort order, and the OR needs rows that match either condition, which one composite index cannot serve on its own."
       },
       {
         "id": "t23-a2",
@@ -650,7 +650,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Indexes trade write cost and storage for faster reads."
+        "explanation": "Each index is another sorted structure, so every insert, and every update of an indexed column, writes to all five, adding latency, WAL and storage. Planning gets slightly harder but that is minor, indexes do not prevent sharding, and the cost continues for as long as they exist."
       },
       {
         "id": "t23-a3",
@@ -678,7 +678,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "LSM-trees turn writes into sequential appends."
+        "explanation": "An LSM-tree buffers writes in memory and flushes them as sorted files, so heavy write streams such as event logs become sequential appends. Reads can touch several files, so mostly-read data, small in-memory tables and complex joins favour a B-tree database."
       },
       {
         "id": "t23-a4",
@@ -714,7 +714,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Faster reads, slower writes."
+        "explanation": "A query filters on a column, and without an index the database scans every row. A B-tree on that column makes lookups take a few page reads (log time), and from then on every write also updates the index: faster reads, paid for by writes."
       },
       {
         "id": "t23-a5",
@@ -1064,7 +1064,7 @@
       {
         "id": "t25-c4",
         "kind": "text",
-        "title": "Durability",
+        "title": "Durability: the log reaches disk before commit returns",
         "body": "Commit returns only after the change is in the write-ahead log on disk, and with synchronous replication on a replica too. After a crash the database replays the log.",
         "teaches": [
           "durability"
@@ -1883,7 +1883,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Route a user’s reads to the leader briefly after they write."
+        "explanation": "The write reached the leader, but the refresh was read from a replica that had not applied it yet: replication lag. Read-your-writes fixes it, by reading from the leader for a short while after a user writes, or from a replica known to have caught up. A constraint failure would have returned an error, a lost write would not reappear seconds later, and session expiry logs the user out rather than hiding a review."
       },
       {
         "id": "t28-a2",
@@ -1911,7 +1911,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Async is fast because it does not wait."
+        "explanation": "The leader acknowledges before replicas have the change, so if it dies, writes in flight (often under a second’s worth) are lost on failover. Waiting for replicas is synchronous replication, replicas still serve reads, and split brain comes from a bad failover, not from each write."
       },
       {
         "id": "t28-a3",
@@ -1939,7 +1939,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Two leaders can accept the same key at once."
+        "explanation": "Two leaders can accept writes to the same row at the same moment, so the system needs a rule to resolve the conflict: last write wins, merging, or asking the user. Multi-leader avoids a global lock, replicas still serve reads, and lag gets worse, not impossible."
       },
       {
         "id": "t28-a4",
@@ -1975,7 +1975,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Replica reads lag by the shipping time."
+        "explanation": "The client writes to the leader, which records the change in its log, ships the log to the replicas, and each replica applies it in order. Reads from replicas see the change only after it is applied, which is the replication lag."
       },
       {
         "id": "t28-a5",
@@ -2023,7 +2023,7 @@
         "rationaleConflicts": {
           "r3": "It makes them slower; the leader waits for the replica’s acknowledgement."
         },
-        "explanation": "Pay latency for durability where money is involved."
+        "explanation": "Synchronous replication makes each commit wait for the replica in the other zone, a few milliseconds, so a failover loses no acknowledged payment. Asynchronous replication is faster but can lose the last moments of payments when the leader dies."
       }
     ],
     "flashcards": [
@@ -2873,7 +2873,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Selling the same seat twice is worse than a brief error."
+        "explanation": "If two sides of a partition both sell the last seat, two fans hold one seat and someone must be refunded and turned away at the gate, so seat inventory should refuse or delay sales until the sides agree. A like count, a view counter or a recommendation that is briefly wrong costs nothing, so those stay available and reconcile later."
       },
       {
         "id": "t32-a2",
@@ -2901,7 +2901,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "You cannot opt out of partitions."
+        "explanation": "Networks drop and delay messages whether you plan for it or not, so partition tolerance is not optional, and CAP only forces a choice while a partition lasts: refuse some requests (C) or answer with possibly stale data (A). More replicas mean more links that can be cut, a fast network still partitions, and the theorem applies to any replicated store, SQL or not."
       },
       {
         "id": "t32-a3",
@@ -2932,7 +2932,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "The choice only bites during the partition."
+        "explanation": "In normal operation the system can be both consistent and available. When a partition cuts nodes off, each side must either reject requests it cannot confirm (CP) or serve them with possibly stale data (AP). When the network heals, an AP system reconciles divergent writes; a CP system simply resumes."
       },
       {
         "id": "t32-a4",
@@ -2980,7 +2980,7 @@
         "rationaleConflicts": {
           "r3": "AP serves possibly stale data; users can see different counts until the partition heals."
         },
-        "explanation": "Choose AP where staleness is cheap."
+        "explanation": "A like counter that is off by a few for the length of a partition harms nobody, while rejecting likes is visible to every user on the cut-off side. Accepting them and merging later (counters merge by adding) is the right posture; CP would buy exactness nobody needs."
       },
       {
         "id": "t32-a5",
@@ -2989,26 +2989,26 @@
         "prompt": "During a partition, a CP system will:",
         "choices": [
           {
-            "id": "d",
-            "label": "Promote a leader on both sides so every request succeeds"
-          },
-          {
-            "id": "c",
-            "label": "Accept writes on both sides and merge conflicts automatically"
+            "id": "a",
+            "label": "Reject or delay some requests rather than return stale data"
           },
           {
             "id": "b",
-            "label": "Return possibly stale data so that every node stays available"
+            "label": "Return possibly stale data so that each node stays available"
           },
           {
-            "id": "a",
-            "label": "Reject or delay some requests rather than return stale data"
+            "id": "c",
+            "label": "Accept writes on both sides and merge conflicts later"
+          },
+          {
+            "id": "d",
+            "label": "Let both sides elect a leader so that requests succeed"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Consistency first, at the cost of availability."
+        "explanation": "A CP system answers only when it can be sure the answer is current, so the side without a majority refuses or delays requests. Returning stale data and accepting writes on both sides are AP behaviours, and two leaders is split brain, which a CP system prevents with a majority quorum."
       }
     ],
     "flashcards": [
@@ -3133,7 +3133,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The E/L half covers normal operation."
+        "explanation": "CAP covers only partitions. PACELC adds the everyday case: even with a healthy network, waiting for replicas to agree costs latency, so a system picks low latency (L) or consistency (C). It does not add a third partition choice, avoid partitions, or say anything about durability."
       },
       {
         "id": "t33-a2",
@@ -3161,7 +3161,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Available under partition, low latency otherwise."
+        "explanation": "With default settings (for example consistency level ONE) Cassandra keeps serving during a partition and answers from the nearest replica normally, so it is usually labelled PA/EL. Higher consistency levels such as QUORUM move individual requests towards C at the cost of latency."
       },
       {
         "id": "t33-a3",
@@ -3189,7 +3189,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Spend latency on consistency only where staleness hurts."
+        "explanation": "A product description a few seconds old harms nobody, so the local replica answers in milliseconds. Reading from a leader in another region, or a quorum across three regions, adds tens to hundreds of milliseconds per read for freshness nobody notices, and blocking until replication is idle could wait forever on a busy system."
       },
       {
         "id": "t33-a4",
@@ -3237,7 +3237,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "The answer differs by feature."
+        "explanation": "The same read, a price from Mumbai, can go to the local replica (fast, maybe stale) or the leader in Singapore (slower, fresh). The right choice depends on the feature: browsing takes the local replica, checkout takes the leader."
       }
     ],
     "flashcards": [

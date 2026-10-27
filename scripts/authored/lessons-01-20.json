@@ -624,7 +624,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "A bigger box is simple but finite, and it is still one box."
+        "explanation": "A bigger machine is simple, but the largest instance is a hard ceiling and it is still one machine whose failure takes the service down. Bigger machines add memory and disk too, load balancers route to any size, and the app does not have to change to run on a larger box."
       },
       {
         "id": "t3-a3",
@@ -652,7 +652,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Copies only raise availability where failures are independent and traffic is routed away from the dead one."
+        "explanation": "Four app servers mean one can fail while the others carry the load, so that tier is far more available. Every request still needs the one primary database, so its failure stops everything. Availability does not multiply by the server count, and round robin alone sends traffic to dead servers unless health checks remove them."
       },
       {
         "id": "t3-a4",
@@ -1630,7 +1630,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "An L7 balancer can only route on paths it can read. Re-encrypt to services with mTLS if needed."
+        "explanation": "A layer-7 balancer routes on the HTTP path, which it can read only after decrypting, so TLS terminates there (or at the edge in front of it), with re-encryption or mTLS to the services if needed. Terminating only at backends hides the path, databases do not speak HTTP, and dropping TLS anywhere exposes traffic to anyone on that network."
       },
       {
         "id": "t7-a2",
@@ -1658,7 +1658,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "TLS secures the connection, not the application."
+        "explanation": "TLS encrypts and protects the connection and proves the server’s identity. It does not say who the user is, does not stop SQL injection (the server decrypts the payload and runs it), and says nothing about data at rest in the database or backups."
       },
       {
         "id": "t7-a3",
@@ -1742,7 +1742,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Authentication of the server is one of TLS’s three guarantees, with confidentiality and integrity."
+        "explanation": "A trusted certificate authority vouched that the key in the certificate belongs to that domain, and the handshake proves the server holds the matching private key, so the browser knows it reached the real site and not an impostor. A certificate makes nothing faster, says nothing about the server’s code, and does not log the user in."
       }
     ],
     "flashcards": [
@@ -1875,7 +1875,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Repeating a PUT leaves the same state; POST creates something new each time unless you add idempotency keys."
+        "explanation": "PUT replaces the resource at a known URL with the full order, so sending it twice leaves the same state. POST asks the server to create something, so a retry can create a second order or a second item unless the API accepts an idempotency key."
       },
       {
         "id": "t8-a2",
@@ -1903,7 +1903,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Status codes are part of the contract; 201 plus Location tells the client where the resource lives."
+        "explanation": "201 Created with a Location header tells the client the order exists and where it lives. 200 with an error field hides the outcome in the body, 204 gives the client no id to use, and a 302 is for browsers navigating, not an API reporting creation."
       },
       {
         "id": "t8-a3",
@@ -1931,7 +1931,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Resources are nouns; the HTTP method is the verb."
+        "explanation": "REST names resources in the path and uses the HTTP method as the verb, so fetching order 42 is GET /v1/orders/42. Verbs in the path (getOrder, fetch, delete) duplicate the method, and a GET that deletes breaks caches and crawlers that assume GET is safe."
       },
       {
         "id": "t8-a4",
@@ -1959,7 +1959,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Cursors stay stable as rows are inserted and do not scan skipped rows."
+        "explanation": "A cursor says “after this id”, so new orders arriving at the top do not shift the pages, and the database seeks straight to the position. Page 2,500 with an offset reads and discards 49,980 rows and shows duplicates or gaps as rows arrive. Returning all 50,000 is slow and heavy, and only the newest 20 hides the rest of the history."
       },
       {
         "id": "t8-a5",
@@ -1990,7 +1990,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Validate before creating; return the new resource’s location."
+        "explanation": "The client sends POST /v1/orders, the server validates the body before touching the database, creates the order, and returns 201 Created with the new order’s Location. Validating first means a bad request costs nothing and leaves no half-made order."
       }
     ],
     "flashcards": [
@@ -3439,7 +3439,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "In-memory state breaks as soon as requests can land on different instances."
+        "explanation": "With carts in each server’s memory, a request that lands on the other server finds no cart. Move carts to a shared store or the database. Databases handle two servers easily, a balancer that strips cookies breaks every login, not only carts, and round robin spreads requests rather than concentrating them."
       },
       {
         "id": "t14-a2",
@@ -3467,7 +3467,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Pinning users ties their state to one machine."
+        "explanation": "Pinning users to instances spreads load unevenly when some users are heavy, and when an instance dies or is redeployed its users lose their sessions. Sticky sessions add no extra round trip, work alongside health checks, and need a cookie rather than a JWT."
       },
       {
         "id": "t14-a3",
@@ -3495,7 +3495,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Shared or client-held state lets any instance serve any request."
+        "explanation": "If session state lives in a shared store such as Redis, or in a signed token the client sends back, any instance can serve any request and instances can be replaced freely. In-memory state without stickiness loses sessions on every hop, a load balancer is not a session store, and local disk files are just as tied to one server."
       },
       {
         "id": "t14-a4",
@@ -3531,7 +3531,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "The instance holds nothing between requests."
+        "explanation": "The client sends its session cookie, the balancer picks any instance, the instance loads the session from Redis, handles the request and writes any changes back. Nothing stays on the instance between requests, so it can be replaced at any time."
       },
       {
         "id": "t14-a5",
@@ -3584,7 +3584,7 @@
         "rationaleConflicts": {
           "r3": "Pinning users makes load uneven as busy sessions pile up on some instances."
         },
-        "explanation": "An external store keeps instances disposable."
+        "explanation": "Rolling deploys restart instances every day, so sticky sessions would log users out on each restart and skew load towards long-lived instances. A Redis session store keeps instances disposable and lets the balancer spread traffic evenly, for about a millisecond per request to fetch the session."
       }
     ],
     "flashcards": [
@@ -3947,7 +3947,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Write-behind acknowledges before the database has the data."
+        "explanation": "Write-behind acknowledges once the cache has the write and flushes to the database later, so a cache crash loses whatever has not been flushed. Write-through writes the database before replying, and cache-aside writes the database directly, with or without a short TTL, so the cache holds only copies."
       },
       {
         "id": "t16-a2",
@@ -3975,7 +3975,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The write returns only after both the cache and the database have it, so a read never sees an old value, but every write pays two round trips."
+        "explanation": "Write-through updates the database and the cache on every write before replying, so reads usually see fresh data; races between concurrent writers or a failure between the two updates can still leave a stale entry, so keep a TTL. The cost is two writes on each request. Buffered writes are write-behind, writing only to the cache skips durability, and new keys can still miss."
       },
       {
         "id": "t16-a3",
@@ -4011,7 +4011,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "The application, not the cache, loads data on a miss."
+        "explanation": "The app reads the cache, misses, reads the database, sets the value in the cache with a TTL and returns it. The application, not the cache, loads data, so the cache can be a plain key-value store, and the TTL bounds how long a stale copy can survive."
       },
       {
         "id": "t16-a4",
@@ -4064,7 +4064,7 @@
         "rationaleConflicts": {
           "r3": "Write-behind speeds up writes and risks losing them; it does nothing for read freshness."
         },
-        "explanation": "Read-heavy and staleness-tolerant is the classic cache-aside case."
+        "explanation": "Reads outnumber writes 100 to 1 and a few seconds of staleness is fine, so cache-aside with a TTL serves almost every read from memory while the database stays the source of truth. Write-through adds work to every write for freshness nobody needs, and write-behind risks losing catalogue edits."
       },
       {
         "id": "t16-a5",
@@ -4092,7 +4092,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Durability matters more than write speed for money."
+        "explanation": "Write-behind acknowledges before the database has the write, so a cache crash can lose ledger entries that users were told succeeded. Reads do not wait for flushes, the cache remains useful for reads, and there is no blanket rule against storing payment data in Redis; the problem is durability."
       }
     ],
     "flashcards": [

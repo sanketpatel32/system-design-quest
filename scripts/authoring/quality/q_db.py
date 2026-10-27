@@ -6,7 +6,7 @@ P = {
         't261-a2': {
             'prompt': 'orders.customer_id has a foreign key to customers.id with the default delete rule. Support tries to delete customer 7, who still has three orders. What happens?',
             'choices': [('a', 'Customer 7 and all three orders are deleted together'),
-                        ('b', 'The delete fails while orders still reference customer 7'),
+                        ('b', 'It is refused, because orders point to customer 7'),
                         ('c', 'Customer 7 goes; the orders keep customer_id = 7'),
                         ('d', 'Customer 7 goes; the orders get customer_id = NULL')],
             'correct': 'b',
@@ -94,7 +94,7 @@ P = {
         't268-a5': {'explanation': 'The lock must be taken before the check, inside the transaction: BEGIN, SELECT … FOR UPDATE, check it is free, UPDATE, COMMIT. Checking first and locking later leaves a gap in which another request can book the same seat.'},
         't268-a6': {'explanation': 'An ALTER that waits for its exclusive lock blocks every later query on the table, so an unbounded wait behind a long report can become an outage. A short lock_timeout (say 2 seconds) makes it give up quickly and retry in a quieter moment. Killing every session discards users’ work and is unnecessary once the wait is time-boxed.'},
     }},
-    269: {'q': {
+    269: {'cards': {'t269-c4': {'title': 'Checkpoints bound how much log recovery replays'}}, 'q': {
         't269-a4': {
             'prompt': 'To cut background write I/O, a team raises the checkpoint interval from 5 to 30 minutes. What is the trade-off?',
             'choices': [('a', 'Less background writing, but slower crash recovery'),

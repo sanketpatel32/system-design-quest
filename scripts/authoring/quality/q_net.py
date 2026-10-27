@@ -116,7 +116,7 @@ P = {
    't249-a3': {
      'prompt': 'A Linux service with default settings opens many short connections to one database address and port. New connections start failing at about 28,000 open sockets. What sets that number?',
      'choices': [('a', 'TCP allows about 28,000 connections per server port'),
-                 ('b', 'Linux’s default ephemeral range, 32,768–60,999'),
+                 ('b', 'The OS ephemeral port range, 32,768–60,999'),
                  ('c', 'IANA caps each address at 28,000 connections'),
                  ('d', 'Ports above 49,152 are reserved for servers')],
      'correct': 'b',

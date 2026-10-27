@@ -827,26 +827,26 @@
         "prompt": "A service writes an order to its database, then publishes to Kafka, and crashes in between. Result?",
         "choices": [
           {
-            "id": "d",
-            "label": "Both are lost"
-          },
-          {
-            "id": "c",
-            "label": "The database retries the publish"
+            "id": "a",
+            "label": "The order exists but no event was published"
           },
           {
             "id": "b",
-            "label": "Kafka rolls back the order"
+            "label": "Kafka rolls the order back on its own"
           },
           {
-            "id": "a",
-            "label": "The order exists but no event was published"
+            "id": "c",
+            "label": "The event is sent, but the order is lost"
+          },
+          {
+            "id": "d",
+            "label": "Both the order and the event are lost"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Two separate writes are not atomic."
+        "explanation": "The database commit finished before the crash and the publish never ran, so the order exists but downstream services never hear of it. Two separate systems are written separately, with nothing to make them atomic. Kafka knows nothing about the order, and the order was committed first, so it survives."
       },
       {
         "id": "t44-a2",
@@ -874,7 +874,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "One local transaction, then an at-least-once relay."
+        "explanation": "The event goes into an outbox table in the same local transaction as the order, so both commit or neither does; a relay then publishes outbox rows and marks them sent. Publishing first just reverses the failure, two-phase commit between a database and Kafka is rarely available and slow, and retrying from memory loses the event if the process dies."
       },
       {
         "id": "t44-a3",
@@ -910,7 +910,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "The relay runs after commit."
+        "explanation": "BEGIN, insert the order and its outbox event, COMMIT; only after the commit does the relay read unsent rows, publish them and mark them sent. A crash between publish and marking republishes, so delivery is at least once."
       },
       {
         "id": "t44-a4",
@@ -938,7 +938,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The log already has every committed change."
+        "explanation": "Change data capture tails the database’s own change log (the PostgreSQL WAL or MySQL binlog), which already holds every committed change in order. Polling with SELECT * misses intermediate updates and loads the database, intercepting HTTP misses changes made any other way, and relying on developers to publish is the dual write again."
       },
       {
         "id": "t44-a5",
@@ -947,26 +947,26 @@
         "prompt": "The relay publishes an event, then crashes before marking it sent. What happens next?",
         "choices": [
           {
-            "id": "c",
-            "label": "The database rolls back the order"
+            "id": "a",
+            "label": "It republishes, so consumers must be idempotent"
           },
           {
             "id": "b",
-            "label": "The event is lost"
+            "label": "The event is lost and must be sent by hand"
+          },
+          {
+            "id": "c",
+            "label": "The database rolls back the original order"
           },
           {
             "id": "d",
-            "label": "Kafka removes the duplicate automatically"
-          },
-          {
-            "id": "a",
-            "label": "It publishes the event again, so consumers must be idempotent"
+            "label": "Kafka drops the duplicate before consumers see it"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "At-least-once relays create duplicates."
+        "explanation": "The row is still unmarked, so the restarted relay publishes it again and consumers see the event twice. That is at-least-once delivery, so consumers deduplicate by event id. Nothing is lost, the order committed long ago, and an idempotent Kafka producer deduplicates retries within one producer session, not a republish from a new process."
       }
     ],
     "flashcards": [
@@ -2845,7 +2845,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Callers need current, healthy addresses."
+        "explanation": "Instances are created, moved and killed by autoscaling and deploys, so their addresses change all the time; callers need a current list of healthy instances. Encrypting traffic, storing data and versioning APIs are separate concerns handled by TLS, databases and API design."
       },
       {
         "id": "t52-a2",
@@ -2854,8 +2854,8 @@
         "prompt": "An instance crashes without deregistering. How does the registry notice?",
         "choices": [
           {
-            "id": "d",
-            "label": "Callers edit the registry by hand"
+            "id": "a",
+            "label": "Its heartbeats stop and its entry expires"
           },
           {
             "id": "b",
@@ -2863,17 +2863,17 @@
           },
           {
             "id": "c",
-            "label": "It never notices"
+            "label": "The next deploy rebuilds the registry"
           },
           {
-            "id": "a",
-            "label": "Its heartbeats stop and its entry expires"
+            "id": "d",
+            "label": "Callers report it after their first failed call"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Heartbeats plus expiry clean up dead entries."
+        "explanation": "A registry keeps an entry only while the instance renews it with heartbeats (or passes health checks), so a crashed instance’s entry lapses after a few missed intervals. A crashed process cannot send a goodbye, waiting for the next deploy could take days, and callers do not normally write to the registry; they retry another instance."
       },
       {
         "id": "t52-a3",
@@ -2901,7 +2901,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The picking happens outside the client."
+        "explanation": "In server-side discovery the caller sends to one stable address and a load balancer or proxy picks a healthy instance. Querying a registry such as Consul and choosing yourself is client-side discovery, a config file of IPs is static configuration, and broadcasting addresses to every caller does not scale."
       },
       {
         "id": "t52-a4",
@@ -2937,7 +2937,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Registration comes first."
+        "explanation": "An instance registers when it starts and keeps renewing with heartbeats; a caller looks the service up, gets the healthy instances and calls one, usually caching the list briefly. Registration must come first, or there is nothing to find."
       },
       {
         "id": "t52-a5",
@@ -2965,7 +2965,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The Service tracks ready pods behind one name."
+        "explanation": "A Service gives a set of pods one stable DNS name and virtual IP and keeps its endpoint list in step with the pods that pass readiness. A ConfigMap would need editing on every pod change, a replica count says how many pods exist, not where, and a liveness probe restarts pods without routing anything."
       }
     ],
     "flashcards": [
@@ -3020,7 +3020,7 @@
       {
         "id": "t53-c1",
         "kind": "text",
-        "title": "Timeouts",
+        "title": "Timeouts shorter than the caller’s deadline",
         "body": "Every outbound call needs a timeout shorter than the caller’s own deadline. Without one, threads wait forever on a hung dependency and the caller runs out of threads too.",
         "teaches": [
           "timeouts"
@@ -3029,7 +3029,7 @@
       {
         "id": "t53-c2",
         "kind": "text",
-        "title": "Retries",
+        "title": "Retries: few, idempotent, with backoff and jitter",
         "body": "Retry only idempotent operations, a few times, with exponential backoff and jitter. Retries at every layer multiply: 3 attempts at each of 3 layers is up to 27 calls.",
         "teaches": [
           "retries"
@@ -3063,7 +3063,7 @@
       {
         "id": "t53-c5",
         "kind": "text",
-        "title": "Bulkheads",
+        "title": "Bulkheads: a separate pool per dependency",
         "body": "Give each dependency its own pool of threads or connections, so a slow recommendations service cannot use up the pool checkout needs.",
         "teaches": [
           "bulkhead"
@@ -3355,29 +3355,29 @@
         "id": "t54-a2",
         "concept": "red",
         "type": "multiple_choice",
-        "prompt": "RED metrics for a service are:",
+        "prompt": "The checkout service’s dashboard must show its health at a glance using the RED method. Which three numbers does it show?",
         "choices": [
           {
             "id": "a",
-            "label": "Rate, errors, duration"
-          },
-          {
-            "id": "d",
-            "label": "Retries, exceptions, deploys"
+            "label": "Rate, errors and duration of requests"
           },
           {
             "id": "b",
-            "label": "Requests, events, disks"
+            "label": "Requests, events and disk use"
           },
           {
             "id": "c",
-            "label": "Reads, edits, deletes"
+            "label": "Reads, edits and deletes per table"
+          },
+          {
+            "id": "d",
+            "label": "Retries, exceptions and deploys per day"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Service-level health in three numbers."
+        "explanation": "RED tracks what callers see: request rate, the share that fail, and how long they take (as percentiles such as p99). Disk use belongs to USE, which covers resources. Per-table reads and edits, and counts of deploys or retries, are useful elsewhere but do not say whether checkout is healthy."
       },
       {
         "id": "t54-a3",
@@ -3405,7 +3405,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "USE (utilisation, saturation, errors) is for resources."
+        "explanation": "USE describes resources: utilisation, saturation and errors. The disk’s I/O queue depth is saturation, work waiting because the disk is busy. API request rate and p99 latency are RED signals for a service, and deploys are events, not a resource measure."
       },
       {
         "id": "t54-a4",
@@ -3441,7 +3441,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "The trace id ties it together."
+        "explanation": "The first service gives the request a trace id and passes it on every call; each service logs with it and records spans; metrics are aggregated from the same events; dashboards and alerts read the metrics, and a slow request can be followed from an alert to its trace and logs."
       },
       {
         "id": "t54-a5",
@@ -3454,22 +3454,22 @@
             "label": "Huge volume and cost, and hard to query"
           },
           {
-            "id": "d",
-            "label": "Metrics become inaccurate"
+            "id": "b",
+            "label": "Requests slow down because logging blocks"
           },
           {
             "id": "c",
-            "label": "Traces stop working"
+            "label": "Traces lose their spans under the load"
           },
           {
-            "id": "b",
-            "label": "Logs become too short"
+            "id": "d",
+            "label": "Metrics get less accurate as logs grow"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Structure and sample logs."
+        "explanation": "DEBUG in production multiplies log volume, and storage and indexing bills, while free text cannot be filtered reliably by field. Use structured logs at INFO, with sampling for chatty paths. Logging can slow requests if writes are synchronous, but the main problem here is cost and queryability; traces and metrics are separate pipelines."
       }
     ],
     "flashcards": [
@@ -4098,7 +4098,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "They proved who they are; they lacked permission for this action."
+        "explanation": "The agent logged in successfully, so authentication worked; the refund was refused because their role does not cover another region’s orders, which is an authorisation decision. TLS protects the connection, and a rate limit blocks volume, not a single permitted-looking request."
       },
       {
         "id": "t57-a2",
@@ -4126,7 +4126,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Nothing server-side remembers them."
+        "explanation": "A JWT is checked by its signature alone, so once issued it stays valid until it expires, even after logout or a password change. Short lifetimes, refresh tokens or a deny list limit that. JWTs are verified with a public key and no call to the auth server, need no sticky sessions, and can carry plenty of claims."
       },
       {
         "id": "t57-a3",
@@ -4154,7 +4154,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Server state makes revocation easy."
+        "explanation": "A server-side session is a row in a store, so deleting it ends access on the next request, which matters when a bank must cut off a stolen session at once. Sessions do need storage, usually travel in a cookie, and require each service to look the session up, which is the price of that control."
       },
       {
         "id": "t57-a4",
@@ -4190,7 +4190,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Short access tokens, longer refresh tokens."
+        "explanation": "The user logs in (say with an OTP), the server verifies it and issues a short-lived access token (minutes) with a longer-lived refresh token, APIs are called with the access token, and when it expires the client uses the refresh token to get a new one without logging in again."
       },
       {
         "id": "t57-a5",
@@ -4218,7 +4218,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "UI checks are convenience; the service enforces."
+        "explanation": "Only the service that owns orders knows whether this user may refund this order, and it must check on every request because roles and ownership change. Hiding the button stops honest users only, a check at login cannot know which order comes later, and a CDN has no view of order ownership."
       }
     ],
     "flashcards": [
@@ -4838,7 +4838,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Parameters keep data from being parsed as SQL."
+        "explanation": "A parameterised query sends the SQL and the input separately, so the input is always treated as data and can never change the query. Stripping quotes misses other encodings and breaks names like O’Brien, hiding errors only hides the evidence, and a stored procedure that concatenates the same string is just as injectable."
       },
       {
         "id": "t60-a2",
@@ -4866,7 +4866,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Code and images get copied; secrets must not travel with them."
+        "explanation": "A secrets manager stores the key encrypted, controls who can read it, logs each access and supports rotation; the app fetches it at runtime. A private repository, a Docker image and a mobile app are all copied widely, so anyone with a copy has the key, and obfuscation in an app can be reversed in minutes."
       },
       {
         "id": "t60-a3",
@@ -4894,7 +4894,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Limit what a compromise can do."
+        "explanation": "A reporting service that only reads should have read access only to the tables it uses, so stolen credentials cannot change or delete orders. The admin account, spare write access or the checkout account all hand an attacker far more than reporting needs."
       },
       {
         "id": "t60-a4",
@@ -4930,7 +4930,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Each layer catches what the previous missed."
+        "explanation": "TLS at the edge protects the connection, rate limits and a firewall shed abusive traffic cheaply, authentication establishes who is calling, authorisation decides what they may do, and validation with parameterised queries keeps their input from turning into code. Each layer stops something the earlier ones let through."
       },
       {
         "id": "t60-a5",
@@ -4958,7 +4958,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "TLS is one layer of several."
+        "explanation": "TLS protects data in transit and nothing else. An attacker can still call the API over HTTPS with a stolen token, someone else’s order id or an injection payload, so authentication, authorisation, input validation and rate limits are all still needed. Certificates and a CDN firewall do not change that."
       }
     ],
     "flashcards": [
