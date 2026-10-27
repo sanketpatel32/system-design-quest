@@ -210,7 +210,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Stable layers first, then build, then a slim runtime."
+    "explanation": "Copy the manifest and install first so that layer stays cached, then copy the source and compile, then start a slim runtime stage and copy in only the built artefact, run as a non-root user. Compilers and build caches stay behind in the build stage, so the runtime image is smaller and has less to attack."
    },
    {
     "id": "t321-a6",
@@ -270,7 +270,7 @@
      "r3": "All containers share one kernel, so a kernel bug crosses tenants.",
      "r4": "They see the host’s filesystem and processes."
     },
-    "explanation": "Containers package software; add a VM or sandbox boundary for untrusted tenants."
+    "explanation": "Plain containers share the host kernel, so one kernel bug lets a tenant’s code escape to every other tenant on the host; bare processes share even more. A lightweight VM or sandboxed runtime gives each tenant its own kernel boundary and still starts in well under a second."
    }
   ],
   "flashcards": [
@@ -1486,7 +1486,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Both versions read and write the same data, so the schema must be compatible both ways during the rollout. They can run in any zones, separate databases or cache copies would split the data, and the code differs by definition."
+    "explanation": "During a rollout both versions read and write the same database, so the schema must work for both: add columns before code uses them and drop them only after no version does. Zones do not matter, and separate databases or private cache copies would split the data that users share."
    },
    {
     "id": "t324-a4",
@@ -1545,7 +1545,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Expose, compare, widen, decide."
+    "explanation": "Send a small share of traffic to the new version, compare its errors and latency with the current version over the same period, widen in steps while they stay healthy, and finish or roll back automatically when a check fails."
    },
    {
     "id": "t324-a6",
@@ -1605,7 +1605,7 @@
      "r3": "A fast global push turns one bad file into a global outage.",
      "r4": "Most customers cannot test every update."
     },
-    "explanation": "Stage every change that can break machines, including content and config."
+    "explanation": "An update that crashes machines does the most damage when it reaches all of them at once, as the July 2024 security-agent outage showed. Rings (internal, then a small customer share, then wider) catch a crash on a few machines first and cost hours, not days. A global push stakes millions of machines on one test, and leaving testing to each customer means most never do, so the risk is unchanged."
    }
   ],
   "flashcards": [
@@ -1871,29 +1871,29 @@
     "id": "t325-a2",
     "concept": "drift",
     "type": "multiple_choice",
-    "prompt": "A security group was edited by hand in the console. What is this called?",
+    "prompt": "The IaC plan wants to remove a port 22 rule from a production security group, though nobody changed the code. What most likely happened?",
     "choices": [
      {
       "id": "a",
-      "label": "Provisioning"
+      "label": "The provider plugin was upgraded overnight"
      },
      {
       "id": "b",
-      "label": "Promotion"
+      "label": "Someone added the rule by hand: drift"
      },
      {
       "id": "c",
-      "label": "Rollback"
+      "label": "The state lock expired and reset the rule"
      },
      {
       "id": "d",
-      "label": "Drift"
+      "label": "The plan is cached from an earlier branch"
      }
     ],
     "correctChoiceIds": [
-     "d"
+     "b"
     ],
-    "explanation": "Drift is live infrastructure that no longer matches the declared configuration, often from console edits. Provisioning creates resources, promotion moves an artefact between environments, and rollback returns to a previous version."
+    "explanation": "The plan compares the code with what really exists. A rule that exists but is not in the code was almost certainly added in the console, which is drift, and applying would remove it. Decide whether to delete it or add it to the code. Provider upgrades rarely invent rules, a lock only blocks concurrent applies, and each plan is computed fresh."
    },
    {
     "id": "t325-a3",
@@ -1980,7 +1980,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Change, plan, review, apply."
+    "explanation": "Change the code in a branch, let CI produce the plan, have reviewers approve both, then apply exactly that saved plan under a state lock. Applying the reviewed plan file, rather than planning again at apply time, guarantees that what runs is what was approved."
    },
    {
     "id": "t325-a6",
@@ -2040,7 +2040,7 @@
      "r3": "Hundreds of settings make manual copies drift.",
      "r4": "Documents go stale and are not applied automatically."
     },
-    "explanation": "Codify first; replication and recovery then become an apply."
+    "explanation": "Importing what exists into code captures the real settings once; the second region is then an apply of the same code, and future changes go to both. Clicking through again or following a document copies hundreds of settings by hand, misses some, and drifts as production changes."
    }
   ],
   "flashcards": [
@@ -2416,7 +2416,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Journey, indicator, objective, alerting."
+    "explanation": "Pick the user journey that matters, define the SLI as good events over valid events, set the target and window (say 99.9% over 30 days), and alert on how fast the error budget burns. Alerting before the SLO exists has nothing to measure against."
    },
    {
     "id": "t326-a6",
@@ -2476,7 +2476,7 @@
      "r3": "They add noise, and noisy pagers get ignored.",
      "r4": "A fast outage can burn the budget within hours."
     },
-    "explanation": "Alert on what threatens the SLO, at a speed that matches the threat."
+    "explanation": "Multi-window burn-rate alerts page only when errors would spend a meaningful share of the budget, for example 2% of a 30-day budget within an hour, so brief self-healing spikes stop paging while real outages still do. Stricter thresholds add pages, and no paging misses outages entirely."
    }
   ],
   "flashcards": [
@@ -3727,7 +3727,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Edge, app, data, back."
+    "explanation": "A request enters the load balancer in a public subnet, which forwards it to an app server in a private subnet, which queries the database in a data subnet; the response returns along the same connections. Only the load balancer is reachable from the internet."
    },
    {
     "id": "t329-a6",
@@ -3787,7 +3787,7 @@
      "r3": "Exposed ports invite scanning and key theft is common.",
      "r4": "It cannot be attributed or revoked per person."
     },
-    "explanation": "Broker admin access through identity and logging, not open ports."
+    "explanation": "A managed session service, or a bastion with identity-based, logged access, satisfies the audit requirement and needs no public IPs on servers. SSH open to the internet invites constant scanning, and a shared key on a wiki leaves no record of who did what and cannot be revoked for one person."
    }
   ],
   "flashcards": [
@@ -4173,7 +4173,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "More pre-provisioned capacity means faster recovery at higher cost."
+    "explanation": "Backup and restore rebuilds everything (hours), pilot light keeps data replicated and core pieces ready (tens of minutes), warm standby runs a scaled-down copy (minutes), and active-active already serves traffic (near zero). Each step faster costs more to keep running."
    },
    {
     "id": "t330-a6",
@@ -4233,7 +4233,7 @@
      "r3": "It multiplies cost for services that do not need it.",
      "r4": "Restore takes hours and loses up to a day: too much for payments."
     },
-    "explanation": "Set RPO and RTO per service and pick the cheapest strategy that meets them."
+    "explanation": "The reporting tool tolerates a day of downtime and data loss, so nightly backups are enough; payments need RTO under 15 minutes and RPO near zero, which needs replication and a warm standby. Active-active everywhere spends the budget on a tool that does not need it, and nightly backups for payments could lose a day of transactions."
    }
   ],
   "flashcards": [

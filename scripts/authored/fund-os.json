@@ -112,29 +112,29 @@
     "id": "t281-a2",
     "concept": "fork-exec",
     "type": "multiple_choice",
-    "prompt": "What does exec do to the calling process?",
+    "prompt": "A shell forks a child, and the child calls exec to run ls. What does the child keep across exec?",
     "choices": [
      {
       "id": "a",
-      "label": "Replaces its program image"
+      "label": "Its process id and its open file descriptors"
      },
      {
       "id": "b",
-      "label": "Starts a thread in the same process"
+      "label": "The shell’s code, heap and variables"
      },
      {
       "id": "c",
-      "label": "Creates a new child process"
+      "label": "Nothing; exec gives it a new process id"
      },
      {
       "id": "d",
-      "label": "Closes every open file descriptor"
+      "label": "Only the threads the shell had running"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "exec keeps the process id but loads a new program; fork is what creates the process."
+    "explanation": "exec replaces the program image (code, heap, stack) with ls but keeps the same process, so its id and its open file descriptors carry over, except those marked close-on-exec. That is how a shell sets up redirection: it rearranges descriptors in the child before exec. fork creates the process; exec does not, and only the calling thread survives exec."
    },
    {
     "id": "t281-a3",
@@ -190,7 +190,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "A zombie keeps its exit status until the parent collects it."
+    "explanation": "A finished child keeps a small process-table entry holding its exit status until the parent calls wait; until then it is a zombie. Its memory, threads and sockets are already freed. Thousands of zombies can exhaust the process-id space, so parents must reap, or a dead parent’s children are adopted and reaped by init."
    },
    {
     "id": "t281-a5",
@@ -221,7 +221,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Create, replace, run, reap."
+    "explanation": "The shell forks a copy of itself, the child execs the command, the program runs and exits, and the parent waits to collect its exit status, which becomes $? and frees the zombie entry."
    },
    {
     "id": "t281-a6",
@@ -542,7 +542,7 @@
     "id": "t282-a1",
     "concept": "context-switch",
     "type": "multiple_choice",
-    "prompt": "What must the kernel save when it switches threads?",
+    "prompt": "Thread A is preempted halfway through a loop and resumes later on the same core. What must the kernel have saved so it carries on exactly where it stopped?",
     "choices": [
      {
       "id": "a",
@@ -564,7 +564,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Execution state lives in registers; memory stays where it is."
+    "explanation": "A thread’s execution state is its registers: the program counter (where it is), the stack pointer and the working values. The kernel saves them on a switch and restores them later. Heap memory, open files and the program’s code stay in place in memory and need no saving; source code is not even loaded."
    },
    {
     "id": "t282-a2",
@@ -592,7 +592,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Blocked threads leave the run queue until woken."
+    "explanation": "A blocked thread leaves the run queue entirely and uses no CPU until the disk interrupt marks it runnable again. That is why one core can host thousands of threads that are mostly waiting. Threads do not poll for I/O they asked the kernel to do, and nothing reserves CPU for sleeping threads."
    },
    {
     "id": "t282-a3",
@@ -620,7 +620,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "More frequent switches cost overhead but let waiting threads run sooner."
+    "explanation": "Shorter slices mean a waiting thread gets the CPU sooner, at the cost of more switches, each of which costs a few microseconds plus colder caches. It does not change the number of cores or threads, memory use, stack size or I/O."
    },
    {
     "id": "t282-a4",
@@ -648,7 +648,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "More CPU-bound threads than cores only add switching."
+    "explanation": "A CPU-bound thread keeps a core busy, so about one per core uses all four with little switching. One thread leaves three cores idle; one per request or 400 threads just queue for the same four cores and add switching and cache misses. I/O-bound work is different: threads that mostly wait can number many more than cores."
    },
    {
     "id": "t282-a5",
@@ -727,7 +727,7 @@
      "r3": "Spinning helps only for very short waits; 2 ms of spinning wastes a whole slice.",
      "r4": "It adds up to 10 ms of extra latency after the lock is free."
     },
-    "explanation": "Block for waits longer than a context switch; spin only for waits of a few microseconds."
+    "explanation": "A 2 ms wait is hundreds of times longer than a context switch (a few microseconds), so blocking frees the core for other runnable threads and wakes this one when the lock is released. Spinning burns 2 ms of a contended CPU, and a fixed 10 ms sleep adds up to 8 ms of needless delay. Spin only when waits are a few microseconds."
    }
   ],
   "flashcards": [
@@ -1444,7 +1444,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "write lands in the page cache; durability needs an explicit flush."
+    "explanation": "A successful write means the kernel copied the data into the page cache; it reaches the disk later, typically within about 30 seconds on Linux. A power cut before then loses it. fsync (or fdatasync) waits until the data, and the drive’s own volatile cache, is flushed. Opening the file changes nothing, and solid-state drives cache writes too."
    },
    {
     "id": "t284-a4",
@@ -1472,7 +1472,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Gathering data into fewer calls cuts the fixed overhead."
+    "explanation": "Each system call has a fixed cost to enter and leave the kernel, so gathering header and body into one write (or one writev of several buffers) cuts the calls per response. Priority changes when the code runs, smaller socket buffers mean more calls, and a thread per response adds switching on top of the same calls."
    },
    {
     "id": "t284-a5",
@@ -1518,7 +1518,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Enter, work, copy, return."
+    "explanation": "The program calls read, the CPU switches to kernel mode, the kernel copies bytes from the page cache (reading from disk first on a miss) into the program’s buffer, and returns the byte count as the CPU drops back to user mode. A return smaller than asked for is normal, not an error."
    }
   ],
   "flashcards": [
@@ -3154,7 +3154,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Permits count concurrent users directly."
+    "explanation": "A semaphore holds a count: each caller takes a permit before the call and returns it after, so a 21st caller waits until one of the 20 frees up. A mutex admits only one thread at a time, a condition variable needs a counter and a mutex beside it to do the same job, and a read-write lock separates readers from writers rather than capping a number."
    },
    {
     "id": "t288-a3",
@@ -3182,7 +3182,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "That is the point of bounding: overload becomes visible backpressure."
+    "explanation": "A full bounded queue makes producers wait or fails their put at once, so overload shows up as backpressure the caller can act on (slow down, retry later). Nothing reorders items, the scheduler does not hand consumers more CPU, and memory growing until the process is killed is what an unbounded queue does."
    },
    {
     "id": "t288-a4",
@@ -3241,7 +3241,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Lock, wait in a loop, take, signal."
+    "explanation": "Lock the mutex, then wait on “not empty” in a while loop (the wait releases the lock while asleep), remove the item, signal “not full” so a blocked producer can proceed, and unlock. Signalling before unlocking is fine; the woken producer simply waits for the mutex."
    },
    {
     "id": "t288-a6",
@@ -3301,7 +3301,7 @@
      "r3": "They lose all of them when the process runs out of memory.",
      "r4": "The 8 workers’ CPU limit is unchanged; extra threads add contention."
     },
-    "explanation": "Bound every queue and choose the overload behaviour deliberately."
+    "explanation": "A 10× burst for minutes means work arrives faster than 8 workers finish, so any queue grows by thousands of jobs. Bounded with 503 and Retry-After keeps memory fixed and latency predictable, and clients can retry. An unbounded queue grows until memory runs out, with jobs waiting minutes, and a thread per job overwhelms the CPU and memory without raising throughput."
    }
   ],
   "flashcards": [
@@ -3952,29 +3952,29 @@
     "id": "t290-a1",
     "concept": "signals",
     "type": "multiple_choice",
-    "prompt": "Which signal cannot be caught or ignored?",
+    "prompt": "A stop script runs kill -9 on a server. In-flight requests drop and the shutdown handler’s log line never appears. Why?",
     "choices": [
      {
       "id": "a",
-      "label": "SIGHUP"
+      "label": "The handler was too slow to finish in time"
      },
      {
       "id": "b",
-      "label": "SIGKILL"
+      "label": "SIGKILL cannot be caught; the kernel ends it"
      },
      {
       "id": "c",
-      "label": "SIGINT"
+      "label": "kill -9 sends SIGTERM twice in quick succession"
      },
      {
       "id": "d",
-      "label": "SIGTERM"
+      "label": "Logs are discarded once a process gets a signal"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "SIGKILL (and SIGSTOP) bypass handlers."
+    "explanation": "Signal 9 is SIGKILL, which (like SIGSTOP) cannot be caught, blocked or ignored, so the kernel ends the process without running any handler. Send SIGTERM first, give the process time to drain, and use SIGKILL only after a deadline. Handler speed is irrelevant when the handler never runs, and receiving a signal does not discard logs."
    },
    {
     "id": "t290-a2",
@@ -4002,7 +4002,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Draining keeps requests from being dropped."
+    "explanation": "On SIGTERM a server should stop taking new work (close the listener, fail its readiness check so the load balancer stops sending) and finish requests already in flight, then exit before the platform’s deadline, 30 s by default in Kubernetes. Exiting at once drops those requests, restarting in place is not what was asked, and no second SIGTERM is coming, only SIGKILL."
    },
    {
     "id": "t290-a3",
@@ -4094,7 +4094,7 @@
      "s4",
      "s5"
     ],
-    "explanation": "Drain, then release, then exit."
+    "explanation": "Receive SIGTERM, stop accepting new connections, let in-flight requests finish within a deadline, close database and queue connections so nothing is left half-done, and exit 0. Closing the database before requests finish would fail them, so release resources only after draining."
    },
    {
     "id": "t290-a6",

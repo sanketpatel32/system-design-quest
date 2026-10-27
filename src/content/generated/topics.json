@@ -96504,29 +96504,29 @@
         "id": "t281-a2",
         "concept": "fork-exec",
         "type": "multiple_choice",
-        "prompt": "What does exec do to the calling process?",
+        "prompt": "A shell forks a child, and the child calls exec to run ls. What does the child keep across exec?",
         "choices": [
           {
             "id": "a",
-            "label": "Replaces its program image"
+            "label": "Its process id and its open file descriptors"
           },
           {
             "id": "b",
-            "label": "Starts a thread in the same process"
+            "label": "The shell’s code, heap and variables"
           },
           {
             "id": "c",
-            "label": "Creates a new child process"
+            "label": "Nothing; exec gives it a new process id"
           },
           {
             "id": "d",
-            "label": "Closes all open file descriptors"
+            "label": "Only the threads the shell had running"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "exec keeps the process id but loads a new program; fork is what creates the process."
+        "explanation": "exec replaces the program image (code, heap, stack) with ls but keeps the same process, so its id and its open file descriptors carry over, except those marked close-on-exec. That is how a shell sets up redirection: it rearranges descriptors in the child before exec. fork creates the process; exec does not, and only the calling thread survives exec."
       },
       {
         "id": "t281-a3",
@@ -96582,7 +96582,7 @@
         "correctChoiceIds": [
           "d"
         ],
-        "explanation": "A zombie keeps its exit status until the parent collects it."
+        "explanation": "A finished child keeps a small process-table entry holding its exit status until the parent calls wait; until then it is a zombie. Its memory, threads and sockets are already freed. Thousands of zombies can exhaust the process-id space, so parents must reap, or a dead parent’s children are adopted and reaped by init."
       },
       {
         "id": "t281-a5",
@@ -96613,7 +96613,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Create, replace, run, reap."
+        "explanation": "The shell forks a copy of itself, the child execs the command, the program runs and exits, and the parent waits to collect its exit status, which becomes $? and frees the zombie entry."
       },
       {
         "id": "t281-a6",
@@ -96934,7 +96934,7 @@
         "id": "t282-a1",
         "concept": "context-switch",
         "type": "multiple_choice",
-        "prompt": "What must the kernel save when it switches threads?",
+        "prompt": "Thread A is preempted halfway through a loop and resumes later on the same core. What must the kernel have saved so it carries on exactly where it stopped?",
         "choices": [
           {
             "id": "a",
@@ -96956,7 +96956,7 @@
         "correctChoiceIds": [
           "d"
         ],
-        "explanation": "Execution state lives in registers; memory stays where it is."
+        "explanation": "A thread’s execution state is its registers: the program counter (where it is), the stack pointer and the working values. The kernel saves them on a switch and restores them later. Heap memory, open files and the program’s code stay in place in memory and need no saving; source code is not even loaded."
       },
       {
         "id": "t282-a2",
@@ -96984,7 +96984,7 @@
         "correctChoiceIds": [
           "d"
         ],
-        "explanation": "Blocked threads leave the run queue until woken."
+        "explanation": "A blocked thread leaves the run queue entirely and uses no CPU until the disk interrupt marks it runnable again. That is why one core can host thousands of threads that are mostly waiting. Threads do not poll for I/O they asked the kernel to do, and nothing reserves CPU for sleeping threads."
       },
       {
         "id": "t282-a3",
@@ -97012,7 +97012,7 @@
         "correctChoiceIds": [
           "d"
         ],
-        "explanation": "More frequent switches cost overhead but let waiting threads run sooner."
+        "explanation": "Shorter slices mean a waiting thread gets the CPU sooner, at the cost of more switches, each of which costs a few microseconds plus colder caches. It does not change the number of cores or threads, memory use, stack size or I/O."
       },
       {
         "id": "t282-a4",
@@ -97040,7 +97040,7 @@
         "correctChoiceIds": [
           "b"
         ],
-        "explanation": "More CPU-bound threads than cores only add switching."
+        "explanation": "A CPU-bound thread keeps a core busy, so about one per core uses all four with little switching. One thread leaves three cores idle; one per request or 400 threads just queue for the same four cores and add switching and cache misses. I/O-bound work is different: threads that mostly wait can number many more than cores."
       },
       {
         "id": "t282-a5",
@@ -97119,7 +97119,7 @@
           "r3": "Spinning helps only for very short waits; 2 ms of spinning wastes a whole slice.",
           "r4": "It adds up to 10 ms of extra latency after the lock is free."
         },
-        "explanation": "Block for waits longer than a context switch; spin only for waits of a few microseconds."
+        "explanation": "A 2 ms wait is hundreds of times longer than a context switch (a few microseconds), so blocking frees the core for other runnable threads and wakes this one when the lock is released. Spinning burns 2 ms of a contended CPU, and a fixed 10 ms sleep adds up to 8 ms of needless delay. Spin only when waits are a few microseconds."
       }
     ],
     "flashcards": [
@@ -97836,7 +97836,7 @@
         "correctChoiceIds": [
           "d"
         ],
-        "explanation": "write lands in the page cache; durability needs an explicit flush."
+        "explanation": "A successful write means the kernel copied the data into the page cache; it reaches the disk later, typically within about 30 seconds on Linux. A power cut before then loses it. fsync (or fdatasync) waits until the data, and the drive’s own volatile cache, is flushed. Opening the file changes nothing, and solid-state drives cache writes too."
       },
       {
         "id": "t284-a4",
@@ -97864,7 +97864,7 @@
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "Gathering data into fewer calls cuts the fixed overhead."
+        "explanation": "Each system call has a fixed cost to enter and leave the kernel, so gathering header and body into one write (or one writev of several buffers) cuts the calls per response. Priority changes when the code runs, smaller socket buffers mean more calls, and a thread per response adds switching on top of the same calls."
       },
       {
         "id": "t284-a5",
@@ -97910,7 +97910,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Enter, work, copy, return."
+        "explanation": "The program calls read, the CPU switches to kernel mode, the kernel copies bytes from the page cache (reading from disk first on a miss) into the program’s buffer, and returns the byte count as the CPU drops back to user mode. A return smaller than asked for is normal, not an error."
       }
     ],
     "flashcards": [
@@ -99546,7 +99546,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Permits count concurrent users directly."
+        "explanation": "A semaphore holds a count: each caller takes a permit before the call and returns it after, so a 21st caller waits until one of the 20 frees up. A mutex admits only one thread at a time, a condition variable needs a counter and a mutex beside it to do the same job, and a read-write lock separates readers from writers rather than capping a number."
       },
       {
         "id": "t288-a3",
@@ -99574,7 +99574,7 @@
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "That is the point of bounding: overload becomes visible backpressure."
+        "explanation": "A full bounded queue makes producers wait or fails their put at once, so overload shows up as backpressure the caller can act on (slow down, retry later). Nothing reorders items, the scheduler does not hand consumers more CPU, and memory growing until the process is killed is what an unbounded queue does."
       },
       {
         "id": "t288-a4",
@@ -99633,7 +99633,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Lock, wait in a loop, take, signal."
+        "explanation": "Lock the mutex, then wait on “not empty” in a while loop (the wait releases the lock while asleep), remove the item, signal “not full” so a blocked producer can proceed, and unlock. Signalling before unlocking is fine; the woken producer simply waits for the mutex."
       },
       {
         "id": "t288-a6",
@@ -99693,7 +99693,7 @@
           "r3": "They lose all of them when the process runs out of memory.",
           "r4": "The 8 workers’ CPU limit is unchanged; extra threads add contention."
         },
-        "explanation": "Bound every queue and choose the overload behaviour deliberately."
+        "explanation": "A 10× burst for minutes means work arrives faster than 8 workers finish, so any queue grows by thousands of jobs. Bounded with 503 and Retry-After keeps memory fixed and latency predictable, and clients can retry. An unbounded queue grows until memory runs out, with jobs waiting minutes, and a thread per job overwhelms the CPU and memory without raising throughput."
       }
     ],
     "flashcards": [
@@ -100344,29 +100344,29 @@
         "id": "t290-a1",
         "concept": "signals",
         "type": "multiple_choice",
-        "prompt": "Which signal cannot be caught or ignored?",
+        "prompt": "A stop script runs kill -9 on a server. In-flight requests drop and the shutdown handler’s log line never appears. Why?",
         "choices": [
           {
             "id": "a",
-            "label": "SIGHUP"
+            "label": "The handler was too slow to finish in time"
           },
           {
             "id": "b",
-            "label": "SIGKILL"
+            "label": "SIGKILL cannot be caught; the kernel ends it"
           },
           {
             "id": "c",
-            "label": "SIGINT"
+            "label": "kill -9 sends SIGTERM twice in quick succession"
           },
           {
             "id": "d",
-            "label": "SIGTERM"
+            "label": "Logs are discarded once a process gets a signal"
           }
         ],
         "correctChoiceIds": [
           "b"
         ],
-        "explanation": "SIGKILL (and SIGSTOP) bypass handlers."
+        "explanation": "Signal 9 is SIGKILL, which (like SIGSTOP) cannot be caught, blocked or ignored, so the kernel ends the process without running any handler. Send SIGTERM first, give the process time to drain, and use SIGKILL only after a deadline. Handler speed is irrelevant when the handler never runs, and receiving a signal does not discard logs."
       },
       {
         "id": "t290-a2",
@@ -100394,7 +100394,7 @@
         "correctChoiceIds": [
           "c"
         ],
-        "explanation": "Draining keeps requests from being dropped."
+        "explanation": "On SIGTERM a server should stop taking new work (close the listener, fail its readiness check so the load balancer stops sending) and finish requests already in flight, then exit before the platform’s deadline, 30 s by default in Kubernetes. Exiting at once drops those requests, restarting in place is not what was asked, and no second SIGTERM is coming, only SIGKILL."
       },
       {
         "id": "t290-a3",
@@ -100486,7 +100486,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Drain, then release, then exit."
+        "explanation": "Receive SIGTERM, stop accepting new connections, let in-flight requests finish within a deadline, close database and queue connections so nothing is left half-done, and exit 0. Closing the database before requests finish would fail them, so release resources only after draining."
       },
       {
         "id": "t290-a6",
@@ -105267,7 +105267,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Stable layers first, then build, then a slim runtime."
+        "explanation": "Copy the manifest and install first so that layer stays cached, then copy the source and compile, then start a slim runtime stage and copy in only the built artefact, run as a non-root user. Compilers and build caches stay behind in the build stage, so the runtime image is smaller and has less to attack."
       },
       {
         "id": "t321-a6",
@@ -105327,7 +105327,7 @@
           "r3": "All containers share one kernel, so a kernel bug crosses tenants.",
           "r4": "They see the host’s filesystem and processes."
         },
-        "explanation": "Containers package software; add a VM or sandbox boundary for untrusted tenants."
+        "explanation": "Plain containers share the host kernel, so one kernel bug lets a tenant’s code escape to every other tenant on the host; bare processes share even more. A lightweight VM or sandboxed runtime gives each tenant its own kernel boundary and still starts in well under a second."
       }
     ],
     "flashcards": [
@@ -106543,7 +106543,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Both versions read and write the same data, so the schema must be compatible both ways during the rollout. They can run in any zones, separate databases or cache copies would split the data, and the code differs by definition."
+        "explanation": "During a rollout both versions read and write the same database, so the schema must work for both: add columns before code uses them and drop them only after no version does. Zones do not matter, and separate databases or private cache copies would split the data that users share."
       },
       {
         "id": "t324-a4",
@@ -106602,7 +106602,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Expose, compare, widen, decide."
+        "explanation": "Send a small share of traffic to the new version, compare its errors and latency with the current version over the same period, widen in steps while they stay healthy, and finish or roll back automatically when a check fails."
       },
       {
         "id": "t324-a6",
@@ -106662,7 +106662,7 @@
           "r3": "A fast global push turns one bad file into a global outage.",
           "r4": "Most customers cannot test every update."
         },
-        "explanation": "Stage every change that can break machines, including content and config."
+        "explanation": "An update that crashes machines does the most damage when it reaches all of them at once, as the July 2024 security-agent outage showed. Rings (internal, then a small customer share, then wider) catch a crash on a few machines first and cost hours, not days. A global push stakes millions of machines on one test, and leaving testing to each customer means most never do, so the risk is unchanged."
       }
     ],
     "flashcards": [
@@ -106928,29 +106928,29 @@
         "id": "t325-a2",
         "concept": "drift",
         "type": "multiple_choice",
-        "prompt": "A security group was edited by hand in the console. What is this called?",
+        "prompt": "The IaC plan wants to remove a port 22 rule from a production security group, though nobody changed the code. What most likely happened?",
         "choices": [
           {
             "id": "a",
-            "label": "Provisioning"
+            "label": "The provider plugin was upgraded overnight"
           },
           {
             "id": "b",
-            "label": "Promotion"
+            "label": "Someone added the rule by hand: drift"
           },
           {
             "id": "c",
-            "label": "Rollback"
+            "label": "The state lock expired and reset the rule"
           },
           {
             "id": "d",
-            "label": "Drift"
+            "label": "The plan is cached from an earlier branch"
           }
         ],
         "correctChoiceIds": [
-          "d"
+          "b"
         ],
-        "explanation": "Drift is live infrastructure that no longer matches the declared configuration, often from console edits. Provisioning creates resources, promotion moves an artefact between environments, and rollback returns to a previous version."
+        "explanation": "The plan compares the code with what really exists. A rule that exists but is not in the code was almost certainly added in the console, which is drift, and applying would remove it. Decide whether to delete it or add it to the code. Provider upgrades rarely invent rules, a lock only blocks concurrent applies, and each plan is computed fresh."
       },
       {
         "id": "t325-a3",
@@ -107037,7 +107037,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Change, plan, review, apply."
+        "explanation": "Change the code in a branch, let CI produce the plan, have reviewers approve both, then apply exactly that saved plan under a state lock. Applying the reviewed plan file, rather than planning again at apply time, guarantees that what runs is what was approved."
       },
       {
         "id": "t325-a6",
@@ -107097,7 +107097,7 @@
           "r3": "Hundreds of settings make manual copies drift.",
           "r4": "Documents go stale and are not applied automatically."
         },
-        "explanation": "Codify first; replication and recovery then become an apply."
+        "explanation": "Importing what exists into code captures the real settings once; the second region is then an apply of the same code, and future changes go to both. Clicking through again or following a document copies hundreds of settings by hand, misses some, and drifts as production changes."
       }
     ],
     "flashcards": [
@@ -107473,7 +107473,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Journey, indicator, objective, alerting."
+        "explanation": "Pick the user journey that matters, define the SLI as good events over valid events, set the target and window (say 99.9% over 30 days), and alert on how fast the error budget burns. Alerting before the SLO exists has nothing to measure against."
       },
       {
         "id": "t326-a6",
@@ -107533,7 +107533,7 @@
           "r3": "They add noise, and noisy pagers get ignored.",
           "r4": "A fast outage can burn the budget within hours."
         },
-        "explanation": "Alert on what threatens the SLO, at a speed that matches the threat."
+        "explanation": "Multi-window burn-rate alerts page only when errors would spend a meaningful share of the budget, for example 2% of a 30-day budget within an hour, so brief self-healing spikes stop paging while real outages still do. Stricter thresholds add pages, and no paging misses outages entirely."
       }
     ],
     "flashcards": [
@@ -108784,7 +108784,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Edge, app, data, back."
+        "explanation": "A request enters the load balancer in a public subnet, which forwards it to an app server in a private subnet, which queries the database in a data subnet; the response returns along the same connections. Only the load balancer is reachable from the internet."
       },
       {
         "id": "t329-a6",
@@ -108844,7 +108844,7 @@
           "r3": "Exposed ports invite scanning and key theft is common.",
           "r4": "It cannot be attributed or revoked per person."
         },
-        "explanation": "Broker admin access through identity and logging, not open ports."
+        "explanation": "A managed session service, or a bastion with identity-based, logged access, satisfies the audit requirement and needs no public IPs on servers. SSH open to the internet invites constant scanning, and a shared key on a wiki leaves no record of who did what and cannot be revoked for one person."
       }
     ],
     "flashcards": [
@@ -109230,7 +109230,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "More pre-provisioned capacity means faster recovery at higher cost."
+        "explanation": "Backup and restore rebuilds everything (hours), pilot light keeps data replicated and core pieces ready (tens of minutes), warm standby runs a scaled-down copy (minutes), and active-active already serves traffic (near zero). Each step faster costs more to keep running."
       },
       {
         "id": "t330-a6",
@@ -109290,7 +109290,7 @@
           "r3": "It multiplies cost for services that do not need it.",
           "r4": "Restore takes hours and loses up to a day: too much for payments."
         },
-        "explanation": "Set RPO and RTO per service and pick the cheapest strategy that meets them."
+        "explanation": "The reporting tool tolerates a day of downtime and data loss, so nightly backups are enough; payments need RTO under 15 minutes and RPO near zero, which needs replication and a warm standby. Active-active everywhere spends the budget on a tool that does not need it, and nightly backups for payments could lose a day of transactions."
       }
     ],
     "flashcards": [
