@@ -20,7 +20,7 @@ const SECTION_OF: Record<string, string> = { 'f1-frontend': 'frontend', 'f2-back
 test('sections: overview rings, a map per section, and System Design unchanged', async ({ page }) => {
   await seed(page)
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Choose a section', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Choose a section', level: 2 })).toBeVisible()
   await expect(page.getByTestId('ring-system-design')).toHaveAttribute('data-done', '0')
   // the overview has no tab row; the logo switcher marks "All sections" as current, not a section
   await expect(page.getByTestId('section-picker')).toHaveCount(0)

@@ -8,6 +8,8 @@ import { SectionSwitcher, useCurrentSection } from './brand/SectionSwitcher'
 import { pageTitle } from '../lib/ui/pageTitle'
 import { useFitsRow } from '../lib/ui/useFitsRow'
 import { AccountButton } from './AccountButton'
+import { GoalToast } from './ui/GoalToast'
+import { todayCount, usePractice } from '../lib/fun/practice'
 
 const nav = [
   { to: '/', label: 'Learn', icon: 'map' },
@@ -21,6 +23,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const xp = useGameStore((s) => s.xp)
   const level = useLevel()
   const streak = useStreak()
+  const practice = usePractice()
   const badges = useGameStore((s) => s.badges)
   const reducedMotion = useGameStore((s) => s.preferences.reducedMotion)
   const [hudOpen, setHudOpen] = useState(false)
@@ -120,7 +123,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
                 <p className="text-dim">XP comes from clearing quizzes and boss fights. Every 500 XP is a level.</p>
-                <p><span className="font-extrabold">{streak}-day streak.</span> <span className="text-dim">Days in a row you studied; any quiz or review counts.</span></p>
+                <p><span className="font-extrabold">{streak}-day streak.</span> <span className="text-dim">Days in a row you studied; any quiz, quick play or review counts.</span></p>
+                <p data-testid="hud-goal"><span className="font-extrabold tabular-nums">{practice.goal ? `${Math.min(todayCount(practice), practice.goal)} of ${practice.goal} questions today.` : `${todayCount(practice)} answered today.`}</span> <span className="text-dim">{practice.goal ? 'Your daily goal; change it in Settings.' : 'No daily goal set.'}</span></p>
                 {badges.length > 0 && (
                   <p><span className="font-extrabold">Badges:</span> <span className="text-dim">{badges.map((b) => BADGE_LABELS[b as keyof typeof BADGE_LABELS] ?? b).join(', ')}</span></p>
                 )}
@@ -140,6 +144,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className={`flex-1 w-full max-w-[73.75rem] 2xl:max-w-[80rem] mx-auto pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] ${inQuiz ? 'pt-3 sm:pt-6 short:pt-1 lg:pt-6' : 'pt-6'} pb-[calc(7rem+env(safe-area-inset-bottom))] short:pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-10`}>{children}</main>
+      <GoalToast />
       <nav className={`tabbar lg:hidden ${inQuiz ? 'hidden' : ''}`} aria-label="Main">
         {nav.map((item) => (
           <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => `tab ${isActive ? 'tab-active' : ''}`}>

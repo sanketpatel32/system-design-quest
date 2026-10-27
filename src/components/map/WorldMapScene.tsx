@@ -7,10 +7,11 @@ import { regionPalette } from '../../lib/design/transitTheme'
 import { suggestionHint, topicStatus } from '../../lib/progression/unlocks'
 import { useGameStore } from '../../stores/gameStore'
 import { RegionMotif } from './RegionMotif'
-import { Mascot, MascotSays } from '../art/Mascot'
+import { Mascot } from '../art/Mascot'
 import { IconBook, IconCastle, IconCheck, IconStar } from '../icons/HudIcons'
 
 import { bosses as arenaTopics, BOSS_N, FUND_N, fundamentalRegions, LESSON_N as STATION_N, learningRegions, playbook, PLAYBOOK_ID, topicLabel } from '../../content/numbering'
+import { usePractice } from '../../lib/fun/practice'
 
 import { SECTION_BY_ID, sectionPalette, sectionTopics, shortName, type SectionId, questName } from '../../content/sections'
 import { sectionXp } from '../../lib/progression/sectionXp'
@@ -60,6 +61,7 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
   const quizAttempts = useGameStore((s) => s.quizAttempts)
   const lessonProgress = useGameStore((s) => s.lessonProgress)
   const topicProgress = useGameStore((s) => s.topicProgress)
+  const practice = usePractice()
   const section = SECTION_BY_ID.get(sectionId)!
   const fund = sectionId !== 'system-design'
   const areaRegions = fundamentalRegions.filter((r) => section.regionIds.includes(r.id))
@@ -78,7 +80,9 @@ export function WorldMapScene({ sectionId = 'system-design' }: { sectionId?: Sec
   }
 
   /** The suggested next lesson: the first one not cleared yet in the suggested order. Everything else is open too. */
-  const nextId = trackIds.find((id) => !completed.has(id))
+  const lastTouched = practice.last?.id
+  /** Continue opens what the learner was last doing in this section, if it isn't cleared yet */
+  const nextId = lastTouched && trackIds.includes(lastTouched) && !completed.has(lastTouched) ? lastTouched : trackIds.find((id) => !completed.has(id))
   const nextTopic = nextId ? topicsById.get(nextId) : undefined
   /** Resume the quiz only when the learner has actually answered something */
   const resume = Boolean(nextId && Object.keys((quizAttempts[`topic-${nextId}`] as { results?: object } | undefined)?.results ?? {}).length)
@@ -496,24 +500,31 @@ function Onboarding() {
     setOpen(false)
   }
   return (
-    <section className="panel mb-6 p-5" aria-labelledby="onboard-title" data-testid="onboarding">
-      <MascotSays mood="happy" size={88}>
-        <h2 id="onboard-title" className="font-display text-xl text-chalk">Hi, I’m Byte! Here’s how DesignQuest works.</h2>
-      </MascotSays>
-      <ul className="mt-3 grid gap-3 text-[0.9375rem] sm:grid-cols-2">
-        {[
-          ['Lessons', 'Each node is a short lesson, then a quiz. Everything is open: follow the path or jump straight to any quiz.', 'var(--color-hero)'],
-          ['Hearts', 'You get 3 per quiz. A wrong answer costs one, but running out never stops you: keep going and finish the quiz.', 'var(--color-heart)'],
-          ['Review', 'Cleared topics come back as flashcards on a schedule, so they stick.', 'var(--color-gem)'],
-          ['Bosses', `${arenaTopics.length} full design problems, open any time and scored stage by stage (requirements, estimates, design on a canvas, deep dive). Switch between bosses and lessons whenever you like.`, 'var(--color-gold)'],
-        ].map(([h, b, c]) => (
-          <li key={h} className="flex gap-3 rounded-2xl bg-paper-2 p-3">
-            <span aria-hidden className="mt-1 h-4 w-4 shrink-0 rounded-full" style={{ background: c }} />
-            <span><span className="font-extrabold text-chalk">{h}.</span> <span className="text-dim">{b}</span></span>
-          </li>
-        ))}
-      </ul>
-      <button type="button" className="btn-cta mt-4 w-full sm:w-auto" onClick={close}>Got it</button>
+    <section className="panel mb-6 p-4" aria-labelledby="onboard-title" data-testid="onboarding">
+      <div className="flex flex-wrap items-center gap-3">
+        <Mascot mood="happy" size={52} className="shrink-0" />
+        <div className="min-w-0 flex-[1_1_16rem]">
+          <h2 id="onboard-title" className="font-display text-lg text-chalk">Hi, I’m Byte! Everything here is open.</h2>
+          <p className="text-sm font-bold text-dim">Each node is a short lesson, then a quiz. Hearts never stop you, and misses come back in Review.</p>
+        </div>
+        <button type="button" className="btn-cta !min-h-[44px] max-sm:w-full" onClick={close}>Got it</button>
+      </div>
+      <details className="mt-2">
+        <summary className="tap-link cursor-pointer text-sm font-extrabold text-teal">How it works</summary>
+        <ul className="mt-3 grid gap-3 text-[0.9375rem] sm:grid-cols-2">
+          {[
+            ['Lessons', 'Each node is a short lesson, then a quiz. Everything is open: follow the path or jump straight to any quiz.', 'var(--color-hero)'],
+            ['Hearts', 'You get 3 per quiz. A wrong answer costs one, but running out never stops you: keep going and finish the quiz.', 'var(--color-heart)'],
+            ['Review', 'Cleared topics come back as flashcards on a schedule, and questions you miss come back on later days, so they stick.', 'var(--color-gem)'],
+            ['Bosses', `${arenaTopics.length} full design problems, open any time and scored stage by stage (requirements, estimates, design on a canvas, deep dive). Switch between bosses and lessons whenever you like.`, 'var(--color-gold)'],
+          ].map(([h, b, c]) => (
+            <li key={h} className="flex gap-3 rounded-2xl bg-paper-2 p-3">
+              <span aria-hidden className="mt-1 h-4 w-4 shrink-0 rounded-full" style={{ background: c }} />
+              <span><span className="font-extrabold text-chalk">{h}.</span> <span className="text-dim">{b}</span></span>
+            </li>
+          ))}
+        </ul>
+      </details>
     </section>
   )
 }

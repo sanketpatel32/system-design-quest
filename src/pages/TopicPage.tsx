@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { touchTopic } from '../lib/fun/practice'
 import type { Topic } from '../content/types'
 import { SECTION_BY_ID, sectionOfTopic, sectionPath } from '../content/sections'
 import { topicLabel } from '../content/numbering'
@@ -18,6 +20,7 @@ export function TopicPage() {
   const topic = allTopics.find((t) => t.slug === slug)
   const state = useGameStore()
   const recordLessonCard = useGameStore((s) => s.recordLessonCard)
+  useEffect(() => { if (topic) touchTopic(topic.id, 'lesson') }, [topic])
   const completed = completedTopicIds(state)
   const accent = topic ? transitLineColor(topic.region) : 'var(--color-amber)'
   /** Reverse index: section topics whose seeAlso points at this System Design lesson */

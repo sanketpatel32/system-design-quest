@@ -3,6 +3,8 @@ import { Mascot } from '../components/art/Mascot'
 import { PageHero } from '../components/ui/PageHero'
 import { SaveWhere } from '../components/SaveWhere'
 import { useGameStore } from '../stores/gameStore'
+import { GoalPicker } from '../components/home/Today'
+import { setGoal, usePractice } from '../lib/fun/practice'
 
 type Notice = { tone: 'ok' | 'error'; text: string } | null
 
@@ -20,6 +22,7 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint: strin
 
 export function SettingsPage() {
   const prefs = useGameStore((s) => s.preferences)
+  const practice = usePractice()
   const setPreferences = useGameStore((s) => s.setPreferences)
   const exportProgress = useGameStore((s) => s.exportProgress)
   const importProgress = useGameStore((s) => s.importProgress)
@@ -99,6 +102,15 @@ export function SettingsPage() {
         />
       </section>
 
+      <section className="panel p-5 space-y-3" aria-labelledby="goal" data-testid="settings-goal">
+        <h2 id="goal" className="font-display text-lg font-bold text-chalk">Daily goal</h2>
+        <p className="text-sm text-dim">Questions a day across quizzes, quick play and review. It only sets the ring on home; nothing is locked if you miss it.</p>
+        <div className="flex flex-wrap gap-2">
+          <GoalPicker goal={practice.goal} onPick={setGoal} />
+          <button type="button" className={`play-pill ${practice.goal === 0 ? 'play-pill-on' : ''}`} aria-pressed={practice.goal === 0} onClick={() => setGoal(0)} data-testid="goal-0">No goal</button>
+        </div>
+      </section>
+
       <section className="panel p-5 space-y-3" aria-labelledby="backup">
         <h2 id="backup" className="font-display text-lg font-bold text-chalk">Back up or move your progress</h2>
         <p className="text-sm text-dim">A backup is a small .json file. Restoring one replaces the progress in this browser.</p>
@@ -126,7 +138,7 @@ export function SettingsPage() {
               onChange={(e) => setImportText(e.target.value)}
             />
             <button type="button" className="btn-quiet" disabled={!importText.trim()} onClick={doImport}>
-              Restore pasted backup
+              Restore backup
             </button>
           </div>
         </details>

@@ -530,6 +530,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
           {question.explanation}
         </p>
       )}
+      {submitted && !sheet && <WhyNotOthers question={question} />}
       {shown && sheet && (
         <>
           <div aria-hidden className="h-72" />
@@ -548,6 +549,7 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
                     <span className="font-extrabold">Why: </span>
                     {question.explanation}
                   </p>
+                  <WhyNotOthers question={question} />
                 </div>
               </div>
               <div className="flex shrink-0 flex-col gap-2 sm:items-end">
@@ -568,5 +570,24 @@ export function QuestionRenderer({ question, onSubmit, locked, initialAnswer, ho
         </>
       )}
     </div>
+  )
+}
+
+/** Tradeoff questions explain every tempting-but-wrong reason, not just the one you picked */
+function WhyNotOthers({ question }: { question: Question }) {
+  if (question.type !== 'tradeoff' || !question.rationaleConflicts) return null
+  const items = Object.entries(question.rationaleConflicts)
+    .map(([id, why]) => ({ id, why, label: question.rationaleOptions.find((o) => o.id === id)?.label }))
+    .filter((x) => x.label)
+  if (!items.length) return null
+  return (
+    <details className="why-others mt-2" data-testid="why-others">
+      <summary className="tap-link cursor-pointer text-sm font-extrabold">Why the other reasons fail ({items.length})</summary>
+      <ul className="mt-2 max-h-40 space-y-1.5 overflow-y-auto pr-1 text-sm leading-relaxed">
+        {items.map((x) => (
+          <li key={x.id}><span className="font-extrabold">“{x.label}”</span>: {x.why}</li>
+        ))}
+      </ul>
+    </details>
   )
 }

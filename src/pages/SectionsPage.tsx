@@ -5,6 +5,7 @@ import { sectionXp } from '../lib/progression/sectionXp'
 import { RegionMotif } from '../components/map/RegionMotif'
 import { Mascot } from '../components/art/Mascot'
 import { ROUND_SIZE } from '../lib/fun/fun'
+import { HomeToday } from '../components/home/Today'
 
 function Ring({ done, total, colour, id }: { done: number; total: number; colour: string; id: string }) {
   const r = 30, c = 2 * Math.PI * r, f = total ? done / total : 0
@@ -46,8 +47,9 @@ export function SectionsPage() {
   const last = lastSection()
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-3xl md:text-4xl text-chalk">Choose a section</h1>
+      <HomeToday />
+      <div className="pt-2">
+        <h2 className="font-display text-3xl md:text-4xl text-chalk">Choose a section</h2>
         <p className="mt-1 font-bold text-dim">Everything is open. Start anywhere, or warm up with a quick round.</p>
       </div>
       <Link to="/play" className="panel flex items-center gap-4 p-4 sm:p-5 hover:-translate-y-0.5 transition-transform" data-testid="quick-play-card">

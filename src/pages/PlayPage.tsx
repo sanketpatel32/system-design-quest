@@ -6,6 +6,16 @@ import { QuestionRenderer } from '../components/QuestionRenderer'
 import { Mascot } from '../components/art/Mascot'
 import { ComboChip } from '../components/ui/ComboChip'
 import { ROUND_SIZE, bestRun, byteReaction, pickRound } from '../lib/fun/fun'
+import { recordAnswer } from '../lib/fun/practice'
+import { suggestedOrder } from '../lib/fun/today'
+import { ShareResult } from '../components/ui/ShareResult'
+import { useGameStore } from '../stores/gameStore'
+import type { Topic } from '../content/types'
+
+/** Warm-up pool: the opening lessons of every section, multiple choice only, so a first try is quick and fair */
+const warmupTopics = (): Topic[] =>
+  SECTIONS.flatMap((x) => suggestedOrder(x.id).slice(0, 2))
+    .map((t) => ({ ...t, questions: t.questions.filter((q) => q.type === 'multiple_choice') }))
 
 
 const newSeed = () => Math.random().toString(36).slice(2)
@@ -17,8 +27,13 @@ export function PlayPage() {
   const section = isSectionId(s) ? s : undefined
   const [seed, setSeed] = useState(() => params.get('seed') ?? newSeed())
   /** ?n= picks a shorter or longer round (3 to 15) */
-  const size = Math.min(15, Math.max(3, Number(params.get('n')) || ROUND_SIZE))
-  const round = useMemo(() => pickRound(section ? sectionTopics(section) : allTopics, size, `${section ?? 'all'}-${seed}`), [section, seed, size])
+  const warmup = params.get('warmup') === '1'
+  const size = warmup ? 3 : Math.min(15, Math.max(3, Number(params.get('n')) || ROUND_SIZE))
+  const round = useMemo(
+    () => pickRound(warmup ? warmupTopics() : section ? sectionTopics(section) : allTopics, size, `${warmup ? 'warmup' : section ?? 'all'}-${seed}`),
+    [section, seed, size, warmup],
+  )
+  const markActive = useGameStore((st) => st.markActive)
   const [step, setStep] = useState(0)
   const [results, setResults] = useState<boolean[]>([])
   const [reaction, setReaction] = useState('')
@@ -54,7 +69,7 @@ export function PlayPage() {
         <ComboChip combo={combo} />
       </header>
 
-      {!done && step === 0 && results.length === 0 && (
+      {!warmup && !done && step === 0 && results.length === 0 && (
         <label className="mb-4 flex items-center gap-2 sm:hidden">
           <span className="whitespace-nowrap text-sm font-extrabold text-dim">Mix from</span>
           <select className="field !min-h-[44px] min-w-0 flex-1 font-extrabold" value={section ?? ''} onChange={(e) => restart(e.target.value)} data-testid="play-mix">
@@ -63,13 +78,13 @@ export function PlayPage() {
           </select>
         </label>
       )}
-      {!done && step === 0 && results.length === 0 && (
+      {!warmup && !done && step === 0 && results.length === 0 && (
         <div className="mb-4 hidden flex-wrap items-center gap-2 sm:flex" role="group" aria-label="Pick what to mix">
           <span className="text-sm font-extrabold text-dim">Mix from</span>
           <button type="button" className={`play-pill ${!section ? 'play-pill-on' : ''}`} aria-pressed={!section} onClick={() => restart('')}>Everything</button>
           {SECTIONS.map((x) => (
             <button key={x.id} type="button" className={`play-pill ${section === x.id ? 'play-pill-on' : ''}`} aria-pressed={section === x.id} onClick={() => restart(x.id)}>
-              {x.name.replace('Operating Systems & Concurrency', 'OS')}
+              {shortName(x)}
             </button>
           ))}
         </div>
@@ -82,6 +97,7 @@ export function PlayPage() {
           <p className="mt-1 text-lg font-bold text-dim">
             {bestRun(results) >= 2 ? `Best run: ${bestRun(results)} in a row. ` : ''}
             {correct === round.length ? 'Flawless round.' : correct >= round.length / 2 ? 'Solid round.' : 'Every miss points at a lesson worth a look.'}
+            {results.some((r) => !r) ? ' Missed ones come back in Review tomorrow.' : ''}
           </p>
           {results.some((r) => !r) && (
             <div className="mx-auto mt-6 max-w-xl text-left">
@@ -97,14 +113,26 @@ export function PlayPage() {
             </div>
           )}
           <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <button type="button" className="btn-cta min-w-[220px]" onClick={() => restart()} data-testid="play-again">Play another round</button>
-            <Link to="/" className="btn-quiet min-w-[220px]">Back to learning</Link>
+            {warmup ? (
+              <>
+                <Link to={`/topic/${suggestedOrder('system-design')[0]?.slug ?? ''}`} className="btn-cta min-w-[220px]" data-testid="warmup-next">Start lesson 1</Link>
+                <button type="button" className="btn-quiet min-w-[220px]" onClick={() => { setParams({}, { replace: true }); restart() }}>Play a full round</button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="btn-cta min-w-[220px]" onClick={() => restart()} data-testid="play-again">Play another round</button>
+                <Link to="/" className="btn-quiet min-w-[220px]">Back to learning</Link>
+              </>
+            )}
+          </div>
+          <div className="mt-6">
+            <ShareResult title={warmup ? 'Warm-up' : section ? `Quick play · ${shortName(SECTIONS.find((x) => x.id === section)!)}` : 'Quick play'} results={results} />
           </div>
         </section>
       ) : (
         <>
           <p className="mb-2 text-sm font-extrabold text-dim">
-            Quick play · from <Link to={`/topic/${item.topicSlug}`} className="text-teal hover:underline">{item.topicTitle}</Link>
+            {warmup ? 'Warm-up' : 'Quick play'} · from <Link to={`/topic/${item.topicSlug}`} className="text-teal hover:underline">{item.topicTitle}</Link>
           </p>
           <QuestionRenderer
             key={`${item.question.id}-${step}-${seed}`}
@@ -120,6 +148,8 @@ export function PlayPage() {
             onSubmit={(_, r) => {
               setReaction(byteReaction(r.correct, r.correct ? combo + 1 : 0, `${item.question.id}-${seed}`))
               setResults((x) => [...x.slice(0, step), r.correct])
+              recordAnswer(item.topicId, item.question.id, r.correct)
+              markActive()
             }}
           />
         </>

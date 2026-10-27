@@ -11,6 +11,8 @@ import { fireConfetti, playCelebrationSound } from '../lib/celebrate'
 import { BADGE_LABELS } from '../lib/progression/badges'
 import { INITIAL_HEARTS, PASS_PERCENT } from '../lib/scoring/quiz'
 import { byteReaction } from '../lib/fun/fun'
+import { touchTopic } from '../lib/fun/practice'
+import { ShareResult } from '../components/ui/ShareResult'
 import { ComboChip } from '../components/ui/ComboChip'
 import { useGameStore, useStreak } from '../stores/gameStore'
 
@@ -47,7 +49,10 @@ export function QuizPage() {
   const [reaction, setReaction] = useState('')
 
   useEffect(() => {
-    if (topicId) startQuizAttempt(topicId)
+    if (topicId) {
+      startQuizAttempt(topicId)
+      touchTopic(topicId, 'quiz')
+    }
   }, [topicId, startQuizAttempt])
 
   // Save a pass automatically as soon as the result is reached (also after a reload)
@@ -213,6 +218,9 @@ export function QuizPage() {
                 </div>
               </div>
             )}
+            <div className="mt-6">
+              <ShareResult title={topic.title} results={topic.questions.filter((x) => x.id in results).map((x) => results[x.id]!)} path={`/topic/${topic.slug}`} />
+            </div>
           </section>
         ) : (
           <section className="space-y-5" aria-labelledby="quiz-result" role="status">
@@ -222,7 +230,7 @@ export function QuizPage() {
                 {correctCount}/{total} correct, you need {need}
               </h1>
               <p className="mt-2 text-sm font-extrabold text-[var(--color-fault)]">Not cleared yet</p>
-              <p className="font-bold text-dim mt-1">Every miss is a clue. Have a look, then try again, or move on and come back later.</p>
+              <p className="font-bold text-dim mt-1">Every miss is a clue. Have a look, then try again, or move on: the questions you missed come back in Review tomorrow.</p>
             </div>
             {missed.length > 0 && (
               <div>
@@ -254,13 +262,9 @@ export function QuizPage() {
             </p>
           )}
           {heartsOut && !heartsNudgeHidden && (
-            <div className="panel mb-4 flex flex-wrap items-center gap-3 p-3" role="status" data-testid="hearts-nudge">
-              <Mascot mood="idle" size={52} className="shrink-0" />
-              <div className="min-w-0 flex-[1_1_14rem]">
-                <p className="font-extrabold text-chalk">Out of hearts, and that’s fine.</p>
-                <p className="text-sm font-bold text-dim">Keep practising: finish the quiz and 70% still clears it.</p>
-              </div>
-              <button type="button" className="btn-quiet !min-h-[44px]" onClick={() => setHeartsNudgeHidden(true)}>Keep going</button>
+            <div className="mb-3 flex items-center gap-2 rounded-2xl bg-flame-wash-2 py-1 pl-4 pr-1 text-sm font-bold text-chalk" role="status" data-testid="hearts-nudge">
+              <p className="min-w-0 flex-1"><span className="font-extrabold">Out of hearts, and that’s fine.</span> <span className="text-dim">Finish the quiz; 70% still clears it.</span></p>
+              <button type="button" className="btn-text min-h-[44px] shrink-0 px-3 font-extrabold text-dim" onClick={() => setHeartsNudgeHidden(true)}>Keep going</button>
             </div>
           )}
           <QuestionRenderer
