@@ -4,6 +4,8 @@ import { useGameStore } from '../stores/gameStore'
 import { saveState } from '../lib/storage/persistence'
 import { defaultPersistedState, type PersistedState } from '../lib/storage/schema'
 import { fromCloud, isCloudProgress, mergeProgress, toCloud } from '../lib/sync/merge'
+import { fromCloudPractice, mergePractice, toCloudPractice } from '../lib/sync/practiceSync'
+import { getPractice, replacePractice, subscribePractice } from '../lib/fun/practice'
 import { useSyncStatus } from '../lib/sync/syncStatus'
 
 const DEBOUNCE_MS = 2000
@@ -28,10 +30,12 @@ export function CloudSync() {
       setStatus('saving')
       try {
         const token = await getToken()
-        const progress = toCloud(pick(useGameStore.getState()))
-        let res = await fetch('/api/progress', { method: 'PUT', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ progress }) })
-        // Too big for the 8 KB metadata limit: keep everything except the review-card schedule
-        if (res.status === 413) res = await fetch('/api/progress', { method: 'PUT', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ progress: { ...progress, r: [] } }) })
+        const progress = { ...toCloud(pick(useGameStore.getState())), pr: toCloudPractice(getPractice()) }
+        const send = (body: typeof progress) => fetch('/api/progress', { method: 'PUT', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ progress: body }) })
+        let res = await send(progress)
+        // Too big for the 8 KB metadata limit: drop the review-card schedule, then most of the missed queue
+        if (res.status === 413) res = await send({ ...progress, r: [] })
+        if (res.status === 413) res = await send({ ...progress, r: [], pr: { ...progress.pr, m: progress.pr.m.slice(0, 20) } })
         if (!res.ok) throw new Error(String(res.status))
         dirty.current = false
         if (!cancelled) setStatus('saved')
@@ -54,6 +58,7 @@ export function CloudSync() {
           const merged = mergeProgress(pick(useGameStore.getState()), fromCloud(progress))
           useGameStore.setState(merged)
           await saveState(merged)
+          if (progress.pr) replacePractice(mergePractice(getPractice(), fromCloudPractice(progress.pr)))
         }
         ready.current = userId
         await put()
@@ -68,9 +73,10 @@ export function CloudSync() {
       if (ready.current !== userId) return
       if (KEYS.some((k) => s[k] !== prev[k])) schedule()
     })
+    const unsubPractice = subscribePractice(() => { if (ready.current === userId) schedule() })
     const online = () => { if (dirty.current) schedule() }
     window.addEventListener('online', online)
-    return () => { cancelled = true; unsub(); window.removeEventListener('online', online); if (timer.current) clearTimeout(timer.current) }
+    return () => { cancelled = true; unsub(); unsubPractice(); window.removeEventListener('online', online); if (timer.current) clearTimeout(timer.current) }
   }, [isSignedIn, hydrated, userId, getToken, setStatus])
 
   return null

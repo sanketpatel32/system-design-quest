@@ -1,3 +1,4 @@
+import type { CloudPractice } from './practiceSync'
 import { defaultPersistedState, type PersistedState, type SrsCardState, type TopicProgress } from '../storage/schema'
 
 /**
@@ -18,6 +19,8 @@ export interface CloudProgress {
   /** [topicId, flashcardId, ease, intervalDays, dueAt, reviews] */
   r: [number, string, number, number, string, number][]
   bo: { c: number; s: number; f: number; sub: Record<string, number> }
+  /** practice log: goal, missed questions, last topic (optional; older blobs lack it) */
+  pr?: CloudPractice
 }
 
 export const STREAK_HISTORY_CAP = 120

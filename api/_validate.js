@@ -30,5 +30,25 @@ export function validateProgress(p) {
   if (!isObj(bo) || !isNum(bo.c ?? 0, 0, 1) || !isNum(bo.s ?? 0, 0, 1e6) || !isNum(bo.f ?? 0, 0, 1) || !isObj(bo.sub ?? {})) return fail('bosses')
   const sub = Object.entries(bo.sub ?? {})
   if (sub.length > 500 || !sub.every(([k, v]) => k.length <= 128 && isNum(v, 0, 1e6))) return fail('bosses')
-  return { ok: true, value: { v: 1, xp: p.xp ?? 0, b, u, t: p.t, l: p.l ?? {}, s, r, bo } }
+  const value = { v: 1, xp: p.xp ?? 0, b, u, t: p.t, l: p.l ?? {}, s, r, bo }
+  if (p.pr !== undefined) {
+    const pr = validatePractice(p.pr)
+    if (!pr.ok) return pr
+    value.pr = pr.value
+  }
+  return { ok: true, value }
+}
+
+const MINUTES_MAX = 1e8 // whole minutes since 1970 (year ~2160)
+export const MAX_PRACTICE_MISTAKES = 100
+
+/** Practice log (`pr`): goal, missed-question queue and last topic; see src/lib/sync/practiceSync.ts */
+export function validatePractice(pr) {
+  if (!isObj(pr)) return fail('practice')
+  if (!isInt(pr.g, 0, 100) || !(pr.ga === null || isInt(pr.ga, 0, MINUTES_MAX)) || !(pr.w === 0 || pr.w === 1)) return fail('practice goal')
+  const m = pr.m
+  if (!Array.isArray(m) || m.length > MAX_PRACTICE_MISTAKES || !m.every((x) => Array.isArray(x) && x.length === 5 && isInt(x[0], 0, 1e7) && isStr(x[1], 128) && x[1].length > 0 && isInt(x[2], 0, MINUTES_MAX) && isInt(x[3], 0, 10) && isInt(x[4], 0, 1e4))) return fail('practice missed')
+  const la = pr.la
+  if (!(la === null || (Array.isArray(la) && la.length === 3 && isInt(la[0], 0, 1e7) && (la[1] === 0 || la[1] === 1) && isInt(la[2], 0, MINUTES_MAX)))) return fail('practice last')
+  return { ok: true, value: { g: pr.g, ga: pr.ga, w: pr.w, m, la } }
 }

@@ -10,6 +10,8 @@ export type Mistake = { topicId: number; questionId: string; dueAt: string; step
 export type LastTopic = { id: number; where: 'lesson' | 'quiz'; at: string }
 export type Practice = {
   goal: number
+  /** When the learner picked the goal (null = still the default); the newer pick wins across devices */
+  goalAt: string | null
   days: Record<string, number>
   mistakes: Mistake[]
   last: LastTopic | null
@@ -25,9 +27,9 @@ export const GOALS = [
 ] as const
 /** Days until a missed question comes back, by how many times it has been answered right since */
 export const MISTAKE_STEPS = [1, 3, 7] as const
-const MAX_MISTAKES = 300
+export const MAX_MISTAKES = 300
 
-const fresh = (): Practice => ({ goal: 10, days: {}, mistakes: [], last: null, welcomeDone: false, goalCelebrated: null })
+const fresh = (): Practice => ({ goal: 10, goalAt: null, days: {}, mistakes: [], last: null, welcomeDone: false, goalCelebrated: null })
 
 function load(): Practice {
   try {
@@ -36,6 +38,7 @@ function load(): Practice {
     const v = JSON.parse(raw) as Partial<Practice>
     return {
       goal: typeof v.goal === 'number' && v.goal >= 0 && v.goal <= 100 ? v.goal : 10,
+      goalAt: typeof v.goalAt === 'string' ? v.goalAt : null,
       days: v.days && typeof v.days === 'object' ? v.days : {},
       mistakes: Array.isArray(v.mistakes) ? v.mistakes.filter((m) => m && typeof m.questionId === 'string' && typeof m.topicId === 'number') : [],
       last: v.last && typeof v.last.id === 'number' ? v.last : null,
@@ -64,12 +67,20 @@ export function resetPractice() {
   for (const l of listeners) l()
 }
 
+export function subscribePractice(l: () => void) {
+  listeners.add(l)
+  return () => { listeners.delete(l) }
+}
+
+export const getPractice = () => get()
+
+/** Cloud sync: replace the whole log with a merged one */
+export function replacePractice(next: Practice) {
+  update(() => next)
+}
+
 export function usePractice(): Practice {
-  return useSyncExternalStore(
-    (l) => { listeners.add(l); return () => listeners.delete(l) },
-    get,
-    get,
-  )
+  return useSyncExternalStore(subscribePractice, get, get)
 }
 
 const addDays = (now: Date, days: number) => new Date(now.getTime() + days * 86_400_000).toISOString()
@@ -126,7 +137,7 @@ export function recordReview(now = new Date()) {
 }
 
 export function setGoal(goal: number) {
-  update((p) => ({ ...p, goal }))
+  update((p) => ({ ...p, goal, goalAt: new Date().toISOString() }))
 }
 
 export function dismissWelcome() {
