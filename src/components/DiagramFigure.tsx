@@ -13,7 +13,8 @@ export function hasDiagram(topicId: number): boolean {
 /**
  * Hand-drawn diagram (pre-rendered SVG, lazy-loaded) with the ASCII version kept as a text fallback.
  * On phones the diagram fits the card width; tapping it opens a full-screen view that pans and pinch-zooms.
- * The .excalidraw source can be downloaded and opened at excalidraw.com.
+ * The .excalidraw source can be downloaded and opened at excalidraw.com. Sources are not shipped with the site
+ * (they stay in the repo); the download fetches the file from GitHub.
  */
 export function DiagramFigure({ topicId, ascii, label }: { topicId: number; ascii?: string; label: string }) {
   const d = index[String(topicId)]
@@ -42,7 +43,7 @@ export function DiagramFigure({ topicId, ascii, label }: { topicId: number; asci
       </div>
       <figcaption className="sketch-caption">
         <span>{label}</span>
-        <a href={`/diagrams/${topicId}.excalidraw`} download={`sdq-${topicId}.excalidraw`} className="sketch-link">
+        <a href={excalidrawSource(topicId)} download={`sdq-${topicId}.excalidraw`} className="sketch-link" onClick={(e) => { e.preventDefault(); void downloadSource(topicId) }}>
           Download .excalidraw
         </a>
         <a href="https://excalidraw.com" target="_blank" rel="noreferrer" className="sketch-link">
@@ -98,4 +99,25 @@ function DiagramViewer({ src, entry, label, onClose }: { src: string; entry: Ent
     </div>,
     document.body,
   )
+}
+
+/** The editable sources live in the public repo, not in the deployed site */
+const excalidrawSource = (topicId: number | string) =>
+  `https://raw.githubusercontent.com/sanketpatel32/system-design-quest/main/public/diagrams/${topicId}.excalidraw`
+
+async function downloadSource(topicId: number | string) {
+  const url = excalidrawSource(topicId)
+  try {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(String(res.status))
+    const blob = new Blob([await res.text()], { type: 'application/json' })
+    const href = URL.createObjectURL(blob)
+    const a = Object.assign(document.createElement('a'), { href, download: `sdq-${topicId}.excalidraw` })
+    document.body.append(a)
+    a.click()
+    a.remove()
+    window.setTimeout(() => URL.revokeObjectURL(href), 1000)
+  } catch {
+    window.open(url, '_blank', 'noopener')
+  }
 }
