@@ -71,7 +71,7 @@
    {
     "id": "t201-c6",
     "kind": "text",
-    "title": "Edge case: skipping work for off-screen sections",
+    "title": "content-visibility skips off-screen render work",
     "body": "content-visibility: auto lets the browser skip style, layout and paint for a section until it nears the viewport, which can cut the first render of long pages sharply. Pair it with contain-intrinsic-size so the skipped section keeps an estimated height; otherwise the scrollbar jumps as sections render.",
     "teaches": [
      "dom-cssom"
@@ -468,7 +468,7 @@
    {
     "id": "t202-c2",
     "kind": "diagram",
-    "title": "Worked example: three requests before anything shows",
+    "title": "Worked example: three requests before the first paint",
     "body": "Each blocking resource the browser discovers late adds at least one round trip to the first paint.",
     "teaches": [
      "critical-path-length"
@@ -517,7 +517,7 @@
    {
     "id": "t202-c6",
     "kind": "text",
-    "title": "Edge case: an inline script waits for the stylesheet above it",
+    "title": "A script waits on an earlier stylesheet",
     "body": "Because a script might read computed styles, browsers do not run any classic script while a stylesheet earlier in the document is still loading, whatever that script actually does. An inline script placed after a slow stylesheet therefore blocks the parser until that CSS arrives: the CSS has become parser-blocking too. Put such scripts before the stylesheet link, or defer them.",
     "teaches": [
      "render-blocking"
@@ -537,7 +537,7 @@
      },
      {
       "id": "b",
-      "label": "CSS must run before JavaScript is downloaded"
+      "label": "A linked stylesheet also blocks the HTML parser, not just the paint"
      },
      {
       "id": "c",
@@ -551,7 +551,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "CSS is render-blocking to avoid a flash of unstyled content; DOM construction itself continues."
+    "explanation": "CSS is render-blocking to avoid a flash of unstyled content; the DOM parser keeps going, and the real cost is the visual jump, not doing layout twice."
    },
    {
     "id": "t202-a2",
@@ -915,7 +915,7 @@
    {
     "id": "t203-c5",
     "kind": "text",
-    "title": "Trap: endless microtasks",
+    "title": "Trap: microtasks that never let the page paint",
     "body": "The loop drains the microtask queue completely before rendering. A promise callback that keeps queueing another promise callback never lets the browser paint or handle input, even though no single callback is long.",
     "teaches": [
      "tasks-microtasks"
@@ -924,7 +924,7 @@
    {
     "id": "t203-c6",
     "kind": "text",
-    "title": "Edge case: timers in background tabs",
+    "title": "Hidden tabs get throttled timers",
     "body": "Browsers throttle timers in hidden tabs to save battery, typically to at most about one run per second. Chromium goes further for pages hidden for around five minutes, batching chained timers to about once a minute. A countdown or clock that adds one second per timer tick therefore drifts badly in a background tab. Compute elapsed time from the clock on each tick instead of counting ticks, and refresh the display when the page becomes visible again.",
     "teaches": [
      "callback-order"
@@ -972,7 +972,7 @@
      },
      {
       "id": "b",
-      "label": "Any task that makes a network request"
+      "label": "A task that runs longer than one 16 ms frame"
      },
      {
       "id": "c",
@@ -980,13 +980,13 @@
      },
      {
       "id": "d",
-      "label": "Any task that touches the DOM"
+      "label": "Any task scheduled by a timer rather than a promise"
      }
     ],
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "The Long Tasks definition uses 50 ms."
+    "explanation": "The Long Tasks API and DevTools flag main-thread tasks over 50 ms. A 16 ms frame is far too short to count, a second is far too long, and the threshold is about how long the task holds the thread, not how it was scheduled."
    },
    {
     "id": "t203-a3",
@@ -1014,7 +1014,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Rendering is a step of the loop that runs between tasks."
+    "explanation": "Rendering is a step of the loop that runs between tasks, once the current task and its microtasks have finished. A resolved promise only queues callbacks, a timer only queues another task, and nothing can interrupt a running task to paint."
    },
    {
     "id": "t203-a4",
@@ -1078,7 +1078,7 @@
      "s4",
      "s5"
     ],
-    "explanation": "Rendering steps come after the task and its microtasks."
+    "explanation": "One turn of the loop runs a single task, drains the microtask queue completely, then does the render steps: animation-frame callbacks, style and layout, then paint."
    },
    {
     "id": "t203-a6",
@@ -1371,7 +1371,7 @@
    {
     "id": "t204-c6",
     "kind": "text",
-    "title": "Edge case: the hidden cost of hydration",
+    "title": "Hydration ships the data twice",
     "body": "Server rendering with hydration sends the content twice: once as HTML, and again as serialised data the script needs to rebuild the same state. The page also looks ready before it can respond. A click in the gap between first paint and hydration may do nothing, or be replayed later, depending on the framework. Measure that gap on a mid-range phone, keep the serialised state small, and make key links and forms work as plain HTML so early clicks still go somewhere.",
     "teaches": [
      "hydration"
@@ -1451,7 +1451,7 @@
      },
      {
       "id": "c",
-      "label": "A single static file regenerated weekly"
+      "label": "Server rendering per request, cached on the CDN for a week"
      },
      {
       "id": "d",
@@ -1461,7 +1461,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Per-user data that changes every few seconds cannot be built once for everyone, so it needs rendering at request time, on the server or in the browser. Build-time generation, hourly rebuilds and a weekly file all serve the same stale page to every visitor."
+    "explanation": "Per-user data that changes every few seconds cannot be built once for everyone, so it needs rendering at request time, on the server or in the browser. Build-time generation and hourly rebuilds serve the same stale page to every visitor, and caching a personalised page on a CDN can show one user’s data to another."
    },
    {
     "id": "t204-a4",
@@ -1525,7 +1525,7 @@
      "s4",
      "s5"
     ],
-    "explanation": "Content is visible before the handlers attach."
+    "explanation": "The server-rendered HTML paints before the script arrives, so the page looks ready while its handlers are not attached; hydration is what closes that gap."
    },
    {
     "id": "t204-a6",
@@ -1799,7 +1799,7 @@
    {
     "id": "t205-c5",
     "kind": "text",
-    "title": "Trap: long-lived HTML",
+    "title": "Trap: long-lived HTML pointing at stale asset names",
     "body": "Caching the HTML for a day while assets change names means returning visitors keep loading yesterday’s HTML, which points at yesterday’s asset names. Short or no-cache HTML plus long-lived hashed assets avoids this.",
     "teaches": [
      "cache-busting"
@@ -1808,7 +1808,7 @@
    {
     "id": "t205-c6",
     "kind": "text",
-    "title": "Edge case: caching without any Cache-Control",
+    "title": "Heuristic freshness without Cache-Control",
     "body": "A response with a Last-Modified date but no explicit freshness can still be cached: RFC 9111 lets caches assign a heuristic lifetime, and suggests a typical value of 10% of the time since the resource was last modified. A file unchanged for 30 days might then be reused for about 3 days without asking. Always send explicit Cache-Control on responses whose freshness matters.",
     "teaches": [
      "freshness"
@@ -1856,7 +1856,7 @@
      },
      {
       "id": "b",
-      "label": "ETag: \"a1\" in the request body"
+      "label": "ETag: \"a1\" as a request header"
      },
      {
       "id": "c",
@@ -1870,7 +1870,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "If-None-Match carries the ETag; If-Modified-Since carries a date."
+    "explanation": "The browser revalidates with If-None-Match, which carries the stored ETag. ETag itself is a response header, If-Modified-Since carries a date, and Cache-Control does not send the tag."
    },
    {
     "id": "t205-a3",
@@ -1898,7 +1898,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "The point of 304 is to skip re-sending the body."
+    "explanation": "A 304 carries headers and no body: the server confirms the stored copy is current and the browser reuses it. It is not a redirect or an error, and sending the body again would defeat revalidation."
    },
    {
     "id": "t205-a4",
@@ -2248,7 +2248,7 @@
    {
     "id": "t206-c5",
     "kind": "text",
-    "title": "Trap: large cookies on every request",
+    "title": "Trap: kilobytes of cookies on every request",
     "body": "Cookies ride on every request to their domain, including requests for images and scripts. Storing a few kilobytes of preferences in cookies adds those bytes to each request, so keep cookies to identifiers and keep bulk data in client storage.",
     "teaches": [
      "storage-options"
@@ -2257,7 +2257,7 @@
    {
     "id": "t206-c6",
     "kind": "text",
-    "title": "Edge case: browsers may delete script-written storage",
+    "title": "Safari can evict script-written storage",
     "body": "WebKit documented in 2020 that Safari deletes all script-writable storage (localStorage, IndexedDB, service worker registrations) for a site after seven days of browser use without user interaction with that site. Treat client storage as a cache that can disappear, and keep the source of truth on the server.",
     "teaches": [
      "storage-options"
@@ -2347,7 +2347,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Only cookies travel in request headers."
+    "explanation": "Only cookies travel in request headers, sent automatically to every matching domain and path. Web storage and IndexedDB are script-readable but never attached to requests."
    },
    {
     "id": "t206-a4",
@@ -2401,7 +2401,7 @@
      "s2",
      "s3"
     ],
-    "explanation": "About 4 KB, about 5 MiB, then a share of disk."
+    "explanation": "A cookie is about 4 KB, an origin’s web storage about 5 MiB, and IndexedDB gets a share of the browser’s disk quota, which can reach gigabytes."
    },
    {
     "id": "t206-a6",
@@ -2695,7 +2695,7 @@
    {
     "id": "t207-c6",
     "kind": "text",
-    "title": "Edge case: CORS answers cached by a CDN",
+    "title": "Missing Vary: Origin poisons shared caches",
     "body": "If an API echoes the caller’s Origin in Access-Control-Allow-Origin but omits Vary: Origin, a shared cache can store the response for one origin and serve it to another. The second front end then sees intermittent CORS errors that depend on which origin warmed the cache. Send Vary: Origin whenever the CORS headers depend on the request.",
     "teaches": [
      "origin"
@@ -3138,7 +3138,7 @@
    {
     "id": "t208-c6",
     "kind": "text",
-    "title": "Failure story: a modified script on a payment page",
+    "title": "The British Airways web skimmer of 2018",
     "body": "Publicly reported: in 2018 attackers altered JavaScript served on British Airways’ booking pages so that card details typed into the payment form were also sent to an attacker-controlled domain. The UK Information Commissioner’s Office reported that data of more than 400,000 customers and staff was affected and fined the airline £20 million in 2020. Defences: Subresource Integrity on third-party scripts, a CSP that limits where scripts may send data (connect-src), and monitoring for changed script files.",
     "teaches": [
      "csp"
@@ -3172,7 +3172,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "XSS runs script in your origin; CSRF only causes a request."
+    "explanation": "XSS puts the attacker’s script inside your page, where it runs with the user’s access to the origin. CSRF only forges a request, clickjacking frames your page rather than injecting into it, and brute force never touches the page."
    },
    {
     "id": "t208-a2",
@@ -3200,7 +3200,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Context-aware output encoding is the core XSS defence."
+    "explanation": "Context-aware output encoding is the core XSS defence: it makes injected markup render as inert text. Stripping keywords misses event handlers and encodings, and a length cap does nothing against a short payload."
    },
    {
     "id": "t208-a3",
@@ -3590,7 +3590,7 @@
    {
     "id": "t209-c6",
     "kind": "text",
-    "title": "Edge case: aria-label on a plain div or span",
+    "title": "aria-label is ignored on generic elements",
     "body": "ARIA 1.2 does not allow naming generic elements: aria-label on a div or span without a role is ignored by many screen readers. The label only works on elements with a role that supports a name, such as a button, link, image or region. Use the right native element first; add ARIA to fill gaps, not to decorate generic containers.",
     "teaches": [
      "semantics"
@@ -4030,7 +4030,7 @@
    {
     "id": "t210-c6",
     "kind": "text",
-    "title": "Edge case: what INP does not see",
+    "title": "INP ignores scrolls and hovers",
     "body": "INP counts clicks, taps and key presses. Scrolling and hovering are not interactions for INP, and a visit with no interactions has no INP value at all. A page can therefore feel janky while scrolling yet pass INP; check scroll smoothness separately in the Performance panel.",
     "teaches": [
      "metrics"
@@ -4092,7 +4092,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "4 s is where “poor” begins; 200 ms is the INP threshold."
+    "explanation": "LCP is good at 2.5 s or less and poor above 4 s; 200 ms is the INP threshold, not an LCP value."
    },
    {
     "id": "t210-a3",
@@ -4120,7 +4120,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "The 75th percentile balances typical and slower experiences."
+    "explanation": "Core Web Vitals are judged at the 75th percentile of visits, which balances typical and slower experiences; the median would hide bad visits and the 95th is too strict for a pass mark."
    },
    {
     "id": "t210-a4",
@@ -4148,7 +4148,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "CLS comes from unreserved space; reserving it stops the shift."
+    "explanation": "CLS comes from unreserved space; reserving the slot’s height stops the shift. Compressing the image or loading the script async changes when the ad arrives, not the space it takes, and lazy-loading the article only delays content."
    },
    {
     "id": "t210-a5",
@@ -4420,7 +4420,7 @@
    {
     "id": "t211-c5",
     "kind": "text",
-    "title": "Trap: preloading everything",
+    "title": "Trap: preloading files that compete with the critical ones",
     "body": "Every preload competes for bandwidth with the files the browser already knows are critical. Preloading many files can delay the hero image or the main stylesheet. Preload one or two late-discovered critical files and measure.",
     "teaches": [
      "resource-hints"
@@ -4429,7 +4429,7 @@
    {
     "id": "t211-c6",
     "kind": "text",
-    "title": "Edge case: the hero image found too late",
+    "title": "CSS backgrounds hide from the preload scanner",
     "body": "A hero image set as a CSS background, or inserted by script, is invisible to the preload scanner and is fetched only after CSS or JavaScript runs, which delays LCP. Use an img element in the HTML with fetchpriority=\"high\", or a preload hint, and never mark it loading=\"lazy\".",
     "teaches": [
      "loading-strategy"
@@ -4872,7 +4872,7 @@
    {
     "id": "t212-c6",
     "kind": "text",
-    "title": "Edge case: what maxlength counts",
+    "title": "maxlength counts UTF-16 units, not characters",
     "body": "The HTML maxlength attribute counts UTF-16 code units, so many emoji count as 2, while a server may count bytes (UTF-8: up to 4 per character) or user-visible characters. A 20-character limit can then pass in the browser and fail on the server. Define the limit in one unit, enforce it on the server, and show the same rule in the form.",
     "teaches": [
      "client-vs-server"
@@ -5315,7 +5315,7 @@
    {
     "id": "t213-c6",
     "kind": "text",
-    "title": "Edge case: two components ask for the same data at once",
+    "title": "Two components can fetch the same data twice",
     "body": "When a header and a sidebar both request the current user as the page loads, a naive cache misses twice and sends two identical requests. Data-fetching layers keep a map of in-flight requests by key and give the second caller the same pending result, which removes duplicate requests and keeps both components consistent.",
     "teaches": [
      "state-kinds"
@@ -5751,7 +5751,7 @@
    {
     "id": "t214-c6",
     "kind": "text",
-    "title": "Edge case: service worker scope",
+    "title": "Scope limits which pages a worker controls",
     "body": "A service worker controls only pages under the path it was served from: a worker at /app/sw.js controls /app/ by default and cannot control /. To control a wider scope, serve the script from that path or send the Service-Worker-Allowed response header. Mis-scoped workers explain many “offline works on some pages only” reports.",
     "teaches": [
      "sw-role"
@@ -5905,7 +5905,7 @@
      "s4",
      "s5"
     ],
-    "explanation": "Install and activate are separate so updates are safe."
+    "explanation": "Install and activate are separate so the new worker does not take over a live page: it installs, waits while old pages are open, then activates and cleans old caches before handling fetches."
    },
    {
     "id": "t214-a6",
@@ -5959,7 +5959,7 @@
     "rationaleConflicts": {
      "r3": "Cached responses never update, so inspectors would see outdated data."
     },
-    "explanation": "Offline-first apps cache the shell, queue writes locally and sync later."
+    "explanation": "Offline-first apps cache the shell for instant load, queue writes locally and sync when a connection returns."
    }
   ],
   "flashcards": [
@@ -6068,7 +6068,7 @@
     "result": "Caching the shell turns a multi-second repeat load into roughly one round trip plus local reads, and keeps the app usable offline."
    },
    "india": {
-    "title": "The service worker lifecycle as documented",
+    "title": "web.dev’s service worker lifecycle guide",
     "label": "Official documentation",
     "body": "web.dev’s article on the service worker lifecycle, by Chrome engineers, explains why a new worker waits: if two versions controlled pages at the same time, one page could load assets cached by another version and break. It describes the skip-waiting option and its risk, and recommends cleaning old caches in the activate step, which is the pattern this lesson follows."
    },
