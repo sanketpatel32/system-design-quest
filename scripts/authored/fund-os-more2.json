@@ -489,13 +489,13 @@
      },
      {
       "id": "d",
-      "label": "One per second, when the kernel audits held locks"
+      "label": "One per lock pair while the process runs in a container"
      }
     ],
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "With no contention, lock and unlock are atomic operations on a word in user space; the kernel is called only to sleep or to wake a waiter. Two calls per pair would be true of older kernel-object locks, which is why futexes were introduced, and the kernel never audits locks periodically."
+    "explanation": "With no contention, lock and unlock are atomic operations on a word in user space; the kernel is called only to sleep or to wake a waiter. Two calls per pair would be true of older kernel-object locks, which is why futexes were introduced, and a container changes isolation, not how the mutex itself is implemented."
    },
    {
     "id": "t642-a2",
@@ -816,7 +816,7 @@
    {
     "id": "t643-c1",
     "kind": "text",
-    "title": "Priorities and policies",
+    "title": "Nice weights and real-time policies",
     "body": "Normal threads share the CPU in proportion to weights set by their nice value: lower nice means a larger share, but every runnable thread still makes progress. Real-time policies (first-in-first-out and round-robin with priorities from 1 to 99) are strict: a runnable real-time thread always runs before any normal thread, and a higher real-time priority always runs before a lower one.",
     "teaches": [
      "scheduling-priority"
@@ -1218,7 +1218,7 @@
    {
     "id": "t644-c1",
     "kind": "text",
-    "title": "Why pools exist",
+    "title": "Threads cost stacks and switches; pools reuse them",
     "body": "Creating a thread costs memory for its stack and a trip through the kernel, and thousands of threads compete for a few cores. A pool keeps a fixed set of worker threads that take tasks from a queue. Three numbers define it: how many workers, how long the queue may grow, and what happens to a task that arrives when both are full.",
     "teaches": [
      "pool-sizing",
@@ -1263,7 +1263,7 @@
    {
     "id": "t644-c5",
     "kind": "text",
-    "title": "Watching a pool",
+    "title": "Four numbers that show a pool’s health",
     "body": "Four measurements show a pool’s health: active workers, queue length, time tasks spend queued, and rejections. Queue time rising while workers are all busy means the pool or its downstream is saturated; workers idle while the queue grows means tasks are stuck waiting on something. Alert on queue time, which is what callers feel, rather than on thread count.",
     "teaches": [
      "bounded-queue",
@@ -1336,7 +1336,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "Sub-tasks are run in reverse order of submission"
+      "label": "Sub-tasks run only on the worker that submitted them"
      },
      {
       "id": "b",
@@ -1354,7 +1354,7 @@
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "Every worker holds a report that waits on queued sub-tasks, and no worker is free to run them, so nothing progresses. Ordering does not matter, a longer queue still leaves the sub-tasks unrun, and waiting is allowed; it is waiting on your own pool that deadlocks."
+    "explanation": "Every worker holds a report that waits on queued sub-tasks, and no worker is free to run them, so nothing progresses. Workers do not pin tasks to their submitter, a longer queue still leaves the sub-tasks unrun, and waiting is allowed; it is waiting on your own pool that deadlocks."
    },
    {
     "id": "t644-a4",
@@ -1656,7 +1656,7 @@
    {
     "id": "t645-c1",
     "kind": "text",
-    "title": "Two kinds of pages to evict",
+    "title": "File-backed pages drop clean; anonymous pages swap",
     "body": "When free memory runs low, the kernel reclaims pages. Clean file pages, such as program code or cached file data, can simply be dropped and read back from the file later. Dirty file pages must be written back first. Anonymous pages, such as heap and stack, have no file behind them, so they can be evicted only if there is swap space to write them to.",
     "teaches": [
      "page-reclaim"
@@ -1756,13 +1756,13 @@
      },
      {
       "id": "d",
-      "label": "The page cache has been disabled by the kernel"
+      "label": "A leak is pushing pages to swap faster than they return"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Pages that are never touched again stay in swap harmlessly; the low swap-in rate and steady latency show no pressure. Usage alone does not show a shortage, nothing requires swapped pages to return, and the page cache is unaffected."
+    "explanation": "Pages that are never touched again stay in swap harmlessly; the low swap-in rate and steady latency show no pressure. Usage alone does not show a shortage, a leak pushing pages out would raise the swap-in rate too, and nothing requires swapped pages to return."
    },
    {
     "id": "t645-a3",
@@ -1776,7 +1776,7 @@
      },
      {
       "id": "b",
-      "label": "The CPU is overheating and throttling its clock speed"
+      "label": "Requests are serialising behind one contended lock"
      },
      {
       "id": "c",
@@ -1790,7 +1790,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Idle CPU, saturated reads and high memory stalls together mean processes spend their time waiting for pages that were evicted and are needed again: thrashing. Throttling would show busy CPUs running slowly, a failing disk would not raise memory stall time, and spinning threads would make the CPU busy, not idle."
+    "explanation": "Idle CPU, saturated reads and high memory stalls together mean processes spend their time waiting for pages that were evicted and are needed again: thrashing. A lock convoy can idle the CPU, but it does not drive the disks to their limit, a failing disk would not raise memory stall time, and spinning threads would make the CPU busy, not idle."
    },
    {
     "id": "t645-a4",
@@ -2460,7 +2460,7 @@
    {
     "id": "t647-c1",
     "kind": "text",
-    "title": "Three ways to talk",
+    "title": "Pipes, local sockets and shared memory",
     "body": "A pipe is a one-way byte stream held in a kernel buffer: one process writes, another reads. A local (Unix domain) socket is two-way, can carry separate messages as well as streams, and can pass open file descriptors and the sender’s identity. Shared memory maps the same physical pages into both processes, so data is not copied by the kernel at all, but the processes must coordinate access themselves.",
     "teaches": [
      "ipc-choice"
