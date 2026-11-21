@@ -1,0 +1,2660 @@
+[
+  {
+    "id": 714,
+    "slug": "websockets-and-the-http-upgrade",
+    "region": "f3-networking",
+    "order": 31,
+    "title": "WebSockets and the HTTP Upgrade",
+    "kind": "lesson",
+    "objectives": [
+      "Explain how the HTTP Upgrade handshake opens a WebSocket",
+      "Read a WebSocket frame: opcodes, masking and message boundaries",
+      "Choose between polling, SSE and WebSockets for a feature"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 14,
+    "prereqIds": [
+      247,
+      250
+    ],
+    "cards": [
+      {
+        "id": "t714-c1",
+        "kind": "text",
+        "title": "Requests stop, the conversation continues",
+        "body": "A WebSocket begins life as an ordinary HTTP request. The client sends a GET with Connection: Upgrade, Upgrade: WebSocket and a random Sec-WebSocket-Key, and may offer subprotocols. A willing server answers 101 Switching Protocols and returns Sec-WebSocket-Accept, a checksum that proves it understood the upgrade rather than treating the bytes as a normal request. The same TCP connection then changes roles: it carries frames in both directions and the request-response cycle ends.",
+        "teaches": [
+          "websocket-upgrade"
+        ]
+      },
+      {
+        "id": "t714-c2",
+        "kind": "diagram",
+        "title": "The 101 handshake, field by field",
+        "body": "The handshake looks like HTTP so that ports, proxies and TLS all keep working.",
+        "teaches": [
+          "websocket-upgrade"
+        ],
+        "steps": [
+          "Client sends GET /chat with Connection: Upgrade and Upgrade: WebSocket",
+          "Sec-WebSocket-Key carries 16 random bytes, base64-encoded",
+          "Sec-WebSocket-Version: 13 names the protocol version",
+          "Server replies 101 Switching Protocols",
+          "Sec-WebSocket-Accept is base64 of the SHA-1 of the key plus a fixed magic string, so an endpoint that merely parrots headers cannot fake it"
+        ]
+      },
+      {
+        "id": "t714-c3",
+        "kind": "text",
+        "title": "Frames carry the traffic now",
+        "body": "After the handshake there are no requests, only frames. Each frame has an opcode (text, binary, ping, pong, close), a length field that grows for large payloads and a mask flag. Client-to-server frames must be masked with a fresh random key: this stops a hostile script from emitting byte patterns that a confused intermediary might parse as a new HTTP request. An application message may span several frames, so receivers reassemble until the final bit arrives.",
+        "teaches": [
+          "ws-frames"
+        ]
+      },
+      {
+        "id": "t714-c4",
+        "kind": "diagram",
+        "title": "Worked example: 5,000 empty polls a second",
+        "body": "Push trades per-request traffic for held connections; the numbers show both sides.",
+        "teaches": [
+          "ws-vs-sse"
+        ],
+        "steps": [
+          "Assume: 50,000 connected users, a notification about every 30 s per user",
+          "Polling every 10 s: 50,000 ÷ 10 = 5,000 requests per second, most returning empty",
+          "At ~700 bytes of request and response headers each: ≈ 3.5 MB/s of header traffic",
+          "Push: 50,000 ÷ 30 ≈ 1,700 messages per second, ~10 bytes of framing each",
+          "The servers now hold 50,000 open connections, the real cost of the socket design"
+        ],
+        "note": "Polling pays per attempt whether or not there is news; a socket pays per message plus the memory of holding every connection open."
+      },
+      {
+        "id": "t714-c5",
+        "kind": "text",
+        "title": "Trap: assuming the socket will stay up on its own",
+        "body": "Idle WebSocket connections look dead to middleboxes. Load balancers and NATs drop quiet flows after tens of seconds, and some proxies strip Upgrade headers entirely. Send application-level pings more often than the shortest idle timeout on your path, serve over wss so intermediaries cannot inspect or corrupt the stream, and write reconnect-with-backoff logic before you ship.",
+        "teaches": [
+          "ws-ops"
+        ]
+      },
+      {
+        "id": "t714-c6",
+        "kind": "text",
+        "title": "Misconception: WebSocket makes HTTP obsolete",
+        "body": "A socket is a channel, not an API. You lose status codes, caching, content negotiation and retries unless you rebuild them inside your messages. One-way feeds such as scoreboards are better as server-sent events, which ride plain HTTP, reconnect automatically and survive proxies. Use a WebSocket when data flows both ways or arrives too often for per-request overhead.",
+        "teaches": [
+          "ws-vs-sse"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t714-a1",
+        "concept": "websocket-upgrade",
+        "type": "multiple_choice",
+        "prompt": "What does the Sec-WebSocket-Accept header in the upgrade reply actually prove?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The server hashed the client’s key with a fixed GUID"
+          },
+          {
+            "id": "b",
+            "label": "The frames that follow are encrypted end to end"
+          },
+          {
+            "id": "c",
+            "label": "The server supports the subprotocols the client offered"
+          },
+          {
+            "id": "d",
+            "label": "The reply is fresh and cannot be a replayed response"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Accept is SHA-1 of the client key plus a magic GUID. A real server computes it; a cache replaying a 101 would fail the check. Encryption needs wss, and subprotocol agreement travels in Sec-WebSocket-Protocol instead."
+      },
+      {
+        "id": "t714-a2",
+        "concept": "ws-frames",
+        "type": "multiple_choice",
+        "prompt": "Why must every client-to-server WebSocket frame be masked with a fresh random key?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "To hide message contents from network observers on the path"
+          },
+          {
+            "id": "b",
+            "label": "To compress the payload bytes before transmission"
+          },
+          {
+            "id": "c",
+            "label": "To stop crafted bytes being read as HTTP by careless proxies"
+          },
+          {
+            "id": "d",
+            "label": "To let the server tell which user sent each frame"
+          }
+        ],
+        "correctChoiceIds": [
+          "c"
+        ],
+        "explanation": "Masking is an anti-poisoning measure for badly written proxies, not confidentiality: the mask key travels inside the same frame. Privacy comes from wss, which runs the channel inside TLS."
+      },
+      {
+        "id": "t714-a3",
+        "concept": "websocket-upgrade",
+        "type": "drag_order",
+        "prompt": "Order a clean WebSocket shutdown.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "The TCP connection underneath is closed"
+          },
+          {
+            "id": "s1",
+            "label": "One side sends a close frame with a status code"
+          },
+          {
+            "id": "s2",
+            "label": "The peer answers with its own close frame"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3"
+        ],
+        "explanation": "Closing is in-band: a close frame, the peer’s answering close frame, then TCP teardown. A client that just drops TCP skips the handshake and the peer may log an abnormal 1006."
+      },
+      {
+        "id": "t714-a4",
+        "concept": "ws-vs-sse",
+        "type": "multiple_choice",
+        "prompt": "A collaborative whiteboard streams every participant’s cursor to everyone else, dozens of small messages per second in both directions. Which transport fits best?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "WebSocket over a single upgraded connection"
+          },
+          {
+            "id": "b",
+            "label": "Server-Sent Events for the cursor stream"
+          },
+          {
+            "id": "c",
+            "label": "Short polling with one GET per cursor move"
+          },
+          {
+            "id": "d",
+            "label": "HTTP/3 datagrams with no fallback"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Cursor updates flow both ways at high frequency, so one persistent full-duplex channel wins. SSE only pushes server→client, polling would add latency and a request per move, and datagrams add loss handling the app would have to rebuild."
+      },
+      {
+        "id": "t714-a5",
+        "concept": "ws-vs-sse",
+        "type": "estimation",
+        "prompt": "200,000 idle WebSocket clients each send a 40-byte ping every 30 s. Roughly how much heartbeat traffic does the fleet generate?",
+        "unit": "bytes per second",
+        "target": 267000,
+        "assumptions": [
+          "200,000 clients",
+          "One 40-byte ping every 30 s per client",
+          "Pings spread evenly over time"
+        ],
+        "formula": "clients × ping size ÷ interval",
+        "workedAnswer": "200,000 × 40 ÷ 30 ≈ 267,000",
+        "explanation": "Design implication: ~0.27 MB/s of heartbeat noise is trivial next to holding 200,000 sockets open, so the connection table, not bandwidth, is the real constraint.",
+        "tolerance": 0,
+        "trapAnswers": [
+          8000,
+          8000000
+        ]
+      },
+      {
+        "id": "t714-a6",
+        "concept": "ws-vs-sse",
+        "type": "tradeoff",
+        "prompt": "Build live score updates for a sports app.",
+        "constraints": [
+          "Updates flow from the server to clients only",
+          "Must work through corporate proxies and mobile networks",
+          "Peak audience is 500,000 concurrent clients"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "Server-sent events from a pooled HTTP service",
+            "description": "Plain HTTP responses with automatic reconnect"
+          },
+          {
+            "id": "p2",
+            "label": "A WebSocket gateway tier",
+            "description": "Full-duplex frames after a 101 upgrade"
+          },
+          {
+            "id": "p3",
+            "label": "Client polling on a 15 s timer",
+            "description": "Ordinary GETs against the score API"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "The traffic is one-way, so a duplex channel buys nothing extra"
+          },
+          {
+            "id": "r2",
+            "label": "Event streams are plain HTTP, so proxies and reconnection need no new protocol"
+          },
+          {
+            "id": "r3",
+            "label": "WebSocket gateways cannot serve that many concurrent users"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3"
+        ],
+        "rationaleConflicts": {
+          "r3": "WebSocket gateways hold very large fan-outs; capacity is not the difference here. Direction is: a duplex channel earns its complexity only when clients also speak."
+        },
+        "explanation": "SSE stays on HTTP, so it passes proxies, reuses the existing load-balancing stack and reconnects itself. WebSockets pay off when the client also speaks, which scores never do."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t714-f1",
+        "front": "What two things must the server return to complete a WebSocket upgrade?",
+        "back": "101 Switching Protocols and Sec-WebSocket-Accept (the hashed client key)."
+      },
+      {
+        "id": "t714-f2",
+        "front": "Why does the client mask every frame it sends?",
+        "back": "To stop crafted bytes being misparsed as HTTP by a confused intermediary; it is not encryption."
+      },
+      {
+        "id": "t714-f3",
+        "front": "When do SSE beats a WebSocket?",
+        "back": "When traffic is one-way server-to-client: SSE is plain HTTP with built-in reconnect."
+      }
+    ],
+    "sources": [
+      {
+        "title": "RFC 6455: The WebSocket Protocol",
+        "url": "https://www.rfc-editor.org/rfc/rfc6455"
+      },
+      {
+        "title": "RFC 8441: Bootstrapping WebSockets with HTTP/2",
+        "url": "https://www.rfc-editor.org/rfc/rfc8441"
+      },
+      {
+        "title": "MDN: The WebSocket API",
+        "url": "https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "websocket-upgrade",
+        "ws-frames",
+        "ws-vs-sse",
+        "ws-ops"
+      ],
+      "mechanism": {
+        "title": "From one request to a permanent channel",
+        "steps": [
+          "A WebSocket is negotiated inside HTTP so it can reuse ports, proxies and TLS. The client advertises Upgrade: WebSocket, a random Sec-WebSocket-Key and version 13; a server that understands returns 101 Switching Protocols with Sec-WebSocket-Accept, computed as base64 of the SHA-1 of the key joined to a fixed GUID from RFC 6455.",
+          "The accept value is a handshake proof, not authentication: it stops an attacker tricking an unaware HTTP server into treating attacker bytes as a socket, and it stops caches storing the reply as a normal response.",
+          "After the upgrade both sides exchange frames. Opcodes mark text, binary, continuation, ping, pong and close; one logical message may span several frames. Clients mask their frames so hostile page scripts cannot emit byte patterns a confused intermediary might read as HTTP.",
+          "There is no request, response or status inside the channel: application protocols supply their own message types, correlation ids and error fields, usually small JSON or binary envelopes.",
+          "Ping and pong frames keep the path alive and expose half-open connections; a close frame starts an orderly shutdown before TCP teardown.",
+          "wss runs the same frames inside TLS, which hides the upgrade headers from proxies and is the reliable mode on the public internet. Extensions such as permessage-deflate can compress payloads and are negotiated during the handshake."
+        ]
+      },
+      "useWhen": [
+        "Use WebSockets when events flow both ways or arrive many times a second: chat, collaborative editing, multiplayer state, live trading views.",
+        "Use them where you control the client and can run a gateway tier sized for many long-lived connections."
+      ],
+      "avoidWhen": [
+        "Avoid for one-way server pushes: SSE gives the same result over plain HTTP with automatic reconnect.",
+        "Avoid for ordinary request-response APIs: you lose status codes, caching and retries that you would then rebuild by hand."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Approach",
+          "Direction",
+          "Transport",
+          "Cost while idle",
+          "Proxy friendliness"
+        ],
+        "rows": [
+          [
+            "Polling",
+            "Client asks",
+            "Many short HTTP requests",
+            "A request every interval",
+            "Works everywhere"
+          ],
+          [
+            "SSE",
+            "Server to client",
+            "One long HTTP response",
+            "One held connection",
+            "Good: plain HTTP"
+          ],
+          [
+            "WebSocket",
+            "Both ways",
+            "Upgraded connection with frames",
+            "A held connection plus heartbeats",
+            "Weakest: needs Upgrade support or wss"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Idle fleet versus busy fleet",
+        "assumptions": [
+          "100,000 simultaneous users",
+          "A notification every 20 s per user on average",
+          "~8 bytes of WebSocket framing per message and ~700 bytes of HTTP headers per poll"
+        ],
+        "steps": [
+          "Push: 100,000 ÷ 20 = 5,000 messages per second, about 40 KB/s of framing overhead.",
+          "Polling every 10 s instead: 100,000 ÷ 10 = 10,000 requests per second, about 7 MB/s of headers alone.",
+          "Memory replaces bandwidth: at ~50 KB of user-space state per open socket, 100,000 sockets cost ~5 GB across the gateway tier."
+        ],
+        "result": "Push trades per-request traffic for held connections, so the capacity question becomes sockets per gateway rather than requests per second."
+      },
+      "india": {
+        "title": "The handshake and frame format in the standard",
+        "label": "Official documentation",
+        "body": "RFC 6455 specifies the opening handshake, including the magic GUID 258EAFA5-E914-47DA-95CA-C5AB0DC85B11 that turns the client’s key into Sec-WebSocket-Accept, the frame format with mandatory client masking, and the ping, pong and close opcodes. MDN documents the browser-facing API: the open, message, error and close events plus the bufferedAmount field for backpressure."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Real time means we need WebSockets.”",
+          "say": "“For server-only pushes I’d start with SSE; WebSockets earn their complexity when the client also speaks.”"
+        },
+        {
+          "trap": "“It worked on my machine, so proxies are fine.”",
+          "say": "“I’d test through a corporate proxy and over wss; many intermediaries strip the Upgrade headers from plain ws.”"
+        }
+      ],
+      "takeaways": [
+        "The socket is born inside an HTTP Upgrade; 101 plus Sec-WebSocket-Accept confirms it.",
+        "After the upgrade there are only frames: no status codes, headers or caching.",
+        "One-way pushes favour SSE; bidirectional or high-rate traffic favours WebSockets.",
+        "Heartbeats, wss and reconnects are production requirements, not extras."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The feature that dies behind a proxy",
+      "prompt": "Your WebSocket calls work from home but fail for users behind a corporate proxy that strips Upgrade headers. What keeps the feature alive for those users?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Detect the failed upgrade and fall back to SSE plus POSTs",
+          "feedback": "Right: you cannot force the proxy to pass the upgrade, so the feature needs a second transport. Over wss the proxy cannot see the headers at all, which raises the success rate further."
+        },
+        {
+          "id": "b",
+          "label": "Retry the WebSocket handshake until it succeeds",
+          "feedback": "A proxy that strips Upgrade will strip it every time; retries replay the same failure."
+        },
+        {
+          "id": "c",
+          "label": "Move the socket to port 443 without TLS",
+          "feedback": "The port is not the problem: the proxy inspects HTTP headers on whichever port they appear, and plaintext on 443 invites interference."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Design the feature as two transports: attempt the upgrade, detect its failure and fall back to SSE or polling. Serving wss on 443 makes the upgrade succeed through far more proxies, because a TLS tunnel hides the headers from inspection."
+    },
+    "seeAlso": [
+      {
+        "topicId": 10,
+        "why": "Polling, long polling, SSE and WebSockets compared at the system level"
+      },
+      {
+        "topicId": 250,
+        "why": "The HTTP versions a WebSocket upgrades from and multiplexes alongside"
+      },
+      {
+        "topicId": 542,
+        "why": "Keep-alive and idle timeouts, the force that kills quiet sockets"
+      }
+    ]
+  },
+  {
+    "id": 715,
+    "slug": "grpc-typed-calls-on-http2-streams",
+    "region": "f3-networking",
+    "order": 32,
+    "title": "gRPC: Typed Calls on HTTP/2 Streams",
+    "kind": "lesson",
+    "objectives": [
+      "Map a gRPC call onto HTTP/2 headers, data frames and trailers",
+      "Apply the field-numbering rules that keep a .proto schema compatible",
+      "Explain why gRPC needs layer-7 or client-side load balancing"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 14,
+    "prereqIds": [
+      250
+    ],
+    "cards": [
+      {
+        "id": "t715-c1",
+        "kind": "text",
+        "title": "A remote call that looks local",
+        "body": "The caller sees a method on a generated stub; the wire sees an HTTP/2 stream. Both ends generate code from one .proto file that names the service, its methods and the message types. A unary call opens a stream, sends its request message, reads the response and closes; streaming calls keep the stream open for a sequence of messages in one or both directions.",
+        "teaches": [
+          "grpc-streams"
+        ]
+      },
+      {
+        "id": "t715-c2",
+        "kind": "diagram",
+        "title": "What one call puts on the wire",
+        "body": "A call is a small HTTP/2 exchange with messages where a body would be.",
+        "teaches": [
+          "grpc-wire"
+        ],
+        "steps": [
+          "HEADERS opens the stream: :path is /package.Service/Method, content-type is application/grpc",
+          "Metadata rides along: auth tokens, a deadline as grpc-timeout, a request id",
+          "DATA frames carry length-prefixed protobuf messages, a 5-byte prefix each",
+          "Response messages arrive on the same stream, many of them for a streaming call",
+          "Trailing HEADERS ends the call with grpc-status, the call’s real verdict"
+        ]
+      },
+      {
+        "id": "t715-c3",
+        "kind": "text",
+        "title": "Four shapes of call",
+        "body": "A unary call is request, reply. Server streaming sends one request and reads a sequence, good for subscribe-style APIs. Client streaming sends a sequence and reads one summary, good for uploads. Bidirectional streaming interleaves both, good for chat-like protocols. All four are the same machinery: messages on one HTTP/2 stream, ended by trailers.",
+        "teaches": [
+          "grpc-streams"
+        ]
+      },
+      {
+        "id": "t715-c4",
+        "kind": "diagram",
+        "title": "Worked example: a 200 that means NOT_FOUND",
+        "body": "The transport status and the call status are separate verdicts.",
+        "teaches": [
+          "grpc-wire"
+        ],
+        "steps": [
+          "The client calls GetUser(7); the request HEADERS go out normally",
+          "The server finds no such user and writes a trailer with grpc-status: 5",
+          "The HTTP status is still 200: the envelope was a well-formed gRPC exchange",
+          "A gateway logging only HTTP codes records this failed call as a success",
+          "Dashboards and retries must key on grpc-status in trailers, not the transport status"
+        ],
+        "note": "HTTP 200 says the framing worked; grpc-status carries the application verdict. Intermediaries that only read status codes misreport failures."
+      },
+      {
+        "id": "t715-c5",
+        "kind": "text",
+        "title": "Trap: hiding a hot pod behind one connection",
+        "body": "gRPC clients keep one HTTP/2 connection per destination and multiplex every call over it. A layer-4 balancer sees a single TCP flow, pins it to one backend and rebalances nothing: ten thousand calls a second can all land on one pod. Balance at the request level with an HTTP/2-aware proxy, or let clients spread calls over their own pool of connections.",
+        "teaches": [
+          "grpc-lb"
+        ]
+      },
+      {
+        "id": "t715-c6",
+        "kind": "text",
+        "title": "Misconception: protobuf’s win is byte size",
+        "body": "The bytes matter less than the contract. Protobuf messages are fields keyed by number, so compatibility is a set of rules: do not reuse a field number, do not change a field’s type, give new fields fresh numbers so readers that do not know them skip them. Renames are free; renumber one field and old clients silently decode garbage.",
+        "teaches": [
+          "grpc-contract"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t715-a1",
+        "concept": "grpc-wire",
+        "type": "multiple_choice",
+        "prompt": "Where does the fully qualified gRPC method name travel on the wire?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "In the :path pseudo-header as /package.Service/Method"
+          },
+          {
+            "id": "b",
+            "label": "In the first bytes of the DATA frame"
+          },
+          {
+            "id": "c",
+            "label": "In a grpc-method header sent before the request"
+          },
+          {
+            "id": "d",
+            "label": "In the trailer that closes the stream"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Each call is an HTTP/2 stream, and :path carries the service and method, which lets a layer-7 proxy route individual calls. The trailers carry the outcome, not the request."
+      },
+      {
+        "id": "t715-a2",
+        "concept": "grpc-wire",
+        "type": "multiple_choice",
+        "prompt": "A call’s HTTP response is 200, yet the client reports NOT_FOUND. Where was the real verdict?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "In the grpc-status field of the trailing HEADERS"
+          },
+          {
+            "id": "b",
+            "label": "In an error code inside the 5-byte message prefix"
+          },
+          {
+            "id": "c",
+            "label": "In the HTTP reason phrase that HTTP/2 removed"
+          },
+          {
+            "id": "d",
+            "label": "In a RST_STREAM frame sent after the response"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "gRPC deliberately splits transport and application status: 200 says the envelope was valid and grpc-status in trailers gives the verdict. The prefix only holds a compression flag and a length."
+      },
+      {
+        "id": "t715-a3",
+        "concept": "grpc-contract",
+        "type": "multiple_choice",
+        "prompt": "Which edit to a deployed .proto file breaks old clients without any compile error?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Renumbering an existing field to a lower tag"
+          },
+          {
+            "id": "b",
+            "label": "Renaming a field while keeping its number"
+          },
+          {
+            "id": "c",
+            "label": "Adding a new field with a fresh number"
+          },
+          {
+            "id": "d",
+            "label": "Reserving a field number against future use"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The number, not the name, is a field’s wire identity. Old binaries keep writing and reading that number, so renumbering reinterprets their data as a different field; renames never reach the wire."
+      },
+      {
+        "id": "t715-a4",
+        "concept": "grpc-wire",
+        "type": "drag_order",
+        "prompt": "Order the frames of a unary gRPC call.",
+        "items": [
+          {
+            "id": "s4",
+            "label": "DATA frames carry the response messages"
+          },
+          {
+            "id": "s1",
+            "label": "Request HEADERS open the stream with :path and content-type"
+          },
+          {
+            "id": "s5",
+            "label": "Trailing HEADERS carry grpc-status and end the stream"
+          },
+          {
+            "id": "s2",
+            "label": "DATA frames carry the length-prefixed request message"
+          },
+          {
+            "id": "s3",
+            "label": "Response HEADERS come back from the server"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "A call is an HTTP/2 exchange whose bodies are length-prefixed messages; the verdict arrives last, in trailers, which is why a client cannot judge a call until the stream ends."
+      },
+      {
+        "id": "t715-a5",
+        "concept": "grpc-streams",
+        "type": "estimation",
+        "prompt": "A client multiplexes 500 concurrent unary calls over one HTTP/2 connection, each carrying a 2 KB request message. How much request payload is in flight on that single connection?",
+        "unit": "KB",
+        "target": 1000,
+        "assumptions": [
+          "500 calls in flight",
+          "2 KB request message each",
+          "One shared connection"
+        ],
+        "formula": "calls × bytes per message",
+        "workedAnswer": "500 × 2 = 1,000 KB",
+        "explanation": "Design implication: one connection can carry serious fan-out, which is exactly why a layer-4 balancer cannot spread a single client’s calls across backends.",
+        "tolerance": 0,
+        "trapAnswers": [
+          512,
+          2048
+        ]
+      },
+      {
+        "id": "t715-a6",
+        "concept": "grpc-lb",
+        "type": "tradeoff",
+        "prompt": "Balance gRPC traffic across twelve identical service pods.",
+        "constraints": [
+          "Requests should spread per call, not per client",
+          "TLS is required end to end",
+          "Clients are long-lived and keep connections open",
+          "You cannot change the client libraries"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "An L7 proxy that understands HTTP/2 and gRPC",
+            "description": "Sees each call as a separately routable unit"
+          },
+          {
+            "id": "p2",
+            "label": "An L4 balancer doing connection NAT",
+            "description": "Forwards each TCP flow to one pod"
+          },
+          {
+            "id": "p3",
+            "label": "Client-side balancing across a pool of connections",
+            "description": "The stub opens channels to several pods"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "A layer-4 device sees one TCP flow per client, so every call would pin to a single pod"
+          },
+          {
+            "id": "r2",
+            "label": "An HTTP/2-aware proxy can route each stream’s calls independently"
+          },
+          {
+            "id": "r3",
+            "label": "TLS prevents any proxy from balancing, so clients must do it"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3"
+        ],
+        "rationaleConflicts": {
+          "r3": "A proxy may terminate TLS and re-encrypt upstream, which is the standard deployment; the real blocker for L4 is multiplexing, not encryption. Client-side balancing also works, but the constraint rules it out here."
+        },
+        "explanation": "HTTP/2 multiplexing hides per-call load inside one connection, so only something that reads streams can balance call by call. With clients fixed, that something is a proxy in the middle."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t715-f1",
+        "front": "Where does a gRPC call’s verdict live?",
+        "back": "In grpc-status inside the trailing HEADERS; HTTP 200 only means the envelope worked."
+      },
+      {
+        "id": "t715-f2",
+        "front": "What identifies a protobuf field on the wire?",
+        "back": "Its tag number, not its name: renumbering silently corrupts old readers."
+      },
+      {
+        "id": "t715-f3",
+        "front": "Why does L4 balancing fail for gRPC?",
+        "back": "All calls multiplex over one TCP flow per client, so the balancer can only pin the whole flow to one pod."
+      }
+    ],
+    "sources": [
+      {
+        "title": "gRPC documentation: Introduction to gRPC",
+        "url": "https://grpc.io/docs/what-is-grpc/introduction/"
+      },
+      {
+        "title": "RFC 9113: HTTP/2",
+        "url": "https://www.rfc-editor.org/rfc/rfc9113"
+      },
+      {
+        "title": "Protocol Buffers: encoding guide",
+        "url": "https://protobuf.dev/programming-guides/encoding/"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "grpc-streams",
+        "grpc-wire",
+        "grpc-contract",
+        "grpc-lb"
+      ],
+      "mechanism": {
+        "title": "How a stub call becomes HTTP/2 frames",
+        "steps": [
+          "The .proto file is the contract: services declare rpc methods with request and response types, and each field carries a tag number that is its permanent wire identity. Code generation produces the client stub and the server skeleton in each language.",
+          "Every call opens an HTTP/2 stream. Request HEADERS carry :method POST, :path /package.Service/Method and content-type application/grpc, plus metadata such as authorisation and a grpc-timeout deadline that servers and intermediaries should honour.",
+          "Messages are length-prefixed: a 5-byte prefix (a compression flag and a 4-byte length) precedes each protobuf blob, so a DATA frame can hold part of a message or several small ones. Protobuf encodes each field as tag, wire type and value.",
+          "Responses use the same shape, then a trailing HEADERS frame carries grpc-status and END_STREAM. The transport can report 200 while the call verdict is any status; only the trailers say which.",
+          "One connection serves many streams at once: clients typically open a single HTTP/2 connection per destination and multiplex every call, which is efficient but hides per-call load from layer-4 equipment.",
+          "Deadlines and cancellations propagate through the metadata, so a 50 ms budget set at the edge reaches nested calls without extra round trips."
+        ]
+      },
+      "useWhen": [
+        "Use gRPC for internal service-to-service calls where both ends share a schema and you want streaming, deadlines and strong typing.",
+        "Use it for high fan-out traffic: one multiplexed connection per peer beats per-request connections."
+      ],
+      "avoidWhen": [
+        "Avoid it for public APIs consumed by unknown browsers without a grpc-web layer or a JSON gateway.",
+        "Avoid it where generic HTTP tooling must read message bodies: protobuf payloads are opaque without the schema."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Aspect",
+          "gRPC",
+          "REST over HTTP/JSON"
+        ],
+        "rows": [
+          [
+            "Contract",
+            ".proto with numbered fields",
+            "OpenAPI description, if kept"
+          ],
+          [
+            "Wire format",
+            "Binary protobuf messages",
+            "Text JSON bodies"
+          ],
+          [
+            "Streaming",
+            "First-class in both directions",
+            "Needs SSE or WebSockets on top"
+          ],
+          [
+            "Call status",
+            "grpc-status in trailers",
+            "HTTP status codes"
+          ],
+          [
+            "Balancing unit",
+            "Per call via L7 or the client",
+            "Per request by default"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "What one connection carries",
+        "assumptions": [
+          "A client keeps one HTTP/2 connection to the service",
+          "2,000 unary calls per second, each a 1 KB request and 4 KB response",
+          "The peer allows 100 concurrent streams, a common default"
+        ],
+        "steps": [
+          "Throughput on the single connection: 2,000 × 5 KB ≈ 10 MB/s.",
+          "At 30 ms average latency, concurrency is 2,000 × 0.03 = 60 streams in flight, under the 100-stream cap.",
+          "HTTP/1.1 keep-alive answers one request per connection at a time: the same latency would need ≈ 60 parallel connections."
+        ],
+        "result": "Multiplexing collapses dozens of connections into one, which is efficient but concentrates the client’s whole load in a single flow."
+      },
+      "india": {
+        "title": "The call format in the specifications",
+        "label": "Official documentation",
+        "body": "The gRPC documentation describes the wire mapping: :path carries the fully qualified method, each message is length-prefixed with a 5-byte prefix, and grpc-status travels in trailers. RFC 9113 defines the HTTP/2 frames, streams and HPACK header compression those calls ride on. The protobuf encoding guide at protobuf.dev explains the tag-and-value layout and why field numbers must stay stable forever."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Renaming a field needs a data migration.”",
+          "say": "“Names are comments on the wire; numbers are the identity. Renumber or retype and you corrupt old readers.”"
+        },
+        {
+          "trap": "“HTTP 200 in the proxy logs means calls succeeded.”",
+          "say": "“I’d alert on grpc-status from the trailers; the transport code only says the envelope was valid.”"
+        }
+      ],
+      "takeaways": [
+        "A call is an HTTP/2 stream: :path names the method and trailers carry grpc-status.",
+        "Protobuf field numbers are the wire contract; renumbering silently corrupts old readers.",
+        "One connection multiplexes every call, so L4 balancing pins all of it to one backend.",
+        "HTTP 200 says the envelope worked, not that the call succeeded."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Why is one pod doing all the work?",
+      "prompt": "Behind a round-robin layer-4 load balancer, one pod serves nearly every gRPC request while eleven sit idle. Scaling to sixteen pods changes nothing. What explains it?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Clients hold one HTTP/2 connection each, so the balancer pinned every call to that pod",
+          "feedback": "Right: layer-4 balancing decides once per TCP flow, and all of a client’s calls ride that one flow. Adding pods cannot help a connection that is already assigned."
+        },
+        {
+          "id": "b",
+          "label": "The idle pods are failing their health checks",
+          "feedback": "Then new pods would fail the same checks and the busy pod would not stay busy forever; the signature here is many calls inside one flow, not failing checks."
+        },
+        {
+          "id": "c",
+          "label": "DNS is caching one pod address for all clients",
+          "feedback": "Clients connect through the balancer’s address, so DNS cannot pick a backend at all."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "HTTP/2 turns per-call load into one TCP flow per client, and layer-4 balancing decides per flow. Fix it with an HTTP/2-aware layer-7 proxy or client-side balancing; scaling pods cannot help while one connection owns all the calls."
+    },
+    "seeAlso": [
+      {
+        "topicId": 9,
+        "why": "Where gRPC sits among API styles in system design interviews"
+      },
+      {
+        "topicId": 250,
+        "why": "The HTTP/2 streams that every gRPC call multiplexes onto"
+      },
+      {
+        "topicId": 12,
+        "why": "L4 versus L7 balancing, which gRPC makes unavoidable"
+      }
+    ]
+  },
+  {
+    "id": 716,
+    "slug": "quic-reliable-transport-over-udp",
+    "region": "f3-networking",
+    "order": 33,
+    "title": "QUIC: Reliable Transport over UDP",
+    "kind": "lesson",
+    "objectives": [
+      "Explain why QUIC runs inside UDP in user space",
+      "Describe how connection IDs let a session survive a network change",
+      "Compare stream-level and connection-level head-of-line blocking"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 14,
+    "prereqIds": [
+      249,
+      250
+    ],
+    "cards": [
+      {
+        "id": "t716-c1",
+        "kind": "text",
+        "title": "TCP’s rules, rebuilt outside the kernel",
+        "body": "QUIC is a reliable, ordered, congestion-controlled transport that runs inside UDP packets. UDP is a thin wrapper: it is the only substrate middleboxes everywhere pass, and running the protocol in user space lets it evolve without operating-system upgrades. TLS 1.3 is built in rather than layered on, so handshake and encryption are part of the transport itself.",
+        "teaches": [
+          "quic-transport"
+        ]
+      },
+      {
+        "id": "t716-c2",
+        "kind": "diagram",
+        "title": "Connection set-up, old and new",
+        "body": "The TLS exchange rides inside QUIC’s own packets, so set-up collapses.",
+        "teaches": [
+          "quic-transport"
+        ],
+        "steps": [
+          "TCP plus TLS 1.3: SYN/ACK, then a TLS handshake: two round trips before a request",
+          "QUIC Initial packets carry the TLS 1.3 handshake inside CRYPTO frames",
+          "A fresh connection is ready for a request after one round trip",
+          "A resumed connection can attach 0-RTT early data to the first flight",
+          "After the handshake every packet is encrypted, including most metadata"
+        ]
+      },
+      {
+        "id": "t716-c3",
+        "kind": "text",
+        "title": "Many streams, independent losses",
+        "body": "Inside one connection, data travels on numbered streams, each an ordered byte sequence. QUIC recovers per stream: a lost packet stalls only the stream whose bytes it carried while the others keep delivering. TCP offers one ordered pipe per connection, so one lost segment stalls everything queued behind it: the head-of-line blocking HTTP/2 inherited.",
+        "teaches": [
+          "quic-streams"
+        ]
+      },
+      {
+        "id": "t716-c4",
+        "kind": "diagram",
+        "title": "Worked example: walking out of Wi-Fi range",
+        "body": "The session is bound to a label, not to the address it started on.",
+        "teaches": [
+          "quic-migration"
+        ],
+        "steps": [
+          "A phone downloads on Wi-Fi: the flow is bound to connection ID abc1, not the address",
+          "The phone loses Wi-Fi and its mobile-data interface comes up with a new IP",
+          "Packets resume from the new address carrying the same connection ID",
+          "The server validates the ID and the new path, then keeps the same connection alive",
+          "No handshake, no half-open timeout, no broken download"
+        ],
+        "note": "TCP keys a connection to its four-tuple, so a changed address kills it. QUIC keys state to connection IDs, so migrating across networks is a normal event."
+      },
+      {
+        "id": "t716-c5",
+        "kind": "text",
+        "title": "Trap: assuming UDP always gets through",
+        "body": "Plenty of networks filter or deprioritise UDP on port 443, and some carriers rate-limit it. A healthy deployment advertises HTTP/3 but keeps HTTP/2 over TCP ready and lets the client race them. Servers also pay more CPU per packet in user space, and until a peer’s address is validated, senders may reply with at most three times the bytes received, a rule against amplification abuse.",
+        "teaches": [
+          "quic-deploy"
+        ]
+      },
+      {
+        "id": "t716-c6",
+        "kind": "text",
+        "title": "Misconception: QUIC kills head-of-line blocking",
+        "body": "It removes blocking between streams: lose a packet carrying stylesheet bytes and the font still arrives. Within one stream ordering still holds, so a hole in a large video chunk stalls the rest of that stream until retransmission. And at the HTTP layer the browser may still want resources delivered in dependency order regardless of transport.",
+        "teaches": [
+          "quic-streams"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t716-a1",
+        "concept": "quic-migration",
+        "type": "multiple_choice",
+        "prompt": "A phone switches from Wi-Fi to mobile data mid-download. What lets its QUIC connection survive the address change?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "The connection ID, which names the session independently of its addresses"
+          },
+          {
+            "id": "b",
+            "label": "NAT rebinding, which preserves the old source port"
+          },
+          {
+            "id": "c",
+            "label": "The server guessing the client’s new IP from the old one"
+          },
+          {
+            "id": "d",
+            "label": "A fast-reconnect option negotiated during the handshake"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "TCP names a connection by its four-tuple, so a new address means a dead connection. QUIC tags packets with connection IDs chosen at set-up, so the same session continues from a new address after a path check."
+      },
+      {
+        "id": "t716-a2",
+        "concept": "quic-streams",
+        "type": "multiple_choice",
+        "prompt": "On an HTTP/3 page, a packet carrying part of the stylesheet is lost. What stalls until retransmission?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Only the stream carrying that stylesheet"
+          },
+          {
+            "id": "b",
+            "label": "Every stream on the connection until the retransmit lands"
+          },
+          {
+            "id": "c",
+            "label": "Nothing: QUIC delivers bytes in arrival order"
+          },
+          {
+            "id": "d",
+            "label": "The connection, which resets and replays its streams"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Ordering is per stream in QUIC. A gap in one stream holds that stream while other streams’ bytes are still delivered, removing the connection-wide stall a single TCP loss causes."
+      },
+      {
+        "id": "t716-a3",
+        "concept": "quic-transport",
+        "type": "drag_order",
+        "prompt": "Order the events when a client opens a fresh QUIC connection.",
+        "items": [
+          {
+            "id": "s2",
+            "label": "The server replies with handshake data and its certificate"
+          },
+          {
+            "id": "s4",
+            "label": "The first application request goes out in 1-RTT packets"
+          },
+          {
+            "id": "s1",
+            "label": "The client’s Initial packet carries its TLS hello in CRYPTO frames"
+          },
+          {
+            "id": "s5",
+            "label": "Connection IDs let the session migrate to a new address later"
+          },
+          {
+            "id": "s3",
+            "label": "Transport and TLS finish together after one round trip"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "TLS messages travel inside QUIC’s own packets, so transport and crypto set up in one round trip; a resumed session can even attach 0-RTT early data to the first flight."
+      },
+      {
+        "id": "t716-a4",
+        "concept": "quic-transport",
+        "type": "multiple_choice",
+        "prompt": "Why did QUIC’s designers run it on UDP rather than proposing a new transport for IP?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Middleboxes and kernels handle UDP today; a new protocol would be filtered or take years to deploy"
+          },
+          {
+            "id": "b",
+            "label": "UDP checksums are stronger than TCP’s, so corruption detection improves"
+          },
+          {
+            "id": "c",
+            "label": "IP forbids new protocol numbers, leaving UDP the only legal option"
+          },
+          {
+            "id": "d",
+            "label": "UDP already orders bytes, so QUIC only adds encryption"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Ossification is the practical reason: anything except TCP and UDP is filtered across much of the internet, and kernel upgrades move slowly. A user-space protocol inside UDP ships like an application update."
+      },
+      {
+        "id": "t716-a5",
+        "concept": "quic-transport",
+        "type": "estimation",
+        "prompt": "On a path with a 90 ms round trip, TCP plus TLS 1.3 needs two round trips before a request while QUIC needs one. How much set-up time does QUIC save for the first request?",
+        "unit": "ms",
+        "target": 90,
+        "assumptions": [
+          "RTT 90 ms",
+          "TCP + TLS 1.3: 2 RTT before the request",
+          "QUIC: 1 RTT before the request"
+        ],
+        "formula": "round trips saved × RTT",
+        "workedAnswer": "(2 − 1) × 90 = 90 ms",
+        "explanation": "Sanity check: on a high-latency mobile link the saving is about a tenth of a second, and resumption with 0-RTT can shave the remaining round trip for idempotent requests.",
+        "tolerance": 0,
+        "trapAnswers": [
+          45,
+          180
+        ]
+      },
+      {
+        "id": "t716-a6",
+        "concept": "quic-deploy",
+        "type": "tradeoff",
+        "prompt": "Roll out HTTP/3 for a consumer API used mostly on phones.",
+        "constraints": [
+          "Some networks filter or throttle UDP",
+          "Clients change networks as users move",
+          "No client code changes are possible"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "Advertise QUIC and keep HTTP/2 over TCP as the fallback",
+            "description": "Alt-Svc offers HTTP/3; clients pick what works"
+          },
+          {
+            "id": "p2",
+            "label": "Serve QUIC only and drop the TCP listener",
+            "description": "One transport and the smallest fleet"
+          },
+          {
+            "id": "p3",
+            "label": "Stay on HTTP/2 over TCP",
+            "description": "No UDP risk and no migration gains"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "Connection migration survives the Wi-Fi to mobile handoff that phones hit constantly"
+          },
+          {
+            "id": "r2",
+            "label": "Where UDP is blocked the client still has the TCP path, so coverage is not lost"
+          },
+          {
+            "id": "r3",
+            "label": "Dropping TCP entirely simplifies the server and its config"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3"
+        ],
+        "rationaleConflicts": {
+          "r3": "A QUIC-only listener leaves clients on UDP-hostile networks with nothing. The point of the rollout is an extra path for those who can use it, not a forced replacement."
+        },
+        "explanation": "Advertising HTTP/3 while keeping TCP lets each client race the transports, so blocked UDP costs a slower start rather than an outage, and phones gain migration plus faster set-up."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t716-f1",
+        "front": "What names a QUIC connection if not the four-tuple?",
+        "back": "Connection IDs chosen at set-up, so the session survives address changes."
+      },
+      {
+        "id": "t716-f2",
+        "front": "Which head-of-line blocking does QUIC remove?",
+        "back": "Between streams: one lost packet stalls only the stream it belonged to."
+      },
+      {
+        "id": "t716-f3",
+        "front": "How many round trips does a fresh QUIC connection need before a request?",
+        "back": "One; a resumed connection can send 0-RTT early data."
+      }
+    ],
+    "sources": [
+      {
+        "title": "RFC 9000: QUIC: A UDP-Based Multiplexed and Secure Transport",
+        "url": "https://www.rfc-editor.org/rfc/rfc9000"
+      },
+      {
+        "title": "RFC 9002: QUIC Loss Detection and Congestion Control",
+        "url": "https://www.rfc-editor.org/rfc/rfc9002"
+      },
+      {
+        "title": "RFC 9114: HTTP/3",
+        "url": "https://www.rfc-editor.org/rfc/rfc9114"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "quic-transport",
+        "quic-streams",
+        "quic-migration",
+        "quic-deploy"
+      ],
+      "mechanism": {
+        "title": "How QUIC reimplements a transport",
+        "steps": [
+          "A QUIC packet is a UDP payload with its own header. Long headers bootstrap connections; short headers carry steady-state traffic with a destination connection ID, a packet number and an encrypted payload.",
+          "TLS 1.3 is integrated rather than wrapped: handshake messages travel in CRYPTO frames inside QUIC packets, so transport and security set up together in one round trip, and encryption covers most header metadata too.",
+          "Reliability is per stream: the sender numbers packets, the receiver acknowledges ranges, and loss recovery retransmits missing stream data without holding up other streams.",
+          "Congestion control runs in user space with algorithms such as NewReno or CUBIC, tuned per deployment; with kernel TCP you take what the operating system shipped.",
+          "Connection IDs are opaque labels the endpoints choose. The four-tuple may change underneath, through NAT rebinding or a network switch, and the connection survives; servers can embed routing hints in the ID so a load balancer forwards migrated packets to the right machine without shared state.",
+          "Because middleboxes see only UDP, QUIC can ship extensions and new versions far faster than TCP options can; QUIC version 1 is RFC 9000 and HTTP/3 is the HTTP mapping over it."
+        ]
+      },
+      "useWhen": [
+        "Use QUIC and HTTP/3 for mobile or lossy clients: fewer set-up round trips, per-stream recovery and migration all help.",
+        "Use it where you control both ends and want transport features, such as datagrams or a different congestion controller, without kernel changes."
+      ],
+      "avoidWhen": [
+        "Avoid QUIC-only listeners on networks you have not measured; filtered UDP quietly costs users unless a TCP fallback exists.",
+        "Avoid it where server CPU per packet is the binding constraint and migration or 0-RTT buys you nothing."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Property",
+          "TCP plus TLS",
+          "QUIC"
+        ],
+        "rows": [
+          [
+            "Set-up to first request",
+            "2 RTT (handshake then TLS)",
+            "1 RTT; 0-RTT on resumption"
+          ],
+          [
+            "Loss granularity",
+            "The whole connection stalls",
+            "Only the affected stream"
+          ],
+          [
+            "Address change",
+            "The connection dies",
+            "Migration via connection ID"
+          ],
+          [
+            "Evolvability",
+            "Kernel pace, ossified options",
+            "User space, versioned"
+          ],
+          [
+            "Debuggability",
+            "Headers visible, mature tooling",
+            "Mostly encrypted; needs QUIC-aware tools"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Round trips on a slow mobile path",
+        "assumptions": [
+          "120 ms RTT, typical for a distant mobile link",
+          "TCP plus TLS 1.3 needs 2 RTT before a request; QUIC needs 1; resumed QUIC can send at 0"
+        ],
+        "steps": [
+          "First request leaves at 240 ms on TCP plus TLS versus 120 ms on QUIC: a 120 ms saving.",
+          "For five short API calls at page load, pipelined on one connection, set-up dominates: 120 ms extra on a 600 ms total is a fifth of the wait.",
+          "With 0-RTT resumption the request travels with the first packet, but replayable early data should stay limited to idempotent requests."
+        ],
+        "result": "Set-up round trips are QUIC’s biggest win on high-latency paths; on a 10 ms office path the same feature is worth 10 ms."
+      },
+      "india": {
+        "title": "The QUIC standards and where they came from",
+        "label": "Official documentation",
+        "body": "RFC 9000 defines QUIC’s packets, frames, streams, connection IDs and migration; RFC 9002 defines its loss detection and congestion control; RFC 9114 maps HTTP onto it as HTTP/3. The standards grew out of Google’s deployment experience: running the transport in user space let one organisation iterate on congestion control and rollout at a pace kernel TCP could not match."
+      },
+      "pitfalls": [
+        {
+          "trap": "“HTTP/3 makes TCP obsolete.”",
+          "say": "“I’d keep the TCP listener; plenty of networks block or throttle UDP, so QUIC is an extra path, not the only one.”"
+        },
+        {
+          "trap": "“0-RTT is free speed for every request.”",
+          "say": "“Early data is replayable, so I’d send only idempotent requests at 0-RTT.”"
+        }
+      ],
+      "takeaways": [
+        "QUIC runs a reliable transport inside UDP with TLS 1.3 folded into set-up.",
+        "Ordering is per stream, so one lost packet stalls one resource, not the page.",
+        "Connection IDs survive address changes; TCP sessions cannot migrate.",
+        "Deploy it alongside TCP: UDP blocking is common enough to matter."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The download that survived a tunnel",
+      "prompt": "On a train, a commuter’s phone drops Wi-Fi and reappears on mobile data with a new address. Their HTTP/3 download resumes silently while a TCP call in another app dies. What made the difference?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "QUIC’s connection IDs decouple the session from the client’s address",
+          "feedback": "Right: the server keyed the session to a connection ID, so packets from the new address continued the same connection after a path check."
+        },
+        {
+          "id": "b",
+          "label": "HTTP/3 uses smaller packets, so fewer were lost",
+          "feedback": "Packet size has nothing to do with it; the handoff changed the address, which is what kills a TCP flow."
+        },
+        {
+          "id": "c",
+          "label": "The mobile network forwarded the old address for a few minutes",
+          "feedback": "Address hand-off between networks does not exist; each interface has its own address."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "This is connection migration: QUIC sessions are bound to connection IDs rather than the four-tuple, so a network switch is survivable. TCP still needs a new handshake per address change, which is why tunnels and lifts keep killing calls."
+    },
+    "seeAlso": [
+      {
+        "topicId": 5,
+        "why": "TCP versus UDP, the trade-off QUIC re-engineers from scratch"
+      },
+      {
+        "topicId": 250,
+        "why": "HTTP/3 is the HTTP mapping that runs over QUIC streams"
+      },
+      {
+        "topicId": 251,
+        "why": "The TLS 1.3 handshake that QUIC embeds in its own set-up"
+      }
+    ]
+  },
+  {
+    "id": 717,
+    "slug": "traceroute-mapping-the-path",
+    "region": "f3-networking",
+    "order": 34,
+    "title": "Traceroute: Mapping the Path Hop by Hop",
+    "kind": "lesson",
+    "objectives": [
+      "Explain how TTL expiry turns routers into beacons",
+      "Read a traceroute: cumulative latency, stars and ECMP noise",
+      "Pick UDP, ICMP or TCP probes for the failure you are chasing"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [
+      242,
+      244
+    ],
+    "cards": [
+      {
+        "id": "t717-c1",
+        "kind": "text",
+        "title": "Weaponising the hop limit",
+        "body": "Every IP packet carries a TTL that each router decrements; at zero the packet dies and the router returns an ICMP “time exceeded” message naming itself. Traceroute exploits the rule: send a probe with TTL 1 and the first router reports back, send TTL 2 for the second, and so on until the destination rather than a router answers.",
+        "teaches": [
+          "traceroute-ttl"
+        ]
+      },
+      {
+        "id": "t717-c2",
+        "kind": "diagram",
+        "title": "The probe ladder",
+        "body": "Each increment pushes the point of expiry one hop deeper.",
+        "teaches": [
+          "traceroute-ttl"
+        ],
+        "steps": [
+          "TTL 1: the first router decrements to 0 and returns time exceeded with its address",
+          "TTL 2: the packet dies at the second router, which reports itself",
+          "Repeat until the destination host answers instead of a router",
+          "Three probes per hop give a round-trip spread rather than one noisy sample",
+          "Total cost: about three packets per hop, roughly 45 for a 15-hop path"
+        ]
+      },
+      {
+        "id": "t717-c3",
+        "kind": "text",
+        "title": "Three probes, three doorways",
+        "body": "Classic traceroute sends UDP to a high, incrementing port and expects “port unreachable” from the destination. Windows tracert sends ICMP echo requests. tcptraceroute and mtr’s TCP mode send SYNs to the real service port. The choice matters: a firewall may drop UDP probes while passing TCP 443, so the mode decides how far the map gets.",
+        "teaches": [
+          "icmp-probes"
+        ]
+      },
+      {
+        "id": "t717-c4",
+        "kind": "text",
+        "title": "Reading cumulative latency",
+        "body": "Each line is a round trip from you to that hop, so jumps mark where delay starts, not where it ends. If hop 6 shows 9 ms and hop 7 shows 82 ms and everything after is ~85 ms, the slow link sits between 6 and 7, often an ocean crossing. A spike that later lines do not inherit is usually a busy control plane, not a slow link.",
+        "teaches": [
+          "path-reading"
+        ]
+      },
+      {
+        "id": "t717-c5",
+        "kind": "text",
+        "title": "Trap: reading stars as dead routers",
+        "body": "A hop of * * * means no reply came back, not that packets stopped flowing. Routers rate-limit ICMP generation, firewalls silently drop probes, and some devices forward traffic but never answer. If later hops reply, the path is fine and only the reporting is muted. Traceroute also shows only the forward path; the return path, often different, stays invisible.",
+        "teaches": [
+          "traceroute-limits"
+        ]
+      },
+      {
+        "id": "t717-c6",
+        "kind": "text",
+        "title": "Misconception: the trace shows one fixed path",
+        "body": "Different probes often take different equal-cost routes, so one hop can show several addresses and repeat runs can draw different maps. Load balancing hashes flows, and your three probes per hop may ride three different links. Paris traceroute pins the flow identifiers constant so every probe follows one path; mtr keeps measuring to report loss per hop over time.",
+        "teaches": [
+          "traceroute-limits"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t717-a1",
+        "concept": "traceroute-ttl",
+        "type": "multiple_choice",
+        "prompt": "What makes the third router on a path identify itself to traceroute?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A probe whose TTL expires there, prompting an ICMP time exceeded"
+          },
+          {
+            "id": "b",
+            "label": "A DNS reverse lookup run against each intermediate address"
+          },
+          {
+            "id": "c",
+            "label": "The router volunteering its name in a response header"
+          },
+          {
+            "id": "d",
+            "label": "An IP option that records every router a packet passes"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Probes go out with rising TTLs; the router where the count hits zero must answer, because dropping the packet obliges it to send time exceeded. DNS names are resolved afterwards from the addresses collected."
+      },
+      {
+        "id": "t717-a2",
+        "concept": "traceroute-limits",
+        "type": "multiple_choice",
+        "prompt": "Hop 5 prints * * *, but hops 6 to 12 answer normally. What is the best reading?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Hop 5 forwards packets but suppresses its error messages"
+          },
+          {
+            "id": "b",
+            "label": "Packets stop at hop 5 and the later lines belong to another flow"
+          },
+          {
+            "id": "c",
+            "label": "Hop 5 is the congested link on the path"
+          },
+          {
+            "id": "d",
+            "label": "The probes were routed around hop 5 entirely"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Traffic clearly reaches beyond hop 5, so the router is forwarding but filters the probes, rate-limits its ICMP replies or hides inside a tunnel. Stars say nothing arrived back; they do not prove failure."
+      },
+      {
+        "id": "t717-a3",
+        "concept": "path-reading",
+        "type": "multiple_choice",
+        "prompt": "Hops 1–4 show 3–11 ms, hop 5 shows 96 ms and hops 6–9 show 94–99 ms. Where was the delay added?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "On the link between hops 4 and 5"
+          },
+          {
+            "id": "b",
+            "label": "At the final hop, which queues its replies"
+          },
+          {
+            "id": "c",
+            "label": "Evenly across the whole path"
+          },
+          {
+            "id": "d",
+            "label": "Between the source and hop 1"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Reported times are cumulative round trips from the source, so a jump that every later hop inherits localises the delay to the link before it. A spike that faded by hop 7 would instead suggest a busy control plane."
+      },
+      {
+        "id": "t717-a4",
+        "concept": "traceroute-ttl",
+        "type": "drag_order",
+        "prompt": "Order what traceroute does to map a path.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "Raise the TTL by one and probe again"
+          },
+          {
+            "id": "s1",
+            "label": "Send a probe with TTL 1"
+          },
+          {
+            "id": "s5",
+            "label": "Print each hop with its round-trip times"
+          },
+          {
+            "id": "s2",
+            "label": "Record the router that returns time exceeded"
+          },
+          {
+            "id": "s4",
+            "label": "Stop when the destination itself answers"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "The tool walks the TTL ladder: each increment expires probes one hop deeper, and the destination answering (rather than a router) is the signal to stop."
+      },
+      {
+        "id": "t717-a5",
+        "concept": "icmp-probes",
+        "type": "multiple_choice",
+        "prompt": "A UDP traceroute to your web server stalls at the edge even though the site is up. Which probe is most likely to finish the map?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "TCP SYNs to port 443, the port the firewall already passes"
+          },
+          {
+            "id": "b",
+            "label": "UDP probes aimed at a lower destination port"
+          },
+          {
+            "id": "c",
+            "label": "ICMP echo requests, since ping is a different protocol"
+          },
+          {
+            "id": "d",
+            "label": "Larger UDP probes, which are harder to filter"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Firewalls commonly discard unsolicited UDP and ICMP while permitting TCP to open service ports. Riding the port the application uses makes probes look like ordinary connection attempts, so they reach the final hop."
+      },
+      {
+        "id": "t717-a6",
+        "concept": "traceroute-ttl",
+        "type": "estimation",
+        "prompt": "Default traceroute sends 3 probes per hop. A destination is 14 hops away. How many probes does one complete run send?",
+        "unit": "probes",
+        "target": 42,
+        "assumptions": [
+          "3 probes per hop",
+          "14 hops to the destination",
+          "Every hop answers before the timeout"
+        ],
+        "formula": "probes per hop × hops",
+        "workedAnswer": "3 × 14 = 42",
+        "explanation": "Sanity check: at around a second or two per run when replies are fast, the count explains why tools send a few probes per hop rather than one noisy sample each.",
+        "tolerance": 0,
+        "trapAnswers": [
+          14,
+          90
+        ]
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t717-f1",
+        "front": "How does traceroute learn each hop’s address?",
+        "back": "Probes expire at successive TTLs; the router that drops one must send ICMP time exceeded."
+      },
+      {
+        "id": "t717-f2",
+        "front": "What does a * * * hop prove?",
+        "back": "Only that no reply came back: filtered ICMP or a busy control plane, not a dead link if later hops answer."
+      },
+      {
+        "id": "t717-f3",
+        "front": "Why do reported latencies grow along the list?",
+        "back": "Each line is a round trip from you to that hop; a persistent jump marks the link where delay entered."
+      }
+    ],
+    "sources": [
+      {
+        "title": "RFC 791: Internet Protocol (the TTL field)",
+        "url": "https://www.rfc-editor.org/rfc/rfc791"
+      },
+      {
+        "title": "RFC 792: Internet Control Message Protocol",
+        "url": "https://www.rfc-editor.org/rfc/rfc792"
+      },
+      {
+        "title": "traceroute(8) manual page",
+        "url": "https://man7.org/linux/man-pages/man8/traceroute.8.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "traceroute-ttl",
+        "icmp-probes",
+        "path-reading",
+        "traceroute-limits"
+      ],
+      "mechanism": {
+        "title": "From hop limit to hop list",
+        "steps": [
+          "The TTL field exists to kill looping packets: every router decrements it, and at zero the router drops the packet and sends ICMP time exceeded to the source. Traceroute turns that error into a beacon by expiring probes at each hop in turn.",
+          "Probes are shaped so the destination answers differently: UDP probes go to a high port so the host replies port unreachable, TCP probes get a SYN/ACK or reset, and ICMP echo gets an echo reply. A router answers time exceeded while a host answers the probe; that difference is the stopping rule.",
+          "Three probes per hop measure round-trip spread and survive single losses. mtr repeats the whole ladder continuously and reports loss per hop, which separates a genuinely lossy link from a router that ignores some probes.",
+          "The result is the forward path only: return packets may travel a different route, so a slow hop might be slow only in the direction you cannot see.",
+          "Middle layers complicate the map. MPLS tunnels can carry packets through many routers that never appear, depending on TTL handling, and ECMP means different probes legitimately visit different routers at the same hop number.",
+          "Paris traceroute holds the flow identifiers constant across probes so hashing routers keep every probe on one path; it trades breadth for a single truthful route."
+        ]
+      },
+      "useWhen": [
+        "Use it to localise where delay or loss enters a path and to confirm which providers or regions traffic crosses.",
+        "Use TCP mode when UDP or ICMP probes die at a firewall the application itself passes."
+      ],
+      "avoidWhen": [
+        "Avoid reading stars as failures when later hops still answer; routers commonly suppress ICMP.",
+        "Avoid trusting a single run: ECMP draws different maps per probe, so treat traces as samples."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Probe type",
+          "Looks like",
+          "Gets through",
+          "Stopping signal"
+        ],
+        "rows": [
+          [
+            "UDP to high ports",
+            "Unconnected datagrams",
+            "Open paths; often filtered at firewalls",
+            "ICMP port unreachable"
+          ],
+          [
+            "ICMP echo",
+            "A ping",
+            "Wherever ping is allowed",
+            "Echo reply"
+          ],
+          [
+            "TCP SYN to a service port",
+            "A real connection attempt",
+            "Firewalls that pass the application",
+            "SYN/ACK or reset"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Probes, time and what a run costs",
+        "assumptions": [
+          "3 probes per hop, the common default",
+          "Destination 14 hops away",
+          "Fast replies at ~10 ms average round trip"
+        ],
+        "steps": [
+          "Probes sent: 3 × 14 = 42 packets per run.",
+          "Probes are sent in waves, so a healthy path resolves in about a second or two.",
+          "Each unresponsive hop costs a 3–5 s timeout, so a long starry run can take a minute while adding little information."
+        ],
+        "result": "The ladder is cheap on live paths and slow on filtered ones; tools cap it at 30 hops and let you trim probes or timeouts."
+      },
+      "india": {
+        "title": "Traceroute in the standards and the manual",
+        "label": "Official documentation",
+        "body": "The mechanism rests on two rules: RFC 791 gives every packet a time to live, and RFC 792 requires routers that discard an expired packet to send ICMP time exceeded; RFC 1812 repeats the requirement for routers. The traceroute manual page documents the practical details: three probes per hop, UDP by default, and flags for ICMP and TCP modes."
+      },
+      "pitfalls": [
+        {
+          "trap": "“The asterisks are where the outage is.”",
+          "say": "“Stars mean no reply came back; if later hops answer, that router is just quiet, so I’d probe again or switch modes.”"
+        },
+        {
+          "trap": "“Hop latency is per link.”",
+          "say": "“Each line is the round trip from me to that hop; a persistent jump marks the link where delay entered.”"
+        }
+      ],
+      "takeaways": [
+        "Traceroute expires probes at successive hops and routers announce themselves by time exceeded.",
+        "Reported latency is cumulative: persistent jumps mark the slow link, unowned spikes mark busy routers.",
+        "Stars mean silence, not necessarily failure; probe type changes what firewalls let through.",
+        "One run is one sample: ECMP and asymmetric routing make the real map a set of paths."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Where does the latency start?",
+      "prompt": "A traceroute shows hops 1–4 at 2–9 ms, hop 5 at 88 ms and hops 6–10 at 85–93 ms. Which link is slow?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "The link between hops 4 and 5",
+          "feedback": "Right: every hop after the jump inherits the extra ~80 ms, so the delay was added once on that link and carried through the rest."
+        },
+        {
+          "id": "b",
+          "label": "The link between hops 9 and 10, closest to the server",
+          "feedback": "The end of the map is the fastest region, not the slowest; its value is inflated by the earlier jump it inherited."
+        },
+        {
+          "id": "c",
+          "label": "No link: the spread across hops is too noisy to say",
+          "feedback": "The stable ~85 ms floor after the jump is signal, not noise; a persistent offset is the signature of a long link."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "Traceroute latency is cumulative: a step that persists to the end marks the link where delay entered. A spike that later hops do not inherit usually means a busy router answering ICMP slowly, not a slow path."
+    },
+    "seeAlso": [
+      {
+        "topicId": 543,
+        "why": "Layer-by-layer connection diagnosis that traceroute complements"
+      },
+      {
+        "topicId": 244,
+        "why": "The routing and NAT behaviour the probes travel through"
+      },
+      {
+        "topicId": 4,
+        "why": "The layers each hop operates at when it decrements TTL"
+      }
+    ]
+  },
+  {
+    "id": 718,
+    "slug": "cdn-edge-pops-serving-from-nearby",
+    "region": "f3-networking",
+    "order": 35,
+    "title": "CDNs and Edge POPs: Serving from Nearby",
+    "kind": "lesson",
+    "objectives": [
+      "Describe what an edge POP does on a hit and on a miss",
+      "Explain how the cache key and TTL decide correctness and hit ratio",
+      "Estimate the origin traffic a CDN absorbs"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 13,
+    "prereqIds": [
+      250,
+      251,
+      541
+    ],
+    "cards": [
+      {
+        "id": "t718-c1",
+        "kind": "text",
+        "title": "The network inside the edge",
+        "body": "A point of presence (POP) is a rack of reverse proxies placed close to users and reached through anycast or DNS steering. Each node terminates TLS, builds the request’s cache key, serves hits from its disks and forwards misses upstream, often via a regional shield tier that collapses many edges’ misses into one origin fetch.",
+        "teaches": [
+          "cdn-pop"
+        ]
+      },
+      {
+        "id": "t718-c2",
+        "kind": "diagram",
+        "title": "A request’s path through the edge",
+        "body": "Steering, termination, lookup, fill: each stage feeds the next.",
+        "teaches": [
+          "cdn-pop"
+        ],
+        "steps": [
+          "Anycast or DNS steers the client to a nearby healthy POP",
+          "TLS terminates at the edge and a cache key is computed",
+          "Hit: the stored response leaves from memory or disk",
+          "Miss: the edge fetches from a shield or the origin, streams it to the client and stores it",
+          "Expiry: the TTL lapses and the next request revalidates or refetches"
+        ]
+      },
+      {
+        "id": "t718-c3",
+        "kind": "text",
+        "title": "The cache key is the correctness rule",
+        "body": "Edges store responses under a key built from host, path, query and the headers named by Vary, such as Accept-Encoding. Anything not in the key is invisible to the cache: serve a personalised page under one shared URL and every visitor receives the first variant stored. Cache-Control decides whether it may be stored at all; private and no-store answers stay off shared disks.",
+        "teaches": [
+          "cache-key-ttl"
+        ]
+      },
+      {
+        "id": "t718-c4",
+        "kind": "diagram",
+        "title": "Worked example: what a 92% hit ratio saves",
+        "body": "Hit ratio multiplies; the last points matter most.",
+        "teaches": [
+          "cdn-offload"
+        ],
+        "steps": [
+          "Assume: 40,000,000 requests a day, 92% served at the edge",
+          "The origin receives only the misses: 40,000,000 × 0.08 = 3,200,000 a day",
+          "That is ~37 requests per second instead of ~463 with no edge",
+          "Raising hit ratio to 96% halves the misses to 1,600,000",
+          "TTLs, purge discipline and cache-key hygiene are the levers that move it"
+        ],
+        "note": "Each point of hit ratio removes a fixed slice of misses: at 40 million requests a day, one point is 400,000 requests your infrastructure never sees."
+      },
+      {
+        "id": "t718-c5",
+        "kind": "text",
+        "title": "Trap: an error cached at every edge",
+        "body": "Edges cache whatever the origin says is cacheable, including mistakes. A 500 or 404 emitted with a generous Cache-Control lives at hundreds of POPs until it expires, so a bad deploy can stamp a broken page onto every user at once. Cap TTLs on error responses, and use versioned asset URLs so deploys never fight a cached name.",
+        "teaches": [
+          "cdn-limits"
+        ]
+      },
+      {
+        "id": "t718-c6",
+        "kind": "text",
+        "title": "Misconception: the edge decides what is fresh",
+        "body": "The origin owns freshness policy. Cache-Control max-age sets the lifetime, validators such as ETag let an edge re-check cheaply with a 304 that refreshes the timer without resending the body, and stale-while-revalidate lets an edge serve the old copy while refetching in the background. Operators can override headers, but the default contract is written by your responses.",
+        "teaches": [
+          "cache-key-ttl"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t718-a1",
+        "concept": "cache-key-ttl",
+        "type": "multiple_choice",
+        "prompt": "Two users receive each other’s account page from a CDN; both fetched the same /account URL. What failed?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "A personalised response was stored under a key every visitor shares"
+          },
+          {
+            "id": "b",
+            "label": "The edge ignored the TTL and served an expired object"
+          },
+          {
+            "id": "c",
+            "label": "TLS resumption replayed the first user’s request"
+          },
+          {
+            "id": "d",
+            "label": "Anycast routed the second user to a different POP"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The cache key covers URL and selected headers, not identity; unless the response is marked private or the key varies on credentials, one stored copy serves everyone. A different POP would hold a separate copy, not a shared one."
+      },
+      {
+        "id": "t718-a2",
+        "concept": "cdn-pop",
+        "type": "multiple_choice",
+        "prompt": "A request misses at one edge. What does a shield tier do for the origin?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Collapses misses from many edges into one upstream fetch"
+          },
+          {
+            "id": "b",
+            "label": "Holds a permanent copy of the entire site"
+          },
+          {
+            "id": "c",
+            "label": "Signs requests so the origin trusts them"
+          },
+          {
+            "id": "d",
+            "label": "Spreads each miss across several origins"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Hundreds of edges missing the same fresh object would hammer the origin at once; a designated shield fetches it once and feeds the rest, turning a thundering herd into a single upstream request."
+      },
+      {
+        "id": "t718-a3",
+        "concept": "cache-key-ttl",
+        "type": "multiple_choice",
+        "prompt": "An edge stores a response with max-age=300 and stale-while-revalidate=60. What happens 320 s later?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "It serves the stale copy while it refreshes from the origin"
+          },
+          {
+            "id": "b",
+            "label": "It must fetch from the origin before it can reply at all"
+          },
+          {
+            "id": "c",
+            "label": "It evicts the object and fetches the page fresh"
+          },
+          {
+            "id": "d",
+            "label": "The next request receives a 503 from the edge"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "At 320 s the object is 20 s into its 60 s grace window, so the edge answers immediately and revalidates behind the response. Past 360 s the next request would be a blocking fetch instead."
+      },
+      {
+        "id": "t718-a4",
+        "concept": "cdn-pop",
+        "type": "drag_order",
+        "prompt": "Order what an edge does with a cacheable GET that is not stored yet.",
+        "items": [
+          {
+            "id": "s3",
+            "label": "The key misses in local storage"
+          },
+          {
+            "id": "s1",
+            "label": "The client connects to a nearby POP"
+          },
+          {
+            "id": "s5",
+            "label": "The response is stored under the key and sent to the client"
+          },
+          {
+            "id": "s2",
+            "label": "TLS terminates and the cache key is computed"
+          },
+          {
+            "id": "s4",
+            "label": "The edge fetches the object from the origin"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Steering, termination, lookup, fill, then store-and-serve: each stage must precede the next, and the store step is what turns the next identical key into a hit."
+      },
+      {
+        "id": "t718-a5",
+        "concept": "cdn-offload",
+        "type": "estimation",
+        "prompt": "A site serves 3,000,000 asset requests a day with a 96% edge hit ratio. How many requests reach the origin each day?",
+        "unit": "requests",
+        "target": 120000,
+        "assumptions": [
+          "3,000,000 requests a day",
+          "96% served at the edge",
+          "Each miss is one origin fetch"
+        ],
+        "formula": "requests × (1 − hit ratio)",
+        "workedAnswer": "3,000,000 × 0.04 = 120,000",
+        "explanation": "Design implication: that is ~1.4 fetches per second the origin must absorb; dropping the ratio to 90% would treble it, which is why small TTL and key changes matter.",
+        "tolerance": 0,
+        "trapAnswers": [
+          2880000,
+          40000
+        ]
+      },
+      {
+        "id": "t718-a6",
+        "concept": "cache-key-ttl",
+        "type": "tradeoff",
+        "prompt": "Publish a product catalogue page whose prices change through the day.",
+        "constraints": [
+          "Millions of views an hour, almost all anonymous",
+          "Price changes must appear within about a minute",
+          "The HTML is small and identical for anonymous users"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "Cache at the edge with a ~60 s TTL and stale-while-revalidate",
+            "description": "The origin sees a trickle; users see data at most about a minute old"
+          },
+          {
+            "id": "p2",
+            "label": "Cache for a day and purge on every price change",
+            "description": "Origin work only on changes, but purges lag"
+          },
+          {
+            "id": "p3",
+            "label": "Bypass the cache so every view is fresh",
+            "description": "Every request reaches the origin"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "A short TTL bounds staleness to about a minute with no purge pipeline"
+          },
+          {
+            "id": "r2",
+            "label": "Anonymous pages share one cache key, so edge hits still offload almost everything"
+          },
+          {
+            "id": "r3",
+            "label": "Purges propagate instantly to every POP worldwide"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3"
+        ],
+        "rationaleConflicts": {
+          "r3": "Invalidation is asynchronous and can take seconds to minutes at global scale; a short TTL plus background refresh gives bounded staleness without depending on it."
+        },
+        "explanation": "Bounded staleness with a short TTL buys near-freshness and near-total offload; purges are for mistakes, not a consistency mechanism."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t718-f1",
+        "front": "What is a CDN cache key built from?",
+        "back": "Host, path, query and the headers named by Vary; anything outside the key is invisible to the cache."
+      },
+      {
+        "id": "t718-f2",
+        "front": "What does a shield tier do?",
+        "back": "Collapses misses from many edges into one upstream fetch, protecting the origin."
+      },
+      {
+        "id": "t718-f3",
+        "front": "Why are versioned asset URLs better than purging?",
+        "back": "Each deploy publishes a new key, so old entries simply expire; purges are asynchronous."
+      }
+    ],
+    "sources": [
+      {
+        "title": "RFC 9111: HTTP Caching",
+        "url": "https://www.rfc-editor.org/rfc/rfc9111"
+      },
+      {
+        "title": "MDN: HTTP caching",
+        "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching"
+      },
+      {
+        "title": "AWS CloudFront Developer Guide",
+        "url": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Introduction.html"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "cdn-pop",
+        "cache-key-ttl",
+        "cdn-offload",
+        "cdn-limits"
+      ],
+      "mechanism": {
+        "title": "What a POP does with a request",
+        "steps": [
+          "Steering brings traffic in: anycast announces the same address from every POP so routing picks a nearby one, or DNS answers with a regionally chosen address. Either way the first packets land at an edge within a few tens of milliseconds.",
+          "The edge terminates TLS, so it sees the request: host, path, query and headers. It builds a cache key from those plus the headers named by Vary, and two requests with equal keys share one stored response.",
+          "On a hit the stored bytes leave from memory or disk. On a miss the edge forwards upstream, usually to a shield tier that consolidates misses so a popular new object triggers one origin fetch, not hundreds.",
+          "Freshness is contractual: Cache-Control (public, private, max-age, s-maxage for shared caches, no-store) says whether and for how long the edge may store a response, and validators such as ETag let it revalidate cheaply and receive a 304.",
+          "Purge APIs ask every POP to forget a key; propagation is fast but asynchronous, so versioned URLs remain the reliable way to change what a name serves.",
+          "Edges also absorb work the origin never sees: TLS handshakes, connection pools, TCP slow-start close to the user, DDoS floods and bot filtering at the perimeter."
+        ]
+      },
+      "useWhen": [
+        "Use a CDN for cacheable, high-read traffic: assets, media, public API reads and anonymous pages.",
+        "Use edge termination to put TLS handshakes and TCP fast-paths close to distant users."
+      ],
+      "avoidWhen": [
+        "Avoid caching personalised or credentialed responses under shared keys; mark them private or vary on the identity.",
+        "Avoid relying on purge for the correctness of every deploy; use versioned names and short TTLs for content that must change quickly."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Choice",
+          "Origin load",
+          "Freshness",
+          "Complexity"
+        ],
+        "rows": [
+          [
+            "Long TTL",
+            "Lowest",
+            "Hours stale",
+            "None"
+          ],
+          [
+            "Short TTL plus revalidate",
+            "Low",
+            "Seconds to a minute",
+            "One header"
+          ],
+          [
+            "TTL plus purge on change",
+            "Low between purges",
+            "Bounded by purge lag",
+            "An invalidation pipeline"
+          ],
+          [
+            "No edge caching",
+            "Full",
+            "Always fresh",
+            "None"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "How hit ratio moves the origin’s day",
+        "assumptions": [
+          "40,000,000 requests a day",
+          "Average origin response 15 KB",
+          "Every miss costs one origin fetch"
+        ],
+        "steps": [
+          "At 90% hit ratio: 4,000,000 misses ≈ 60 GB a day from the origin, about 46 fetches per second.",
+          "At 97%: 1,200,000 misses ≈ 18 GB, about 14 fetches per second.",
+          "Each added point removes 400,000 origin requests; moving from 90% to 97% cuts origin traffic by 70%."
+        ],
+        "result": "Hit ratio is a multiplier on infrastructure: the last few points are worth more than the first ones."
+      },
+      "india": {
+        "title": "When an edge network itself goes down",
+        "label": "Publicly reported incident",
+        "body": "In June 2021 a configuration change at Fastly disabled most of its POPs at once, and major sites worldwide returned errors for about an hour: a reminder that a CDN is a single dependency even though it is globally distributed. Providers publish these incident reports, and the multi-CDN pattern, steering traffic across two providers, exists for exactly this failure mode."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Purge it and the old version is gone.”",
+          "say": "“Purges propagate asynchronously; I’d rely on versioned URLs and keep purges for mistakes.”"
+        },
+        {
+          "trap": "“It is static, so it is safe to cache.”",
+          "say": "“Static bytes can still be per-user; I check the cache key and Vary, not the file type.”"
+        }
+      ],
+      "takeaways": [
+        "An edge is a TLS-terminating cache close to users; misses flow through a shield to the origin.",
+        "The cache key and Cache-Control decide correctness; what is not in the key is invisible to the cache.",
+        "Hit ratio multiplies: at high volumes each point removes hundreds of thousands of origin fetches.",
+        "Purges are best-effort; versioned URLs make staleness impossible."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Still serving last week’s prices",
+      "prompt": "You deploy a price fix and purge the URL, yet ten minutes later some users still see the old page. The response carried max-age=3600. What is the most likely cause?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Edges that already stored the page serve it until expiry or until the purge arrives",
+          "feedback": "Right: a TTL is a lease the edge holds, and purge is best-effort invalidation that takes time to reach hundreds of POPs. Versioned names avoid the fight entirely."
+        },
+        {
+          "id": "b",
+          "label": "The origin is still generating the old page",
+          "feedback": "You deployed the fix and the origin’s output changed; the stale copies are the edges’ stored responses, not the origin’s."
+        },
+        {
+          "id": "c",
+          "label": "Browsers are sharing their disk cache with the CDN",
+          "feedback": "Private browser caches can hold stale pages too, but they cannot explain the same stale page reaching new devices."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "TTLs grant edges the right to serve without asking, and purges claw that back asynchronously. For assets, fingerprint the name (app.9f2c.css) so each deploy is a new key and the old entry expires unused."
+    },
+    "seeAlso": [
+      {
+        "topicId": 19,
+        "why": "Where CDNs sit in a system design and what they offload"
+      },
+      {
+        "topicId": 541,
+        "why": "The anycast routing that steers users to a nearby POP"
+      },
+      {
+        "topicId": 251,
+        "why": "The TLS handshake the edge terminates on the origin’s behalf"
+      }
+    ]
+  },
+  {
+    "id": 719,
+    "slug": "load-balancer-packets-vs-requests",
+    "region": "f3-networking",
+    "order": 36,
+    "title": "Inside the Load Balancer: Packets vs Requests",
+    "kind": "lesson",
+    "objectives": [
+      "Show what a layer-4 balancer rewrites versus what a layer-7 proxy terminates",
+      "Explain why one flow pins to one backend and how that skews load",
+      "Choose NAT-mode, DSR or a proxy for a given workload"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 14,
+    "prereqIds": [
+      244,
+      247,
+      252
+    ],
+    "cards": [
+      {
+        "id": "t719-c1",
+        "kind": "text",
+        "title": "One flow, one backend",
+        "body": "A layer-4 balancer sees packets, not requests. It hashes the flow’s five-tuple (source and destination addresses and ports, plus protocol) to a backend, records the choice in a flow table and rewrites every packet of that flow the same way. Per-packet work is cheap and protocol-agnostic, but the decision is made once per connection, never per request.",
+        "teaches": [
+          "flow-hashing"
+        ]
+      },
+      {
+        "id": "t719-c2",
+        "kind": "diagram",
+        "title": "NAT-mode: both directions rewritten",
+        "body": "The box is a full middlebox: every byte of both directions crosses it.",
+        "teaches": [
+          "nat-dsr"
+        ],
+        "steps": [
+          "The client sends to the VIP; the balancer rewrites the destination to a backend",
+          "The backend replies to the balancer, which rewrites the source back to the VIP",
+          "Both directions cross the box, so it must be sized for peak bandwidth",
+          "The backend sees the balancer’s address, not the client’s, unless SNAT is skipped",
+          "The flow-table entry lives for the connection’s life plus a timeout"
+        ]
+      },
+      {
+        "id": "t719-c3",
+        "kind": "text",
+        "title": "DSR: asymmetric on purpose",
+        "body": "Direct server return sends requests through the balancer but lets replies skip it. The balancer rewrites only the destination MAC to a backend that holds the VIP on a loopback interface; the backend then answers the client directly. It suits read-heavy traffic where responses dwarf requests (video, downloads) and is useless when replies must be inspected or shaped.",
+        "teaches": [
+          "nat-dsr"
+        ]
+      },
+      {
+        "id": "t719-c4",
+        "kind": "diagram",
+        "title": "Worked example: who sees whose address",
+        "body": "Address visibility is a mode choice, and each mode restores it differently.",
+        "teaches": [
+          "l7-proxying"
+        ],
+        "steps": [
+          "NAT-mode: the backend logs the balancer as the client; the real address needs PROXY protocol or trusted headers",
+          "DSR: the backend sees the client’s address natively, and the return path bypasses the balancer",
+          "L7: the proxy opens its own connection to the backend and can attach X-Forwarded-For",
+          "Health checks differ too: L4 probes a port, L7 can GET /healthz and parse the answer"
+        ],
+        "note": "Each mode trades the backend’s view of the client for a different traffic path; none of them gets everything for free."
+      },
+      {
+        "id": "t719-c5",
+        "kind": "text",
+        "title": "Trap: pinning long flows to draining backends",
+        "body": "Layer-4 decisions bind to the connection, so draining a node does not rebalance it: established flows stay put until they close, and keep-alive clients concentrate old load wherever it started. Connection draining (stop new flows, wait for old ones) is the fix on the way out; working at layer 7 is the fix on the way in, because a proxy rebalances per request.",
+        "teaches": [
+          "flow-hashing"
+        ]
+      },
+      {
+        "id": "t719-c6",
+        "kind": "text",
+        "title": "Misconception: layer 7 is just slower layer 4",
+        "body": "They answer different questions. Layer 4 asks which backend should own this flow; it cannot see paths, headers or even whether the bytes are HTTP. Layer 7 terminates the connection, reads the request, then chooses: route /images to one pool, retry an idempotent call on another backend, stamp headers, offload auth. The price is two connections and per-request parsing.",
+        "teaches": [
+          "l7-proxying"
+        ]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t719-a1",
+        "concept": "flow-hashing",
+        "type": "multiple_choice",
+        "prompt": "Why does a layer-4 balancer hash the five-tuple instead of picking a backend per packet?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "TCP needs every packet of a flow to reach the same backend"
+          },
+          {
+            "id": "b",
+            "label": "Hashing removes the state table, so the device stores nothing"
+          },
+          {
+            "id": "c",
+            "label": "Packets of one flow are guaranteed to arrive in order"
+          },
+          {
+            "id": "d",
+            "label": "The five-tuple already identifies the application in use"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "Splitting one flow across backends breaks sequence numbers and per-flow state. The hash makes the per-flow choice cheap, and the flow table makes the first packet’s decision stick for the connection’s life."
+      },
+      {
+        "id": "t719-a2",
+        "concept": "nat-dsr",
+        "type": "multiple_choice",
+        "prompt": "Behind a NAT-mode balancer, every backend log shows the balancer’s address as the client. Which fix preserves the real address?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Carry the client address with PROXY protocol or a forwarded header"
+          },
+          {
+            "id": "b",
+            "label": "Resolve the balancer’s PTR record on the backend"
+          },
+          {
+            "id": "c",
+            "label": "Move the VIP onto a public address"
+          },
+          {
+            "id": "d",
+            "label": "Lower the idle timeout so flows refresh sooner"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "SNAT rewrites the source, so the address has to travel out of band: the PROXY protocol prefixes it on the connection, and at layer 7 X-Forwarded-For carries it. The backend cannot recover an address the packet no longer contains."
+      },
+      {
+        "id": "t719-a3",
+        "concept": "l7-proxying",
+        "type": "multiple_choice",
+        "prompt": "You want /api traffic sent to one pool and everything else to another, all on port 443. Why must the balancer work at layer 7?",
+        "choices": [
+          {
+            "id": "a",
+            "label": "Only after terminating TLS can it read the request path"
+          },
+          {
+            "id": "b",
+            "label": "Layer-4 devices cannot forward port 443 traffic"
+          },
+          {
+            "id": "c",
+            "label": "The five-tuple already encodes the URL"
+          },
+          {
+            "id": "d",
+            "label": "Each pool requires its own TLS version"
+          }
+        ],
+        "correctChoiceIds": [
+          "a"
+        ],
+        "explanation": "The path lives inside an encrypted stream, so a packet-level device cannot see it. A terminating proxy reads each request and routes it; without termination, only host-name steering is possible."
+      },
+      {
+        "id": "t719-a4",
+        "concept": "nat-dsr",
+        "type": "drag_order",
+        "prompt": "Order one request’s journey through a NAT-mode balancer.",
+        "items": [
+          {
+            "id": "s4",
+            "label": "The balancer rewrites the source back to the VIP"
+          },
+          {
+            "id": "s1",
+            "label": "The client sends to the virtual address"
+          },
+          {
+            "id": "s5",
+            "label": "The reply reaches the client"
+          },
+          {
+            "id": "s2",
+            "label": "The balancer rewrites the destination to a backend"
+          },
+          {
+            "id": "s3",
+            "label": "The backend answers the balancer"
+          }
+        ],
+        "correctOrder": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5"
+        ],
+        "explanation": "Both directions cross the box: the destination is rewritten outbound and the source inbound, which is why the client sees only the VIP and the backend sees only the balancer."
+      },
+      {
+        "id": "t719-a5",
+        "concept": "l7-proxying",
+        "type": "tradeoff",
+        "prompt": "Front a fleet of game servers speaking a custom TCP protocol, plus a separate HTTPS API.",
+        "constraints": [
+          "Game traffic needs throughput and client-IP visibility",
+          "API calls should route by path",
+          "One team owns both services"
+        ],
+        "approaches": [
+          {
+            "id": "p1",
+            "label": "L4 with PROXY protocol for the game, an L7 proxy for the API",
+            "description": "Each layer does what its protocol needs"
+          },
+          {
+            "id": "p2",
+            "label": "One L7 proxy in front of everything",
+            "description": "A simpler fleet with one configuration"
+          },
+          {
+            "id": "p3",
+            "label": "One L4 balancer in front of everything",
+            "description": "The cheapest option per byte"
+          }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          {
+            "id": "r1",
+            "label": "A custom TCP protocol has no HTTP semantics to route on, so it wants L4 throughput plus address passthrough"
+          },
+          {
+            "id": "r2",
+            "label": "Path routing needs to read requests, which only a terminating L7 proxy can do"
+          },
+          {
+            "id": "r3",
+            "label": "Mixing layers doubles cost with no benefit"
+          }
+        ],
+        "correctRationaleIds": [
+          "r1",
+          "r2"
+        ],
+        "distractorRationaleIds": [
+          "r3"
+        ],
+        "rationaleConflicts": {
+          "r3": "The two protocols ask different questions; forcing a single layer sacrifices either visibility or throughput for half the traffic."
+        },
+        "explanation": "Match the layer to the protocol: raw TCP wants packet forwarding with PROXY protocol for addresses, while HTTP wants a proxy that reads each request."
+      },
+      {
+        "id": "t719-a6",
+        "concept": "flow-hashing",
+        "type": "estimation",
+        "prompt": "A NAT-mode balancer keeps one flow-table entry per connection. At a peak of 2,000,000 concurrent flows with ~320 bytes per entry, how much memory does the table need?",
+        "unit": "MB",
+        "target": 640,
+        "assumptions": [
+          "2,000,000 concurrent flows",
+          "320 bytes per flow-table entry"
+        ],
+        "formula": "flows × bytes per entry",
+        "workedAnswer": "2,000,000 × 320 B = 640,000,000 B ≈ 640 MB",
+        "explanation": "Design implication: state size is why connection floods hurt at layer 4 and why timeouts and draining bound the table’s growth.",
+        "tolerance": 0.1,
+        "trapAnswers": [
+          64,
+          6400
+        ]
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "t719-f1",
+        "front": "What identifies a flow at layer 4?",
+        "back": "The five-tuple: source and destination addresses, ports and protocol."
+      },
+      {
+        "id": "t719-f2",
+        "front": "What does direct server return bypass?",
+        "back": "The reply leg: requests cross the balancer, replies go backend-to-client directly."
+      },
+      {
+        "id": "t719-f3",
+        "front": "Why can only layer 7 route by URL path?",
+        "back": "The path sits inside the (usually encrypted) stream; packets alone never contain it."
+      }
+    ],
+    "sources": [
+      {
+        "title": "AWS: What is a Network Load Balancer?",
+        "url": "https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html"
+      },
+      {
+        "title": "AWS: What is an Application Load Balancer?",
+        "url": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html"
+      },
+      {
+        "title": "Google Cloud: Cloud Load Balancing overview",
+        "url": "https://cloud.google.com/load-balancing/docs/load-balancing-overview"
+      }
+    ],
+    "deep": {
+      "teaches": [
+        "flow-hashing",
+        "nat-dsr",
+        "l7-proxying",
+        "lb-health"
+      ],
+      "mechanism": {
+        "title": "What each layer actually touches",
+        "steps": [
+          "A layer-4 device operates on packets: it looks up the five-tuple in a flow table, and on a miss applies a scheduling decision such as a hash, least-connections or weights, then pins it. Every later packet of the flow follows the same rewrite.",
+          "NAT-mode rewrites addresses in both directions, so the box is a real middlebox: it sees every byte, must be sized for peak bandwidth, and its flow table is state an attacker can try to exhaust with SYN floods unless timeouts and syncookies hold.",
+          "Direct server return rewrites only the link-layer destination on the request leg. Backends hold the VIP on a loopback interface and reply straight to the client, so the balancer never sees reply bytes: the standard trick when responses dwarf requests.",
+          "A layer-7 balancer is a full proxy: it terminates the client connection including TLS, parses HTTP, then opens or reuses a backend connection under its routing rules. It can route by path or header, retry requests and add X-Forwarded-For: everything a packet device is blind to.",
+          "Health checking mirrors the split. Layer 4 can check that a port accepts connections; layer 7 can issue GET /healthz and inspect the body, which separates “port open” from “application broken”.",
+          "The balancers scale with the same trick again: ECMP routing spreads flows across many layer-4 nodes, and consistent hashing keeps flows stable when the balancer pool resizes."
+        ]
+      },
+      "useWhen": [
+        "Use layer 4 (NAT or DSR) for non-HTTP protocols, extreme bandwidth and anywhere per-packet cost is the constraint.",
+        "Use layer 7 when you must route on requests, terminate TLS centrally or retry at the request level."
+      ],
+      "avoidWhen": [
+        "Avoid layer 4 where routing depends on URL or headers; packets cannot carry that decision.",
+        "Avoid DSR when replies need inspection, shaping or accounting at the balancer, or where the network blocks the asymmetric return path."
+      ],
+      "tradeoffs": {
+        "columns": [
+          "Mode",
+          "Request leg",
+          "Reply leg",
+          "Backend sees",
+          "Typical use"
+        ],
+        "rows": [
+          [
+            "NAT-mode L4",
+            "DNAT at the balancer",
+            "SNAT back through it",
+            "The balancer’s address",
+            "General TCP services"
+          ],
+          [
+            "DSR L4",
+            "MAC rewrite only",
+            "Backend to client directly",
+            "The client’s real address",
+            "Read-heavy traffic: media, downloads"
+          ],
+          [
+            "L7 proxy",
+            "Terminate and re-originate",
+            "Back through the proxy",
+            "A proxy connection plus X-Forwarded-For",
+            "HTTP routing, retries, auth"
+          ]
+        ]
+      },
+      "numbers": {
+        "title": "Flow state and the asymmetry of traffic",
+        "assumptions": [
+          "A flow-table entry costs ~320 bytes",
+          "Peak of 2,000,000 concurrent flows",
+          "Reply traffic is 20× request bytes"
+        ],
+        "steps": [
+          "Flow-table memory: 2,000,000 × 320 B ≈ 640 MB on the balancer.",
+          "NAT-mode forwarding: if requests total 5 Gbit/s, replies total ~100 Gbit/s, and the box forwards all of it.",
+          "DSR: the box forwards the 5 Gbit/s request leg only; the 100 Gbit/s of replies leaves the backends directly.",
+          "One pinned flow can outlive its backend: draining needs a timeout, because flows only re-hash after they close."
+        ],
+        "result": "The flow table bounds connection scale and the reply path bounds bandwidth; DSR removes the second limit."
+      },
+      "india": {
+        "title": "How cloud load balancers name these layers",
+        "label": "Official documentation",
+        "body": "AWS documents the same split: a Network Load Balancer forwards flows at layer 4, preserves client addresses and scales to tens of millions of requests per second, while an Application Load Balancer terminates connections and routes by path, host or header. Google Cloud’s documentation describes the analogous split between the network tier and the proxy-based application tier, including health-check semantics per layer."
+      },
+      "pitfalls": [
+        {
+          "trap": "“The balancer spreads requests evenly.”",
+          "say": "“At layer 4 it spreads connections; long-lived or multiplexed flows can pin a disproportionate share of work to one backend.”"
+        },
+        {
+          "trap": "“The backend sees the client IP, so logs are fine.”",
+          "say": "“Only if the mode preserves it: NAT-mode needs PROXY protocol or X-Forwarded-For, while DSR keeps it natively.”"
+        }
+      ],
+      "takeaways": [
+        "Layer 4 decides per flow from the five-tuple; layer 7 decides per request after terminating the connection.",
+        "NAT-mode proxies both directions; DSR lets replies bypass the balancer entirely.",
+        "The backend’s view of the client address is a mode choice; PROXY protocol or X-Forwarded-For restores it.",
+        "Health checks mirror the layer: an open port versus a parsed /healthz response."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Which leg crosses the box?",
+      "prompt": "You run a video service: 200-byte requests and multi-megabyte replies. The balancer is CPU-bound forwarding return traffic. Which mode relieves it while keeping flow decisions?",
+      "choices": [
+        {
+          "id": "a",
+          "label": "Direct server return, so replies leave backends straight to clients",
+          "feedback": "Right: requests still pass the balancer for the five-tuple decision, but the heavy direction bypasses it; the VIP moves onto each backend’s loopback."
+        },
+        {
+          "id": "b",
+          "label": "NAT-mode on a bigger machine",
+          "feedback": "A faster box helps, but every returned byte still crosses it: you keep paying for the heaviest direction."
+        },
+        {
+          "id": "c",
+          "label": "Layer-7 termination for visibility",
+          "feedback": "Terminating adds a second connection and request parsing, which increases balancer work instead of removing it."
+        }
+      ],
+      "correctId": "a",
+      "reveal": "DSR exploits the asymmetry of read-heavy traffic: the balancer decides flows on the cheap request leg and skips the expensive reply leg, at the price of backends answering clients directly."
+    },
+    "seeAlso": [
+      {
+        "topicId": 12,
+        "why": "L4 versus L7 balancing and health checks at the design level"
+      },
+      {
+        "topicId": 13,
+        "why": "Forward versus reverse proxies: where the layer-7 balancer sits"
+      },
+      {
+        "topicId": 252,
+        "why": "The forwarded headers that restore the client address"
+      }
+    ]
+  }
+]
