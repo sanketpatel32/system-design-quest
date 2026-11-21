@@ -1,0 +1,1781 @@
+[
+ {
+  "id": 720,
+  "slug": "covering-indexes-and-index-only-scans",
+  "region": "f4-databases",
+  "order": 31,
+  "title": "Covering Indexes and Index-Only Scans",
+  "kind": "lesson",
+  "objectives": [
+   "Explain how a covering index lets a query skip the table",
+   "Choose between key columns and INCLUDE columns",
+   "Judge when an index-only scan is worth a wider index"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 13,
+  "prereqIds": [264],
+  "cards": [
+   {
+    "id": "t720-c1",
+    "kind": "text",
+    "title": "An index that answers the query by itself",
+    "body": "An ordinary index is a map to rows: the query finds entry pointers in the index, then visits the table to fetch the columns it actually needs. A covering index stores every column the query touches, so the answer comes from index pages alone. In PostgreSQL that enables an index-only scan; in InnoDB a covering secondary index avoids the second hop through the clustered index.",
+    "teaches": ["covering-index"]
+   },
+   {
+    "id": "t720-c2",
+    "kind": "diagram",
+    "title": "What an index-only scan skips",
+    "body": "The same lookup with and without the columns it needs inside the index.",
+    "teaches": ["index-only-scan"],
+    "steps": [
+     "Index on orders(customer_id, created_at)",
+     "Query: the five most recent created_at values for one customer",
+     "With the index alone: find five entries, then fetch five heap pages for the columns",
+     "With both columns inside the index: five entries, zero heap pages",
+     "The saving is largest when heap fetches would be random I/O"
+    ]
+   },
+   {
+    "id": "t720-c3",
+    "kind": "text",
+    "title": "Misconception: a covering index is a different kind of index",
+    "body": "There is no covering index type. Any B-tree covers a query when its entries hold every column that query reads, and the same index covers one query while missing another. Covering describes a relationship between an index and a query, which is why the planner decides per query whether the index alone is enough.",
+    "teaches": ["covering-index"]
+   },
+   {
+    "id": "t720-c4",
+    "kind": "text",
+    "title": "Key columns versus INCLUDE columns",
+    "body": "PostgreSQL splits an index into key columns, which it searches and orders by, and INCLUDE columns, which ride along in leaf entries for the query to read but are never compared. INCLUDE keeps the searchable key small while still covering the query. A unique index with INCLUDE enforces uniqueness on its key columns only.",
+    "teaches": ["include-columns"]
+   },
+   {
+    "id": "t720-c5",
+    "kind": "text",
+    "title": "Why the heap is still fetched sometimes",
+    "body": "PostgreSQL index entries do not say whether a row version is visible to your transaction; that check needs the heap. An index-only scan consults the visibility map, one bit per heap page marking it all-visible, and only skips pages whose bit is set. Recently written pages have it clear, so a table under heavy churn fetches the heap anyway until vacuum catches up.",
+    "teaches": ["heap-fetch", "index-only-scan"]
+   },
+   {
+    "id": "t720-c6",
+    "kind": "text",
+    "title": "Trap: covering a column that changes constantly",
+    "body": "Each column inside an index is maintained on every write. Cover a status field that changes 300 times a second and each change rewrites an index entry, blocks heap-only tuple updates, and fattens the index. Cover the columns the hot query actually returns; leave the rest in the heap where an update costs less.",
+    "teaches": ["index-cost"]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t720-a1",
+    "concept": "covering-index",
+    "type": "multiple_choice",
+    "prompt": "orders has a B-tree on (customer_id) only. Which change makes SELECT created_at FROM orders WHERE customer_id = 42 ORDER BY created_at DESC a candidate for an index-only scan?",
+    "choices": [
+     {"id": "a", "label": "Rebuild the index on (customer_id, created_at)"},
+     {"id": "b", "label": "Add INCLUDE (total) to the existing index"},
+     {"id": "c", "label": "Recreate the index as a unique index"},
+     {"id": "d", "label": "Raise shared_buffers so heap pages stay cached"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "The index must carry created_at, the column the query returns and sorts by, for the scan to skip the heap. Including total covers a column this query does not read, uniqueness changes lookup semantics rather than stored columns, and a warm buffer pool speeds heap fetches without removing them."
+   },
+   {
+    "id": "t720-a2",
+    "concept": "heap-fetch",
+    "type": "multiple_choice",
+    "prompt": "EXPLAIN shows an index-only scan yet reports many heap fetches right after a bulk update. Why?",
+    "choices": [
+     {"id": "a", "label": "Freshly written pages are not yet marked all-visible in the visibility map"},
+     {"id": "b", "label": "Index entries written before the update point at old row versions"},
+     {"id": "c", "label": "The query returns a column the index does not hold"},
+     {"id": "d", "label": "Heap fetches happen when statistics are older than the data"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "The visibility map is what lets the scan trust index entries without checking row versions, and recent writes clear the all-visible bit until vacuum sets it again. Old row versions are a MVCC detail the index handles, and a missing column or stale statistics would change the plan choice rather than add heap fetches mid-scan."
+   },
+   {
+    "id": "t720-a3",
+    "concept": "index-only-scan",
+    "type": "estimation",
+    "prompt": "An index-only scan plans to read 200 index leaf entries for a query. Only 40% of the table’s heap pages are marked all-visible, and each entry maps to a distinct heap page. How many heap fetches does the scan skip?",
+    "unit": "heap fetches skipped",
+    "target": 80,
+    "assumptions": [
+     "200 index entries, each on a different heap page",
+     "40% of heap pages are all-visible"
+    ],
+    "formula": "entries × share of pages marked all-visible",
+    "workedAnswer": "200 × 0.40 = 80 heap fetches skipped.",
+    "explanation": "Sanity check: the other 60% still cost one heap fetch each, 120 fetches, which is why a freshly churned table gains less from index-only scans than a settled one. 200 would mean every page was all-visible and 120 confuses the share fetched with the share skipped.",
+    "tolerance": 0,
+    "trapAnswers": [200, 120]
+   },
+   {
+    "id": "t720-a4",
+    "concept": "include-columns",
+    "type": "multiple_choice",
+    "prompt": "Why place a returned-only column in INCLUDE rather than in the index key?",
+    "choices": [
+     {"id": "a", "label": "The searchable part stays narrow while the column still rides along for reads"},
+     {"id": "b", "label": "Included columns are compressed so the index stays smaller"},
+     {"id": "c", "label": "Key columns cannot store text or binary values"},
+     {"id": "d", "label": "Included columns take part in the index’s uniqueness check"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "INCLUDE carries data in leaf entries without widening the ordered key, so comparisons stay on fewer columns while the query still reads the value. Included columns are stored plainly, text works in key columns, and uniqueness applies to the key columns only."
+   },
+   {
+    "id": "t720-a5",
+    "concept": "index-cost",
+    "type": "tradeoff",
+    "prompt": "A hot query filters on customer_id and returns created_at and status. The status column changes about 300 times per second.",
+    "constraints": [
+     "The query selects customer_id, created_at and status",
+     "status changes roughly 300 times per second",
+     "The lookup runs thousands of times per minute"
+    ],
+    "approaches": [
+     {"id": "p1", "label": "Index (customer_id, created_at); read status from the heap", "description": "Narrow index"},
+     {"id": "p2", "label": "Index (customer_id, created_at) INCLUDE (status)", "description": "Covered read"},
+     {"id": "p3", "label": "Two indexes: (customer_id, created_at) and (status)", "description": "Split indexes"}
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {"id": "r1", "label": "status updates stay heap-only, so no index entry is rewritten"},
+     {"id": "r2", "label": "A few heap fetches per lookup cost less than rewriting a wider entry 300 times a second"},
+     {"id": "r3", "label": "A covered read is faster, so covering is the right choice here"},
+     {"id": "r4", "label": "A second index on status lets the planner combine both indexes"}
+    ],
+    "correctRationaleIds": ["r1", "r2"],
+    "distractorRationaleIds": ["r3", "r4"],
+    "rationaleConflicts": {
+     "r3": "It counts the read saving but not the write cost: each status change would rewrite a wider index entry and rule out heap-only updates.",
+     "r4": "A (status) index does not help a filter on customer_id; bitmap combination is rare and still reads the heap for created_at."
+    },
+    "explanation": "Covering pays when heap fetches dominate; here a handful of fetches per lookup is cheap while 300 index rewrites a second is not. Keeping status out of the index also keeps its updates eligible for heap-only-tuple updates, which generate no index maintenance at all."
+   },
+   {
+    "id": "t720-a6",
+    "concept": "heap-fetch",
+    "type": "multiple_choice",
+    "prompt": "Which change raises the share of pages an index-only scan can skip on a busy table?",
+    "choices": [
+     {"id": "a", "label": "Let vacuum run often enough to mark settled pages all-visible"},
+     {"id": "b", "label": "Rebuild the index with a lower fill factor"},
+     {"id": "c", "label": "Run ANALYZE so row estimates reflect the churn"},
+     {"id": "d", "label": "Wait for the next checkpoint to flush dirty pages"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "Vacuum is what sets the all-visible bit on pages whose rows every transaction can see, so timely vacuuming is what turns nominal index-only scans into real ones. Fill factor, statistics and checkpoints affect space, estimates and durability, not per-page visibility marking."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t720-f1",
+    "front": "Covering index?",
+    "back": "An index whose entries hold every column a query reads, so the table is never visited."
+   },
+   {
+    "id": "t720-f2",
+    "front": "Key columns versus INCLUDE?",
+    "back": "Keys are searched and ordered; INCLUDE columns are stored for reading only."
+   },
+   {
+    "id": "t720-f3",
+    "front": "Why does an index-only scan still fetch heap pages?",
+    "back": "Pages not marked all-visible in the visibility map need a real row-visibility check."
+   }
+  ],
+  "sources": [
+   {
+    "title": "PostgreSQL: Index-Only Scans and Covering Indexes",
+    "url": "https://www.postgresql.org/docs/current/indexes-index-only-scans.html"
+   },
+   {
+    "title": "PostgreSQL: Multicolumn Indexes",
+    "url": "https://www.postgresql.org/docs/current/indexes-multicolumn.html"
+   },
+   {
+    "title": "MySQL 8.4: Clustered and Secondary Indexes",
+    "url": "https://dev.mysql.com/doc/refman/8.4/en/innodb-index-types.html"
+   }
+  ],
+  "deep": {
+   "teaches": ["covering-index", "index-only-scan", "include-columns", "heap-fetch", "index-cost"],
+   "mechanism": {
+    "title": "How a covering index turns two reads into one",
+    "steps": [
+     "A B-tree leaf entry stores the key columns plus the row’s heap address. To answer a query the engine walks the tree to matching entries, then visits the heap for each row to fetch the remaining columns and check visibility. That second hop, one heap page per row, is often where the I/O goes.",
+     "If the index also stores the other columns the query needs, the heap hop is optional. PostgreSQL calls the resulting plan an index-only scan. In InnoDB the clustered index is the row itself, so every secondary lookup already pays a second B-tree descent; covering the query inside the secondary index removes it.",
+     "PostgreSQL cannot skip the heap unconditionally, because index entries lack visibility information. The visibility map holds one all-visible bit per heap page, set by vacuum when no transaction could still need to check. Index-only scans consult it per page, so the benefit scales with how settled the table is.",
+     "Covering has real costs. Every extra column is written into every index entry, so the index is wider, needs more pages and is slower to maintain. Updates that change an indexed column, including INCLUDE columns, cannot use heap-only-tuple updates and must write fresh index entries.",
+     "INCLUDE exists to bound that cost. Key columns take part in ordering and comparisons; INCLUDE columns are payload. Putting returned-only columns in INCLUDE keeps the searched key narrow, so the tree stays shallow while the query still never visits the heap.",
+     "The planner compares costs per query. An index-only scan wins when the alternative is many scattered heap fetches; it buys little when rows come from a few sequential pages or when the visibility map is mostly unset, so a freshly loaded table may not use it until after vacuum."
+    ]
+   },
+   "useWhen": [
+    "A small set of hot queries reads the same few columns at high rate, such as lookups by customer returning id, state and timestamp.",
+    "Heap fetches for the query would be random page reads rather than cached or sequential access."
+   ],
+   "avoidWhen": [
+    "The candidate column is wide or updated frequently, since index maintenance and lost heap-only updates can cost more than the saved fetches.",
+    "The table churns constantly, because a mostly-unset visibility map means the scan reads the heap anyway."
+   ],
+   "tradeoffs": {
+    "columns": ["Index shape", "Read path", "Write and space cost"],
+    "rows": [
+     ["Key columns only", "Index probe plus heap fetch per row", "Smallest index; cheapest to maintain"],
+     ["Extra columns in the key", "Index-only reads", "Wider comparisons, deeper tree, slower writes"],
+     ["Columns in INCLUDE", "Index-only reads", "Still maintained on update, but the key stays narrow"]
+    ]
+   },
+   "numbers": {
+    "title": "What heap fetches cost on a hot lookup",
+    "assumptions": [
+     "40,000 lookups per minute through the index",
+     "1.2 heap pages fetched per lookup on average",
+     "0.1 ms per random read on solid-state storage"
+    ],
+    "steps": [
+     "Heap fetches per minute: 40,000 × 1.2 = 48,000, about 800 per second.",
+     "I/O time: 800 × 0.1 ms = 80 ms of storage time per second, roughly 8% of one drive.",
+     "An index-only scan removes those fetches, spending the savings on a wider index instead.",
+     "On spinning disks at about 5 ms per random read the same fetches would cost 4 seconds of I/O per second, more than one drive can do; the covering index matters far more there."
+    ],
+    "result": "At SSD latency the fetches are a modest tax; at hard-disk latency they are a bottleneck, which is why covering pays most on spinning storage or cache-cold data."
+   },
+   "india": {
+    "title": "Index-only scans in the PostgreSQL and MySQL manuals",
+    "label": "Official documentation",
+    "body": "The PostgreSQL chapter on index-only scans explains that the optimisation is only possible when the visibility map marks a heap page all-visible, and that INCLUDE columns extend an index without widening its key. The MySQL manual’s index-types section describes how InnoDB’s clustered index stores whole rows, so a covering secondary index avoids the clustered lookup entirely."
+   },
+   "pitfalls": [
+    {
+     "trap": "“Let us add every column to the index so all queries go index-only.”",
+     "say": "“Each column is maintained on each write and widens the tree; I would cover the two hot queries, not the whole row.”"
+    },
+    {
+     "trap": "“Index-only scans mean vacuum does not matter any more.”",
+     "say": "“They depend on it: only vacuum sets the all-visible bits that let the scan skip the heap.”"
+    }
+   ],
+   "takeaways": [
+    "Covering is a property of an index paired with a query, not an index type.",
+    "Index-only scans in PostgreSQL lean on the visibility map, so vacuum keeps them honest.",
+    "INCLUDE stores payload columns without widening the searched key.",
+    "Every covered column is a write cost paid on each update; cover hot reads, not whole rows."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Which query can answer from the index alone?",
+   "prompt": "orders has an index on (customer_id, created_at). Which query can PostgreSQL run as an index-only scan, given a settled table?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "SELECT created_at FROM orders WHERE customer_id = 7",
+     "feedback": "Right: the filter and the returned column both live in the index."
+    },
+    {
+     "id": "b",
+     "label": "SELECT * FROM orders WHERE customer_id = 7",
+     "feedback": "Star selects every column; the index only holds two, so the heap is needed."
+    },
+    {
+     "id": "c",
+     "label": "SELECT created_at FROM orders WHERE status = 'paid'",
+     "feedback": "status is not in the index, so the filter cannot be evaluated there."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "A covering index answers only the queries whose filters and returned columns it stores; widen the query or narrow the index and the heap comes back."
+  },
+  "seeAlso": [
+   {"topicId": 23, "why": "B-tree and LSM layout decides what an index entry can carry"},
+   {"topicId": 264, "why": "Composite B-tree indexes are the baseline that INCLUDE extends"},
+   {"topicId": 625, "why": "Each covering column adds bytes to every entry when you estimate index size"}
+  ]
+ },
+ {
+  "id": 721,
+  "slug": "deadlocks-detection-and-ordering",
+  "region": "f4-databases",
+  "order": 32,
+  "title": "Deadlocks: Detection, Ordering and Recovery",
+  "kind": "lesson",
+  "objectives": [
+   "Explain how the database detects a deadlock and picks a victim",
+   "Order lock acquisition so cycles cannot form",
+   "Retry aborted transactions instead of treating deadlocks as fatal"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 13,
+  "prereqIds": [268],
+  "cards": [
+   {
+    "id": "t721-c1",
+    "kind": "text",
+    "title": "A cycle of waiting, not a slow query",
+    "body": "A deadlock is a cycle: transaction A holds a lock that B needs while B holds one that A needs. Neither can proceed, so no amount of waiting resolves it, and unlike a slow query nothing is making progress underneath. Someone outside the cycle has to break it, which is why engines ship a detector rather than a timeout guess.",
+    "teaches": ["deadlock-detection"]
+   },
+   {
+    "id": "t721-c2",
+    "kind": "diagram",
+    "title": "How PostgreSQL finds the cycle",
+    "body": "Detection runs only after a wait has lasted a little while.",
+    "teaches": ["deadlock-timeout"],
+    "steps": [
+     "A lock request waits longer than deadlock_timeout, one second by default",
+     "The waiting backend builds a wait-for graph of who holds what it needs",
+     "Following the edges it finds a cycle: A waits on B, B waits on A",
+     "One transaction in the cycle is chosen as the victim and aborted",
+     "Its locks release, the survivors proceed, the victim sees a deadlock error"
+    ]
+   },
+   {
+    "id": "t721-c3",
+    "kind": "text",
+    "title": "A fixed order prevents the cycle",
+    "body": "A cycle needs transactions to take the same locks in different orders. If every transaction that touches accounts 7 and 9 locks the lower id first, then whoever holds 7 simply makes the other wait; no cycle can exist. Lock ordering converts deadlocks into queueing: work serialises for a moment, but nothing has to be aborted and retried.",
+    "teaches": ["lock-ordering"]
+   },
+   {
+    "id": "t721-c4",
+    "kind": "text",
+    "title": "Misconception: a deadlock error means something is badly broken",
+    "body": "A deadlock error is the detector doing its job, not corruption or a crash. The victim transaction rolls back cleanly and can be retried unchanged. Applications that update the same hot rows from many connections will see occasional deadlocks at any scale; the healthy response is a small bounded retry, not an incident page each time.",
+    "teaches": ["deadlock-retry"]
+   },
+   {
+    "id": "t721-c5",
+    "kind": "text",
+    "title": "Watching waits while they happen",
+    "body": "pg_locks lists which locks are granted and which are awaited, and pg_stat_activity’s wait_event columns name what each session is blocked on, so joining the two shows the exact lock queue. InnoDB exposes the last detected deadlock in its monitor output and current waits in the performance schema. When a deploy stalls, these views tell you who is waiting on whom before the detector fires.",
+    "teaches": ["observing-locks"]
+   },
+   {
+    "id": "t721-c6",
+    "kind": "text",
+    "title": "Trap: locking rows in request order",
+    "body": "An endpoint that locks rows in the order they appear in the request, such as a basket’s items or a batch of ids, deadlocks whenever two requests list the same rows in different orders. Sort the ids before locking, or lock parents before children, and the common cycles disappear before they can form.",
+    "teaches": ["lock-ordering"]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t721-a1",
+    "concept": "deadlock-detection",
+    "type": "multiple_choice",
+    "prompt": "Two transactions hang for about a second, then one fails with a deadlock error while the other completes. What happened?",
+    "choices": [
+     {"id": "a", "label": "The detector found a cycle in the wait-for graph and aborted one transaction"},
+     {"id": "b", "label": "A timeout cancelled whichever transaction had been running longest"},
+     {"id": "c", "label": "The lock manager merged the two transactions so both could finish"},
+     {"id": "d", "label": "The two transactions were restarted in a different order"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "After deadlock_timeout the waiter checks the wait-for graph; finding a cycle, the engine aborts one member so the rest can finish. A plain timeout kills by elapsed time without finding a cycle, and the engine neither merges nor restarts transactions on its own."
+   },
+   {
+    "id": "t721-a2",
+    "concept": "lock-ordering",
+    "type": "multiple_choice",
+    "prompt": "Why does locking rows in ascending id order stop deadlocks between transactions that touch the same rows?",
+    "choices": [
+     {"id": "a", "label": "Both sides request the same locks in the same order, so a cycle cannot form"},
+     {"id": "b", "label": "Lower ids sit earlier in memory, so their locks are cheaper to grant"},
+     {"id": "c", "label": "Ascending order lets the lock manager skip its conflict checks"},
+     {"id": "d", "label": "It makes the transactions commit in id order"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "A deadlock needs a cycle of waits, and a cycle needs different orders. When every transaction takes locks in one global order, waits form a line rather than a circle. The choice of order is arbitrary; what matters is that it is shared."
+   },
+   {
+    "id": "t721-a3",
+    "concept": "deadlock-detection",
+    "type": "drag_order",
+    "prompt": "Order what happens when two PostgreSQL transactions deadlock.",
+    "items": [
+     {"id": "s1", "label": "Each transaction takes its first lock without conflict"},
+     {"id": "s2", "label": "A second lock request conflicts and the backend starts waiting"},
+     {"id": "s3", "label": "The wait passes deadlock_timeout, so the waiter checks the wait-for graph"},
+     {"id": "s4", "label": "A cycle is confirmed and one transaction is aborted and rolled back"}
+    ],
+    "correctOrder": ["s1", "s2", "s3", "s4"],
+    "explanation": "Locks only conflict once both sides hold something, so the deadlock exists only after the second request starts waiting. Detection is lazy: nothing checks the graph until a wait outlives deadlock_timeout, which is why deadlocks surface as a pause then one error, not instantly."
+   },
+   {
+    "id": "t721-a4",
+    "concept": "deadlock-retry",
+    "type": "multiple_choice",
+    "prompt": "A transfer service sees a deadlock error a few times a day at peak. What is the right response?",
+    "choices": [
+     {"id": "a", "label": "Catch the error and retry the transaction a bounded number of times"},
+     {"id": "b", "label": "Raise deadlock_timeout so transactions wait longer before checking"},
+     {"id": "c", "label": "Lock the whole accounts table at the start of each transfer"},
+     {"id": "d", "label": "Page an operator for each deadlock error"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "The victim’s work is cleanly rolled back, so retrying the transaction is the designed-for response, bounded so a persistent conflict does not loop. A longer deadlock_timeout just delays detection, a table lock serialises all transfers, and a few deadlocks a day at peak is expected contention rather than an incident."
+   },
+   {
+    "id": "t721-a5",
+    "concept": "observing-locks",
+    "type": "multiple_choice",
+    "prompt": "Which pair of PostgreSQL views shows who holds a lock and who is waiting for it?",
+    "choices": [
+     {"id": "a", "label": "pg_locks joined to pg_stat_activity"},
+     {"id": "b", "label": "pg_stat_statements and pg_stat_user_tables"},
+     {"id": "c", "label": "pg_stat_replication and the WAL receiver view"},
+     {"id": "d", "label": "EXPLAIN output and the visibility map"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "pg_locks lists granted and awaited locks while pg_stat_activity’s wait_event columns name each session’s blocker, and joining them shows the wait queue. Statement statistics, replication views, plans and the visibility map answer different questions."
+   },
+   {
+    "id": "t721-a6",
+    "concept": "lock-ordering",
+    "type": "tradeoff",
+    "prompt": "A nightly job reprices every line of every open order while support tools update single lines all day.",
+    "constraints": [
+     "The job touches thousands of rows",
+     "Interactive updates hit the same rows",
+     "The job runs for about an hour"
+    ],
+    "approaches": [
+     {"id": "p1", "label": "One big transaction processing orders in id order", "description": "Ordered, long"},
+     {"id": "p2", "label": "Small transactions, one per order, each in id order", "description": "Ordered, short"},
+     {"id": "p3", "label": "Small transactions in arrival order, retrying on deadlock", "description": "Unordered"}
+    ],
+    "correctApproachId": "p2",
+    "rationaleOptions": [
+     {"id": "r1", "label": "A shared locking order means the job and tools can wait but not cycle"},
+     {"id": "r2", "label": "Short transactions shrink the window in which a conflict can form"},
+     {"id": "r3", "label": "Lock order is irrelevant once deadlock detection exists"},
+     {"id": "r4", "label": "One big transaction holds fewer locks overall"}
+    ],
+    "correctRationaleIds": ["r1", "r2"],
+    "distractorRationaleIds": ["r3", "r4"],
+    "rationaleConflicts": {
+     "r3": "Detection finds cycles but still aborts and reruns work; ordering prevents the aborts, not just the hang.",
+     "r4": "A transaction keeps the locks it takes until commit, so one long transaction accumulates an hour of locks."
+    },
+    "explanation": "Ordering by id prevents the cycle, and short per-order transactions bound both the lock window and the blast radius if one batch still deadlocks. One ordered mega-transaction avoids cycles too but holds its locks for the whole run, and unordered-with-retries accepts avoidable aborts all night."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t721-f1",
+    "front": "How does PostgreSQL detect a deadlock?",
+    "back": "After a wait exceeds deadlock_timeout it walks the wait-for graph for a cycle."
+   },
+   {
+    "id": "t721-f2",
+    "front": "How does lock ordering prevent deadlocks?",
+    "back": "One shared order for taking locks means waits form a line, never a cycle."
+   },
+   {
+    "id": "t721-f3",
+    "front": "What should an application do with a deadlock error?",
+    "back": "Retry the rolled-back transaction a small, bounded number of times."
+   }
+  ],
+  "sources": [
+   {
+    "title": "PostgreSQL: Explicit Locking",
+    "url": "https://www.postgresql.org/docs/current/explicit-locking.html"
+   },
+   {
+    "title": "PostgreSQL: The pg_locks view",
+    "url": "https://www.postgresql.org/docs/current/view-pg-locks.html"
+   },
+   {
+    "title": "MySQL 8.4: Deadlocks in InnoDB",
+    "url": "https://dev.mysql.com/doc/refman/8.4/en/innodb-deadlocks.html"
+   }
+  ],
+  "deep": {
+   "teaches": ["deadlock-detection", "deadlock-timeout", "lock-ordering", "deadlock-retry", "observing-locks"],
+   "mechanism": {
+    "title": "How a lock wait becomes a deadlock error",
+    "steps": [
+     "Row and table locks form a wait-for graph: an edge from each waiting transaction to each holder it needs. Most of the time the graph is a forest of short chains, and waits resolve when the holder commits.",
+     "Detection is deliberately lazy in PostgreSQL. A backend that has waited longer than deadlock_timeout, one second by default, walks the graph looking for a cycle through itself. Sleeping on every lock request would waste work; a one-second delay trades a brief hang for near-zero steady-state cost.",
+     "When a cycle exists, the engine picks a victim and aborts it. PostgreSQL rolls back the transaction running the check or another member of the cycle; InnoDB chooses the transaction that has modified the fewest rows, which is cheapest to undo. The victim gets a deadlock error while the rest of the cycle proceeds.",
+     "Cycles need cycles in ordering: A takes lock 1 then 2, B takes 2 then 1. A shared acquisition order, such as sorting ids or always locking parents before children, makes the wait-for graph acyclic by construction, so deadlock rates fall to near zero rather than being managed.",
+     "InnoDB adds a twist: next-key and gap locks mean inserts can deadlock on ranges of index records, not only on rows that exist. Keeping transactions short and indexing the columns used for locking reduces both the range each lock covers and the window a conflict needs.",
+     "Deadlock retries belong in the application: the victim saw none of its changes commit, so re-running the same transaction is safe. Bound the retries and add a small jittered delay so two victims do not collide again in lockstep."
+    ]
+   },
+   "useWhen": [
+    "Transactions update several rows or tables that other transactions also touch, such as transfers between accounts.",
+    "Deadlock errors appear in logs and you need to decide between fixing the order, shortening the transaction or just retrying."
+   ],
+   "avoidWhen": [
+    "Avoid reaching for table-level locks to prevent deadlocks; serialising the whole table costs far more than the occasional abort.",
+    "Avoid raising deadlock_timeout to hide deadlocks; it delays detection without removing the cycle."
+   ],
+   "tradeoffs": {
+    "columns": ["Strategy", "What it fixes", "What it costs"],
+    "rows": [
+     ["Shared lock order", "Cycles cannot form between ordered transactions", "Every code path must agree on the order"],
+     ["Shorter transactions", "Smaller conflict window, less lock time", "More commits, more WAL and round trips"],
+     ["Bounded retries", "Survives unavoidable deadlocks", "Extra latency and a chance of repeated aborts"]
+    ]
+   },
+   "numbers": {
+    "title": "How often unordered transfers collide",
+    "assumptions": [
+     "400 two-account transfers per second between accounts drawn from 1,000",
+     "Each transfer holds its row locks for about 5 ms",
+     "Illustrative figures; real contention depends on the account distribution"
+    ],
+    "steps": [
+     "Locks held at a typical instant: 400 × 0.005 ≈ 2 transfers in flight.",
+     "Two in-flight transfers share an account with probability about 4 in 1,000: two accounts each over 1,000 accounts.",
+     "When a colliding pair takes its locks in opposite orders it deadlocks; in the same order it merely waits 5 ms.",
+     "Unordered, roughly half the colliding pairs become abort-and-retry work; ordered, that share falls to zero."
+    ],
+    "result": "Even rare collisions are worth ordering for: half of them turn into retries at zero benefit, and ordering converts them all into short waits."
+   },
+   "india": {
+    "title": "Deadlock guidance in the PostgreSQL and InnoDB manuals",
+    "label": "Official documentation",
+    "body": "PostgreSQL’s explicit-locking chapter defines the wait-for cycle, names deadlock_timeout and the one-second default, and recommends consistent lock ordering. MySQL’s Deadlocks in InnoDB page walks through a two-transaction example, explains that the engine rolls back the transaction modifying fewer rows, and lists the standard defences: same order of operations, small transactions and retrying on the error."
+   },
+   "pitfalls": [
+    {
+     "trap": "“Deadlocks are unavoidable, we just retry everything forever.”",
+     "say": "“Retry, but bound it, and I would fix the lock order so most cycles never form.”"
+    },
+    {
+     "trap": "“Bump deadlock_timeout and the deadlocks go away.”",
+     "say": "“That only slows detection; the transactions still wait for ever until someone checks the graph.”"
+    }
+   ],
+   "takeaways": [
+    "A deadlock is a wait-for cycle; detection aborts one transaction so the rest proceed.",
+    "A shared lock order prevents cycles instead of surviving them.",
+    "Short transactions shrink both the conflict window and the retry cost.",
+    "pg_locks and pg_stat_activity show the queue before the detector fires."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Which pair of lock sequences deadlocks?",
+   "prompt": "Two transactions each update accounts 7 and 9. Which pair of lock sequences can deadlock?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "A locks 7 then 9; B locks 7 then 9",
+     "feedback": "Same order: B just waits for A’s lock on 7. No cycle."
+    },
+    {
+     "id": "b",
+     "label": "A locks 7 then 9; B locks 9 then 7",
+     "feedback": "Right: A can hold 7 wanting 9 while B holds 9 wanting 7, a cycle."
+    },
+    {
+     "id": "c",
+     "label": "A locks 9 then 7; B locks 9 then 7",
+     "feedback": "The order is unusual but shared, so waits form a line, not a cycle."
+    }
+   ],
+   "correctId": "b",
+   "reveal": "Cycles need opposite orders. Any single ordering, even a strange one like 9 before 7, removes deadlocks between transactions that follow it."
+  },
+  "seeAlso": [
+   {"topicId": 72, "why": "Optimistic versus pessimistic concurrency at the design level"},
+   {"topicId": 268, "why": "Row locks and MVCC are the machinery deadlocks build on"},
+   {"topicId": 286, "why": "Database locks are mutual exclusion; the OS lesson carries the theory"}
+  ]
+ },
+ {
+  "id": 722,
+  "slug": "planner-statistics-and-plan-regressions",
+  "region": "f4-databases",
+  "order": 33,
+  "title": "Planner Statistics and Plan Regressions",
+  "kind": "lesson",
+  "objectives": [
+   "Explain what ANALYZE collects and where the planner reads it",
+   "Diagnose a plan regression caused by stale or coarse statistics",
+   "Choose between refreshing, raising the target and extended statistics"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 13,
+  "prereqIds": [265],
+  "cards": [
+   {
+    "id": "t722-c1",
+    "kind": "text",
+    "title": "What ANALYZE stores about each column",
+    "body": "ANALYZE samples a slice of each table and writes per-column facts into pg_stats: the most common values with their frequencies, a histogram over the rest, a distinct-count estimate and the null fraction. The planner never sees the table itself; every row estimate behind every plan comes from that stored snapshot.",
+    "teaches": ["statistics"]
+   },
+   {
+    "id": "t722-c2",
+    "kind": "diagram",
+    "title": "From a histogram to a row estimate",
+    "body": "Two filters priced from stored statistics on a 5,000,000-row table.",
+    "teaches": ["row-estimates"],
+    "steps": [
+     "Filter on status = 'active': the most-common-values list says 72%",
+     "Filter on created_at beyond a cutoff: histogram buckets say 8%",
+     "Independence assumed: 0.72 × 0.08 ≈ 5.8% of the table",
+     "On 5,000,000 rows the planner expects about 290,000",
+     "Each join method and index choice is priced against that 290,000"
+    ]
+   },
+   {
+    "id": "t722-c3",
+    "kind": "text",
+    "title": "Misconception: statistics describe the table as it is now",
+    "body": "Statistics are a photograph, not a live feed. Between ANALYZE runs the table can double, shift distribution or drain, and the planner keeps costing plans against the old picture. Autovacuum re-analyses changed tables on a schedule, so a bulk load minutes ago can leave estimates describing a table that no longer exists.",
+    "teaches": ["stale-stats"]
+   },
+   {
+    "id": "t722-c4",
+    "kind": "text",
+    "title": "The plan that flips when statistics refresh",
+    "body": "A regression needs no code change. ANALYZE runs, a row estimate crosses a cost threshold, say the assumed probe count inside a nested loop, and the planner switches to a plan shape that is worse for the real data. The query regressed because the model of the data moved, which is why diffing estimated against actual rows explains most overnight flips.",
+    "teaches": ["plan-regression"]
+   },
+   {
+    "id": "t722-c5",
+    "kind": "text",
+    "title": "Correlated filters multiply the wrong guess",
+    "body": "Estimates treat columns as independent: city = 'Bengaluru' AND state = 'Karnataka' multiplies two selectivities, so a city that sits inside its own state is under-counted by orders of magnitude. Extended statistics, created explicitly over a column group, let ANALYZE record the dependency so the estimate stops multiplying independent guesses.",
+    "teaches": ["extended-statistics"]
+   },
+   {
+    "id": "t722-c6",
+    "kind": "text",
+    "title": "Trap: raising the statistics target on every column",
+    "body": "A bigger target buys finer histograms and longer most-common-value lists, but ANALYZE pays for it in sampling time and stored statistics on every column. Raise the target only on the column whose skew fools the estimates; the rest keep the default and stay cheap to refresh.",
+    "teaches": ["statistics-target"]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t722-a1",
+    "concept": "stale-stats",
+    "type": "multiple_choice",
+    "prompt": "A nightly bulk load doubled a table. The next morning a hot query switched to a plan that drags through a nested loop. EXPLAIN’s row estimates are far below the counts ANALYZE would report today. What is the most likely trigger?",
+    "choices": [
+     {"id": "a", "label": "The planner is still costing the table as it was before the load"},
+     {"id": "b", "label": "The load dropped the index the old plan relied on"},
+     {"id": "c", "label": "A cold buffer pool slowed the first runs of the day"},
+     {"id": "d", "label": "The new rows land outside the index’s sort order"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "Row estimates come from statistics taken before the load, so the planner priced the small table it remembered rather than the doubled table it has. Re-analysing refreshes the picture; nothing here dropped an index or changed ordering."
+   },
+   {
+    "id": "t722-a2",
+    "concept": "statistics",
+    "type": "multiple_choice",
+    "prompt": "Which set of facts about a column does ANALYZE leave for the planner?",
+    "choices": [
+     {"id": "a", "label": "Most common values, a histogram for the rest, distinct and null counts"},
+     {"id": "b", "label": "A sorted copy of every value the column has ever held"},
+     {"id": "c", "label": "The observed cost of the last hundred queries that filtered on it"},
+     {"id": "d", "label": "Row counts per hour so trends can be extrapolated"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "pg_stats stores a summary, not the data: frequent values with frequencies, histogram bounds over the remainder, plus distinct-count and null estimates. It holds no query history, no trend and certainly no full copy of the column."
+   },
+   {
+    "id": "t722-a3",
+    "concept": "plan-regression",
+    "type": "drag_order",
+    "prompt": "Order how a routine statistics refresh produces a plan regression.",
+    "items": [
+     {"id": "s1", "label": "A query runs under a plan chosen from hours-old statistics"},
+     {"id": "s2", "label": "Autovacuum analyses the table and writes fresh pg_stats rows"},
+     {"id": "s3", "label": "The new estimate pushes a costed alternative past the current plan"},
+     {"id": "s4", "label": "The planner switches plan shape and the query gets slower"}
+    ],
+    "correctOrder": ["s1", "s2", "s3", "s4"],
+    "explanation": "The engine answers the question the statistics ask, so a refresh can move an estimate across a cost threshold and flip the winner. The regression lives in the changed model of the data, not in a planner fault."
+   },
+   {
+    "id": "t722-a4",
+    "concept": "statistics",
+    "type": "estimation",
+    "prompt": "pg_stats says 'archived' is a most common value covering 72% of a 3,000,000-row table. How many rows does the planner estimate for status = 'archived'?",
+    "unit": "rows",
+    "target": 2160000,
+    "assumptions": [
+     "3,000,000 rows in the table",
+     "the stored frequency for status = 'archived' is 72%"
+    ],
+    "formula": "table rows × stored frequency of the value",
+    "workedAnswer": "3,000,000 × 0.72 = 2,160,000 rows.",
+    "explanation": "Sanity check: the estimate is a direct lookup, not a guess; frequent values come straight from the stored frequency. 840,000 is the 28% remainder and 720,000 treats the frequency as a count.",
+    "tolerance": 0,
+    "trapAnswers": [840000, 720000]
+   },
+   {
+    "id": "t722-a5",
+    "concept": "extended-statistics",
+    "type": "multiple_choice",
+    "prompt": "A filter on city and state is estimated a hundred times too low because the two columns are correlated. What gives the planner the missing fact?",
+    "choices": [
+     {"id": "a", "label": "Extended statistics created over the two columns together"},
+     {"id": "b", "label": "A higher statistics target on each column separately"},
+     {"id": "c", "label": "A composite index over the same two columns"},
+     {"id": "d", "label": "Running ANALYZE twice so sampling converges"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "Single-column statistics cannot see dependence, so the two selectivities get multiplied as if the columns were unrelated. A column-group statistics object records the dependency directly; a bigger target keeps the same independence assumption and an index changes access paths, not the estimate."
+   },
+   {
+    "id": "t722-a6",
+    "concept": "plan-regression",
+    "type": "tradeoff",
+    "prompt": "A dashboard query flipped to a slow plan the morning after ANALYZE refreshed a fast-growing table.",
+    "constraints": [
+     "The query was fast for months on the old statistics",
+     "The table grows about 20% a day",
+     "One skewed status column drives the estimate"
+    ],
+    "approaches": [
+     {"id": "p1", "label": "Raise the statistics target on the skewed column and re-analyse", "description": "Better estimates"},
+     {"id": "p2", "label": "Pin the old plan with a hint so the planner stops re-deciding", "description": "Frozen plan"},
+     {"id": "p3", "label": "Disable ANALYZE on the table so the statistics stay put", "description": "Frozen statistics"}
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {"id": "r1", "label": "The regression came from a coarse estimate, so better input fixes the cost comparison"},
+     {"id": "r2", "label": "A finer target on the skewed column keeps future refreshes from re-crossing the threshold"},
+     {"id": "r3", "label": "The old plan was fastest before, so freezing it is the durable answer"},
+     {"id": "r4", "label": "Frozen statistics keep the good plan without paying for re-analysis"}
+    ],
+    "correctRationaleIds": ["r1", "r2"],
+    "distractorRationaleIds": ["r3", "r4"],
+    "rationaleConflicts": {
+     "r3": "The old plan was right for the old distribution; on a table growing 20% a day, the pin rots while the claim that it stays fastest goes unchecked.",
+     "r4": "Stale statistics are what caused the flip risk in the first place; freezing them keeps one plan by blinding the cost model to the growing table."
+    },
+    "explanation": "The flip happened because a coarse estimate moved past a threshold, so improving the estimate on the column that misleads is the durable fix. Pinning or freezing each buys tonight at the cost of a plan the data will outgrow."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t722-f1",
+    "front": "What does ANALYZE record in pg_stats?",
+    "back": "Most common values with frequencies, histogram bounds, distinct-count and null estimates per column."
+   },
+   {
+    "id": "t722-f2",
+    "front": "Why can a fresh ANALYZE make a query slower?",
+    "back": "New estimates can push a costed alternative past the current plan, flipping the winner."
+   },
+   {
+    "id": "t722-f3",
+    "front": "When do single-column statistics mislead?",
+    "back": "On correlated columns: independent selectivities multiply into a badly wrong estimate."
+   }
+  ],
+  "sources": [
+   {
+    "title": "PostgreSQL: Statistics Used by the Planner",
+    "url": "https://www.postgresql.org/docs/current/planner-stats.html"
+   },
+   {
+    "title": "PostgreSQL: How the Planner Uses Statistics",
+    "url": "https://www.postgresql.org/docs/current/planner-stats-details.html"
+   },
+   {
+    "title": "PostgreSQL: ANALYZE",
+    "url": "https://www.postgresql.org/docs/current/sql-analyze.html"
+   }
+  ],
+  "deep": {
+   "teaches": ["statistics", "row-estimates", "stale-stats", "plan-regression", "extended-statistics", "statistics-target"],
+   "mechanism": {
+    "title": "How a sampled snapshot prices every plan",
+    "steps": [
+     "ANALYZE reads a random sample of heap pages and summarises each column: up to a statistics-target number of most common values with frequencies, the same number of histogram bounds over the rest, a distinct-count estimate and the null fraction. Everything lands in pg_statistic, surfaced through pg_stats.",
+     "Every plan begins life as a row estimate. A predicate matching a most common value reads its frequency directly; a range predicate interpolates between histogram bounds; several predicates multiply their selectivities as though the columns were independent.",
+     "Those estimates feed the cost model. Whether an index probe beats a scan, a nested loop beats a hash join, or a sort fits in memory all hang on the same predicted row counts, so one wrong estimate bends every comparison downstream of it.",
+     "Statistics go stale the moment data changes, because nothing updates them between ANALYZE runs. Autovacuum re-analyses tables once enough rows have changed, but a bulk load can leave the planner costing a table a quarter of the size it has become.",
+     "A regression is often a refresh landing badly rather than staleness itself: the new estimate crosses a cost threshold and the planner switches to a plan shape that fits the real data worse. The engine answered a different question because its input changed.",
+     "Where single-column statistics cannot see dependence, extended statistics record it. A statistics object over a column group makes ANALYZE track combined dependencies and distinct counts, so correlated predicates stop being priced as independent multiplications."
+    ]
+   },
+   "useWhen": [
+    "A query changed plan with no code or schema change; compare estimated with actual rows before touching indexes or settings.",
+    "A skewed or correlated column produces estimates orders of magnitude off, and a targeted statistics change can fix the input instead of forcing the output."
+   ],
+   "avoidWhen": [
+    "Avoid raising default_statistics_target globally to fix one bad estimate; every column then pays the sampling and storage cost.",
+    "Avoid ritual ANALYZE runs without first checking whether the estimates are stale, since a fresh sample changes plans again and can repeat the regression."
+   ],
+   "tradeoffs": {
+    "columns": ["Lever", "What it fixes", "What it costs"],
+    "rows": [
+     ["Run ANALYZE", "Stale estimates after loads or churn", "Sampling time now, and the plan may still flip to a new shape"],
+     ["Raise the column’s target", "Skew a default histogram cannot see", "Slower analysis and larger stored statistics on that column"],
+     ["Create extended statistics", "Correlated predicates priced as independent", "Another object to maintain; it helps only the listed columns"]
+    ]
+   },
+   "numbers": {
+    "title": "When a stale estimate buys a nested loop",
+    "assumptions": [
+     "Stale statistics estimate a filter at 40 rows",
+     "The real match is 900,000 rows",
+     "Each inner index probe costs about 0.05 ms",
+     "The rejected scan-and-hash would take about 10 s"
+    ],
+    "steps": [
+     "Planned cost: 40 probes × 0.05 ms ≈ 2 ms, so the nested loop looks free next to a 10 s hash build.",
+     "Real work: 900,000 probes × 0.05 ms ≈ 45 s of index lookups for a single query.",
+     "Estimate error: 900,000 ÷ 40 = 22,500×, enough to invert the whole cost comparison.",
+     "After ANALYZE the estimate lands near the truth and the hash join wins its cost comparison again."
+    ],
+    "result": "A large estimate error does not just misprice a plan; it picks a different algorithm, so the miss multiplies by row count rather than adding a few per cent."
+   },
+   "india": {
+    "title": "Statistics arithmetic in the PostgreSQL manual",
+    "label": "Official documentation",
+    "body": "The manual’s planner-statistics chapter walks through the same most-common-value and histogram arithmetic used here, and the statistics-details appendix shows the pg_stats rows behind it. It documents default_statistics_target, which can be raised per column, and the CREATE STATISTICS reference describes the dependencies and distinct counts ANALYZE collects over correlated column groups, all official documented behaviour rather than folklore."
+   },
+   "pitfalls": [
+    {
+     "trap": "“The plan changed on its own, so the planner is buggy.”",
+     "say": "“Plans follow the statistics; I would diff the estimates first, not blame the engine.”"
+    },
+    {
+     "trap": "“Set the statistics target high on every column for safety.”",
+     "say": "“Each raise slows ANALYZE on every column; I would target only the skewed columns that mislead the estimates.”"
+    }
+   ],
+   "takeaways": [
+    "The planner costs plans against a stored snapshot of the data, not the live table.",
+    "A plan regression after a statistics refresh is usually an estimate crossing a cost threshold, not a planner fault.",
+    "Raise statistics targets only on columns whose distribution actually misleads the estimates.",
+    "Correlated filters need extended statistics; single-column histograms multiply the wrong guess."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Which plan does the stale estimate buy?",
+   "prompt": "pg_stats still says the status filter keeps 60 rows, but the table now keeps 3,000,000. The planner compares a nested loop with index probes against a hash join. Which does it cost lower?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "The nested loop, trusting the 60-row estimate",
+     "feedback": "Right: the cost model sees 60 cheap probes and picks the nested loop; the real 3,000,000 rows never enter the maths."
+    },
+    {
+     "id": "b",
+     "label": "The hash join, since the scan reveals the truth",
+     "feedback": "Plans are chosen before execution; the scan’s real row count stays invisible until the query runs."
+    },
+    {
+     "id": "c",
+     "label": "Neither, because it re-samples the table first",
+     "feedback": "The planner never samples at query time; ANALYZE alone refreshes the picture it optimises against."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "The planner optimises against statistics rather than data, so a stale estimate buys a plan for a table that no longer exists."
+  },
+  "seeAlso": [
+   {"topicId": 23, "why": "Index layout decides which plans the cost model has to choose between"},
+   {"topicId": 265, "why": "The cost model this topic feeds gets its mechanics in the planner lesson"},
+   {"topicId": 624, "why": "Statement statistics are where a plan regression first shows up as a slow query"}
+  ]
+ },
+ {
+  "id": 723,
+  "slug": "vacuum-autovacuum-and-table-bloat",
+  "region": "f4-databases",
+  "order": 34,
+  "title": "Vacuum, Autovacuum and Table Bloat",
+  "kind": "lesson",
+  "objectives": [
+   "Explain why MVCC leaves dead row versions behind",
+   "Tune autovacuum so cleanup keeps pace with churn",
+   "Tell reusable space from real bloat and know when a rewrite pays"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 14,
+  "prereqIds": [268],
+  "cards": [
+   {
+    "id": "t723-c1",
+    "kind": "text",
+    "title": "Dead versions are the price of snapshots",
+    "body": "PostgreSQL never overwrites a row in place. UPDATE inserts a new tuple version and marks the old one dead at commit; DELETE only marks. Each dead version keeps its heap slot because some open snapshot may still need to see it, and the space stays occupied until vacuum decides no snapshot can.",
+    "teaches": ["dead-tuples"]
+   },
+   {
+    "id": "t723-c2",
+    "kind": "diagram",
+    "title": "What one vacuum pass reclaims",
+    "body": "The work a single autovacuum worker does on a busy table.",
+    "teaches": ["vacuum-mechanics"],
+    "steps": [
+     "Scan heap pages for versions no open snapshot can still see",
+     "Remove the dead tuples and mark the space reusable in the free space map",
+     "Set all-visible bits in the visibility map where every row is settled",
+     "Freeze rows whose transaction ids are ageing towards wraparound",
+     "Vacuum the indexes that point at the reclaimed heap space"
+    ]
+   },
+   {
+    "id": "t723-c3",
+    "kind": "text",
+    "title": "Misconception: VACUUM returns disk space to the filesystem",
+    "body": "A plain vacuum marks space inside the table file as reusable; the file itself stays as large as its biggest moment. Only a full rewrite such as VACUUM FULL shrinks the file, and it takes an exclusive lock for the whole pass. Most tables never need the rewrite: reused space is free space for the next rows.",
+    "teaches": ["table-bloat"]
+   },
+   {
+    "id": "t723-c4",
+    "kind": "text",
+    "title": "The oldest snapshot sets the cleanup horizon",
+    "body": "Vacuum may only remove versions that no running transaction can still see, so the oldest open snapshot in the cluster is the horizon everything waits on. A six-hour report, a session idle in transaction, or a lagging replication slot each pin every dead version younger than themselves, so vacuum scans but cannot reclaim past them.",
+    "teaches": ["cleanup-blockers"]
+   },
+   {
+    "id": "t723-c5",
+    "kind": "text",
+    "title": "Autovacuum is a throttle, not a janitor on call",
+    "body": "A table earns a pass when dead tuples exceed scale-factor times row count plus a small threshold, and each worker pauses under a cost limit so cleanup never starves foreground work. With the default 0.2 scale factor a 50,000-row table triggers at about 10,000 dead tuples while a 400-million-row table waits for 80 million; proportional triggers arrive late exactly where they hurt most.",
+    "teaches": ["autovacuum-tuning"]
+   },
+   {
+    "id": "t723-c6",
+    "kind": "text",
+    "title": "Trap: disabling autovacuum to speed up a load",
+    "body": "Turning autovacuum off trades background churn for a debt that compounds: dead tuples pile up, statistics go stale, and transaction ids keep ageing towards the wraparound freeze that forces aggressive single-user recovery. Tune per-table settings or schedule the load around vacuum; switching it off borrows speed against the table’s health.",
+    "teaches": ["xid-wraparound", "autovacuum-tuning"]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t723-a1",
+    "concept": "dead-tuples",
+    "type": "multiple_choice",
+    "prompt": "An UPDATE commits on a PostgreSQL row. What has physically happened to the previous version of that row?",
+    "choices": [
+     {"id": "a", "label": "It was marked dead but keeps its heap slot until vacuum removes it"},
+     {"id": "b", "label": "It was overwritten in place once the commit record flushed"},
+     {"id": "c", "label": "It was moved into a rollback segment for undo"},
+     {"id": "d", "label": "It was frozen so no transaction could read it again"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "MVCC writes a new version and marks the old one dead rather than erasing it, because older snapshots may still need it. In-place overwrite would break those readers; freezing marks transaction ids on live rows rather than disposing of dead ones."
+   },
+   {
+    "id": "t723-a2",
+    "concept": "cleanup-blockers",
+    "type": "multiple_choice",
+    "prompt": "Autovacuum visits a table hourly yet its dead-tuple count keeps climbing. pg_stat_activity shows one reporting transaction open since yesterday. Why can vacuum not reclaim?",
+    "choices": [
+     {"id": "a", "label": "That snapshot can still see the old versions, so they stay alive"},
+     {"id": "b", "label": "Vacuum skips any table while a read is in flight"},
+     {"id": "c", "label": "Dead tuples survive until the writing transaction itself commits"},
+     {"id": "d", "label": "The table’s indexes block vacuum until they are rebuilt"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "The oldest open snapshot is the cleanup horizon: versions that transaction might still see must be kept no matter how often vacuum scans. Ordinary reads do not block vacuum; only snapshots older than the dead versions do, and the writers have already committed."
+   },
+   {
+    "id": "t723-a3",
+    "concept": "autovacuum-tuning",
+    "type": "multiple_choice",
+    "prompt": "A 400-million-row table churns constantly but autovacuum visits it rarely under default settings. What is the structural reason?",
+    "choices": [
+     {"id": "a", "label": "The proportional threshold needs about 80 million dead tuples before a pass"},
+     {"id": "b", "label": "Autovacuum ignores tables above a fixed maximum size"},
+     {"id": "c", "label": "The worker’s cost limit forbids touching large tables"},
+     {"id": "d", "label": "Each index on the table vetoes a vacuum pass"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "The trigger is scale factor times rows plus a small threshold: 0.2 × 400 million means roughly 80 million dead tuples accumulate before the first pass. There is no size cap on which tables qualify; the defaults simply scale the wait with the table."
+   },
+   {
+    "id": "t723-a4",
+    "concept": "vacuum-mechanics",
+    "type": "drag_order",
+    "prompt": "Order what one autovacuum pass does on a churned table.",
+    "items": [
+     {"id": "s1", "label": "The table crosses its dead-tuple threshold and a worker claims it"},
+     {"id": "s2", "label": "The worker removes versions no open snapshot can still see"},
+     {"id": "s3", "label": "Settled pages are marked all-visible in the visibility map"},
+     {"id": "s4", "label": "Ageing transaction ids on surviving rows are frozen against wraparound"}
+    ],
+    "correctOrder": ["s1", "s2", "s3", "s4"],
+    "explanation": "A pass exists because the proportional threshold tripped, and reclamation is bounded by the oldest open snapshot. Marking pages all-visible and freezing old transaction ids ride along on the same scan."
+   },
+   {
+    "id": "t723-a5",
+    "concept": "dead-tuples",
+    "type": "estimation",
+    "prompt": "A 200,000-row table rewrites its full row set once a day, and each dead version occupies about a live row’s space. Vacuum lags for three days. Roughly how many dead tuples pile up?",
+    "unit": "dead tuples",
+    "target": 600000,
+    "assumptions": [
+     "200,000 rows rewritten per day",
+     "three days of dead versions retained"
+    ],
+    "formula": "rows rewritten per day × days without reclamation",
+    "workedAnswer": "200,000 × 3 = 600,000 dead tuples.",
+    "explanation": "Sanity check: the table then carries three times its live size in dead space, which is why lagging vacuum shows up as growth rather than error. 200,000 counts one day only and 800,000 adds a fourth phantom day.",
+    "tolerance": 0,
+    "trapAnswers": [200000, 800000]
+   },
+   {
+    "id": "t723-a6",
+    "concept": "table-bloat",
+    "type": "tradeoff",
+    "prompt": "A 60 GB orders table is about 40% dead space after years of churn. A 30-minute weekend window is available.",
+    "constraints": [
+     "Roughly 24 GB of the file is reusable dead space",
+     "Plain autovacuum now keeps pace with daily churn",
+     "The window allows one exclusive-lock operation"
+    ],
+    "approaches": [
+     {"id": "p1", "label": "One VACUUM FULL in the window, then tuned autovacuum to hold the line", "description": "Rewrite once"},
+     {"id": "p2", "label": "Leave it: plain vacuum reuse means the file stops growing", "description": "Reuse only"},
+     {"id": "p3", "label": "Dump, drop and reload the table every month", "description": "Monthly rebuild"}
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {"id": "r1", "label": "Plain vacuum reuses space inside the file but never shrinks it"},
+     {"id": "r2", "label": "One rewrite returns the 24 GB, and tuned autovacuum stops it growing back"},
+     {"id": "r3", "label": "Reuse alone eventually drains the dead space out of the file"},
+     {"id": "r4", "label": "A recurring dump-and-reload is cheaper than a single rewrite"}
+    ],
+    "correctRationaleIds": ["r1", "r2"],
+    "distractorRationaleIds": ["r3", "r4"],
+    "rationaleConflicts": {
+     "r3": "Reuse caps growth but leaves the file at its high-water mark; the 24 GB stays allocated for ever.",
+     "r4": "A monthly rebuild repeats the migration cost and downtime window without gaining anything over one well-timed rewrite."
+    },
+    "explanation": "Since autovacuum already keeps pace, the dead space is a fixed historical debt that only a rewrite repays. One VACUUM FULL inside the window returns the space, and tuned settings keep churn from rebuilding it."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t723-f1",
+    "front": "What is a dead tuple?",
+    "back": "An old row version no snapshot can still see; vacuum makes its space reusable."
+   },
+   {
+    "id": "t723-f2",
+    "front": "Does a plain vacuum shrink the table file?",
+    "back": "No; it marks space reusable inside the file. Only a rewrite such as VACUUM FULL returns space."
+   },
+   {
+    "id": "t723-f3",
+    "front": "What blocks vacuum on a busy table?",
+    "back": "The oldest open snapshot: long transactions, idle-in-transaction sessions and lagging slots."
+   }
+  ],
+  "sources": [
+   {
+    "title": "PostgreSQL: Routine Vacuuming",
+    "url": "https://www.postgresql.org/docs/current/routine-vacuuming.html"
+   },
+   {
+    "title": "PostgreSQL: VACUUM",
+    "url": "https://www.postgresql.org/docs/current/sql-vacuum.html"
+   },
+   {
+    "title": "PostgreSQL: Progress Reporting for VACUUM",
+    "url": "https://www.postgresql.org/docs/current/progress-reporting.html"
+   }
+  ],
+  "deep": {
+   "teaches": ["dead-tuples", "vacuum-mechanics", "table-bloat", "cleanup-blockers", "autovacuum-tuning", "xid-wraparound"],
+   "mechanism": {
+    "title": "How updates become bloat and vacuum turns it back",
+    "steps": [
+     "PostgreSQL never overwrites a row in place. UPDATE inserts a new tuple version and marks the old one’s xmax; DELETE only marks. Each dead version keeps occupying its heap slot because an older snapshot may still need it.",
+     "Heap-only-tuple updates soften the cost: when no indexed column changes and the same page has room, the new version chains inside the page and no index entry is written. Updates touching indexed columns miss that shortcut and leave an entry in every index.",
+     "Vacuum is the garbage collector. A pass scans heap pages, removes versions no running snapshot can see, marks their space reusable in the free space map, updates the visibility map and freezes rows whose transaction ids age towards the roughly two-billion wraparound limit.",
+     "The cleanup horizon is the oldest open snapshot in the cluster. A six-hour report, a session idle in transaction or a lagging replication slot each pin every version younger than themselves, so vacuum scans yet cannot reclaim past them.",
+     "Autovacuum is deliberately throttled: workers pause under a cost limit, and a table only earns a pass once dead tuples exceed scale-factor times rows plus a threshold, 0.2 and 50 by default. Small hot tables trigger constantly; a 400-million-row table waits for about 80 million dead tuples.",
+     "Reclaimed space becomes reusable inside the same file, not free disk. A table that once held a week’s churn keeps that size, so genuine bloat, meaning heap and indexes padded with dead or empty space, needs a rewrite such as VACUUM FULL or a repack tool to shrink."
+    ]
+   },
+   "useWhen": [
+    "Update-heavy tables such as counters, sessions and queue-like rows, where dead versions accumulate faster than default thresholds trip.",
+    "Index-only scans matter, since vacuum is what marks settled pages all-visible and lets the heap skip actually happen."
+   ],
+   "avoidWhen": [
+    "Avoid scheduled VACUUM FULL as routine maintenance; the exclusive lock and full rewrite exist for reclaiming real bloat.",
+    "Avoid disabling autovacuum to speed up loads or imports; tune per-table settings or schedule around it instead."
+   ],
+   "tradeoffs": {
+    "columns": ["Setting", "Effect", "Trade-off"],
+    "rows": [
+     ["Lower scale factor on a hot table", "A pass trips before dead tuples pile up", "More frequent passes and more background I/O"],
+     ["Higher cost limit per worker", "Each pass finishes sooner", "Cleanup competes harder with foreground queries"],
+     ["VACUUM FULL or repack", "Physically returns space to the filesystem", "A rewrite of the table, and an exclusive lock for the plain form"]
+    ]
+   },
+   "numbers": {
+    "title": "How long a big table waits for vacuum",
+    "assumptions": [
+     "The table holds 10 million live rows",
+     "Churn creates 3,000 dead tuples a minute",
+     "The trigger is scale factor 0.2 plus a 50-tuple threshold"
+    ],
+    "steps": [
+     "Trigger point: 10,000,000 × 0.2 + 50 ≈ 2,000,050 dead tuples.",
+     "Time to trip at that churn: 2,000,050 ÷ 3,000 ≈ 667 minutes, about 11 hours between passes.",
+     "Between passes the table carries up to roughly a fifth extra dead weight, so scans and the indexes point at it.",
+     "A batch job deleting 1,000,000 rows crosses the threshold in one run and forces a pass immediately on top."
+    ],
+    "result": "On large tables the proportional trigger means cleanup arrives late by design; per-table scale factors bring the dead share back under control."
+   },
+   "india": {
+    "title": "Vacuum behaviour in the PostgreSQL manual",
+    "label": "Official documentation",
+    "body": "The routine-vacuuming chapter states the trigger formula plainly, autovacuum_vacuum_scale_factor times the table’s row count plus a small threshold, and documents freezing, which prevents transaction-id wraparound around two billion transactions and would otherwise force aggressive shutdown behaviour. It also describes the cost-delay throttling that keeps autovacuum workers from starving foreground queries."
+   },
+   "pitfalls": [
+    {
+     "trap": "“Autovacuum slows the load test down, so let us switch it off.”",
+     "say": "“Off is how wraparound risk and runaway bloat start; I would tune the scale factor or per-table settings instead.”"
+    },
+    {
+     "trap": "“The table file keeps growing, so vacuum must be broken.”",
+     "say": "“Plain vacuum reuses space inside the file; only a rewrite gives space back, and reuse is usually enough.”"
+    }
+   ],
+   "takeaways": [
+    "MVCC turns updates and deletes into dead versions; vacuum is the collector that makes their space reusable.",
+    "Plain vacuum never shrinks the file; bloat is only returned by a rewrite.",
+    "The oldest open snapshot pins every dead version it might still see; long transactions and lagging slots are the usual suspects.",
+    "Autovacuum’s proportional trigger arrives late on big tables; tune the scale factor per table."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Which table trips autovacuum first?",
+   "prompt": "Two tables share the default 0.2 scale factor. Table A holds 50,000 rows with 30% daily churn; table B holds 200,000,000 rows with 0.05% daily churn. Which trips its dead-tuple threshold first?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "Table A, whose trigger is only about 10,000 dead tuples",
+     "feedback": "Right: A’s trigger is small, so a single morning of churn crosses it."
+    },
+    {
+     "id": "b",
+     "label": "Table B, since more rows means more dead tuples to collect",
+     "feedback": "B’s churn is real but its trigger is about 40 million dead tuples; it waits hundreds of days between passes."
+    },
+    {
+     "id": "c",
+     "label": "They trip together, because the scale factor is the same",
+     "feedback": "Same ratio, very different absolute trigger: B must pile up 40 million dead tuples before one pass."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "The default threshold is proportional, so small hot tables get constant attention while huge tables can go weeks between vacuums on unchanged settings."
+  },
+  "seeAlso": [
+   {"topicId": 23, "why": "B-tree layout decides what dead entries and heap-only updates cost"},
+   {"topicId": 268, "why": "MVCC snapshot mechanics are what produce the dead versions vacuum reclaims"},
+   {"topicId": 554, "why": "Partitioning bounds how much table each vacuum pass has to walk"}
+  ]
+ },
+ {
+  "id": 724,
+  "slug": "forcing-the-planner-hints-and-pins",
+  "region": "f4-databases",
+  "order": 35,
+  "title": "Forcing the Planner: Hints, Pins and Rot",
+  "kind": "lesson",
+  "objectives": [
+   "Explain what a query hint overrides and what it cannot fix",
+   "Weigh a pinned plan against repairing estimates or indexes",
+   "Judge when forcing a plan is the lesser evil"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 13,
+  "prereqIds": [265],
+  "cards": [
+   {
+    "id": "t724-c1",
+    "kind": "text",
+    "title": "A cost model, not a rule engine",
+    "body": "The planner enumerates candidate plans, prices each in units of page reads and CPU, and keeps the cheapest. Nothing in that process knows which index a developer hoped for, only what each alternative costs under the current estimates. A hint does not negotiate with that model; it overrides it.",
+    "teaches": ["planner-hints"]
+   },
+   {
+    "id": "t724-c2",
+    "kind": "text",
+    "title": "What hints look like across engines",
+    "body": "MySQL offers index hints such as USE, FORCE and IGNORE INDEX, plus comment-style optimiser hints for join order and switches; Oracle popularised the same comment form decades ago. PostgreSQL deliberately ships none: its stance is that hints mask the real problem, so hint support exists only through the pg_hint_plan extension.",
+    "teaches": ["hint-syntax"]
+   },
+   {
+    "id": "t724-c3",
+    "kind": "text",
+    "title": "Misconception: a hint tells the planner something it missed",
+    "body": "A hint commands rather than informs. FORCE INDEX does not hand the optimiser a new fact about the data; it prices the table scan as ruinous so the index wins by decree. The estimate that misled the choice stays wrong, and the hint simply stops the planner asking whether it is right.",
+    "teaches": ["hint-limits"]
+   },
+   {
+    "id": "t724-c4",
+    "kind": "text",
+    "title": "Why pinned plans rot",
+    "body": "A hint is correct for the distribution on the day it was written. Months later the same filter keeps fifteen times more rows, the forced nested loop is now the worst option, and nothing complains: the planner is never asked to compare again, so the regression arrives silently instead of as an error.",
+    "teaches": ["plan-pinning"]
+   },
+   {
+    "id": "t724-c5",
+    "kind": "text",
+    "title": "The escape hatches PostgreSQL does ship",
+    "body": "Instead of hints, PostgreSQL exposes planner-method switches such as enable_seqscan and enable_nestloop. Setting one off prices that method out of contention long enough to compare the alternatives in EXPLAIN, a diagnostic lever for asking what another plan would cost, not a production steering wheel.",
+    "teaches": ["cost-knobs"]
+   },
+   {
+    "id": "t724-c6",
+    "kind": "text",
+    "title": "Trap: answering a regression with a hint",
+    "body": "The query was fast yesterday, so pinning yesterday’s plan feels like the fix. But a hint freezes today’s data shape into the query for ever; the durable answer is the estimate or index that made the old plan cheap. Treat a pin as a leased stopgap with a follow-up task attached, not a resolution.",
+    "teaches": ["hint-limits"]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t724-a1",
+    "concept": "planner-hints",
+    "type": "multiple_choice",
+    "prompt": "Why has PostgreSQL chosen not to ship built-in query hints?",
+    "choices": [
+     {"id": "a", "label": "Hints bypass the cost model, so they keep forcing a plan after the data outgrows it"},
+     {"id": "b", "label": "Hint syntax would conflict with the SQL standard’s comments"},
+     {"id": "c", "label": "The planner already enumerates the cheapest plan provably"},
+     {"id": "d", "label": "Hints cannot coexist with prepared statements"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "The documented position is that hints mask causes and then rot: they command a plan without informing the cost model, so the forced choice survives long past the data it suited. The planner is not provably optimal, which is exactly why overrides are risky."
+   },
+   {
+    "id": "t724-a2",
+    "concept": "hint-syntax",
+    "type": "multiple_choice",
+    "prompt": "In MySQL, which change is an actual query hint rather than tuning or maintenance?",
+    "choices": [
+     {"id": "a", "label": "Adding FORCE INDEX (idx_status) to the table reference"},
+     {"id": "b", "label": "Raising innodb_buffer_pool_size so the index looks cheaper"},
+     {"id": "c", "label": "Running ANALYZE TABLE so estimates reflect the index"},
+     {"id": "d", "label": "Prefixing the query with EXPLAIN to expose the plan"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "FORCE INDEX is a directive embedded in the statement: it makes the optimiser price a table scan as prohibitive. Buffer tuning, ANALYZE TABLE and EXPLAIN all change the model or observe it; none commands a plan."
+   },
+   {
+    "id": "t724-a3",
+    "concept": "plan-pinning",
+    "type": "drag_order",
+    "prompt": "Order how a hint pinned in an emergency becomes an incident months later.",
+    "items": [
+     {"id": "s1", "label": "A regression appears and a hint pins the previously fast plan"},
+     {"id": "s2", "label": "The table’s size and distribution drift over the following months"},
+     {"id": "s3", "label": "The pinned plan no longer fits the data but the hint still wins"},
+     {"id": "s4", "label": "The query stays slow until someone traces it back to the hint"}
+    ],
+    "correctOrder": ["s1", "s2", "s3", "s4"],
+    "explanation": "The pin is only valid for the distribution it was written against. Because the planner is no longer consulted, drift accumulates silently and the failure surfaces as chronic slowness rather than an error."
+   },
+   {
+    "id": "t724-a4",
+    "concept": "plan-pinning",
+    "type": "estimation",
+    "prompt": "A forced index plan does about 120,000 random page reads at 0.1 ms each for one report run. How long do those reads alone take?",
+    "unit": "seconds",
+    "target": 12,
+    "assumptions": [
+     "120,000 random page reads per run",
+     "0.1 ms per random read on solid-state storage"
+    ],
+    "formula": "reads × time per read, converted to seconds",
+    "workedAnswer": "120,000 × 0.1 ms = 12,000 ms = 12 s.",
+    "explanation": "Sanity check: the honest table scan would take roughly 10 s at this size, so the forced plan is already losing; a hint can win the vote and still lose the race. 1.2 s drops a factor of ten; 120 confuses minutes with seconds.",
+    "tolerance": 0,
+    "trapAnswers": [1.2, 120]
+   },
+   {
+    "id": "t724-a5",
+    "concept": "cost-knobs",
+    "type": "multiple_choice",
+    "prompt": "To compare costs for one EXPLAIN, you want the PostgreSQL planner to price out sequential scans temporarily. Which lever exists for that?",
+    "choices": [
+     {"id": "a", "label": "SET enable_seqscan = off for the session"},
+     {"id": "b", "label": "SET planner_mode = 'index-only' for the query"},
+     {"id": "c", "label": "SET seq_page_cost = 0 so scans are free"},
+     {"id": "d", "label": "SET force_index = on in postgresql.conf"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "The enable_* family removes a method from contention long enough to see how the alternatives cost, a diagnostic switch rather than a hint. The other settings do not exist; there is no planner_mode and no force_index in the configuration."
+   },
+   {
+    "id": "t724-a6",
+    "concept": "hint-limits",
+    "type": "tradeoff",
+    "prompt": "A revenue report regressed after a statistics refresh, and the on-call engineer needs it fast again tonight.",
+    "constraints": [
+     "The report runs hourly and feeds finance",
+     "Diagnosing the bad estimate properly will take days",
+     "A schema upgrade next month will change plans again"
+    ],
+    "approaches": [
+     {"id": "p1", "label": "Pin the old plan with a hint now, with a dated follow-up to fix the estimate", "description": "Stopgap pin"},
+     {"id": "p2", "label": "Pin the plan permanently and close the ticket", "description": "Permanent pin"},
+     {"id": "p3", "label": "Hold the report for days until the statistics investigation ends", "description": "Fix first"}
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {"id": "r1", "label": "Finance cannot wait days for a statistics investigation"},
+     {"id": "r2", "label": "A hint is a lease on the old plan; the follow-up bounds how long it rots"},
+     {"id": "r3", "label": "Once pinned, the plan stays optimal as the data changes"},
+     {"id": "r4", "label": "A correct estimate is required before any improvement is possible"}
+    ],
+    "correctRationaleIds": ["r1", "r2"],
+    "distractorRationaleIds": ["r3", "r4"],
+    "rationaleConflicts": {
+     "r3": "The pin is only valid for today’s distribution; next month’s upgrade and growth make an unowned hint a future incident.",
+     "r4": "The hint restores the service now precisely because the real fix takes days; blocking the report on it confuses correctness with urgency."
+    },
+    "explanation": "A hint is defensible as a stopgap: it returns the service tonight while the underlying estimate gets a proper fix. The failure modes are pinning with no follow-up, which guarantees rot, and holding the business hostage to an investigation."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t724-f1",
+    "front": "What does a query hint actually do?",
+    "back": "Overrides the costed choice with a commanded plan; the planner stops asking whether it is cheapest."
+   },
+   {
+    "id": "t724-f2",
+    "front": "Why do pinned plans rot?",
+    "back": "The hint outlives the data distribution it was pinned for, and nothing re-asks the question."
+   },
+   {
+    "id": "t724-f3",
+    "front": "Does PostgreSQL ship query hints?",
+    "back": "No; diagnostic switches such as enable_seqscan exist, and hint support is the pg_hint_plan extension."
+   }
+  ],
+  "sources": [
+   {
+    "title": "MySQL 8.4: Optimizer Hints",
+    "url": "https://dev.mysql.com/doc/refman/8.4/en/optimizer-hints.html"
+   },
+   {
+    "title": "MySQL 8.4: Index Hints",
+    "url": "https://dev.mysql.com/doc/refman/8.4/en/index-hints.html"
+   },
+   {
+    "title": "PostgreSQL: Query Planning Configuration",
+    "url": "https://www.postgresql.org/docs/current/runtime-config-query.html"
+   }
+  ],
+  "deep": {
+   "teaches": ["planner-hints", "hint-syntax", "plan-pinning", "cost-knobs", "hint-limits"],
+   "mechanism": {
+    "title": "Why an override outlives its moment",
+    "steps": [
+     "The planner is a cost model: it enumerates candidate plans, prices each in units of page reads and CPU, and keeps the cheapest. Nothing in that process knows which index a developer hoped for, only what each alternative costs under the current estimates.",
+     "A hint changes the question. MySQL’s USE, FORCE and IGNORE INDEX tell the optimiser to treat a table scan as ruinously expensive; comment-style optimiser hints steer join order and switches per statement; pg_hint_plan bolts the same idea onto PostgreSQL, whose core ships no hint syntax by design.",
+     "Because a hint commands rather than informs, the planner stops comparing. It never re-asks whether the forced path stays cheap as the table grows, so the pin is silently re-applied to data it never saw.",
+     "That is why pinned plans rot. The hint was correct for one distribution on one day; months later the same filter keeps fifteen times more rows and the forced nested loop is now the worst option, surfacing as chronic slowness rather than an error.",
+     "PostgreSQL’s compromise is diagnostic switches: enable_seqscan, enable_nestloop and friends price a method out of consideration long enough to compare costs in EXPLAIN. They answer what the other plan would cost, which is a question, not a command.",
+     "The durable fixes attack the reason the plan was wrong: stale statistics get ANALYZE or a higher target, a missing composite index gets built, a misshaped query gets rewritten. A hint is the lever left when none of those can land in time."
+    ]
+   },
+   "useWhen": [
+    "A production regression cannot wait for a statistics or index investigation, and pinning the known-good plan restores service tonight.",
+    "A vendor or legacy schema you cannot touch mis-costs one hot join, and a hint is the only lever available."
+   ],
+   "avoidWhen": [
+    "Avoid hints as the first answer to a slow plan; each one freezes today’s distribution into tomorrow’s query.",
+    "Avoid deploying enable_* switches in application code to steer plans; they are diagnostic levers for EXPLAIN sessions."
+   ],
+   "tradeoffs": {
+    "columns": ["Approach", "Speed to fix", "What you owe later"],
+    "rows": [
+     ["Hint or forced plan", "Minutes: the old plan returns tonight", "A pin that rots as data drifts and must be revisited"],
+     ["Refresh or raise statistics", "Minutes to hours", "Better estimates for every query, not only this one"],
+     ["New index or a rewrite", "Hours to days", "The permanent fix plus maintenance cost on each write"]
+    ]
+   },
+   "numbers": {
+    "title": "Six months under a pinned plan",
+    "assumptions": [
+     "At pin time the filter keeps 1% of a 2,000,000-row table",
+     "Six months later the table is 40,000,000 rows and the filter keeps 15%",
+     "A forced index probe costs about 0.1 ms per row",
+     "Scanning the grown table would take about 100 s"
+    ],
+    "steps": [
+     "Pin day: 2,000,000 × 1% = 20,000 probes × 0.1 ms ≈ 2 s, genuinely the best plan then.",
+     "Six months on: 40,000,000 × 15% = 6,000,000 probes × 0.1 ms ≈ 600 s per run.",
+     "The scan the hint overrules would cost about 100 s, roughly six times faster than the forced plan.",
+     "No alert fires, because the hint keeps outvoting the cost model at every single run."
+    ],
+    "result": "A pin is only correct for the distribution it was pinned on; here the forced plan grew about 300× worse while nobody re-asked the question."
+   },
+   "india": {
+    "title": "Hint syntax and switches in the official manuals",
+    "label": "Official documentation",
+    "body": "MySQL’s manual documents index hints, where FORCE INDEX makes the optimiser price a table scan as very expensive, alongside comment-style optimiser hints for join order and settings. PostgreSQL’s configuration reference lists the enable_* planner-method switches for comparison and debugging, and ships no hint syntax, which is why pg_hint_plan remains a separate extension."
+   },
+   "pitfalls": [
+    {
+     "trap": "“FORCE INDEX fixed the regression, so the ticket is done.”",
+     "say": "“It fixed today’s distribution; I would keep the pin as a stopgap and fix the estimate that failed.”"
+    },
+    {
+     "trap": "“A hint guarantees the fastest plan.”",
+     "say": "“It guarantees a plan, not the best one; the cost model stops being consulted once the hint wins.”"
+    }
+   ],
+   "takeaways": [
+    "A hint overrides the costed choice; it hands the planner a command, not better information.",
+    "Forced plans rot because the data drifts while the command stays fixed, and nothing warns you.",
+    "PostgreSQL ships no hints on purpose; the enable_* switches are diagnostics, not production levers.",
+    "Reach for a hint only after statistics, indexes and query shape have had their chance, and file the real fix."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Force the index or fix the guess?",
+   "prompt": "A region filter keeps about 70% of the table, so the planner scans. A colleague wants FORCE INDEX (idx_region) so the query ‘uses the index’. What does the hint buy?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "A slower plan, probing the index once per row over most of the table",
+     "feedback": "Right: probing the index for 70% of the rows reads more pages than the honest sequential scan would."
+    },
+    {
+     "id": "b",
+     "label": "A faster plan, since index reads beat scanning",
+     "feedback": "Index probes win on selective filters; at 70% selectivity they multiply random reads instead of saving them."
+    },
+    {
+     "id": "c",
+     "label": "Nothing, because the engine ignores hints on fat predicates",
+     "feedback": "FORCE INDEX is obeyed: the engine prices the scan as prohibitive and walks the index anyway."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "A hint cannot make a bad index good; it can only stop the planner noticing. Fix the estimate or the index rather than the messenger."
+  },
+  "seeAlso": [
+   {"topicId": 23, "why": "Knowing when an index genuinely wins is the knowledge a hint pretends to have"},
+   {"topicId": 265, "why": "The cost model a hint overrides is the subject of the planner lesson"},
+   {"topicId": 624, "why": "Statement statistics show whether a forced plan is actually the right call"}
+  ]
+ },
+ {
+  "id": 725,
+  "slug": "logical-versus-physical-replication",
+  "region": "f4-databases",
+  "order": 36,
+  "title": "Logical versus Physical Replication",
+  "kind": "lesson",
+  "objectives": [
+   "Distinguish what physical and logical replication actually ship",
+   "Choose logical replication for selective or cross-version flows",
+   "Anticipate the gaps: DDL, sequences and slot retention"
+  ],
+  "difficulty": 3,
+  "durationMinutes": 14,
+  "prereqIds": [270],
+  "cards": [
+   {
+    "id": "t725-c1",
+    "kind": "text",
+    "title": "Bytes versus row changes",
+    "body": "Physical replication ships the write-ahead log itself: page-level change records a standby replays to stay a byte-level twin of the whole cluster. Logical replication decodes the same WAL into committed row changes, namely inserts, updates and deletes on chosen tables, and applies them through the subscriber’s own engine.",
+    "teaches": ["physical-vs-logical"]
+   },
+   {
+    "id": "t725-c2",
+    "kind": "diagram",
+    "title": "A committed row’s path to a subscriber",
+    "body": "How one row travels from WAL record to a logical replica.",
+    "teaches": ["logical-decoding"],
+    "steps": [
+     "The change is written to the WAL on the primary",
+     "Logical decoding rebuilds it as a row-level change event",
+     "The publication’s filter decides whether the change qualifies",
+     "The subscriber applies the row through its own engine",
+     "Its slot position advances so the primary can release that WAL"
+    ]
+   },
+   {
+    "id": "t725-c3",
+    "kind": "text",
+    "title": "What a replication slot really pins",
+    "body": "A slot is the primary’s promise not to discard WAL a consumer still needs: every byte past the slot’s confirmed position is retained so nothing is lost during a disconnect. That promise is also the danger: a stalled subscriber converts reliability into a pg_wal directory that grows until the disk fills.",
+    "teaches": ["replication-slots"]
+   },
+   {
+    "id": "t725-c4",
+    "kind": "text",
+    "title": "Misconception: a logical replica is a byte copy of the primary",
+    "body": "A subscriber is an independent database holding chosen tables, not a twin. It may carry extra indexes, different storage settings, a newer major version, even tables that exist nowhere upstream. Physical replication is the twin; logical replication is a subscription.",
+    "teaches": ["logical-gaps"]
+   },
+   {
+    "id": "t725-c5",
+    "kind": "text",
+    "title": "What logical replication does not carry",
+    "body": "The stream contains row data only: no DDL, so schema changes must be applied on both ends by hand; no sequence state, so counters drift unless synced separately; no large objects. A migration that forgets these gaps produces a replica that looks complete until the first insert collides.",
+    "teaches": ["logical-gaps"]
+   },
+   {
+    "id": "t725-c6",
+    "kind": "text",
+    "title": "Trap: assuming ALTER TABLE replicates",
+    "body": "A migration adds a column on the primary and the subscription quietly stops making sense: the decoded rows no longer match the subscriber’s table and apply errors pile up. Logical replication demands schema discipline: DDL lands on the subscriber first or in lockstep, never as a surprise.",
+    "teaches": ["logical-gaps"]
+   }
+  ],
+  "questions": [
+   {
+    "id": "t725-a1",
+    "concept": "physical-vs-logical",
+    "type": "multiple_choice",
+    "prompt": "What does a physical standby actually receive and apply?",
+    "choices": [
+     {"id": "a", "label": "WAL records describing page changes, replayed into a byte-level twin"},
+     {"id": "b", "label": "Decoded row events for the tables listed in its subscription"},
+     {"id": "c", "label": "The SQL statements the primary’s clients issued"},
+     {"id": "d", "label": "Periodic snapshots of whichever data files changed"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "Streaming replication replays the write-ahead log itself, so the standby converges to a byte-for-byte copy of the cluster: every database, every index. Row-level events and statement text describe logical replication and neither is what the WAL contains."
+   },
+   {
+    "id": "t725-a2",
+    "concept": "logical-decoding",
+    "type": "multiple_choice",
+    "prompt": "Why can a logical subscriber run a newer PostgreSQL major version than its primary?",
+    "choices": [
+     {"id": "a", "label": "It applies decoded row changes, not the primary’s on-disk page format"},
+     {"id": "b", "label": "The primary ships SQL text that the newer engine re-parses"},
+     {"id": "c", "label": "Major versions share an identical on-disk layout anyway"},
+     {"id": "d", "label": "The subscriber converts itself back to the old format per batch"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "Logical replication carries abstracted insert, update and delete events, so each side keeps its own version and physical layout. Physical replicas must match because they replay page changes; on-disk formats do change between major versions."
+   },
+   {
+    "id": "t725-a3",
+    "concept": "replication-slots",
+    "type": "estimation",
+    "prompt": "A logical slot’s subscriber goes offline while the primary keeps writing 200 MB of WAL an hour. About 30 GB of disk is free for retained WAL. Roughly how many hours until that space is gone?",
+    "unit": "hours",
+    "target": 150,
+    "assumptions": [
+     "200 MB of WAL retained per hour for the stalled slot",
+     "30 GB ≈ 30,000 MB of free space"
+    ],
+    "formula": "free space ÷ WAL retained per hour",
+    "workedAnswer": "30,000 MB ÷ 200 MB/h = 150 h.",
+    "explanation": "Sanity check: that is about six days of runway, and the slot releases nothing until the subscriber resumes, so retained-WAL alerts matter more than lag dashboards. 15 h divides by 2,000; 300 h doubles the rate the wrong way.",
+    "tolerance": 0,
+    "trapAnswers": [15, 300]
+   },
+   {
+    "id": "t725-a4",
+    "concept": "logical-decoding",
+    "type": "drag_order",
+    "prompt": "Order one committed row’s journey to a logical subscriber.",
+    "items": [
+     {"id": "s1", "label": "The row’s change is appended to the WAL on the primary"},
+     {"id": "s2", "label": "Logical decoding turns the WAL record into a row-change event"},
+     {"id": "s3", "label": "The publication’s filter lets the change through"},
+     {"id": "s4", "label": "The subscriber applies the row and confirms its slot position"}
+    ],
+    "correctOrder": ["s1", "s2", "s3", "s4"],
+    "explanation": "Everything starts as a WAL record; decoding reinterprets it as row changes, publication filters decide what qualifies, and the slot position only advances once the subscriber confirms the apply."
+   },
+   {
+    "id": "t725-a5",
+    "concept": "logical-gaps",
+    "type": "multiple_choice",
+    "prompt": "After a logical migration, every new insert collides with keys the primary’s sequences already passed. What was missed?",
+    "choices": [
+     {"id": "a", "label": "Sequence state is outside logical replication and must be synced separately"},
+     {"id": "b", "label": "The subscriber rewound its sequences during the initial table copy"},
+     {"id": "c", "label": "Sequences replicate lazily and only flush at checkpoint time"},
+     {"id": "d", "label": "The publication omitted the sequence columns from its filter"}
+    ],
+    "correctChoiceIds": ["a"],
+    "explanation": "The stream carries row changes only; sequence counters live outside it, so the subscriber’s sequences start wherever they were left. They are not flushed on checkpoints, and a column filter cannot carry a sequence’s current value."
+   },
+   {
+    "id": "t725-a6",
+    "concept": "physical-vs-logical",
+    "type": "tradeoff",
+    "prompt": "A 2 TB database must move to a newer major version, but only the orders and payments schemas are actually needed. Cut-over must fit inside a minute.",
+    "constraints": [
+     "Only two schemas of the 2 TB are wanted at the far end",
+     "The target runs a different major version",
+     "Cut-over downtime is under one minute"
+    ],
+    "approaches": [
+     {"id": "p1", "label": "Publish the needed schemas to a logical subscriber, then repoint the app", "description": "Selective stream"},
+     {"id": "p2", "label": "Stand up a physical standby on the new version and promote it", "description": "Byte-level twin"},
+     {"id": "p3", "label": "Dump and restore the two schemas during the cut-over window", "description": "Offline copy"}
+    ],
+    "correctApproachId": "p1",
+    "rationaleOptions": [
+     {"id": "r1", "label": "Logical replication crosses major versions, which physical streaming cannot"},
+     {"id": "r2", "label": "Subscribing to only the needed schemas avoids copying the rest of the 2 TB"},
+     {"id": "r3", "label": "A physical standby can be promoted across major versions"},
+     {"id": "r4", "label": "Dump and restore keeps up with commits inside the minute"}
+    ],
+    "correctRationaleIds": ["r1", "r2"],
+    "distractorRationaleIds": ["r3", "r4"],
+    "rationaleConflicts": {
+     "r3": "Physical replication replays page-level WAL and requires the same major version; it cannot bridge the upgrade.",
+     "r4": "A dump is a frozen snapshot, so anything committed during the restore is lost; nothing streams it to the far side."
+    },
+    "explanation": "The requirements, a subset of the data plus a different major version, are exactly the two capabilities only logical replication has. A physical standby copies everything at the same version, and a dump cannot keep pace with live commits."
+   }
+  ],
+  "flashcards": [
+   {
+    "id": "t725-f1",
+    "front": "Physical versus logical replication?",
+    "back": "Physical ships WAL page changes for a byte-level twin; logical ships decoded row changes for chosen tables."
+   },
+   {
+    "id": "t725-f2",
+    "front": "What does a replication slot pin?",
+    "back": "The WAL a consumer still needs: reliable delivery at the price of retained disk until it catches up."
+   },
+   {
+    "id": "t725-f3",
+    "front": "What does logical replication not carry?",
+    "back": "DDL, sequence state and large objects; each needs separate handling on both ends."
+   }
+  ],
+  "sources": [
+   {
+    "title": "PostgreSQL: Logical Replication",
+    "url": "https://www.postgresql.org/docs/current/logical-replication.html"
+   },
+   {
+    "title": "PostgreSQL: Logical Decoding",
+    "url": "https://www.postgresql.org/docs/current/logicaldecoding.html"
+   },
+   {
+    "title": "PostgreSQL: Streaming Replication",
+    "url": "https://www.postgresql.org/docs/current/warm-standby.html"
+   }
+  ],
+  "deep": {
+   "teaches": ["physical-vs-logical", "logical-decoding", "replication-slots", "logical-gaps"],
+   "mechanism": {
+    "title": "From WAL record to subscribed row",
+    "steps": [
+     "Physical replication ships the write-ahead log itself: page-level change records that a standby replays until it is a byte-level twin of the cluster: every database, every index, same major version.",
+     "Logical replication starts at the same WAL but runs it through logical decoding, which reconstructs committed transactions as row-level insert, update and delete events rather than page changes.",
+     "A publication decides what leaves: chosen tables, optionally filtered by rows or column lists. The subscriber applies the surviving events through its own engine, so its layout, from indexes to settings to major version, is its own business.",
+     "Replication slots are the reliability hinge. The primary retains every WAL byte past a slot’s confirmed position so a disconnected consumer loses nothing; a stalled subscriber converts that promise into a pg_wal directory that grows until the disk fills.",
+     "A subscription begins with a snapshot: the subscriber copies the published tables’ existing contents, then catches up on the changes queued during the copy. Until caught up the replica is consistent but behind.",
+     "The gaps are real: the stream carries row data only: no DDL, no sequence state, no large objects. Schema changes and sequence values need their own handling on both ends, which is where most logical-replication incidents are born."
+    ]
+   },
+   "useWhen": [
+    "Copying a subset of tables, feeding a different major version, or distributing a filtered slice where a whole-cluster twin is wrong anyway.",
+    "Near-zero-downtime major-version upgrades, where a logical subscriber on the new version catches up and then takes over."
+   ],
+   "avoidWhen": [
+    "Avoid logical replication as a whole-cluster standby; physical streaming is simpler, carries everything and keeps indexes for free.",
+    "Avoid unmonitored slots; retained WAL is a disk-filling failure mode, not a queue you can leave alone."
+   ],
+   "tradeoffs": {
+    "columns": ["Stream", "What the replica is", "Limits"],
+    "rows": [
+     ["Physical (WAL shipping)", "Byte-level twin of the whole cluster", "Same major version, no table selection, read-only standby"],
+     ["Logical (decoded rows)", "An independent database holding chosen tables", "No DDL or sequences, an initial sync, and slots to babysit"]
+    ]
+   },
+   "numbers": {
+    "title": "Initial sync and the WAL that waits",
+    "assumptions": [
+     "The published schemas total 800 GB",
+     "The initial copy streams at about 400 MB/s",
+     "The primary writes 100 MB a minute of WAL for those tables"
+    ],
+    "steps": [
+     "Copy time: 800 GB ÷ 0.4 GB/s ≈ 2,000 s, roughly 33 minutes.",
+     "Changes queued meanwhile: 100 MB/min × 33 min ≈ 3.3 GB waiting after the snapshot.",
+     "Catch-up at the same apply rate adds only about 8 s; the slot holds that WAL the entire time.",
+     "If the subscriber dies mid-copy, its slot keeps retaining: at 100 MB/min that is 6 GB an hour until it resumes or is dropped."
+    ],
+    "result": "The copy itself is manageable; the risk is a slot quietly pinning gigabytes of WAL; monitor retained bytes, not just lag."
+   },
+   "india": {
+    "title": "Replication mechanics in the PostgreSQL manual",
+    "label": "Official documentation",
+    "body": "The logical-replication chapter states plainly that only data-modification changes are sent, since schema DDL and sequence data are not replicated, and describes publications, subscriptions and the initial table sync. The streaming-replication documentation explains that the primary retains WAL needed by each slot, which is why the manual advises monitoring retained bytes rather than assuming the queue is free."
+   },
+   "pitfalls": [
+    {
+     "trap": "“Once logical replication runs, the replica stays a faithful copy.”",
+     "say": "“It copies chosen tables’ row changes; new columns, DDL and sequences drift unless I handle them myself.”"
+    },
+    {
+     "trap": "“The subscriber is offline, but its slot can wait.”",
+     "say": "“A dormant slot retains WAL without bound; I would alert on retained bytes before the primary’s disk fills.”"
+    }
+   ],
+   "takeaways": [
+    "Physical replication replays WAL into a byte-level twin of the whole cluster at the same major version.",
+    "Logical replication streams decoded row changes for chosen tables and can cross major versions.",
+    "Replication slots make delivery reliable by pinning WAL, which is dangerous the moment a consumer stalls.",
+    "Logical replication omits DDL, sequences and large objects; each needs its own migration step."
+   ]
+  },
+  "interactive": {
+   "kind": "predict",
+   "title": "Which stream reaches the new version?",
+   "prompt": "The task: copy only the orders schema from a PostgreSQL 15 primary to a fresh PostgreSQL 17 cluster, then repoint the app. Which mechanism fits?",
+   "choices": [
+    {
+     "id": "a",
+     "label": "A publication on orders with a v17 subscriber",
+     "feedback": "Right: logical replication ships decoded row changes for chosen tables and crosses major versions."
+    },
+    {
+     "id": "b",
+     "label": "A physical standby promoted on v17",
+     "feedback": "Physical streaming needs the same major version; it is a byte-level twin of the whole cluster."
+    },
+    {
+     "id": "c",
+     "label": "Nightly dump-and-restore until cut-over",
+     "feedback": "Restores are day-old snapshots; nothing carries the commits that land between dumps."
+    }
+   ],
+   "correctId": "a",
+   "reveal": "Logical replication exists for exactly this: a filtered, version-independent stream of row changes. Physical replication is the byte-twin answer for same-version standbys."
+  },
+  "seeAlso": [
+   {"topicId": 28, "why": "The system-design replication topic sets up sync versus async and lag"},
+   {"topicId": 270, "why": "Replication basics introduce streaming, lag and read-your-writes"},
+   {"topicId": 269, "why": "The WAL is the single source both physical and logical streams draw from"}
+  ]
+ }
+]
