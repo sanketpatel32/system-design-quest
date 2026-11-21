@@ -1,0 +1,1609 @@
+[
+  {
+    "id": 738,
+    "slug": "secrets-rotation-and-injection",
+    "region": "f7-cloud",
+    "order": 31,
+    "title": "Secrets Management: Stores, Rotation and Injection",
+    "kind": "lesson",
+    "objectives": [
+      "Describe what a secrets manager adds beyond encrypted variables",
+      "Choose between environment variables, mounted files and fetched secrets for a workload",
+      "Plan a rotation that never drops live traffic"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [323, 582],
+    "cards": [
+      {
+        "id": "t738-c1",
+        "kind": "text",
+        "title": "What makes a secret different from configuration",
+        "body": "A secret is configuration whose value must stay confidential: a database password, an API key, a signing key. That changes the requirements. Alongside delivery it needs access scoped by identity, a log of every read and a plan for replacing the value while the service keeps running.",
+        "teaches": ["secret-stores"]
+      },
+      {
+        "id": "t738-c2",
+        "kind": "text",
+        "title": "A secrets manager in the middle",
+        "body": "A secrets manager stores values centrally, checks the caller’s identity against policy, audits every read and can rotate on a schedule. Some also mint dynamic secrets: a database user created for one workload with a TTL, deleted automatically when it expires.",
+        "teaches": ["secret-stores"]
+      },
+      {
+        "id": "t738-c3",
+        "kind": "diagram",
+        "title": "Worked example: rotating a shared API key",
+        "body": "A key used by twenty services must be replaced without an outage.",
+        "teaches": ["secret-rotation"],
+        "steps": [
+          "Issue a second key while the first keeps working",
+          "Roll the new key out to the services over a normal deploy",
+          "Watch usage until calls authenticated with the old key stop",
+          "Revoke the old key; the overlap is what made it safe"
+        ]
+      },
+      {
+        "id": "t738-c4",
+        "kind": "text",
+        "title": "Environment variables versus mounted files",
+        "body": "An environment variable is fixed when the process starts: a rotated value cannot reach a running process without a restart, and variables leak into crash dumps and child processes. A mounted file can be refreshed by the platform and re-read by the app, at the cost of the app knowing to look again.",
+        "teaches": ["secret-injection"]
+      },
+      {
+        "id": "t738-c5",
+        "kind": "text",
+        "title": "Misconception: encrypted at rest means safe",
+        "body": "Encrypting a secret and committing it is not access control: everyone holding the key, now or later through git history, holds every version. Encryption answers at-rest exposure; it does nothing about who may decrypt, when the value should change or what happens after a leak.",
+        "teaches": ["secret-rotation"]
+      },
+      {
+        "id": "t738-c6",
+        "kind": "text",
+        "title": "Trap: secrets that live forever in CI settings",
+        "body": "A permanent token pasted into pipeline variables outlives the project, the person who created it and every fork of the job. When it leaks, through a log, a misconfigured job or a departed engineer, nobody knows what it could reach. Prefer credentials the job mints from its own workload identity, valid for minutes.",
+        "teaches": ["secret-stores"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t738-a1",
+        "concept": "secret-stores",
+        "type": "multiple_choice",
+        "prompt": "Why keep production secrets in a central secrets manager rather than in each CI system’s variables?",
+        "choices": [
+          { "id": "a", "label": "It encrypts secrets other stores cannot encrypt" },
+          { "id": "b", "label": "One place scopes access, logs reads and rotates values" },
+          { "id": "c", "label": "Workloads then need no credentials of their own" },
+          { "id": "d", "label": "Developers can read the values more quickly" }
+        ],
+        "correctChoiceIds": ["b"],
+        "explanation": "The gains are operational, not cryptographic: CI variables are encrypted too, but a central store gives one policy surface, one audit log and one rotation point. Workloads still authenticate, and ease of reading is the opposite of the goal."
+      },
+      {
+        "id": "t738-a2",
+        "concept": "secret-injection",
+        "type": "multiple_choice",
+        "prompt": "Why deliver a frequently rotated password as a mounted file rather than an environment variable?",
+        "choices": [
+          { "id": "a", "label": "Files hide the value from anyone on the host" },
+          { "id": "b", "label": "Environment variables cannot hold long secrets" },
+          { "id": "c", "label": "Mounted files are encrypted on disk by default" },
+          { "id": "d", "label": "The app can re-read the new value without restarting" }
+        ],
+        "correctChoiceIds": ["d"],
+        "explanation": "An environment variable is fixed at process start, so a rotation needs a restart to propagate; a file the platform refreshes lets the app pick up the new value in place. Files are not inherently hidden or encrypted, and variables hold any length."
+      },
+      {
+        "id": "t738-a3",
+        "concept": "secret-rotation",
+        "type": "multiple_choice",
+        "prompt": "A deploy log prints a live API key. The team enables log masking. What still must happen?",
+        "choices": [
+          { "id": "a", "label": "Re-run the deploy so the key is used correctly" },
+          { "id": "b", "label": "Nothing: masking removes it from the log history" },
+          { "id": "c", "label": "Rotate the key: masking does not change the value" },
+          { "id": "d", "label": "Purge the stored logs so the key cannot be re-read" }
+        ],
+        "correctChoiceIds": ["c"],
+        "explanation": "Masking changes what future log output shows, not the credential itself; anyone who saw the log keeps a working key until it is rotated. Deleting logs helps but is not guaranteed, and re-running the deploy does nothing for the leaked value."
+      },
+      {
+        "id": "t738-a4",
+        "concept": "secret-rotation",
+        "type": "estimation",
+        "prompt": "A platform team rotates 240 secrets by hand each quarter at about 25 minutes each. How many engineer-hours is that per quarter?",
+        "unit": "engineer-hours",
+        "target": 100,
+        "assumptions": [
+          "240 secrets, one manual rotation each per quarter",
+          "25 minutes of engineer time per rotation (illustrative)"
+        ],
+        "formula": "240 × 25 ÷ 60",
+        "workedAnswer": "240 × 25 ÷ 60 = 100 engineer-hours",
+        "explanation": "Sanity check: 25 minutes is a little under half an hour, so the total should land just under 120 hours. Automation that cuts each rotation to a 5-minute review saves about 80 hours every quarter.",
+        "tolerance": 0.02,
+        "trapAnswers": [6000, 240]
+      },
+      {
+        "id": "t738-a5",
+        "concept": "secret-rotation",
+        "type": "drag_order",
+        "prompt": "Order a zero-downtime rotation of a shared API key.",
+        "items": [
+          { "id": "s3", "label": "Watch until calls on the old key stop" },
+          { "id": "s1", "label": "Issue a second key while the first still works" },
+          { "id": "s4", "label": "Revoke the old key" },
+          { "id": "s2", "label": "Roll the new key out to every caller" }
+        ],
+        "correctOrder": ["s1", "s2", "s3", "s4"],
+        "explanation": "The overlap is the whole trick: two valid keys let callers migrate on a normal deploy. Revoking before usage stops just moves the outage to a different clock, and issuing only one key forces a coordinated cutover."
+      },
+      {
+        "id": "t738-a6",
+        "concept": "secret-stores",
+        "type": "tradeoff",
+        "prompt": "A nightly batch job needs to read from a cloud database.",
+        "constraints": [
+          "Job runs once a day for an hour",
+          "A stored password would sit valid for months",
+          "Every workload already has a platform identity"
+        ],
+        "approaches": [
+          { "id": "p2", "label": "A stored password, rotated by hand each quarter", "description": "Quarterly static password" },
+          { "id": "p3", "label": "One shared admin password kept in the team vault", "description": "Shared admin password" },
+          { "id": "p1", "label": "The job exchanges its workload identity for a short-lived credential each run", "description": "Dynamic credential" }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          { "id": "r3", "label": "A quarterly rotation is often enough for a leaked key" },
+          { "id": "r1", "label": "A credential that lives an hour bounds what a leak can do" },
+          { "id": "r4", "label": "A shared password is safe while few people know it" },
+          { "id": "r2", "label": "There is no long-lived value to store or rotate" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "Months of validity is exactly the exposure rotation exists to shrink.",
+          "r4": "Shared credentials make audit trails and revocation painful."
+        },
+        "explanation": "The job already owns an identity, so it can mint a credential that exists for the run and is gone after; a leaked value then expires before anyone uses it. A quarterly password spends most of its life waiting to leak, and a shared admin credential can reach far more than the job needs."
+      }
+    ],
+    "flashcards": [
+      { "id": "t738-f1", "front": "Static vs dynamic secret?", "back": "Static lives until rotated; dynamic is minted per use with a TTL and dies on its own." },
+      { "id": "t738-f2", "front": "Why rotate secrets?", "back": "To bound how long a leaked value stays useful." },
+      { "id": "t738-f3", "front": "Env var vs mounted file for a rotating secret?", "back": "The file can be refreshed and re-read; the variable is fixed for the life of the process." }
+    ],
+    "sources": [
+      { "title": "OWASP: Secrets Management Cheat Sheet", "url": "https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html" },
+      { "title": "AWS: Secrets Manager User Guide", "url": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html" },
+      { "title": "HashiCorp: Vault documentation", "url": "https://developer.hashicorp.com/vault/docs" },
+      { "title": "The Twelve-Factor App: Config", "url": "https://12factor.net/config" }
+    ],
+    "deep": {
+      "teaches": ["secret-stores", "secret-rotation", "secret-injection"],
+      "mechanism": {
+        "title": "How a workload actually gets a secret",
+        "steps": [
+          "The workload starts with an identity it already owns: a service account token, an instance identity or a signed CI job token. No secret is needed to prove who it is, which is what breaks the bootstrap problem.",
+          "The secrets broker checks that identity against its trust configuration: which issuer it accepts, which subject and audience the token must carry and which workload it maps to.",
+          "A policy then decides which paths or roles that identity may read, ideally as narrowly as the workload’s real need. Broad policies quietly recreate the shared-password problem inside the manager.",
+          "The store either returns a stored value or generates a dynamic credential, such as a database user created on the spot with a TTL and scheduled deletion, so nothing permanent exists to steal.",
+          "Delivery is the last hop: the value lands in a mounted file the platform can refresh, or in memory the app fetched itself. Either way it never sits in source control, image layers or pipeline variables.",
+          "On rotation or expiry the new credential is already working before the old one is revoked, and the app re-reads the file or re-fetches. Rotation becomes routine rather than a maintenance window."
+        ]
+      },
+      "useWhen": [
+        "Use a central secrets store whenever more than one system needs the same credentials.",
+        "Prefer dynamic, TTL-bound credentials for databases and cloud APIs that support them.",
+        "Rotate on suspicion, not only on schedule."
+      ],
+      "avoidWhen": [
+        "Do not bake secrets into images, build artefacts or source control, even encrypted ones if the key is widely held.",
+        "Avoid environment variables for secrets that rotate; the process keeps the old value until restarted.",
+        "Do not let every workload read every secret; broad policies undo the point of the store."
+      ],
+      "tradeoffs": {
+        "columns": ["Delivery method", "Benefit", "Cost"],
+        "rows": [
+          ["Environment variable", "Simple and works everywhere", "Fixed at process start; leaks into dumps and subprocesses"],
+          ["Mounted file", "Refreshes without a restart; stays out of the environment", "App must re-read it; file permissions need care"],
+          ["App fetches from the store", "Tight audit trail; rotation logic lives in the app", "Couples the app to the store; fetch failures need handling"],
+          ["Sidecar or agent syncs to files", "App reads plain files; platform handles renewal", "One more component to run and secure"]
+        ]
+      },
+      "numbers": {
+        "title": "What hand rotation costs as secrets multiply",
+        "assumptions": [
+          "240 secrets rotated quarterly (illustrative)",
+          "25 minutes per manual rotation versus 5 minutes of review for an automated one"
+        ],
+        "steps": [
+          "Manual: 240 × 25 minutes = 6,000 minutes = 100 hours a quarter, about 2.5 weeks of one engineer’s time.",
+          "Automated: 240 × 5 minutes = 1,200 minutes = 20 hours a quarter.",
+          "The 80-hour difference recurs every quarter and grows with every new service and credential.",
+          "Manual rotation also tends to slip, so secrets live longer than policy intends."
+        ],
+        "result": "Rotation that is cheap happens on time; rotation that is toil happens late or never."
+      },
+      "india": {
+        "title": "What the public guidance says",
+        "label": "Official documentation",
+        "body": "The OWASP Secrets Management Cheat Sheet recommends centralising secrets in a dedicated manager, scoping access by identity, auditing every read and preferring short-lived dynamic credentials over long-lived static ones. Vendor documentation follows the same shape: cloud secrets managers pair stored secrets with automatic rotation, and workload-identity federation lets a job mint temporary credentials instead of holding a permanent key in CI settings."
+      },
+      "pitfalls": [
+        {
+          "trap": "“We mask secrets in the logs, so a leak is handled.”",
+          "say": "“Masking stops the next print; the value that already leaked stays valid until I rotate it.”"
+        },
+        {
+          "trap": "“The secret is encrypted in the repository, so it is safe.”",
+          "say": "“Encrypted at rest is not access control; anyone with the key or the decrypt job gets every version in the history.”"
+        }
+      ],
+      "takeaways": [
+        "Secrets need identity-scoped access, audit and rotation; config does not.",
+        "Prefer short-lived credentials minted from workload identity.",
+        "Deliver by file or fetch so rotation does not force a restart.",
+        "Masking logs is hygiene, not remediation; rotate after any leak."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The masked leak",
+      "prompt": "A deploy job prints a live API key into CI logs. The team turns on secret masking, deletes nothing else and moves on. A month later, what is true of the leaked key?",
+      "choices": [
+        { "id": "a", "label": "It can still be used by anyone who saw the log, until it is rotated", "feedback": "Right: masking changes what future logs show, not the credential." },
+        { "id": "b", "label": "It stopped working when masking was enabled", "feedback": "Masking edits log output, not the key itself." },
+        { "id": "c", "label": "It expired on its own shortly after the log was written", "feedback": "Static secrets have no expiry; they live until rotated or revoked." }
+      ],
+      "correctId": "a",
+      "reveal": "After any leak the remediation is rotation plus a look at who could read the log. Masking and log access control shrink the audience; they do not heal the credential."
+    },
+    "seeAlso": [
+      { "topicId": 60, "why": "Least privilege and defence in depth, applied to credentials" },
+      { "topicId": 582, "why": "Workload identity is what lets a job mint credentials instead of storing them" },
+      { "topicId": 323, "why": "Pipelines are where secrets most often leak into logs and artefacts" }
+    ]
+  },
+  {
+    "id": 739,
+    "slug": "container-supply-chain-security",
+    "region": "f7-cloud",
+    "order": 32,
+    "title": "Supply-Chain Security for Containers: SBOMs, Scanning and Signing",
+    "kind": "lesson",
+    "objectives": [
+      "Explain what an image scan does and does not tell you",
+      "Describe how SBOMs, signatures and admission checks tie a running pod back to a trusted build",
+      "Choose gating rules that keep findings actionable rather than ignored"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [321, 323],
+    "cards": [
+      {
+        "id": "t739-c1",
+        "kind": "text",
+        "title": "Every dependency is somebody else’s code",
+        "body": "A production image holds a base operating system, runtime packages and application dependencies, all chosen by other people and all carrying their vulnerabilities. You ship whatever they shipped, so you need to know what is in the box and how you will hear when part of it goes bad.",
+        "teaches": ["image-scanning"]
+      },
+      {
+        "id": "t739-c2",
+        "kind": "text",
+        "title": "Scanning reports what you shipped",
+        "body": "A scanner indexes the packages inside an image and matches them against a vulnerability feed, reporting findings with severity and often a fixed version. Two consequences follow: the base image sets your noise floor, and a scan is a snapshot, true only until the feed moves.",
+        "teaches": ["image-scanning"]
+      },
+      {
+        "id": "t739-c3",
+        "kind": "text",
+        "title": "An SBOM is the ingredients list",
+        "body": "A software bill of materials records every package and version inside an image, generated at build and stored next to it. On disclosure day it turns “are we affected?” from an audit of every running system into a single query.",
+        "teaches": ["sbom"]
+      },
+      {
+        "id": "t739-c4",
+        "kind": "text",
+        "title": "Signing and admission bind runtime to pipeline",
+        "body": "The pipeline signs the image digest with its own identity and records provenance: which source and build produced it. An admission check in the cluster verifies the signature before a pod may start, so an image that bypassed the pipeline cannot run.",
+        "teaches": ["signing-attestation"]
+      },
+      {
+        "id": "t739-c5",
+        "kind": "diagram",
+        "title": "Worked example: answering a same-day vulnerability",
+        "body": "A critical CVE is published in a common compression library at noon.",
+        "teaches": ["sbom"],
+        "steps": [
+          "Query the SBOM index for every deployed image containing the library",
+          "The result: 24 of 400 images carry it, listed by digest",
+          "Rebuild those images from a patched base in the normal pipeline",
+          "Redeploy by digest; the admission check confirms each new signature"
+        ]
+      },
+      {
+        "id": "t739-c6",
+        "kind": "text",
+        "title": "Trap: scanning only at build time",
+        "body": "A clean scan at build is true for one afternoon. Vulnerabilities are published daily into code that has not changed in months, so an image grows worse sitting in the registry. Continuous rescanning of stored and running images is what keeps the statement “we are clean” honest.",
+        "teaches": ["image-scanning"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t739-a1",
+        "concept": "sbom",
+        "type": "multiple_choice",
+        "prompt": "What does a kept SBOM let a team answer in minutes?",
+        "choices": [
+          { "id": "a", "label": "Whether a container is running as root" },
+          { "id": "b", "label": "How much each image costs to store" },
+          { "id": "c", "label": "Which deployed images contain a newly disclosed package" },
+          { "id": "d", "label": "Which images sit in the wrong region" }
+        ],
+        "correctChoiceIds": ["c"],
+        "explanation": "The SBOM is the package index per image, so a new disclosure becomes a lookup over what is deployed. Privilege, cost and placement are properties of the runtime and the registry, not of the ingredients list."
+      },
+      {
+        "id": "t739-a2",
+        "concept": "signing-attestation",
+        "type": "multiple_choice",
+        "prompt": "A cluster verifies the signature on an image digest before admitting a pod. What does a valid signature prove?",
+        "choices": [
+          { "id": "a", "label": "This exact image content came from the trusted pipeline" },
+          { "id": "b", "label": "The image contains no known vulnerabilities" },
+          { "id": "c", "label": "The image was built from a minimal base" },
+          { "id": "d", "label": "The registry holds an uncorrupted copy" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "The signature binds the digest, which is the content, to the signer’s identity: provenance. It says nothing about what is inside, so a signed image can still be vulnerable, built from a fat base or mirrored faithfully."
+      },
+      {
+        "id": "t739-a3",
+        "concept": "image-scanning",
+        "type": "multiple_choice",
+        "prompt": "An image that scanned clean at build fails the nightly rescan two months later. What changed?",
+        "choices": [
+          { "id": "a", "label": "The image quietly mutated inside the registry" },
+          { "id": "b", "label": "The scanner lost access to the package index" },
+          { "id": "c", "label": "The base image tag moved to a newer build" },
+          { "id": "d", "label": "A vulnerability in a packaged dependency was published since" }
+        ],
+        "correctChoiceIds": ["d"],
+        "explanation": "The image is unchanged; the feed moved. A finding on an old, unmodified image almost always means a new CVE was published against code it has carried all along, which is exactly why rescanning exists."
+      },
+      {
+        "id": "t739-a4",
+        "concept": "signing-attestation",
+        "type": "drag_order",
+        "prompt": "Order the checks a supply-chain-hardened release passes through.",
+        "items": [
+          { "id": "s2", "label": "Generate the SBOM and scan the image" },
+          { "id": "s5", "label": "Deploy by digest so pods run" },
+          { "id": "s1", "label": "Build the image from a pinned base" },
+          { "id": "s4", "label": "Admission verifies signature and policy" },
+          { "id": "s3", "label": "Sign the digest and record provenance" }
+        ],
+        "correctOrder": ["s1", "s2", "s3", "s4", "s5"],
+        "explanation": "Each later check depends on the earlier artefact: you cannot scan or sign an image that does not exist, and the signature is only meaningful because admission verifies it before the workload is allowed to start."
+      },
+      {
+        "id": "t739-a5",
+        "concept": "sbom",
+        "type": "estimation",
+        "prompt": "An estate runs 400 deployed images. An SBOM query finds a vulnerable library in 6% of them. How many images need a rebuild?",
+        "unit": "images",
+        "target": 24,
+        "assumptions": [
+          "400 distinct deployed images",
+          "6% carry the library (illustrative)"
+        ],
+        "formula": "400 × 0.06",
+        "workedAnswer": "400 × 0.06 = 24 images",
+        "explanation": "Sanity check: 6% is a little under one sixteenth, and 400 ÷ 16 = 25, so the answer belongs in the mid-twenties. Without the index the team would be auditing all 400 by hand.",
+        "tolerance": 0.02,
+        "trapAnswers": [400, 6]
+      },
+      {
+        "id": "t739-a6",
+        "concept": "image-scanning",
+        "type": "tradeoff",
+        "prompt": "Security wants no image with a critical, fixable vulnerability running in production.",
+        "constraints": [
+          "Deploys run hourly",
+          "Scans flag hundreds of low-risk findings",
+          "New CVEs are published daily"
+        ],
+        "approaches": [
+          { "id": "p2", "label": "Block a deploy on any finding, whatever its severity", "description": "Block on everything" },
+          { "id": "p1", "label": "Block deploys on critical findings and rescan running images continuously", "description": "Severity gate plus rescan" },
+          { "id": "p3", "label": "Run one fleet-wide vulnerability scan each quarter", "description": "Quarterly scan" }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          { "id": "r2", "label": "Rescanning catches CVEs published after the build" },
+          { "id": "r4", "label": "Quarterly scans reach disclosures soon enough" },
+          { "id": "r1", "label": "A severity gate keeps the deploy path usable" },
+          { "id": "r3", "label": "Blocking every finding stays cheap when scans are noisy" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "A gate that floods gets bypassed or ignored, which is worse than a risk-based one.",
+          "r4": "Daily disclosures make a quarterly scan a months-long exposure window."
+        },
+        "explanation": "Gating on criticals keeps the deploy path fast enough that teams respect it, while continuous rescanning closes the gap between a CVE being published and the vulnerable image being noticed. Blocking everything trains workarounds, and quarterly scanning leaves weeks of silent exposure."
+      }
+    ],
+    "flashcards": [
+      { "id": "t739-f1", "front": "SBOM?", "back": "The ingredients list of an image: every package and version, produced at build." },
+      { "id": "t739-f2", "front": "What does a signature on a digest prove?", "back": "That exact content came from the signer; nothing about vulnerabilities." },
+      { "id": "t739-f3", "front": "Why rescan stored images?", "back": "New CVEs are published daily; a clean build ages into a vulnerable one." }
+    ],
+    "sources": [
+      { "title": "SLSA: Supply-chain Levels for Software Artifacts", "url": "https://slsa.dev/" },
+      { "title": "Kubernetes: Pod Security Standards", "url": "https://kubernetes.io/docs/concepts/security/pod-security-standards/" },
+      { "title": "Open Container Initiative", "url": "https://opencontainers.org/about/overview/" },
+      { "title": "Docker Docs: Image build best practices", "url": "https://docs.docker.com/build/building/best-practices/" }
+    ],
+    "deep": {
+      "teaches": ["image-scanning", "sbom", "signing-attestation"],
+      "mechanism": {
+        "title": "From commit to admitted pod",
+        "steps": [
+          "The build starts from a pinned, minimal base. Fewer packages mean a shorter ingredients list, a smaller attack surface and a lower noise floor on every future scan.",
+          "The SBOM generator walks the build context and layers and records every package and version; the list is stored beside the image so later queries need no access to running systems.",
+          "The scanner matches that index against a vulnerability feed and reports findings with severity and fix availability; the same matching runs again whenever the feed updates, which is daily.",
+          "The pipeline signs the image digest with its own workload identity and attaches provenance: which source, which build and which steps produced the artefact.",
+          "The registry keeps image, SBOM, scan report and attestations together. Deploying by digest guarantees the artefact that was checked is the one that runs.",
+          "In the cluster an admission controller verifies the signature and policy before a pod may start, so an image that skipped the pipeline cannot begin.",
+          "Between deploys, rescanning watches the feed; when a new CVE lands in a running image, the SBOM index turns the response into a rebuild list rather than an estate-wide audit."
+        ]
+      },
+      "useWhen": [
+        "Sign and verify for any cluster that runs third-party or multi-team images.",
+        "Keep SBOMs for every deployed image so disclosure days are lookups, not audits.",
+        "Rescan continuously; the feed moves even when nothing deploys."
+      ],
+      "avoidWhen": [
+        "Do not gate on every finding; a gate that floods gets bypassed.",
+        "Avoid scanning only at build time; it is a point-in-time answer.",
+        "Do not treat signing as a vulnerability check; provenance and hygiene answer different questions."
+      ],
+      "tradeoffs": {
+        "columns": ["Choice", "Benefit", "Cost"],
+        "rows": [
+          ["Minimal or distroless base", "Short SBOM, few findings, small attack surface", "No shell or tools; debugging takes extra steps"],
+          ["Full OS base image", "Familiar packages and debugging tools", "Longer SBOM; more findings to triage"],
+          ["Block on criticals, rescan continuously", "Deploys keep moving; new CVEs still surface", "Some accepted risk below the gate"],
+          ["Block on any finding", "Nothing flagged can deploy", "Noise drowns the gate; teams route around it"]
+        ]
+      },
+      "numbers": {
+        "title": "Disclosure day, with and without an index",
+        "assumptions": [
+          "400 deployed images; a critical CVE lands in a common library (illustrative)",
+          "A manual audit costs 20 minutes per service; an indexed query is instant"
+        ],
+        "steps": [
+          "Manual audit: 400 × 20 minutes ≈ 133 engineer-hours, spread over days while the vulnerability stays open.",
+          "Indexed query: the 6% of images carrying the package surface immediately, 24 rebuilds instead of 400 checks.",
+          "Each rebuild from a patched base takes about 15 minutes of pipeline time, roughly 6 hours of compute that can run in parallel.",
+          "The exposure window shrinks from days of auditing to the time it takes to rebuild and roll."
+        ],
+        "result": "An SBOM index turns disclosure response from a per-service audit into a rebuild list."
+      },
+      "india": {
+        "title": "The SLSA supply-chain framework",
+        "label": "Official documentation",
+        "body": "The SLSA framework, published at slsa.dev, describes supply-chain integrity in levels: provenance recording how an artefact was built, isolated build systems and signed attestations that consumers verify before use. Kubernetes documentation likewise covers admission-time verification of signed images, so a cluster only runs images a trusted pipeline produced. Together these are the mechanisms a container supply-chain control is built from."
+      },
+      "pitfalls": [
+        {
+          "trap": "“The image was scanned, so it is clean.”",
+          "say": "“It was clean against that feed on that day; rescanning is what keeps the statement true.”"
+        },
+        {
+          "trap": "“The dependency was bumped, so the vulnerability is fixed.”",
+          "say": "“Only once a new image is built from it, redeployed by digest and the old one stopped.”"
+        }
+      ],
+      "takeaways": [
+        "Scan results expire; rescan as the feed moves.",
+        "SBOMs make “are we affected?” a query, not an audit.",
+        "Sign digests and verify at admission to bind runtime to pipeline.",
+        "Minimal bases shrink both attack surface and finding noise."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The lunchtime CVE",
+      "prompt": "At noon a critical vulnerability is published in a library baked into many images. Which team can say within the hour whether it is affected?",
+      "choices": [
+        { "id": "a", "label": "The team keeping an SBOM index for every deployed image", "feedback": "Right: one query over package names produces the rebuild list." },
+        { "id": "b", "label": "The team that scans every image at build time", "feedback": "Their scan reports are as old as each build; nothing re-runs on a new CVE." },
+        { "id": "c", "label": "The team whose clusters verify image signatures", "feedback": "Signatures prove where an image came from, not what is inside it." }
+      ],
+      "correctId": "a",
+      "reveal": "SBOMs answer “where is this package?”; scanning answers “is it vulnerable?”; signing answers “did our pipeline make it?”. Disclosure day needs the first one."
+    },
+    "seeAlso": [
+      { "topicId": 70, "why": "How the containers being secured actually run in production" },
+      { "topicId": 321, "why": "Layers, digests and multi-stage builds are what SBOMs and scans operate on" },
+      { "topicId": 686, "why": "Admission control is where signature verification is enforced" }
+    ]
+  },
+  {
+    "id": 740,
+    "slug": "observability-signals",
+    "region": "f7-cloud",
+    "order": 33,
+    "title": "Observability Signals: Metrics, Logs, Traces and Cardinality",
+    "kind": "lesson",
+    "objectives": [
+      "Pick the signal that answers an operational question cheapest",
+      "Explain how cardinality turns one label into a storage bill",
+      "Describe how trace context travels across services"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [326],
+    "cards": [
+      {
+        "id": "t740-c1",
+        "kind": "text",
+        "title": "Three signals answer different questions",
+        "body": "Metrics are cheap aggregates over time: is it bad, and since when? Logs are events with full context: what exactly happened here? Traces follow one request across services: where did the time go? Asking the wrong signal is how teams end up drowning in data and starved of answers.",
+        "teaches": ["signal-types"]
+      },
+      {
+        "id": "t740-c2",
+        "kind": "text",
+        "title": "Cardinality is the meter on the metrics bill",
+        "body": "Every distinct combination of label values is its own stored time series. A status label with three values triples one metric; a user id label with two million values turns it into two million series. Storage, memory and query time all scale with series count.",
+        "teaches": ["cardinality"]
+      },
+      {
+        "id": "t740-c3",
+        "kind": "diagram",
+        "title": "Worked example: one request, one trace",
+        "body": "A checkout request crosses six services and one is slow.",
+        "teaches": ["tracing-context"],
+        "steps": [
+          "The edge service creates a trace id and a root span",
+          "Each hop adds a child span carrying the same trace id",
+          "Sampling keeps all errors and a fraction of routine traffic",
+          "The waterfall shows the inventory service holding 800 of the 900 ms"
+        ]
+      },
+      {
+        "id": "t740-c4",
+        "kind": "text",
+        "title": "Sampling keeps traces affordable",
+        "body": "Recording every span at high request rates is expensive and mostly boring. Head sampling decides early and cheap; tail sampling decides after the request finished, so it can keep every error and slow outlier while storing only a sliver of routine work.",
+        "teaches": ["tracing-context"]
+      },
+      {
+        "id": "t740-c5",
+        "kind": "text",
+        "title": "Misconception: more telemetry always means more insight",
+        "body": "Unbounded cardinality, full-fidelity logs and 100% trace sampling all raise cost faster than they raise understanding. Instrument to answer the questions you actually ask: symptom alerts, per-hop diagnosis and post-incident detail.",
+        "teaches": ["cardinality"]
+      },
+      {
+        "id": "t740-c6",
+        "kind": "text",
+        "title": "Trap: logging what should never be stored",
+        "body": "Logs are the easiest place to accidentally build a data breach: request bodies, tokens and personal data flow straight into a system built for searching, not secrecy. Redact fields at emission, and treat log access as sensitive access.",
+        "teaches": ["signal-types"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t740-a1",
+        "concept": "signal-types",
+        "type": "multiple_choice",
+        "prompt": "Which signal most cheaply answers “is fleet-wide p99 latency rising?”",
+        "choices": [
+          { "id": "a", "label": "Full request logs from every service" },
+          { "id": "b", "label": "Aggregated metrics per service" },
+          { "id": "c", "label": "A stored trace of every request" },
+          { "id": "d", "label": "Weekly error summary reports" }
+        ],
+        "correctChoiceIds": ["b"],
+        "explanation": "A latency histogram per service costs a handful of series and answers the question continuously. Logs and full tracing record per request, orders of magnitude more data than a fleet-wide symptom needs."
+      },
+      {
+        "id": "t740-a2",
+        "concept": "cardinality",
+        "type": "multiple_choice",
+        "prompt": "A team adds customer id as a label on a request metric across 2,000,000 customers. What happens?",
+        "choices": [
+          { "id": "a", "label": "Queries speed up because data is pre-grouped" },
+          { "id": "b", "label": "Nothing until the metric is actually queried" },
+          { "id": "c", "label": "The metric is sampled down to a fixed size" },
+          { "id": "d", "label": "A series per customer: storage and query cost explode" }
+        ],
+        "correctChoiceIds": ["d"],
+        "explanation": "Each distinct label value set is a series the system must store, index and scan. Two million values means two million series for one metric, where drill-down by customer is what traces and logs exist for."
+      },
+      {
+        "id": "t740-a3",
+        "concept": "tracing-context",
+        "type": "multiple_choice",
+        "prompt": "Why does a tracing system inject a trace id into outbound request headers?",
+        "choices": [
+          { "id": "a", "label": "So spans from different services join into one trace" },
+          { "id": "b", "label": "So downstream services can rate-limit the caller" },
+          { "id": "c", "label": "So the request can be deduplicated on retries" },
+          { "id": "d", "label": "So trace data is encrypted end to end" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Context propagation is what lets a span recorded in service C be placed under the span from service B. Without the id in the header, each service produces orphan fragments that no collector can stitch together."
+      },
+      {
+        "id": "t740-a4",
+        "concept": "cardinality",
+        "type": "estimation",
+        "prompt": "A metric carries two labels: status (3 values) and endpoint (200 values). Across 50 pods, how many series does that pair create?",
+        "unit": "series",
+        "target": 30000,
+        "assumptions": [
+          "Every label value combination on every pod is a distinct series",
+          "Labels are independent, so counts multiply"
+        ],
+        "formula": "3 × 200 × 50",
+        "workedAnswer": "3 × 200 × 50 = 30,000 series",
+        "explanation": "Sanity check: each pod holds 3 × 200 = 600 series, so 50 pods must land in the tens of thousands. Swap endpoint for user id and the same multiplication explains a blown metrics budget.",
+        "tolerance": 0.02,
+        "trapAnswers": [600, 253]
+      },
+      {
+        "id": "t740-a5",
+        "concept": "signal-types",
+        "type": "drag_order",
+        "prompt": "Order a trace-guided hunt for a slow request.",
+        "items": [
+          { "id": "s4", "label": "Open that service’s logs around the span" },
+          { "id": "s1", "label": "Watch the latency metric rise" },
+          { "id": "s3", "label": "Find the span holding most of the time" },
+          { "id": "s2", "label": "Pull traces of the slowest requests" }
+        ],
+        "correctOrder": ["s1", "s2", "s3", "s4"],
+        "explanation": "Metrics say that it is slow, traces say where, logs say why. Each signal narrows the search before the more expensive one is opened, which is why the signals are used as a funnel rather than interchangeably."
+      },
+      {
+        "id": "t740-a6",
+        "concept": "signal-types",
+        "type": "tradeoff",
+        "prompt": "Checkout latency doubled and forty services sit on the request path.",
+        "constraints": [
+          "The guilty service is unknown",
+          "Errors are rare",
+          "Telemetry spend is capped"
+        ],
+        "approaches": [
+          { "id": "p2", "label": "Full-fidelity logs of every request at every hop", "description": "Log everything" },
+          { "id": "p1", "label": "Fleet metrics for health, plus traces sampled with all errors kept", "description": "Metrics plus sampled traces" },
+          { "id": "p3", "label": "Metrics only; skip tracing to save money", "description": "Metrics only" }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          { "id": "r3", "label": "Full logs at forty hops stay cheap under a cap" },
+          { "id": "r1", "label": "Metrics find the spike cheaply; traces name the hop" },
+          { "id": "r4", "label": "Metrics alone can show which hop is guilty" },
+          { "id": "r2", "label": "Keeping all error traces costs little volume" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "Forty services logging every request in full is exactly the spend the cap forbids.",
+          "r4": "A per-service metric says that hop is slow only after the slow service is known to matter; the trace is what points at it first."
+        },
+        "explanation": "Metrics localise the symptom cheaply, and sampled traces identify which of the forty hops holds the time, with error traces always kept since they are the interesting minority. Logging everything blows the cap; metrics alone stall at knowing something, somewhere, is slow."
+      }
+    ],
+    "flashcards": [
+      { "id": "t740-f1", "front": "Metric vs log vs trace?", "back": "Metric: fleet health over time. Log: one event in detail. Trace: one request’s path across services." },
+      { "id": "t740-f2", "front": "Cardinality?", "back": "The number of distinct label value combinations on a metric; each is a stored series." },
+      { "id": "t740-f3", "front": "Head vs tail sampling?", "back": "Head decides at request start; tail decides after, so it can keep all errors and outliers." }
+    ],
+    "sources": [
+      { "title": "OpenTelemetry: Signals", "url": "https://opentelemetry.io/docs/concepts/signals/" },
+      { "title": "Google SRE Book: Monitoring Distributed Systems", "url": "https://sre.google/sre-book/monitoring-distributed-systems/" },
+      { "title": "OpenTelemetry: Sampling", "url": "https://opentelemetry.io/docs/concepts/sampling/" }
+    ],
+    "deep": {
+      "teaches": ["signal-types", "cardinality", "tracing-context"],
+      "mechanism": {
+        "title": "How one request becomes one trace",
+        "steps": [
+          "At the edge, the first service creates a trace id and a root span, then propagates the id in headers on every call it makes downstream.",
+          "Each service starts a child span on arrival and ends it on reply, recording duration, status and a few low-cardinality attributes such as route and result.",
+          "Propagation is the load-bearing step: without the id in the header, downstream spans become orphan fragments that cannot be stitched into the request’s story.",
+          "Agents or a collector receive spans, batch them and apply sampling policy: routine traffic sampled down, errors and slow outliers kept whole.",
+          "Metrics run a separate, cheaper pipeline: counters and histograms aggregate as they are recorded, so fleet health costs a few series per service rather than a record per request.",
+          "Logs carry the detail that fits neither: they are the most expensive per byte, so they earn their keep on errors and unusual paths, structured so a trace id can pivot straight to them.",
+          "Cardinality is the hidden multiplier in metrics: every distinct label value set becomes its own series, so one unbounded label can cost more than every other metric combined."
+        ]
+      },
+      "useWhen": [
+        "Metrics for dashboards, alerts and SLOs; the cheapest signal per question.",
+        "Traces where a request crosses many services and the guilty hop is unknown.",
+        "Structured logs with trace ids for detail after the trace has pointed."
+      ],
+      "avoidWhen": [
+        "Never put unbounded values (user id, session id, full path) into metric labels.",
+        "Do not keep every span at high request rates; sample and keep all errors.",
+        "Avoid logging payloads wholesale; cost and leaked data grow together."
+      ],
+      "tradeoffs": {
+        "columns": ["Signal choice", "Benefit", "Cost"],
+        "rows": [
+          ["Metrics", "Cheap aggregates; instant fleet answers", "No per-request story"],
+          ["Full request logs", "Complete detail", "Expensive at volume; easy to over-collect"],
+          ["Head sampling", "Cheap, decided early", "Drops the rare interesting traces"],
+          ["Tail sampling", "Keeps errors and outliers", "Needs buffering; costlier collector"]
+        ]
+      },
+      "numbers": {
+        "title": "How one label becomes a storage bill",
+        "assumptions": [
+          "200 metrics per pod, 100 pods (illustrative)",
+          "Each label multiplies series by its number of distinct values"
+        ],
+        "steps": [
+          "Base: 200 × 100 = 20,000 series, already the cost floor.",
+          "Add a 3-value status label to one metric: it triples, a modest bump.",
+          "Add user id with 500,000 values to that metric: it alone becomes 500,000 series, twenty-five times the entire base.",
+          "Query latency and memory track series count, so the dashboard slows before anyone sees the invoice."
+        ],
+        "result": "Cardinality is a multiplier, not an add-on; bound a label’s values or leave it out of metrics."
+      },
+      "india": {
+        "title": "What OpenTelemetry standardises",
+        "label": "Official documentation",
+        "body": "OpenTelemetry’s documentation defines the three signals, traces, metrics and logs, and standardises context propagation so a trace id survives across services and vendors. Google’s SRE book describes monitoring through the golden signals, latency, traffic, errors and saturation, all of which are metric-shaped questions. The division of labour is deliberate: metrics answer fleet questions cheaply, traces follow single requests and logs hold the detail."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Add request id as a label so we can drill down.”",
+          "say": "“That is a series per request; drill-down is what trace ids and logs are for.”"
+        },
+        {
+          "trap": "“Sample 1% of all spans to save money.”",
+          "say": "“Sample the boring 99%; keep every error and outlier, or the traces that mattered are gone.”"
+        }
+      ],
+      "takeaways": [
+        "Metrics for is-it-bad, traces for where, logs for why.",
+        "Cardinality multiplies cost; bound every label’s values.",
+        "Propagate trace context or traces split at the hop boundary.",
+        "Sample aggressively but keep all errors."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "One more label",
+      "prompt": "A service adds plan_tier (3 values) to a metric; fine. Next sprint someone adds session_id. A week later the metrics backend is slow and the bill has jumped. What happened?",
+      "choices": [
+        { "id": "a", "label": "Every session minted new series, and series are the unit of cost", "feedback": "Right: unbounded label values multiply the series count without limit." },
+        { "id": "b", "label": "Sessions ran long, so each series accumulated too many points", "feedback": "Extra points cost little; the count of distinct series is what hurts." },
+        { "id": "c", "label": "The backend charges per label name on a metric", "feedback": "It is the distinct value combinations, not the label itself, that create series." }
+      ],
+      "correctId": "a",
+      "reveal": "Label values must have a bound you can say out loud. If you cannot bound it, it belongs in a trace attribute or a log field, not a metric label."
+    },
+    "seeAlso": [
+      { "topicId": 54, "why": "The same three signals from the system-design side" },
+      { "topicId": 326, "why": "SLIs are built from these signals" },
+      { "topicId": 690, "why": "Alerts page on the symptoms these signals surface" }
+    ]
+  },
+  {
+    "id": 741,
+    "slug": "capacity-planning-and-headroom",
+    "region": "f7-cloud",
+    "order": 34,
+    "title": "Capacity Planning and Headroom",
+    "kind": "lesson",
+    "objectives": [
+      "Explain what headroom buys and what it costs",
+      "Turn a demand forecast into a replica or capacity count",
+      "Name the lead times that make capacity a planning problem"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [328, 587],
+    "cards": [
+      {
+        "id": "t741-c1",
+        "kind": "text",
+        "title": "Headroom is bought before you need it",
+        "body": "Some capacity arrives in seconds and some in weeks. Pods start fast; nodes take minutes; quota raises, reserved contracts and new regions take days. A capacity plan exists because the lead times do not match, and the slow items must be handled before the peak, not during it.",
+        "teaches": ["headroom"]
+      },
+      {
+        "id": "t741-c2",
+        "kind": "text",
+        "title": "Utilisation targets buy reaction time",
+        "body": "A 60% utilisation target is not waste; it is the room where bursts, deploys and one lost node can land. As utilisation approaches saturation, queueing delay climbs steeply, so the same service that is cheap at 95% is also one jittery afternoon from meltdown.",
+        "teaches": ["saturation"]
+      },
+      {
+        "id": "t741-c3",
+        "kind": "diagram",
+        "title": "Worked example: from forecast to replica count",
+        "body": "Next quarter’s peak is forecast at 5,000 requests a second.",
+        "teaches": ["demand-forecast"],
+        "steps": [
+          "Load testing says a replica serves 250 rps at the 60% utilisation target",
+          "5,000 ÷ 250 = 20 working replicas",
+          "Add 20% headroom for failure and deploy overlap: 24 replicas",
+          "Check the quota and subnet allow 24 before the quarter starts"
+        ]
+      },
+      {
+        "id": "t741-c4",
+        "kind": "text",
+        "title": "Forecast demand from business drivers",
+        "body": "The demand side is not a graph extrapolation alone: it is growth trends plus the events calendar. Launches, marketing pushes and seasonal peaks all move the peak, and honest plans are ranges with dates, revisited each quarter rather than a single number computed once.",
+        "teaches": ["demand-forecast"]
+      },
+      {
+        "id": "t741-c5",
+        "kind": "text",
+        "title": "Misconception: autoscaling removes the need to plan",
+        "body": "Autoscaling spends provisioned headroom inside limits someone set: cluster size, quotas, warm pools and budget. It handles the shape of a normal day beautifully; it cannot create a node the quota forbids or a contract nobody signed.",
+        "teaches": ["headroom"]
+      },
+      {
+        "id": "t741-c6",
+        "kind": "text",
+        "title": "Trap: planning to one hundred per cent",
+        "body": "A plan that only works at 100% utilisation leaves nowhere for a rolling deploy’s extra pods, a zone event or arrival jitter to go. Sizing to the average is the quieter version of the same mistake: the peak is what breaks you, so the peak is what you provision for.",
+        "teaches": ["saturation"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t741-a1",
+        "concept": "saturation",
+        "type": "multiple_choice",
+        "prompt": "Why run a latency-sensitive service at a 60% utilisation target rather than 95%?",
+        "choices": [
+          { "id": "a", "label": "Providers bill less below 70% utilisation" },
+          { "id": "b", "label": "Monitoring is more accurate below two thirds" },
+          { "id": "c", "label": "Bursts, deploys and failures need spare capacity to land in" },
+          { "id": "d", "label": "Each instance runs measurably faster when less loaded" }
+        ],
+        "correctChoiceIds": ["c"],
+        "explanation": "The spare 40% is reaction time made physical: it absorbs spikes before autoscaling reacts, extra pods during deploys and the loss of a node. Near saturation, queueing delay climbs steeply, so the saved fleet cost is traded for fragility."
+      },
+      {
+        "id": "t741-a2",
+        "concept": "demand-forecast",
+        "type": "multiple_choice",
+        "prompt": "Which lead time must a capacity plan handle ahead of a launch?",
+        "choices": [
+          { "id": "a", "label": "A provider quota raise that can take days" },
+          { "id": "b", "label": "A container restart that takes seconds" },
+          { "id": "c", "label": "A DNS record that propagates in a minute" },
+          { "id": "d", "label": "A configuration rollout that takes an hour" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Quotas, reserved contracts and new-region approvals are the slow items, measured in days, so they belong in a plan made before the peak. Restarts, DNS and config changes all fit inside the window where the launch is already happening."
+      },
+      {
+        "id": "t741-a3",
+        "concept": "demand-forecast",
+        "type": "multiple_choice",
+        "prompt": "Average CPU is 35%, but every weekday at 6 p.m. the service saturates for ten minutes. What should the plan size to?",
+        "choices": [
+          { "id": "a", "label": "The daily average, since peaks are brief" },
+          { "id": "b", "label": "The busiest second ever recorded" },
+          { "id": "c", "label": "Whatever the autoscaler last requested" },
+          { "id": "d", "label": "The recurring peak plus headroom" }
+        ],
+        "correctChoiceIds": ["d"],
+        "explanation": "Users experience the peak, not the average; a service sized to 35% melts at 6 p.m. daily. The single highest second is noise rather than a target, and last request is a measurement, not a forecast."
+      },
+      {
+        "id": "t741-a4",
+        "concept": "headroom",
+        "type": "estimation",
+        "prompt": "Forecast peak is 5,000 requests a second. A replica serves 250 at the utilisation target, and the plan reserves 20% for failures. How many replicas should be provisioned?",
+        "unit": "replicas",
+        "target": 24,
+        "assumptions": [
+          "Demand divides evenly across replicas",
+          "The 20% reserve sits on top of the working count"
+        ],
+        "formula": "5,000 ÷ 250 × 1.2",
+        "workedAnswer": "5,000 ÷ 250 × 1.2 = 24 replicas",
+        "explanation": "Design implication: 20 replicas carry the forecast only while nothing fails; the 4 extra are the margin that absorbs a lost node or a rolling deploy without turning it into a capacity emergency.",
+        "tolerance": 0.02,
+        "trapAnswers": [20, 30]
+      },
+      {
+        "id": "t741-a5",
+        "concept": "demand-forecast",
+        "type": "drag_order",
+        "prompt": "Order a quarterly capacity review.",
+        "items": [
+          { "id": "s5", "label": "Revisit the plan and re-measure the ratio" },
+          { "id": "s2", "label": "Convert demand into per-resource needs" },
+          { "id": "s4", "label": "Provision ahead of the peak" },
+          { "id": "s1", "label": "Gather growth trends and planned events" },
+          { "id": "s3", "label": "Check quotas, budgets and lead times" }
+        ],
+        "correctOrder": ["s1", "s2", "s3", "s4", "s5"],
+        "explanation": "Forecast first, translate to resources, then clear the slow constraints before provisioning; the review closes the loop by re-measuring the demand-per-replica ratio that the whole plan rests on."
+      },
+      {
+        "id": "t741-a6",
+        "concept": "headroom",
+        "type": "tradeoff",
+        "prompt": "A retail service sees 4× normal traffic on one festival weekend a year.",
+        "constraints": [
+          "The peak lasts about 48 hours",
+          "Extra nodes need a week’s notice",
+          "Running 4× all year quadruples the bill"
+        ],
+        "approaches": [
+          { "id": "p3", "label": "Let autoscaling find the capacity on the day", "description": "Autoscale on the day" },
+          { "id": "p1", "label": "Pre-provision for the known peak, then release the capacity", "description": "Pre-provisioned peak" },
+          { "id": "p2", "label": "Run 4× capacity all year to stay safe", "description": "Permanent 4×" }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          { "id": "r1", "label": "The peak is on the calendar, so it can be provisioned ahead" },
+          { "id": "r4", "label": "Year-round 4× is cheap insurance" },
+          { "id": "r3", "label": "Autoscaling can fetch any amount of capacity quickly" },
+          { "id": "r2", "label": "Lead time, not reaction speed, is the constraint" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "A week of procurement cannot be compressed into minutes on the day.",
+          "r4": "It quadruples cost to cover two days of need."
+        },
+        "explanation": "A known peak is a scheduling problem, not a scaling problem: provision before the window, ride it, release after. Autoscaling cannot beat the week-long lead time, and permanent 4× capacity pays all year for a weekend."
+      }
+    ],
+    "flashcards": [
+      { "id": "t741-f1", "front": "Headroom?", "back": "Provisioned spare capacity that absorbs bursts, deploys and failures." },
+      { "id": "t741-f2", "front": "Why not plan to 100% utilisation?", "back": "Nowhere for jitter, deploys or a lost node to go; queues explode near saturation." },
+      { "id": "t741-f3", "front": "Capacity lead times?", "back": "Quota raises, reserved contracts and new regions take days; pods take seconds." }
+    ],
+    "sources": [
+      { "title": "Google SRE Book: Software Engineering in SRE", "url": "https://sre.google/sre-book/software-engineering-in-sre/" },
+      { "title": "Kubernetes: Managing Resources for Containers", "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/" },
+      { "title": "AWS: EC2 Auto Scaling", "url": "https://docs.aws.amazon.com/autoscaling/ec2/userguide/what-is-amazon-ec2-auto-scaling.html" }
+    ],
+    "deep": {
+      "teaches": ["headroom", "demand-forecast", "saturation"],
+      "mechanism": {
+        "title": "How a capacity plan is built",
+        "steps": [
+          "Start from demand, not machines: forecast the peak in business terms, orders per minute or requests per second, from growth trends and the events calendar.",
+          "Convert demand to resources with a tested ratio: if a replica serves 250 rps at the utilisation target, a 5,000 rps forecast means twenty working replicas before any margin.",
+          "Add failure headroom: the count must still serve the peak while a node, a rack or a zone is missing, which is why targets sit near 60% rather than 95%.",
+          "Add change headroom: rolling deploys and autoscaler churn run extra copies at once, so the cluster needs room for the old and new versions together.",
+          "Check the constraints: provider quotas, subnet addresses, licence limits and budget all cap the plan, and each has a lead time measured in days rather than seconds.",
+          "Provision ahead and rehearse: quotas are raised and limits bumped before the peak, then a load test confirms the forecast ratio still holds on current code.",
+          "Review on a cadence: growth compounds quietly, so the plan is revisited each quarter and the ratio re-measured whenever the service changes shape."
+        ]
+      },
+      "useWhen": [
+        "Forecast and pre-provision for known peaks: launches, festivals, sales.",
+        "Keep utilisation targets that leave room for failures plus deploy overlap.",
+        "Re-measure the demand-per-replica ratio after large code changes."
+      ],
+      "avoidWhen": [
+        "Do not size to the daily average; peaks and failures are what break services.",
+        "Do not assume autoscaling creates capacity; it only spends provisioned headroom.",
+        "Avoid single-point forecasts; plan ranges and revisit them."
+      ],
+      "tradeoffs": {
+        "columns": ["Choice", "Benefit", "Cost"],
+        "rows": [
+          ["Run hot, near saturation", "Cheapest fleet", "No room for bursts; queues explode"],
+          ["Generous headroom", "Absorbs failures and spikes", "Pays for idle capacity"],
+          ["Autoscaling only", "Matches normal daily variation", "Cannot beat quotas or warm-up time"],
+          ["Pre-provisioned peaks", "Ready on the day", "Needs forecasting; pays for the window"]
+        ]
+      },
+      "numbers": {
+        "title": "When to order the next tranche",
+        "assumptions": [
+          "Traffic grows 8% a month from 2,000 rps today (illustrative)",
+          "Provisioned capacity is 4,000 rps and new capacity takes 6 weeks to arrive"
+        ],
+        "steps": [
+          "At 8% monthly growth demand doubles in about nine months: 2,000 × 1.08^9 ≈ 4,000 rps.",
+          "Existing headroom therefore runs out in roughly nine months.",
+          "A 6-week lead time means the order lands around month seven, not when the dashboard turns red.",
+          "Early ordering also covers forecast error: at 10% growth the headroom is gone in about seven months."
+        ],
+        "result": "Capacity planning is mostly calendar arithmetic: work backwards from the lead time."
+      },
+      "india": {
+        "title": "The Tatkal opening spike",
+        "label": "Publicly reported",
+        "body": "India’s railway booking platform sees demand concentrate at fixed times each day: the Tatkal window opens at 10:00 for AC classes and 11:00 for non-AC, and publicly reported figures describe large shares of each day’s Tatkal tickets selling within minutes of the window opening. It is a textbook known peak: the spike sits in the calendar, so the capacity for it has to be provisioned ahead rather than discovered on the day."
+      },
+      "pitfalls": [
+        {
+          "trap": "“We autoscale, so capacity planning is done for us.”",
+          "say": "“Autoscaling spends headroom inside limits I set; the limits, quotas and warm pools are still planned.”"
+        },
+        {
+          "trap": "“Buy for the worst imaginable day and forget it.”",
+          "say": "“Idle forever-capacity is a bill; I would rather plan ranges with lead times than a permanent peak.”"
+        }
+      ],
+      "takeaways": [
+        "Plan for peak plus failures, not the average day.",
+        "Utilisation targets are bought reaction time.",
+        "Quotas, contracts and provisioning all carry lead times.",
+        "Autoscaling spends headroom; it does not create it."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Quota day",
+      "prompt": "A festival weekend needs 4× capacity. The team trusts autoscaling; the node quota allows 3× and quota raises take a week. On the day, traffic hits 3.5×. What do users see?",
+      "choices": [
+        { "id": "a", "label": "Growing queues and errors: scaling stops at the quota wall", "feedback": "Right: the autoscaler keeps requesting nodes the quota refuses to grant." },
+        { "id": "b", "label": "Nothing unusual: autoscaling adds nodes until demand is met", "feedback": "The quota is the ceiling; requests above it are simply denied." },
+        { "id": "c", "label": "A few seconds of slowness while the new nodes boot", "feedback": "Boot time is not the constraint; the missing quarter of capacity never arrives." }
+      ],
+      "correctId": "a",
+      "reveal": "Lead-time items, quotas, reserved capacity and contracts, belong in a capacity plan reviewed before the peak, because they cannot be fixed during it."
+    },
+    "seeAlso": [
+      { "topicId": 56, "why": "Failure headroom is what lets a service lose a zone or region and keep serving" },
+      { "topicId": 328, "why": "Autoscaling consumes the headroom this plan provides" },
+      { "topicId": 587, "why": "The demand-per-replica ratio comes from load testing" }
+    ]
+  },
+  {
+    "id": 742,
+    "slug": "kubernetes-dns-and-service-discovery",
+    "region": "f7-cloud",
+    "order": 35,
+    "title": "Kubernetes DNS and Service Discovery",
+    "kind": "lesson",
+    "objectives": [
+      "Describe how a pod turns a Service name into a connection",
+      "Explain when a headless Service is the right answer",
+      "Diagnose common DNS failure modes: search expansion, missing endpoints and overload"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 12,
+    "prereqIds": [322, 590],
+    "cards": [
+      {
+        "id": "t742-c1",
+        "kind": "text",
+        "title": "A name per Service, not per pod",
+        "body": "Cluster DNS publishes records like payments.shop.svc.cluster.local that map to a stable virtual IP, while pods come and go underneath it. Callers name a Service, never a pod, and the name survives every rollout.",
+        "teaches": ["cluster-dns"]
+      },
+      {
+        "id": "t742-c2",
+        "kind": "text",
+        "title": "CoreDNS answers for the whole cluster",
+        "body": "A small set of DNS pods watches the API and answers for every Service in the cluster. Because nearly every call starts with a lookup, those pods are a critical dependency: when they throttle or fail, everything reports that everything else is down.",
+        "teaches": ["cluster-dns"]
+      },
+      {
+        "id": "t742-c3",
+        "kind": "text",
+        "title": "Headless Services return pod IPs",
+        "body": "A headless Service has no virtual IP; its DNS record returns the addresses of the backing pods directly. That is how stateful members find each other by name and how clients that pick their own endpoints, per-connection balancing or leader-aware routing, get the full list.",
+        "teaches": ["service-discovery"]
+      },
+      {
+        "id": "t742-c4",
+        "kind": "diagram",
+        "title": "Worked example: a name that resolves to nothing",
+        "body": "A pod calls api.payments and gets nowhere.",
+        "teaches": ["service-discovery"],
+        "steps": [
+          "Check the Service exists in the expected namespace",
+          "Check its selector matches the labels on the intended pods",
+          "List the Service’s endpoints; an empty list explains the timeouts",
+          "Fix the selector; the DNS name starts working because endpoints appear"
+        ]
+      },
+      {
+        "id": "t742-c5",
+        "kind": "text",
+        "title": "The ndots trap: five searches per name",
+        "body": "Pod resolvers are configured with a search list and ndots:5, so a short name is tried against each search domain before the name as written. One innocent-looking lookup of an external host can cost three or four queries, multiplied by every request the service makes.",
+        "teaches": ["dns-tuning"]
+      },
+      {
+        "id": "t742-c6",
+        "kind": "text",
+        "title": "Trap: treating DNS as free",
+        "body": "Every lookup crosses the same small fleet of DNS pods, and search expansion multiplies the query count again. Bursty or misconfigured clients can saturate it. Node-local caches, fully-qualified names and watching DNS latency like any other dependency keep it invisible.",
+        "teaches": ["dns-tuning"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t742-a1",
+        "concept": "dns-tuning",
+        "type": "multiple_choice",
+        "prompt": "From a pod in namespace shop, a lookup of the bare name api tries which name first?",
+        "choices": [
+          { "id": "a", "label": "api.svc.cluster.local" },
+          { "id": "b", "label": "api.shop.svc.cluster.local" },
+          { "id": "c", "label": "api.cluster.local" },
+          { "id": "d", "label": "api. as an absolute name" }
+        ],
+        "correctChoiceIds": ["b"],
+        "explanation": "The search list puts the pod’s own namespace first, so api expands to api.shop.svc.cluster.local before the cluster-level suffixes and finally the name as written."
+      },
+      {
+        "id": "t742-a2",
+        "concept": "service-discovery",
+        "type": "multiple_choice",
+        "prompt": "What does a headless Service’s DNS record return?",
+        "choices": [
+          { "id": "a", "label": "A single virtual IP shared by its pods" },
+          { "id": "b", "label": "The node IP running the first pod" },
+          { "id": "c", "label": "The individual IPs of its ready pods" },
+          { "id": "d", "label": "The ingress address of the cluster" }
+        ],
+        "correctChoiceIds": ["c"],
+        "explanation": "Headless means no virtual IP: DNS hands the caller the pod addresses so it can address members individually or balance itself. The other answers describe the normal ClusterIP path or things outside Service DNS entirely."
+      },
+      {
+        "id": "t742-a3",
+        "concept": "service-discovery",
+        "type": "multiple_choice",
+        "prompt": "A Service name resolves to an IP but every connection times out, and the Service’s selector matches no pods. What is the underlying gap?",
+        "choices": [
+          { "id": "a", "label": "The DNS record’s TTL has expired" },
+          { "id": "b", "label": "The name exists but there are no endpoints behind it" },
+          { "id": "c", "label": "The pod’s resolver points outside the cluster" },
+          { "id": "d", "label": "The virtual IP collides with another Service" }
+        ],
+        "correctChoiceIds": ["b"],
+        "explanation": "DNS resolved fine: the record exists because the Service exists. With a selector matching nothing, the endpoint list is empty, so the virtual IP has no pod to route to. Selector typos are the classic cause."
+      },
+      {
+        "id": "t742-a4",
+        "concept": "dns-tuning",
+        "type": "estimation",
+        "prompt": "A pod resolves 4,000 short names a second, and each expands through a 3-entry search list before the real lookup. How many queries a second reach cluster DNS?",
+        "unit": "queries per second",
+        "target": 16000,
+        "assumptions": [
+          "ndots:5 with a 3-entry search list",
+          "Each failed expansion is a full DNS query"
+        ],
+        "formula": "4,000 × (3 + 1)",
+        "workedAnswer": "4,000 × 4 = 16,000 queries per second",
+        "explanation": "Design implication: one logical lookup became four DNS queries, so the DNS fleet carries several times the load the application team believes it sends; fully-qualified names remove the expansion.",
+        "tolerance": 0.02,
+        "trapAnswers": [4000, 12000]
+      },
+      {
+        "id": "t742-a5",
+        "concept": "dns-tuning",
+        "type": "drag_order",
+        "prompt": "Order how a short name gets resolved inside a pod.",
+        "items": [
+          { "id": "s3", "label": "The name as written is tried last" },
+          { "id": "s1", "label": "The resolver counts the dots in the requested name" },
+          { "id": "s4", "label": "The answer comes back from the DNS pods" },
+          { "id": "s2", "label": "Each search-domain suffix is tried in turn" }
+        ],
+        "correctOrder": ["s1", "s2", "s3", "s4"],
+        "explanation": "With ndots above the name’s dot count the resolver works down the search list first and only then tries the name as written, so short names cost one extra query per suffix. A trailing dot marks the name absolute and skips the whole list."
+      },
+      {
+        "id": "t742-a6",
+        "concept": "dns-tuning",
+        "type": "tradeoff",
+        "prompt": "A latency-critical service makes hundreds of short calls a second to three internal names, and DNS adds jitter.",
+        "constraints": [
+          "The three names are stable",
+          "Pod IPs churn on every rollout",
+          "DNS pods occasionally throttle"
+        ],
+        "approaches": [
+          { "id": "p2", "label": "Resolve each pod IP once in the app and cache it forever", "description": "Cache pod IPs forever" },
+          { "id": "p1", "label": "Use fully-qualified names or a node-local DNS cache to cut lookups", "description": "FQDNs or local cache" },
+          { "id": "p3", "label": "Hard-code the endpoint IPs into configuration", "description": "Hard-coded IPs" }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          { "id": "r4", "label": "Hard-coded IPs remove DNS at no cost" },
+          { "id": "r2", "label": "Lookups still follow endpoint changes" },
+          { "id": "r1", "label": "Fewer expanded queries means less throttling" },
+          { "id": "r3", "label": "Caching pod IPs forever survives rollouts" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "Pods are replaced on every deploy; a stale IP is a dead call.",
+          "r4": "IPs churn with every scale event; the config rots immediately."
+        },
+        "explanation": "The fix is fewer or closer lookups, not bypassing discovery: a trailing dot skips search expansion and a node-local cache shortens the path, while DNS still tracks the endpoints. Caching pod IPs or hard-coding them breaks silently the moment a rollout replaces the pods."
+      }
+    ],
+    "flashcards": [
+      { "id": "t742-f1", "front": "cluster.local?", "back": "The cluster’s DNS domain: service.namespace.svc.cluster.local." },
+      { "id": "t742-f2", "front": "Headless Service?", "back": "No virtual IP; DNS returns the pods’ own IPs for direct addressing." },
+      { "id": "t742-f3", "front": "ndots:5?", "back": "Names with fewer than five dots try the search domains before the name as written." }
+    ],
+    "sources": [
+      { "title": "Kubernetes: DNS for Services and Pods", "url": "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/" },
+      { "title": "Kubernetes: Debugging DNS Resolution", "url": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/" },
+      { "title": "Kubernetes: Service", "url": "https://kubernetes.io/docs/concepts/services-networking/service/" }
+    ],
+    "deep": {
+      "teaches": ["cluster-dns", "service-discovery", "dns-tuning"],
+      "mechanism": {
+        "title": "The life of a Service lookup",
+        "steps": [
+          "Every pod is born with a resolv.conf written by the kubelet: the nameserver is the cluster DNS Service, the search list covers the pod’s own namespace first, and ndots defaults to five.",
+          "A bare name like api has fewer than five dots, so the resolver tries api.<namespace>.svc.cluster.local and the rest of the search list before the name as written; a trailing dot marks a name absolute and skips the expansion.",
+          "The DNS pods, a replicated deployment watching the API, answer with the Service’s records: a virtual IP for a normal Service, or the pod IPs themselves for a headless one.",
+          "For a normal Service the answer is one stable virtual IP; the node’s routing rules then translate connections to that IP onto one of the ready endpoint pods.",
+          "For a headless Service the answer is the set of pod IPs, which is how stateful members address each other by name and how clients that balance themselves get the live list.",
+          "Records follow the API with short TTLs, so endpoints appear and disappear with readiness; negative answers are cached too, which is why a just-created Service can briefly stay unknown.",
+          "Because every name in the cluster funnels through a small DNS fleet, it is sized, spread and sometimes cached per node like any other critical dependency, since an outage there looks like every service failing at once."
+        ]
+      },
+      "useWhen": [
+        "Use normal Services for balanced access to interchangeable pods.",
+        "Use headless Services when clients must address members individually.",
+        "Fully qualify hot external names, or cache locally, to cut query amplification."
+      ],
+      "avoidWhen": [
+        "Do not cache resolved pod IPs in the application; they churn with every rollout.",
+        "Avoid ignoring DNS in dependency maps; its overload fails everything at once.",
+        "Do not expect instant propagation; TTLs and negative caching add lag."
+      ],
+      "tradeoffs": {
+        "columns": ["Choice", "Benefit", "Cost"],
+        "rows": [
+          ["ClusterIP Service", "One stable address, balanced for free", "No per-pod addressing"],
+          ["Headless Service", "Clients pick endpoints directly", "Client must handle the full IP list"],
+          ["Node-local DNS cache", "Cuts latency and central load", "Another per-node component"],
+          ["App-side IP caching", "Fewer lookups", "Stale IPs break on every deploy"]
+        ]
+      },
+      "numbers": {
+        "title": "What ndots expansion does to DNS load",
+        "assumptions": [
+          "A service resolves 4,000 short names a second (illustrative)",
+          "ndots:5 with a 3-entry search list expands each into four queries",
+          "A DNS pod comfortably serves about 8,000 queries a second"
+        ],
+        "steps": [
+          "Each logical lookup tries three search-suffixed names, then the real one: four queries.",
+          "4,000 × 4 = 16,000 queries a second lands on the DNS pods instead of 4,000.",
+          "At about 8,000 per pod, the expansion turns one DNS pod at half load into two at saturation.",
+          "Fully-qualifying the names returns the load to one query per lookup."
+        ],
+        "result": "A resolver default quietly multiplies DNS load; bound it with FQDNs or a lower ndots."
+      },
+      "india": {
+        "title": "The Kubernetes DNS specification",
+        "label": "Official documentation",
+        "body": "The Kubernetes documentation on DNS for Services and Pods defines the record layout: services get A or AAAA records under <service>.<namespace>.svc.cluster.local, headless services resolve to their backing pods, and pods receive a resolver configuration and DNS policy from the kubelet. The same documentation describes the ndots and search-list behaviour that turns one short name into several queries."
+      },
+      "pitfalls": [
+        {
+          "trap": "“We resolved the pod IP once; we can keep using it.”",
+          "say": "“Pod IPs die with the pod; re-resolve, or better, go through the Service.”"
+        },
+        {
+          "trap": "“DNS is internal plumbing; it cannot be the bottleneck.”",
+          "say": "“Every call in the cluster crosses a handful of DNS pods, and ndots expansion multiplies it further.”"
+        }
+      ],
+      "takeaways": [
+        "Service names resolve to a stable virtual IP or, headless, to pod IPs.",
+        "resolv.conf’s ndots and search list multiply queries on short names.",
+        "Never cache pod IPs; re-resolve or use the Service.",
+        "Cluster DNS is a critical dependency; size and cache it like one."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The trailing dot",
+      "prompt": "A service calls partner.example.com thousands of times a minute. An engineer changes the configured name to partner.example.com. with a trailing dot. What changes?",
+      "choices": [
+        { "id": "a", "label": "Each lookup skips the search list: one query instead of several", "feedback": "Right: the dot marks the name absolute, so ndots expansion never runs." },
+        { "id": "b", "label": "Nothing: the resolver ignores the trailing dot", "feedback": "The dot is significant; it is what makes the name fully qualified." },
+        { "id": "c", "label": "The lookups now bypass cluster DNS entirely", "feedback": "The same resolver still answers; it just skips the search-suffix attempts." }
+      ],
+      "correctId": "a",
+      "reveal": "On a hot name the trailing dot cuts DNS queries by the size of the search list. It is a one-character fix for a multiplied load."
+    },
+    "seeAlso": [
+      { "topicId": 6, "why": "DNS resolution, TTLs and negative caching are the same machinery at internet scale" },
+      { "topicId": 52, "why": "Service discovery is the general pattern cluster DNS implements" },
+      { "topicId": 590, "why": "Services and endpoints are what these DNS records describe" }
+    ]
+  },
+  {
+    "id": 743,
+    "slug": "database-change-management",
+    "region": "f7-cloud",
+    "order": 36,
+    "title": "Database Change Management: Safe Migrations in the Pipeline",
+    "kind": "lesson",
+    "objectives": [
+      "Explain why a schema must stay compatible with old and new code at once",
+      "Apply the expand-contract pattern to a destructive-looking change",
+      "Run migrations as a controlled pipeline step, not an application side effect"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [323, 324],
+    "cards": [
+      {
+        "id": "t743-c1",
+        "kind": "text",
+        "title": "Code rolls back; data does not",
+        "body": "Reverting a release puts old code back in minutes, but a destructive schema change has already moved or removed data. So every schema version must work with the code before and after it: the database lives in the overlap between releases, not inside either one.",
+        "teaches": ["backward-compatible"]
+      },
+      {
+        "id": "t743-c2",
+        "kind": "text",
+        "title": "Expand, migrate, contract",
+        "body": "The safe pattern for a destructive-looking change: expand by adding the new shape alongside the old, migrate code and data onto it, then contract by removing the old shape once nothing released can still touch it. Three releases where one felt natural.",
+        "teaches": ["expand-contract"]
+      },
+      {
+        "id": "t743-c3",
+        "kind": "diagram",
+        "title": "Worked example: renaming a column without downtime",
+        "body": "A column used by live traffic needs a better name.",
+        "teaches": ["expand-contract"],
+        "steps": [
+          "Add the new column next to the old one",
+          "Deploy code that writes to both",
+          "Backfill existing rows in small batches",
+          "Deploy code that reads only the new column",
+          "Drop the old column in a later release"
+        ]
+      },
+      {
+        "id": "t743-c4",
+        "kind": "text",
+        "title": "Migrations run as a controlled step",
+        "body": "Migrations belong in the pipeline as one versioned step with a lock, timeouts and a record of what applied, ahead of the rollout it supports. That gives a single point to review, rehearse and retry, instead of whichever replica happens to boot first.",
+        "teaches": ["migration-runner"]
+      },
+      {
+        "id": "t743-c5",
+        "kind": "text",
+        "title": "Misconception: auto-migrate on startup is production-safe",
+        "body": "It works on one instance in staging. In production five replicas boot together and race the same change, a long statement locks a real table mid-traffic, and a half-applied failure leaves no release to roll back to. Boot is the worst place to learn a migration is slow.",
+        "teaches": ["migration-runner"]
+      },
+      {
+        "id": "t743-c6",
+        "kind": "text",
+        "title": "Trap: a migration that locks the table during the rollout",
+        "body": "Some engines still rewrite a table for innocent-looking changes, holding an exclusive lock while they do. On a large table that is minutes of stalled writes inside a deploy. Rehearse on a production-sized copy, set lock timeouts and batch the heavy work.",
+        "teaches": ["backward-compatible"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t743-a1",
+        "concept": "backward-compatible",
+        "type": "multiple_choice",
+        "prompt": "During a rolling deploy, what must every intermediate schema version tolerate?",
+        "choices": [
+          { "id": "a", "label": "Only queries from the newest release" },
+          { "id": "b", "label": "Writes paused for the whole deploy" },
+          { "id": "c", "label": "A separate schema per application version" },
+          { "id": "d", "label": "Old and new code reading and writing it at once" }
+        ],
+        "correctChoiceIds": ["d"],
+        "explanation": "A rolling deploy runs both versions against the same schema for its duration, and a rollback extends that overlap backwards. Schemas that serve only one code version turn every deploy into a coordinated outage."
+      },
+      {
+        "id": "t743-a2",
+        "concept": "expand-contract",
+        "type": "multiple_choice",
+        "prompt": "Why is the old column dropped in a later release rather than the same one that stops reading it?",
+        "choices": [
+          { "id": "a", "label": "A rollback then still finds the column it expects" },
+          { "id": "b", "label": "Dropping columns always takes several days" },
+          { "id": "c", "label": "Storage billing only updates monthly" },
+          { "id": "d", "label": "The query planner keeps using the old name" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "While a rollback of the reading release is possible, the old column is still live equipment. Drop it once nothing that could run again needs it; drops are fast, so the delay is about compatibility, not mechanics."
+      },
+      {
+        "id": "t743-a3",
+        "concept": "migration-runner",
+        "type": "multiple_choice",
+        "prompt": "Five app replicas each run pending schema migrations at boot. What is the failure mode?",
+        "choices": [
+          { "id": "a", "label": "The migrations finish five times faster" },
+          { "id": "b", "label": "Only the first replica can read the schema" },
+          { "id": "c", "label": "Concurrent changes race, deadlock or apply partially" },
+          { "id": "d", "label": "Migrations are idempotent, so extra runs cost nothing" }
+        ],
+        "correctChoiceIds": ["c"],
+        "explanation": "Schema changes are not safely parallel: replicas can interleave statements, deadlock on catalogue locks or die half-applied. Even when the tooling takes a lock, app boot gives it no review, timeout or retry discipline."
+      },
+      {
+        "id": "t743-a4",
+        "concept": "expand-contract",
+        "type": "estimation",
+        "prompt": "A backfill must touch 12,000,000 rows. To keep replication lag low it writes batches of 20,000 rows every 5 seconds. About how long does it take?",
+        "unit": "minutes",
+        "target": 50,
+        "assumptions": [
+          "Batches are evenly sized and run back to back",
+          "The 5-second spacing is the pacing that keeps lag low"
+        ],
+        "formula": "12,000,000 ÷ 20,000 × 5 ÷ 60",
+        "workedAnswer": "600 batches × 5 s = 3,000 s = 50 minutes",
+        "explanation": "Sanity check: 12 million rows at 4,000 rows a second is 3,000 seconds. An unbatched write could finish faster but would trade the wall-clock for lag spikes and lock contention during a live deploy.",
+        "tolerance": 0.05,
+        "trapAnswers": [600, 3000]
+      },
+      {
+        "id": "t743-a5",
+        "concept": "migration-runner",
+        "type": "drag_order",
+        "prompt": "Order the stages of a rehearsed schema change around a rolling deploy.",
+        "items": [
+          { "id": "s2", "label": "Run the single migration job ahead of the rollout" },
+          { "id": "s4", "label": "Ship a later release that contracts the old shape" },
+          { "id": "s1", "label": "Rehearse the migration on a production-sized copy" },
+          { "id": "s3", "label": "Roll out code that works with both shapes" }
+        ],
+        "correctOrder": ["s1", "s2", "s3", "s4"],
+        "explanation": "Rehearsal measures the lock time before it happens live, the single runner applies the change before any new code needs it, the rollout then straddles both shapes safely, and contraction waits until no released code can still touch the old shape."
+      },
+      {
+        "id": "t743-a6",
+        "concept": "expand-contract",
+        "type": "tradeoff",
+        "prompt": "A 400 GB table needs a new column; deploys roll during the day and no maintenance window exists.",
+        "constraints": [
+          "Writes must not stall",
+          "Deploys run old and new code together",
+          "The change must be reversible"
+        ],
+        "approaches": [
+          { "id": "p3", "label": "Take the table offline overnight to run it", "description": "Offline migration" },
+          { "id": "p2", "label": "One ALTER in the deploy migration", "description": "Single deploy-time ALTER" },
+          { "id": "p1", "label": "Add the column, dual-write, backfill in batches, contract later", "description": "Expand-contract" }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          { "id": "r1", "label": "Each step keeps both code versions working" },
+          { "id": "r3", "label": "A single ALTER is quick on large tables" },
+          { "id": "r2", "label": "Batched writes avoid one giant lock" },
+          { "id": "r4", "label": "Scheduled downtime is simpler than batching" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "On a 400 GB table, some engines rewrite the whole thing under an exclusive lock.",
+          "r4": "There is no maintenance window, so offline is not on the table."
+        },
+        "explanation": "Expand-contract trades one blocking moment for several boring steps, each compatible with whatever code is running. The single ALTER risks minutes of stalled writes, and the offline plan violates the no-window constraint outright."
+      }
+    ],
+    "flashcards": [
+      { "id": "t743-f1", "front": "Expand-contract?", "back": "Add the new shape, migrate writes and data, then remove the old shape in a later release." },
+      { "id": "t743-f2", "front": "Why not migrate at app boot?", "back": "Replicas race the change, there is no review or timeout, and a half-applied failure has no clean rollback." },
+      { "id": "t743-f3", "front": "Why drop the old column later?", "back": "So a rollback of the reading release still finds the schema it expects." }
+    ],
+    "sources": [
+      { "title": "Martin Fowler: Evolutionary Database Design", "url": "https://martinfowler.com/articles/evodb.html" },
+      { "title": "PostgreSQL: ALTER TABLE", "url": "https://www.postgresql.org/docs/current/sql-altertable.html" },
+      { "title": "The Twelve-Factor App: Admin Processes", "url": "https://12factor.net/admin-processes" }
+    ],
+    "deep": {
+      "teaches": ["backward-compatible", "expand-contract", "migration-runner"],
+      "mechanism": {
+        "title": "What a safe migration pipeline does",
+        "steps": [
+          "Migrations are versioned, forward-only changes applied by a single runner in the pipeline, not by every app instance at boot; a lock or version table makes who applies unambiguous.",
+          "Each change is designed backward-compatible: the schema after the step must serve the code before and after the deploy, because a rolling deploy runs both at once.",
+          "For a destructive-looking change the runner expands instead: add the new shape, deploy code that writes to both, then backfill in measured batches while watching replication lag.",
+          "Reads switch only after the backfill completes and a deploy puts the reading code live; the old shape stays in place until no released version can still touch it.",
+          "The contract step, dropping the column or table, ships as its own later migration once rollback of the reading release is no longer needed.",
+          "Risky statements get guardrails: lock and statement timeouts, batching, online-change options where the engine offers them, and a rehearsal on a production-sized copy so lock time is measured rather than discovered.",
+          "Rollback means roll forward: because data has already moved, the undo path is a new compatible change, which is why each step is kept small and reversible by a forward fix."
+        ]
+      },
+      "useWhen": [
+        "Expand-contract for any change on tables that serve live traffic.",
+        "One pipeline migration job ahead of the rollout, never per-replica at boot.",
+        "Batch backfills with lag monitoring on large tables."
+      ],
+      "avoidWhen": [
+        "Do not auto-migrate from application startup in production.",
+        "Avoid whole-table rewrites during a deploy on engines that still do them.",
+        "Do not ship destructive changes in the same release that starts depending on them."
+      ],
+      "tradeoffs": {
+        "columns": ["Choice", "Benefit", "Cost"],
+        "rows": [
+          ["Single deploy-time ALTER", "One step, simple pipeline", "May lock the table for the duration"],
+          ["Expand-contract", "Zero-downtime, rollback-friendly", "Multiple releases; temporary dual writes"],
+          ["Boot-time auto-migrate", "No pipeline work", "Racing replicas; no review gate"],
+          ["Maintenance window", "Simplest change of all", "Downtime many services cannot take"]
+        ]
+      },
+      "numbers": {
+        "title": "The cost of one table rewrite",
+        "assumptions": [
+          "A 400 GB table; the engine rewrites it under an exclusive lock (illustrative)",
+          "Sustained rewrite at 200 MB/s; batched online backfill at 4,000 rows a second"
+        ],
+        "steps": [
+          "Rewrite under lock: 400 GB ÷ 200 MB/s ≈ 2,000 s ≈ 33 minutes of stalled writes.",
+          "Through those minutes every write queues behind the lock, and user-facing timeouts start long before it ends.",
+          "A batched backfill over 12,000,000 rows at 20,000 rows per 5 s finishes in about 50 minutes with lag under a second.",
+          "Expand-contract trades a longer wall-clock for no single blocking moment."
+        ],
+        "result": "On big tables the question is not how fast the change runs but how long it stops the world."
+      },
+      "india": {
+        "title": "What PostgreSQL documents about locking",
+        "label": "Official documentation",
+        "body": "PostgreSQL’s ALTER TABLE documentation states that most forms of the command take an ACCESS EXCLUSIVE lock, blocking reads and writes for the duration, while some operations, such as adding a column with a non-volatile default since version 11, are optimised to avoid a full table rewrite. Those notes are why pipeline migrations set lock timeouts, rehearse on realistic data and batch large changes instead of running one heavyweight statement at deploy time."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Reverting the release commit undoes the migration.”",
+          "say": "“A revert moves code back; the copied data and the dropped column do not come back with it.”"
+        },
+        {
+          "trap": "“Auto-migrate on boot has always worked.”",
+          "say": "“On one instance in staging; in production several replicas race it against real data.”"
+        }
+      ],
+      "takeaways": [
+        "The schema must serve old and new code during every deploy.",
+        "Expand, dual-write, backfill, switch, then contract later.",
+        "One migration runner in the pipeline, never per-replica at boot.",
+        "Roll forward is the rollback plan for data."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The deploy-time lock",
+      "prompt": "A pipeline runs a migration that adds a column to a 300 GB table; on this engine the statement rewrites the table under an exclusive lock. The rollout starts at the same moment. What do users see?",
+      "choices": [
+        { "id": "a", "label": "Writes queue behind the lock for many minutes, surfacing as timeouts", "feedback": "Right: the rewrite holds the lock until it finishes, and the lock is on the table itself." },
+        { "id": "b", "label": "Nothing: adding a column is instant on any table", "feedback": "On engines that rewrite the table, the duration scales with table size." },
+        { "id": "c", "label": "A brief pause on one replica while the others serve", "feedback": "The lock covers the table, not a replica, so every write waits." }
+      ],
+      "correctId": "a",
+      "reveal": "Know which statements rewrite in your engine, set lock timeouts and rehearse on real data. For large tables, expand-contract with batched writes keeps the deploy boring."
+    },
+    "seeAlso": [
+      { "topicId": 69, "why": "Expand-contract is progressive delivery applied to the schema" },
+      { "topicId": 324, "why": "Rolling deploys are what force backward-compatible schemas" },
+      { "topicId": 28, "why": "Replication lag is the metric that paces a backfill" }
+    ]
+  }
+]
