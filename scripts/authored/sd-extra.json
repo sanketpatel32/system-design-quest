@@ -30,7 +30,7 @@
    {
     "id": "t501-c2",
     "kind": "text",
-    "title": "Worked example: a page that fans out to 100 shards",
+    "title": "Fan-out to 100 shards: 63% of pages hit a slow call",
     "body": "Assume: each shard answers in 10 ms at p50, 30 ms at p95 and 120 ms at p99; slow calls happen independently.",
     "teaches": [
      "tail-fanout",
@@ -73,7 +73,7 @@
    {
     "id": "t501-c5",
     "kind": "text",
-    "title": "Trap: tuning the average while pages hang",
+    "title": "A faster average still leaves the tail to ruin pages",
     "body": "A dashboard that shows only mean latency hides the problem. Track p99 and p99.9 for each fan-out level, give every call a deadline derived from the page budget, and where the product allows it return partial results (48 of 50 shards, marked partial) instead of waiting for the slowest shard.",
     "teaches": [
      "tail-budget"
@@ -474,7 +474,7 @@
    {
     "id": "t502-c2",
     "kind": "text",
-    "title": "Worked example: a like counter on a viral post",
+    "title": "50K likes/s on one key: split it into 16 counters",
     "body": "Assume: 50,000 likes per second on one post at peak; one partition handles about 5,000 counter writes per second comfortably.",
     "teaches": [
      "split-counter"
@@ -510,7 +510,7 @@
    {
     "id": "t502-c5",
     "kind": "text",
-    "title": "Trap: adding shards for a single hot key",
+    "title": "More shards cannot spread a single hot key",
     "body": "Doubling the shard count halves the load per shard for ordinary keys, but the hot key still lands on exactly one shard with the same traffic. Find the key first, then cache it, replicate it or split it; more shards only help when the load is spread across many keys.",
     "teaches": [
      "hot-key"
@@ -946,7 +946,7 @@
    {
     "id": "t503-c4",
     "kind": "text",
-    "title": "Worked example: snapshots and rebuilds",
+    "title": "Snapshots cap replay; rebuilds take ~5.6 hours",
     "body": "Assume: a busy wallet records 10 events a day; the platform holds 1 billion events in total and a projector processes 50,000 events per second.",
     "teaches": [
      "snapshots",
@@ -963,7 +963,7 @@
    {
     "id": "t503-c5",
     "kind": "text",
-    "title": "Trap: event sourcing for plain CRUD",
+    "title": "Event-sourcing plain CRUD buys complexity for nothing",
     "body": "Event sourcing adds versioned event schemas, projections, rebuilds, eventual consistency and harder deletion of personal data (often handled by encrypting each person’s data with their own key and deleting the key). It pays off where history and audit are the product, such as ledgers, orders and workflows; for a settings page or a simple catalogue, a normal table with an audit log is enough.",
     "teaches": [
      "es-fit"
@@ -1430,7 +1430,7 @@
    {
     "id": "t504-c4",
     "kind": "text",
-    "title": "Worked example: how many breaks a day?",
+    "title": "99.9% matching still leaves 2,000 breaks a day",
     "body": "Assume: 2,000,000 transactions a day; automatic matching against bank and provider files pairs 99.9% of them.",
     "teaches": [
      "reconciliation"
@@ -1446,7 +1446,7 @@
    {
     "id": "t504-c5",
     "kind": "text",
-    "title": "Trap: a balance column as the only record",
+    "title": "A balance column alone cannot show where money went",
     "body": "Keeping only UPDATE accounts SET balance = balance − 500 leaves no explanation of how a balance arose, and a lost or doubled update is invisible. Keep the entries as the record; a cached balance is fine if it is updated in the same transaction as the entries and periodically checked against their sum.",
     "teaches": [
      "double-entry"
@@ -1880,7 +1880,7 @@
    {
     "id": "t505-c4",
     "kind": "text",
-    "title": "Worked example: backfill time and keys moved",
+    "title": "2 TB at 50 MB/s: an ~11-hour backfill",
     "body": "Assume: 2 TB to copy, throttled to 50 MB per second to protect the live database; separately, a hash-sharded table grows from 8 to 16 shards using hash mod N.",
     "teaches": [
      "backfill-math",
@@ -1897,7 +1897,7 @@
    {
     "id": "t505-c5",
     "kind": "text",
-    "title": "Trap: a big-bang cutover with no way back",
+    "title": "A big-bang cutover leaves no way back",
     "body": "Switching all reads and writes at once, straight after the backfill, bets everything on an unverified copy. Compare a sample of reads first, move traffic in steps (1%, 10%, 50%, 100%), and keep writing to the old store until the new one has run cleanly for a while, so rollback is a configuration change rather than a restore.",
     "teaches": [
      "shadow-reads",
@@ -1986,7 +1986,7 @@
      },
      {
       "id": "c",
-      "label": "Write with a version check so newer wins"
+      "label": "A conditional put that keeps the fresher of the two values"
      },
      {
       "id": "d",
@@ -2296,7 +2296,7 @@
    {
     "id": "t506-c2",
     "kind": "text",
-    "title": "Worked example: blast radius with 20 cells",
+    "title": "20 cells cap one bad deploy at 5% of customers",
     "body": "Assume: customers are spread evenly over 20 cells; deploys go to one cell first and wait an hour before the next wave.",
     "teaches": [
      "blast-radius",
@@ -2340,7 +2340,7 @@
    {
     "id": "t506-c5",
     "kind": "text",
-    "title": "Trap: cells that share a dependency",
+    "title": "Cells that share a dependency share its blast radius",
     "body": "Cells that all write to one global database or call one shared service are not isolated; that dependency fails them together. Keep data and critical dependencies inside each cell, and treat the few truly global pieces (the router, identity, billing aggregation) as separately hardened systems. Shuffle sharding reduces the overlap further: give each customer a random pair of workers, so that one bad customer shares both workers with few others. With 10 workers there are 10 × 9 ÷ 2 = 45 possible pairs, so only about 1 in 45 other customers loses both of its workers; the rest keep at least one.",
     "teaches": [
      "cell",
@@ -2736,7 +2736,7 @@
    {
     "id": "t507-c2",
     "kind": "text",
-    "title": "Worked example: a slow dependency exhausts a pool",
+    "title": "A dependency 3× slower needs 300 threads, not 100",
     "body": "Assume: 2,000 requests per second; each holds a worker thread for 50 ms normally; the pool has 200 threads.",
     "teaches": [
      "littles-law",
@@ -2779,7 +2779,7 @@
    {
     "id": "t507-c5",
     "kind": "text",
-    "title": "Trap: an unbounded queue as a safety net",
+    "title": "An unbounded queue serves requests nobody waits for",
     "body": "An unbounded queue does not create capacity; when arrivals exceed service rate it grows until waits pass every client’s timeout, and the server spends its time on requests nobody is waiting for. Bound the queue, reject or shed the excess quickly, and let clients back off.",
     "teaches": [
      "bounded-queue"
@@ -3196,7 +3196,7 @@
    {
     "id": "t508-c3",
     "kind": "text",
-    "title": "Worked example: one tenant’s export blocks everyone",
+    "title": "One tenant’s export makes everyone wait ~20 s",
     "body": "Assume: a shared pool of 100 workers processes jobs first in, first out; one tenant enqueues 1,000 export jobs of 2 seconds each.",
     "teaches": [
      "noisy-neighbour",
@@ -3230,7 +3230,7 @@
    {
     "id": "t508-c5",
     "kind": "text",
-    "title": "Trap: one shared pool for every size of tenant",
+    "title": "One shared pool lets the largest tenant starve the rest",
     "body": "When a few enterprise tenants generate a large share of load, a single shared pool makes everyone’s latency depend on their batch jobs. Give the largest tenants dedicated pools or cells, keep per-tenant limits for the rest, and track usage by tenant in logs or for the top tenants only, since a tenant_id label on every metric can explode series counts.",
     "teaches": [
      "noisy-neighbour",

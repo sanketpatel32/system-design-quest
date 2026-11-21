@@ -43,7 +43,7 @@
       {
         "id": "t61-c2",
         "kind": "text",
-        "title": "Worked example: bandwidth saved by presigned uploads",
+        "title": "Presigned uploads keep ~667 Mbit/s off app servers",
         "body": "Assume: 100,000 photo uploads per hour at 3 MB each.",
         "teaches": [
           "presigned"
@@ -60,7 +60,7 @@
       {
         "id": "t61-c4",
         "kind": "text",
-        "title": "Trap: images as database BLOBs",
+        "title": "Images in the database bloat backups and replicas",
         "body": "Storing images as BLOBs in the relational database. At 3 MB a photo, 1M photos is 3 TB inside the tables, every backup and every replica, so restores and new replicas take hours longer. Keep the bytes in object storage and the key, owner and size in a row.",
         "teaches": [
           "blob-trap"
@@ -173,7 +173,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Processing is asynchronous."
+        "explanation": "The app signs a URL, the client uploads the bytes straight to object storage, then a callback or event queues the processing and marks the row ready. Resizing and scanning run asynchronously, off the request path."
       },
       {
         "id": "t61-a5",
@@ -280,7 +280,7 @@
       {
         "id": "t62-c4",
         "kind": "text",
-        "title": "Trap: tiny files in HDFS",
+        "title": "Millions of tiny files exhaust the NameNode’s memory",
         "body": "Using HDFS for millions of tiny files or low-latency lookups. Each file costs NameNode memory, and HDFS is built for large sequential scans, not serving user requests.",
         "teaches": [
           "hdfs-fit"
@@ -494,7 +494,7 @@
       {
         "id": "t63-c2",
         "kind": "text",
-        "title": "Worked example: why a LIKE scan is slow",
+        "title": "A leading wildcard turns each search into a ~2 s scan",
         "body": "Assume: 10,000,000 product rows, 200 bytes of searchable text each; Disk or memory scan at 1 GB per second.",
         "teaches": [
           "inverted"
@@ -511,7 +511,7 @@
       {
         "id": "t63-c4",
         "kind": "text",
-        "title": "Trap: LIKE '%term%' at scale",
+        "title": "LIKE ‘%term%’ cannot use an index at scale",
         "body": "Using SQL LIKE \"%term%\" on millions of rows for search.",
         "teaches": [
           "like-scan"
@@ -601,7 +601,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Analysers tokenise, lowercase and stem."
+        "explanation": "The analyser applies the same chain at index and query time (tokenise, lowercase, stem), so “running” and “run” resolve to the same term. Indexes, shards and replicas change where the index lives, not what a term becomes."
       },
       {
         "id": "t63-a4",
@@ -637,7 +637,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "The database is written first."
+        "explanation": "The write commits to the database first; a change event then carries it to the search cluster, which re-indexes the document so it becomes searchable. The index is always a slightly stale, derived copy."
       },
       {
         "id": "t63-a5",
@@ -665,7 +665,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Search is a derived copy."
+        "explanation": "When they disagree, the database wins because it is the source of truth: re-sync or rebuild the index from it. Treating the search copy as authoritative, or rebuilding both from empty, throws away committed data."
       }
     ],
     "flashcards": [
@@ -710,7 +710,7 @@
       {
         "id": "t64-c1",
         "kind": "text",
-        "title": "MapReduce",
+        "title": "MapReduce: map, shuffle, reduce",
         "body": "Map: each worker reads a chunk and emits key-value pairs, such as (word, 1). Shuffle: pairs with the same key go to the same reducer. Reduce: combine the values per key. Moving computation to the data beats moving data.",
         "teaches": [
           "mapreduce"
@@ -735,7 +735,7 @@
       {
         "id": "t64-c3",
         "kind": "text",
-        "title": "Spark",
+        "title": "Spark keeps intermediate data in memory",
         "body": "Spark keeps intermediate data in memory across steps instead of writing to disk after every MapReduce stage, so multi-step jobs and iterative ML run much faster. Lost partitions are recomputed from lineage.",
         "teaches": [
           "spark"
@@ -851,7 +851,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Map, shuffle, reduce."
+        "explanation": "Mappers emit key-value pairs, the shuffle routes every pair with the same key to one reducer, and the reducers combine them into the output. The middle step is the expensive one: it moves the data across the network."
       },
       {
         "id": "t64-a4",
@@ -1023,7 +1023,7 @@
       {
         "id": "t65-c4",
         "kind": "text",
-        "title": "Trap: in-order, exactly-once events",
+        "title": "Streams arrive late, out of order and more than once",
         "body": "Assuming events arrive in order and exactly once. Mobile clients send late events and brokers redeliver, so use watermarks for lateness and idempotent or transactional sinks for duplicates.",
         "teaches": [
           "stream-dupes"
@@ -1057,7 +1057,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Count clicks when they happened."
+        "explanation": "Event time counts each click in the minute it actually happened, with a watermark saying how long to wait for stragglers. Processing time or receive time would smear the offline clicks into the wrong minute."
       },
       {
         "id": "t65-a2",
@@ -1085,7 +1085,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Seconds matter only for the first."
+        "explanation": "Flagging a suspicious payment is worthless hours later, so it belongs in a stream job. Monthly GST reports, yesterday’s payouts and training on last year’s data are all bounded sets a nightly batch handles well."
       },
       {
         "id": "t65-a3",
@@ -1247,7 +1247,7 @@
       {
         "id": "t66-c2",
         "kind": "text",
-        "title": "Worked example: why columnar scans are cheaper",
+        "title": "Columnar reads ~3 GB compressed instead of 320 GB",
         "body": "Assume: 1,000,000,000 order rows, 40 columns of 8 bytes each; Query sums one column grouped by one other column.",
         "teaches": [
           "oltp-olap"
@@ -1264,7 +1264,7 @@
       {
         "id": "t66-c4",
         "kind": "text",
-        "title": "Trap: analytics on the OLTP primary",
+        "title": "Heavy reports on the OLTP primary slow every checkout",
         "body": "Running heavy analytical queries on the production OLTP database.",
         "teaches": [
           "olap-on-oltp"
@@ -1298,7 +1298,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Large aggregates belong in OLAP."
+        "explanation": "Two years of per-city-hour aggregates scan billions of rows, which is warehouse work: a columnar store reads only the columns touched. The OLTP primary would be slowed for everyone, and Redis or search are the wrong shape for year-scale aggregates."
       },
       {
         "id": "t66-a2",
@@ -1390,7 +1390,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Analytics reads a copy."
+        "explanation": "Transactions land in the OLTP database, an ETL or CDC job copies them into the warehouse, and dashboards query that copy. Analysts never run heavy scans on the production primary."
       },
       {
         "id": "t66-a5",
@@ -1418,7 +1418,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Small, transactional, row-level."
+        "explanation": "OLTP work is small point reads and writes under a transaction: insert an order, decrement its stock. The others scan and aggregate over long periods, which is OLAP."
       }
     ],
     "flashcards": [
@@ -1497,7 +1497,7 @@
       {
         "id": "t67-c4",
         "kind": "text",
-        "title": "Trap: searching one cell",
+        "title": "Searching one cell misses points across the boundary",
         "body": "Searching only the user’s own cell. A restaurant 50 m away can sit across a cell boundary, so always include neighbouring cells.",
         "teaches": [
           "neighbours"
@@ -1755,7 +1755,7 @@
       {
         "id": "t68-c4",
         "kind": "text",
-        "title": "Trap: high-cardinality labels",
+        "title": "High-cardinality labels multiply the series count",
         "body": "Putting user IDs or request IDs in labels. Every unique label combination is a new series, so cardinality explodes and memory with it.",
         "teaches": [
           "cardinality"
@@ -1789,7 +1789,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Every label combination is a series."
+        "explanation": "A series exists for every unique label combination, so a user_id label with thousands of values multiplies the series thousands of times and memory with it. The fix is dropping or bounding the label, not more compaction."
       },
       {
         "id": "t68-a2",
@@ -1817,7 +1817,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Rollups keep old data cheap to query."
+        "explanation": "Downsampling keeps a year of data as hourly or daily points, and retention drops raw data you no longer need, so dashboards scan a fraction of the points. Faster disks help once; the point count is the real problem."
       },
       {
         "id": "t68-a3",
@@ -1881,7 +1881,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Raw data is short-lived; rollups last."
+        "explanation": "A metric arrives as raw high-frequency points, stays queryable briefly, gets rolled into coarser aggregates and is eventually archived or deleted. Each step trades resolution for storage cost."
       },
       {
         "id": "t68-a5",
@@ -1986,7 +1986,7 @@
       {
         "id": "t69-c5",
         "kind": "text",
-        "title": "Trap: irreversible schema changes",
+        "title": "A schema change must survive two app versions at once",
         "body": "Shipping a schema change the old version cannot read, then rolling back. Make changes backward compatible: add the new column, switch code, remove the old column later.",
         "teaches": [
           "schema"
@@ -2222,7 +2222,7 @@
       {
         "id": "t70-c4",
         "kind": "text",
-        "title": "Trap: database checks in liveness",
+        "title": "Dependency checks belong in readiness, not liveness",
         "body": "Using the liveness probe to check the database. If the DB blips, every pod fails liveness and gets restarted at once. Dependency checks belong in readiness, which only stops traffic.",
         "teaches": [
           "probes"
@@ -2469,7 +2469,7 @@
       {
         "id": "t71-c5",
         "kind": "text",
-        "title": "Trap: OFFSET for infinite feeds",
+        "title": "OFFSET pages get slower and drift under new writes",
         "body": "Using OFFSET for an infinite feed. Deep pages get slower and new posts push items onto the next page, so users see duplicates.",
         "teaches": [
           "offset"
@@ -2728,7 +2728,7 @@
       {
         "id": "t72-c4",
         "kind": "text",
-        "title": "Trap: locks around external calls",
+        "title": "Locks held across external calls stall every waiter",
         "body": "Holding a pessimistic lock while calling an external payment API. The lock lives for seconds and everything else queues behind it. Keep lock scopes short.",
         "teaches": [
           "lock-scope"
@@ -2790,7 +2790,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The version moved on."
+        "explanation": "WHERE version = 7 matched zero rows because another transaction already committed version 8, so your read was stale: re-read and retry. It is a conflict caught at write time, not a deadlock or a deleted row."
       },
       {
         "id": "t72-a3",
@@ -2818,7 +2818,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Low contention: no waiting needed."
+        "explanation": "Users editing their own address almost never collide, so an optimistic version check costs nothing and a lock would only add waiting. Pessimistic locks, distributed locks and serializable isolation all pay for conflicts that never arrive."
       },
       {
         "id": "t72-a4",
@@ -2849,7 +2849,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Check at write time."
+        "explanation": "Read the row and its version, compute the update, then UPDATE … WHERE version is unchanged; zero rows updated means someone won the race and you retry. The check happens at write time instead of a lock held ahead of time."
       },
       {
         "id": "t72-a5",
@@ -2983,7 +2983,7 @@
       {
         "id": "t73-c4",
         "kind": "text",
-        "title": "Trap: last-write-wins on documents",
+        "title": "Last-write-wins deletes one person’s whole edit",
         "body": "Using last-write-wins on whole documents. One user’s entire edit disappears. Merge at the operation or character level.",
         "teaches": [
           "lww-docs"
@@ -3017,7 +3017,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "CRDT merges converge in any order."
+        "explanation": "CRDTs let each copy apply edits locally and merge in any order to the same result, which is exactly what offline edits need. Classic OT wants a central server to order operations, and last-write-wins loses whole edits."
       },
       {
         "id": "t73-a2",
@@ -3045,7 +3045,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Merge at the operation level instead."
+        "explanation": "Last-write-wins treats the document as one value, so the second writer erases the other’s entire paragraph. OT and CRDTs merge at the operation level, per character or per field, so both edits survive."
       },
       {
         "id": "t73-a3",

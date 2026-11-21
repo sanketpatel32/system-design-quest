@@ -458,9 +458,9 @@
       "result": "Retries at every layer multiply: three layers of three attempts make 27 calls to a struggling database, so retry at one layer and use budgets."
     },
     "india": {
-      "title": "Recommendations down during a sale",
+      "title": "Recommendations down during a Diwali sale",
       "label": "Illustrative estimate",
-      "body": "During a festival sale, an e-commerce site’s “customers also bought” service slows to 5-second responses under load. Without timeouts, product page threads wait on it and the whole page, including Add to Cart, stops responding. With a 200 ms timeout, a circuit breaker that opens once more than half of calls fail, and a bulkhead limiting recommendations to its own small pool, the product page renders without recommendations and sales continue. When the breaker’s half-open trial calls succeed a minute later, the carousel quietly returns."
+      "body": "During a Diwali sale, an Indian e-commerce site’s “customers also bought” service slows to 5-second responses under load. Without timeouts, product page threads wait on it and the whole page, including Add to Cart, stops responding. With a 200 ms timeout, a circuit breaker that opens once more than half of calls fail, and a bulkhead limiting recommendations to its own small pool, the product page renders without recommendations and sales continue. When the breaker’s half-open trial calls succeed a minute later, the carousel quietly returns."
     },
     "pitfalls": [
       {
@@ -483,29 +483,29 @@
         "id": "t53-d1",
         "type": "multiple_choice",
         "concept": "retries",
-        "prompt": "Three layers each make up to 3 attempts. If the database is down, how many database attempts can one user request cause?",
+        "prompt": "A service retries a timed-out call immediately, three times, while the dependency is already overloaded. What does this risk?",
         "choices": [
           {
             "id": "a",
-            "label": "27"
+            "label": "A retry storm that adds load at the worst moment"
           },
           {
             "id": "b",
-            "label": "3"
+            "label": "The retries cancel each other out"
           },
           {
             "id": "c",
-            "label": "9"
+            "label": "Each retry is routed to a fresh replica automatically"
           },
           {
             "id": "d",
-            "label": "6"
+            "label": "The dependency recovers faster under the extra calls"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Three layers of three attempts each give 27 database attempts; retries multiply across layers."
+        "explanation": "Immediate retries multiply load precisely when the dependency can least afford it, and every caller retrying at once re-creates the burst. Backoff with jitter spaces retries out, and a retry budget caps the total."
       }
     ],
     "diagram": "CLOSED --errors > 50%--> OPEN (fail fast / fallback) --cool-down--> HALF-OPEN\n   ^                                                                |\n   +-------------------- trial calls succeed -----------------------+"
@@ -610,29 +610,29 @@
         "id": "t54-d1",
         "type": "multiple_choice",
         "concept": "trace-id",
-        "prompt": "Which signal shows that the payment span took 3.2 s of a slow request?",
+        "prompt": "Each service logs the request, but nobody can tell which downstream call made it slow. What links the log lines across services?",
         "choices": [
           {
             "id": "a",
-            "label": "A distributed trace of that request"
+            "label": "A shared trace id propagated on every call"
           },
           {
             "id": "b",
-            "label": "The payment service’s CPU metric"
+            "label": "The server’s hostname in each line"
           },
           {
             "id": "c",
-            "label": "The payment service’s p99 latency"
+            "label": "Timestamps rounded to the same second"
           },
           {
             "id": "d",
-            "label": "The payment service’s error log"
+            "label": "The pod name of the first service"
           }
         ],
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "A trace records each service’s span with its start and duration under one trace id, so it shows that this request spent 3.2 s in payments. A p99 latency or CPU chart summarises many requests and cannot point to this one, and an error log shows nothing if the call was slow but succeeded."
+        "explanation": "A trace id generated at the edge and passed on every hop lets the tracing system join spans into one request timeline. Hostnames and rounded timestamps cannot reliably match one request among thousands, and a pod name identifies a machine, not a call chain."
       }
     ],
     "diagram": "gateway (trace 7f3a) -> orders [span 120 ms] -> payments [span 3.2 s] -> bank API (timeout, retry)\n alert on p99 metric -> open trace 7f3a -> grep logs trace_id=7f3a"
@@ -737,11 +737,11 @@
         "id": "t55-d1",
         "type": "multiple_choice",
         "concept": "series",
-        "prompt": "Three components each at 99.9% availability are in series. What is the system availability?",
+        "prompt": "A checkout call chain has four components in series, each 99.9% available. What is the end-to-end availability?",
         "choices": [
           {
             "id": "a",
-            "label": "About 99.7%"
+            "label": "About 99.6%"
           },
           {
             "id": "b",
@@ -759,7 +759,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "0.999 cubed is about 0.997: series components multiply."
+        "explanation": "0.999 to the power 4 is about 0.996, so each series link multiplies the chain down to roughly 99.6%. Staying at 99.9% forgets the multiplication, 99.99% goes the wrong way, and 97% would need components far below three nines."
       }
     ],
     "diagram": "series:   [LB 99.99] -> [app 99.9] -> [DB 99.9]   = ~99.8%\nparallel: [DB 99.9] || [standby 99.9]          = ~99.9999%"

@@ -44,7 +44,7 @@
       {
         "id": "t41-c2",
         "kind": "text",
-        "title": "Worked example: token bucket for an OTP endpoint",
+        "title": "An OTP bucket of 3 allows 23 sends in 10 minutes",
         "body": "Assume: Allow on average 1 OTP per 30 seconds per phone; Allow a burst of 3.",
         "teaches": [
           "token-bucket"
@@ -61,7 +61,7 @@
       {
         "id": "t41-c4",
         "kind": "text",
-        "title": "Trap: fixed-window bursts",
+        "title": "Fixed windows double the burst at boundaries",
         "body": "Fixed windows let 2× traffic through at window boundaries. Mention sliding windows or token buckets.",
         "teaches": [
           "fixed-window"
@@ -95,7 +95,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Saved-up tokens can be spent at once."
+        "explanation": "A token bucket lets callers spend tokens saved earlier, so a burst up to the bucket size passes at once. Fixed and sliding windows cap each window, and a leaky bucket drains at a steady rate, smoothing bursts away."
       },
       {
         "id": "t41-a2",
@@ -154,7 +154,7 @@
           },
           {
             "id": "d",
-            "label": "The window slid to block them"
+            "label": "All 200 were counted in a single one-minute window"
           },
           {
             "id": "a",
@@ -288,7 +288,7 @@
       {
         "id": "t42-c2",
         "kind": "text",
-        "title": "Worked example: capacity of the Snowflake layout",
+        "title": "Snowflake layout: ~69 years and ~4M IDs/s per worker",
         "body": "Assume: 41 timestamp bits in milliseconds; 10 machine bits, 12 sequence bits.",
         "teaches": [
           "snowflake"
@@ -305,7 +305,7 @@
       {
         "id": "t42-c4",
         "kind": "text",
-        "title": "Trap: public auto-increment IDs",
+        "title": "Public auto-increment IDs leak order volume",
         "body": "Using auto-increment IDs exposed publicly: leaks volume and enables enumeration.",
         "teaches": [
           "auto-increment"
@@ -339,7 +339,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Timestamp bits come first."
+        "explanation": "Snowflake puts the timestamp in the high bits, so newer IDs sort after older ones while staying 64-bit. UUIDv4 and random numbers carry no time order, and auto-increment per shard gives unrelated sequences."
       },
       {
         "id": "t42-a2",
@@ -361,7 +361,7 @@
         "choices": [
           {
             "id": "a",
-            "label": "Inserts land on random pages, causing splits and cache misses"
+            "label": "New keys land on scattered pages, causing splits and cache misses"
           },
           {
             "id": "c",
@@ -460,7 +460,7 @@
         "rationaleConflicts": {
           "r3": "v4 is random; UUIDv7 is the time-ordered variant."
         },
-        "explanation": "Snowflake gives both properties."
+        "explanation": "Snowflake IDs fit here because worker bits let each of the 50 servers mint IDs without a coordinator, and the timestamp prefix keeps them sorted by creation. UUIDv4 scatters inserts across the index; it is not sortable by time."
       }
     ],
     "flashcards": [
@@ -515,7 +515,7 @@
       {
         "id": "t43-c2",
         "kind": "text",
-        "title": "Sagas",
+        "title": "Sagas: local transactions plus compensations",
         "body": "A saga splits the work into local transactions, one per service. If a later step fails, earlier steps are undone by compensating actions (refund, release the seat). No global locks, but the system is briefly inconsistent.",
         "teaches": [
           "saga",
@@ -550,7 +550,7 @@
       {
         "id": "t43-c5",
         "kind": "text",
-        "title": "Trap: 2PC by default",
+        "title": "2PC blocks every participant on the slowest",
         "body": "Defaulting to 2PC across microservices. It ties every service’s availability together and holds locks across network calls. Prefer sagas unless you truly need atomic commit. Expect the follow-up “what does the user see while the saga is half done?”: show “payment pending”, not a confirmed booking.",
         "teaches": [
           "2pc-blocking"
@@ -615,7 +615,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Locks are held from prepare to commit."
+        "explanation": "In the prepare phase every participant votes and holds its locks; the coordinator then collects the votes and tells everyone to commit or abort. Locks are held across that whole exchange, which is why one stalled participant stalls everyone."
       },
       {
         "id": "t43-a3",
@@ -625,7 +625,7 @@
         "choices": [
           {
             "id": "d",
-            "label": "The user keeps the reservations"
+            "label": "The user keeps the hotel and flight reservations"
           },
           {
             "id": "a",
@@ -643,7 +643,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Each completed step is undone by a new action, in reverse order: cancel the hotel, then the flight. There is no cross-service transaction to roll back, leaving the reservations holds rooms and seats the user did not pay for, and retrying a declined card forever never ends. Compensations must be idempotent, because they can be retried too."
+        "explanation": "Each completed step is undone by a new action, in reverse order: cancel the hotel, then the flight. There is no cross-service transaction to roll back; keeping the reservations would hold rooms and seats the user did not pay for, and retrying a declined card forever never ends. Compensations must be idempotent, because they can be retried too."
       },
       {
         "id": "t43-a4",
@@ -719,7 +719,7 @@
         "rationaleConflicts": {
           "r3": "Sagas are briefly inconsistent between steps; design for it."
         },
-        "explanation": "Sagas trade instant consistency for availability."
+        "explanation": "Independent services stay up independently, and compensating actions undo partial work; those are the saga’s real gains. “Keeps data consistent at every instant” is the 2PC promise a saga gives up."
       }
     ],
     "flashcards": [
@@ -812,7 +812,7 @@
       {
         "id": "t44-c5",
         "kind": "text",
-        "title": "Trap: relays deliver twice",
+        "title": "Republished events demand idempotent consumers",
         "body": "Forgetting the relay delivers at least once. It can crash after publishing but before marking the row sent, so consumers must handle duplicates idempotently.",
         "teaches": [
           "outbox-dupes"
@@ -1065,7 +1065,7 @@
       {
         "id": "t45-c5",
         "kind": "text",
-        "title": "Trap: two-node consensus",
+        "title": "Two nodes cannot form a majority after a split",
         "body": "Running consensus on 2 nodes, or putting a high-latency link in every write. Two nodes cannot lose one and keep a majority, and every commit waits for the slowest member of the majority.",
         "teaches": [
           "majority"
@@ -1099,7 +1099,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "A majority of 3 must stay up."
+        "explanation": "Raft needs a majority of the five nodes, three, to elect a leader and commit, so it keeps working until fewer than three remain. That is two failures tolerated, not three; losing three leaves no majority."
       },
       {
         "id": "t45-a2",
@@ -1152,7 +1152,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Commit needs a majority, not everyone."
+        "explanation": "The leader appends the entry, replicates it to followers and commits once a majority has written it, then replies to the client. Waiting for every follower would let one slow or dead node stall each write."
       },
       {
         "id": "t45-a4",
@@ -1194,7 +1194,7 @@
           },
           {
             "id": "b",
-            "label": "Four nodes cannot elect a leader because a majority needs an odd count"
+            "label": "Four nodes need all four votes for a majority, so elections take twice as long"
           },
           {
             "id": "a",
@@ -1208,7 +1208,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Majority of 4 is 3, so tolerance stays at 1."
+        "explanation": "A majority of 4 is still 3, so a fourth node buys no extra fault tolerance while adding an acknowledgement to every write. Four nodes do not deadlock elections, since randomised timeouts break ties, and they do not tolerate two failures either."
       }
     ],
     "flashcards": [
@@ -1286,7 +1286,7 @@
       {
         "id": "t46-c2",
         "kind": "text",
-        "title": "Worked example: lease and renewal timing",
+        "title": "A 10 s lease with 3 s renewals leaves 4 s of slack",
         "body": "Assume: Lease TTL 10 s, renewal every 3 s; Worst observed GC pause 2 s, network delay 1 s.",
         "teaches": [
           "fencing"
@@ -1303,7 +1303,7 @@
       {
         "id": "t46-c4",
         "kind": "text",
-        "title": "Trap: locks without a TTL",
+        "title": "Locks without a TTL can block forever",
         "body": "Holding a lock without a TTL: a crashed holder blocks everyone forever.",
         "teaches": [
           "lock-ttl"
@@ -1355,7 +1355,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Leases expire on their own."
+        "explanation": "A TTL makes the lock self-cleaning: if the holder crashes or loses its network, the lease expires and another node can take over. Without a lease, a dead holder blocks everyone forever."
       },
       {
         "id": "t46-a2",
@@ -1430,7 +1430,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "The token travels with the writes."
+        "explanation": "Acquire the lock with a TTL, receive a fencing token, and pass that token with each write to the storage layer, which rejects anything older than the newest it has seen. The token must travel with the writes because the lock service itself cannot stop a paused holder."
       },
       {
         "id": "t46-a5",
@@ -1483,7 +1483,7 @@
         "rationaleConflicts": {
           "r3": "A crashed holder would then block the job forever."
         },
-        "explanation": "Leases plus fencing handle both crashes and pauses."
+        "explanation": "A lease with a TTL makes sure only the current holder runs the job, and a fencing token stops a paused former holder writing later: both failure modes are covered. A lock that never expires is the opposite of safe: one crash blocks the job forever."
       }
     ],
     "flashcards": [
@@ -1558,7 +1558,7 @@
       {
         "id": "t47-c2",
         "kind": "text",
-        "title": "Worked example: Lamport timestamps step by step",
+        "title": "Lamport clocks: receive takes max(local, sent) + 1",
         "body": "Assume: Process P starts at 0, Q starts at 0.",
         "teaches": [
           "lamport",
@@ -1576,7 +1576,7 @@
       {
         "id": "t47-c4",
         "kind": "text",
-        "title": "Trap: last-write-wins on skewed clocks",
+        "title": "Last-write-wins lets a skewed clock delete newer data",
         "body": "Using server timestamps to decide “last write wins” across regions without accounting for skew.",
         "teaches": [
           "skew"
@@ -1638,7 +1638,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "max(7, 12) + 1 = 13."
+        "explanation": "On receive, a Lamport clock sets itself to max(local, received) + 1, so 7 becomes max(7, 12) + 1 = 13. Taking 12 could collide with the sender’s timestamp, and 19 wrongly adds the two clocks."
       },
       {
         "id": "t47-a3",
@@ -1730,7 +1730,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "The implication only goes one way."
+        "explanation": "Lamport guarantees that if A happened before B then ts(A) < ts(B). The converse does not hold, since a smaller timestamp may come from an unrelated node, so Lamport alone cannot detect concurrent events; vector clocks can."
       }
     ],
     "flashcards": [
@@ -1775,7 +1775,7 @@
       {
         "id": "t48-c1",
         "kind": "text",
-        "title": "Gossip",
+        "title": "Gossip spreads state like an epidemic",
         "body": "Every second each node picks a few random peers and swaps what it knows: membership, heartbeats, versions. News reaches the whole cluster in about log N rounds with no central server, which is why Cassandra and Consul use it.",
         "teaches": [
           "gossip"
@@ -1819,7 +1819,7 @@
       {
         "id": "t48-c5",
         "kind": "text",
-        "title": "Trap: dead after one missed beat",
+        "title": "One missed beat can be a bad path, not a dead node",
         "body": "Declaring a node dead on one missed heartbeat. A GC pause triggers a rebalance, the node comes back, and data moves twice.",
         "teaches": [
           "heartbeat"
@@ -1853,7 +1853,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Each round roughly doubles who knows."
+        "explanation": "Each informed node tells a random peer per round, so the count that knows roughly doubles and reaches N in about log₂N rounds. O(N) would mean one new node a round; O(N²) would never scale to large clusters."
       },
       {
         "id": "t48-a2",
@@ -1921,7 +1921,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "One bad path should not condemn a node."
+        "explanation": "A SWIM-style detector asks a few peers to ping the suspect indirectly; if any reach it, the node is alive and only the direct path was bad. Removing C on one failed ping would flap healthy nodes whenever a single route breaks."
       },
       {
         "id": "t48-a5",
@@ -1952,7 +1952,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Versions decide what is newer."
+        "explanation": "In each round a node picks random peers, exchanges keys and versions, and keeps the newer value for each. Versions decide what is newer, so the two views merge instead of blindly overwriting."
       }
     ],
     "flashcards": [
@@ -2037,7 +2037,7 @@
       {
         "id": "t49-c4",
         "kind": "text",
-        "title": "Trap: false positives that hurt",
+        "title": "A false positive can block a real user",
         "body": "Using a Bloom filter where a false positive is harmful, such as deciding a username is taken. A false positive there blocks a real user; confirm against the database.",
         "teaches": [
           "bloom-risk"
@@ -2261,7 +2261,7 @@
       {
         "id": "t50-c2",
         "kind": "text",
-        "title": "Worked example: what a network hop costs a request",
+        "title": "Six hops: 0.06 ms in-process, ~12 ms over the network",
         "body": "Assume: A page needs 6 sequential calls between components; In-process call about 0.01 ms; network call about 2 ms at p50 and 20 ms at p99.",
         "teaches": [
           "modular-monolith",
@@ -2279,7 +2279,7 @@
       {
         "id": "t50-c4",
         "kind": "text",
-        "title": "Trap: 15 services for 3 people",
+        "title": "Fifteen services for three people buys overhead, not scale",
         "body": "Splitting a 3-person team’s app into 15 services.",
         "teaches": [
           "ms-costs"
@@ -2313,7 +2313,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Split along team and scaling needs."
+        "explanation": "A service earns its boundary when a team must deploy or scale that part independently of the rest. Fashion, a line count or wanting a new language are not pressures a network boundary solves; they buy distributed problems for nothing."
       },
       {
         "id": "t50-a2",
@@ -2459,7 +2459,7 @@
         "rationaleConflicts": {
           "r3": "The service needs its own data, and function calls become network calls."
         },
-        "explanation": "Extract where team and scaling pressure are real."
+        "explanation": "Extraction pays when a team ships on its own schedule or the part needs separate scaling; both are real pressures. It is never free: the module still needs a network boundary, its own data and its own operations."
       }
     ],
     "flashcards": [
@@ -2529,7 +2529,7 @@
       {
         "id": "t51-c2",
         "kind": "text",
-        "title": "Worked example: latency of an aggregation endpoint",
+        "title": "Parallel fan-out halves the home screen to ~83 ms",
         "body": "Assume: Home screen needs profile (30 ms), offers (50 ms) and orders (80 ms); Gateway overhead 3 ms.",
         "teaches": [
           "gateway-jobs"
@@ -2546,7 +2546,7 @@
       {
         "id": "t51-c4",
         "kind": "text",
-        "title": "Trap: business logic in the gateway",
+        "title": "Business logic in the gateway makes it the bottleneck",
         "body": "Putting business logic in the gateway. It becomes a bottleneck and a deployment choke point.",
         "teaches": [
           "gateway-logic"
@@ -2608,7 +2608,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Aggregation saves mobile round trips."
+        "explanation": "The gateway can fan out to the four services in parallel and return one aggregated payload, saving four slow mobile round trips. Storing service data, replacing the services or forcing separate calls are all outside its job."
       },
       {
         "id": "t51-a3",
@@ -2636,7 +2636,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Keep the gateway thin."
+        "explanation": "Once business rules live in the gateway, every change needs a deploy by one shared gateway team, which becomes the bottleneck. It still routes and verifies tokens; the problem is ownership and coupling, not function."
       },
       {
         "id": "t51-a4",
@@ -2672,7 +2672,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Reject bad requests before routing."
+        "explanation": "The order is: verify the token, apply the rate limit, then route to the right service. Rejecting unauthenticated or abusive calls at the edge keeps them from spending any service resources at all."
       },
       {
         "id": "t51-a5",
@@ -2811,7 +2811,7 @@
       {
         "id": "t52-c5",
         "kind": "text",
-        "title": "Trap: hard-coded IPs",
+        "title": "Hard-coded IPs go stale as soon as an instance moves",
         "body": "Hard-coding IPs in config, or caching lookups with no refresh. Deploys then send traffic to instances that no longer exist.",
         "teaches": [
           "discovery"
@@ -3097,7 +3097,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Trials decide whether to close."
+        "explanation": "After the cooldown the breaker lets a few trial calls through; success closes it, failure reopens it. Letting all traffic through at once could re-crush a service that is still recovering."
       },
       {
         "id": "t53-a2",
@@ -3142,7 +3142,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Hung calls spread the outage upward."
+        "explanation": "Without a timeout, each request blocks a thread on the dead dependency, and new arrivals keep piling in until the pool is gone. One hung call is never just one; that is how a sick leaf takes the whole service down."
       },
       {
         "id": "t53-a4",
@@ -3178,7 +3178,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Fail fast while it is down."
+        "explanation": "After repeated failures the breaker opens and rejects calls quickly while the dependency recovers, then probes with a few half-open trials before closing. Failing fast protects the caller’s threads and gives the sick service room."
       },
       {
         "id": "t53-a5",
@@ -3226,7 +3226,7 @@
         "rationaleConflicts": {
           "r3": "Extra retries add load to a struggling service and slow its recovery."
         },
-        "explanation": "Contain optional dependencies so they cannot take checkout down."
+        "explanation": "Recommendations are optional, so checkout must not wait on them, and a breaker that fails fast keeps threads free while the service is down. More retries make a sick dependency worse, not better."
       }
     ],
     "flashcards": [
@@ -3297,7 +3297,7 @@
       {
         "id": "t54-c2",
         "kind": "text",
-        "title": "Worked example: log volume and the case for sampling",
+        "title": "Verbose logging at 5K req/s makes ~864 GB a day",
         "body": "Assume: 5,000 requests per second; Each request logs 4 lines of 500 bytes.",
         "teaches": [
           "pillars"
@@ -3315,7 +3315,7 @@
       {
         "id": "t54-c4",
         "kind": "text",
-        "title": "Trap: unstructured DEBUG logging",
+        "title": "Free-text DEBUG logs cost money and resist queries",
         "body": "Logging everything at DEBUG in production with no structure or sampling.",
         "teaches": [
           "log-hygiene"
@@ -3541,7 +3541,7 @@
       {
         "id": "t55-c2",
         "kind": "text",
-        "title": "Worked example: availability in series and in parallel",
+        "title": "Series links multiply down: fix the weakest first",
         "body": "Assume: Load balancer 99.99%, app tier 99.9%, database 99.9%, all in series; Then make the database a primary plus a standby with automatic failover, treated as two 99.9% copies.",
         "teaches": [
           "nines"
@@ -3558,7 +3558,7 @@
       {
         "id": "t55-c4",
         "kind": "text",
-        "title": "Trap: five nines on one zone",
+        "title": "Five nines in one zone still dies with the zone",
         "body": "Claiming five nines without redundancy across zones. Availability comes from removing single points of failure.",
         "teaches": [
           "spof"
@@ -3660,7 +3660,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Set the SLO tighter than the SLA."
+        "explanation": "The SLO is the internal target the team engineers to; the SLA is the contractual promise with penalties. Keeping the SLO tighter leaves an error-budget buffer, so one bad week does not become a breach."
       },
       {
         "id": "t55-a5",
@@ -3784,7 +3784,7 @@
       {
         "id": "t56-c5",
         "kind": "text",
-        "title": "Trap: untested failover",
+        "title": "An untested failover plan is not a plan",
         "body": "Never testing failover. Backups that were never restored and runbooks that were never run tend to fail on the day. Rehearse with game days.",
         "teaches": [
           "failover"
@@ -3818,7 +3818,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "RPO is data loss; RTO is downtime."
+        "explanation": "RPO bounds how much data you can lose, expressed as the age of the newest recoverable write; RTO bounds how long the service may be down. “Lose at most five minutes of orders” is a recovery-point target."
       },
       {
         "id": "t56-a2",
@@ -3846,7 +3846,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Nothing runs until you need it."
+        "explanation": "Backup and restore keeps only data copies, so it costs almost nothing but takes hours to bring the service back, which fits a multi-hour RTO. Pilot light, warm standby and active-active each buy less downtime for more money."
       },
       {
         "id": "t56-a3",
@@ -3882,7 +3882,7 @@
           "s4",
           "s5"
         ],
-        "explanation": "Promote data before scaling."
+        "explanation": "Failover runs: detect the regional loss, promote the replica, repoint traffic, then scale capacity back up. Scaling first just gives you healthy servers pointed at a store that cannot take writes yet."
       },
       {
         "id": "t56-a4",
@@ -3963,7 +3963,7 @@
         "rationaleConflicts": {
           "r3": "Restoring from backups takes hours and loses up to a day of data."
         },
-        "explanation": "Targets drive the strategy."
+        "explanation": "RTO under five minutes needs a running standby ready to take traffic, and RPO near zero needs synchronous replication so no committed write is missing. Nightly backups lose a day of writes; the targets pick the tier."
       }
     ],
     "flashcards": [
@@ -4038,7 +4038,7 @@
       {
         "id": "t57-c2",
         "kind": "text",
-        "title": "Worked example: revocation window of a stolen token",
+        "title": "A 15-minute token leaves ~7.5 minutes of misuse",
         "body": "Assume: Access token lifetime 15 minutes; Attacker steals a token at a random moment.",
         "teaches": [
           "sessions"
@@ -4055,7 +4055,7 @@
       {
         "id": "t57-c4",
         "kind": "text",
-        "title": "Trap: long-lived JWTs",
+        "title": "Long-lived access tokens cannot be revoked",
         "body": "Long-lived JWTs with no revocation path.",
         "teaches": [
           "jwt-revoke"
@@ -4297,7 +4297,7 @@
       {
         "id": "t58-c4",
         "kind": "text",
-        "title": "Trap: access token as identity",
+        "title": "An access token is not proof of identity",
         "body": "Using an OAuth access token as proof of identity. It says what the app may do, not who the user is. Use the OIDC ID token for login.",
         "teaches": [
           "id-token"
@@ -4418,7 +4418,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Tokens come over the back channel."
+        "explanation": "The browser only ever carries the authorisation code; the app then calls the token endpoint directly (the back channel), presenting the code and the PKCE verifier. Keeping tokens off the redirect keeps them out of browser history."
       },
       {
         "id": "t58-a5",
@@ -4466,7 +4466,7 @@
         "rationaleConflicts": {
           "r3": "With the password the app can do anything as the user, and access cannot be scoped or revoked separately."
         },
-        "explanation": "Delegation beats impersonation."
+        "explanation": "OAuth lets the user grant the aggregator scoped, revocable access, so the app never stores a bank password. Even encrypted, a stored password grants full access with no per-scope control; delegation is strictly better than impersonation."
       }
     ],
     "flashcards": [
@@ -4558,7 +4558,7 @@
       {
         "id": "t59-c4",
         "kind": "text",
-        "title": "Trap: week-long access tokens",
+        "title": "Week-long access tokens leave a wide theft window",
         "body": "Week-long access tokens. A stateless token cannot be easily revoked, so keep access tokens short (minutes) and use refresh tokens, which can be revoked server-side.",
         "teaches": [
           "jwt-lifetime"
@@ -4592,7 +4592,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Signed, not secret."
+        "explanation": "A signature only stops tampering; the payload is base64-encoded, so anyone holding the token can decode the PAN. “Signed” is not “secret”: sensitive data does not belong in an unencrypted JWT."
       },
       {
         "id": "t59-a2",
@@ -4648,7 +4648,7 @@
         "correctChoiceIds": [
           "a"
         ],
-        "explanation": "Verification is local."
+        "explanation": "Each service verifies the signature locally with the issuer’s public key, so no per-request call reaches the auth server. That is the point of stateless tokens: the auth server only signs tokens and publishes keys."
       },
       {
         "id": "t59-a4",
@@ -4679,7 +4679,7 @@
           "s3",
           "s4"
         ],
-        "explanation": "Signature first, then claims."
+        "explanation": "Check the signature and algorithm first, then the claims (issuer, audience, expiry), and only then route the request. Validating claims on a token whose signature you have not checked trusts data you have not authenticated."
       },
       {
         "id": "t59-a5",
