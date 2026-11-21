@@ -46,7 +46,7 @@
    {
     "id": "t551-c3",
     "kind": "text",
-    "title": "Expression indexes",
+    "title": "Expression indexes for computed lookups",
     "body": "WHERE lower(email) = 'ann@example.com' cannot use a plain index on email, because the index is sorted by the stored value, not the lower-cased one. An index on lower(email) stores the computed value, so that exact expression becomes an index lookup. Made unique, it also stops 'Ann@x.com' and 'ann@x.com' from both being registered. Two rules apply. The query must use the same expression the index was built on, and the function must give the same result for the same input every time (PostgreSQL calls this immutable), or the index could hold stale answers. Each write pays for computing the expression once more.",
     "teaches": [
      "expression-index"
@@ -96,7 +96,7 @@
     "choices": [
      {
       "id": "a",
-      "label": "A B-tree on status that covers all 40 million rows"
+      "label": "A B-tree on status covering all 40 million paid and unpaid rows"
      },
      {
       "id": "b",
@@ -104,7 +104,7 @@
      },
      {
       "id": "c",
-      "label": "A hash index on the status column alone"
+      "label": "A hash index on created_at alone"
      },
      {
       "id": "d",
@@ -114,7 +114,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "The partial index holds only the roughly 2,000 unpaid rows, so it stays tiny and cached, already sorted by created_at, and paid invoices never write to it. A full B-tree on status finds the same rows, but it is about 20,000 times larger and every invoice pays to maintain it. A hash index on status still has 40 million entries and cannot return rows in created_at order. A block-range index needs values that follow the physical row order, and status is scattered through the table."
+    "explanation": "The partial index holds only the roughly 2,000 unpaid rows, so it stays tiny and cached, already sorted by created_at, and paid invoices never write to it. A full B-tree on status finds the same rows, but it is about 20,000 times larger and every invoice pays to maintain it. A hash index on created_at cannot even find the unpaid rows, since it serves only equality on its own key. A block-range index needs values that follow the physical row order, and status is scattered through the table."
    },
    {
     "id": "t551-a2",
@@ -368,7 +368,7 @@
     "title": "How each index type decides which entries to store",
     "steps": [
      "A plain B-tree stores one entry per row: the column value exactly as stored, plus a pointer to the row. It answers equality, ranges and ordering on that value, and nothing else. Every variation below changes what is stored, so that a different question becomes a short lookup.",
-     "A partial index evaluates its condition on every write. Rows that fail the condition are not indexed at all, so a queue or an “unpaid” slice of a huge table keeps an index the size of the slice. At query time, the planner must prove that the query's WHERE clause implies the index condition, or it will not use the index.",
+     "A partial index evaluates its condition on every write. Rows that fail the condition are not indexed at all, so a queue or an “unpaid” slice of a huge table keeps an index the size of the slice. At query time, the planner must prove that the query’s WHERE clause implies the index condition, or it will not use the index.",
      "An expression index computes a function of the row, such as lower(email) or (payload->>'country'), and indexes the result. It serves only queries that contain the same expression. Because stored results must stay valid, the function has to be deterministic: no current time, no random values, no session settings.",
      "An inverted index splits each value into elements, such as words, array members or JSON keys, and keeps a posting list of row pointers for each element. Containment and word-match queries read one or a few posting lists and intersect them. One row can add many entries, so writes cost more, and PostgreSQL GIN can collect them in a pending list and merge them later.",
      "A block-range index divides the table into runs of pages (128 by default in PostgreSQL) and stores a summary for each, usually the minimum and maximum value. A query reads only the runs whose summary could contain matches, then rechecks every row in them. It is tiny, but it helps only when values follow the physical order of rows.",
@@ -439,7 +439,7 @@
    "india": {
     "title": "PostgreSQL index documentation",
     "label": "Official documentation",
-    "body": "The PostgreSQL manual has separate chapters on partial indexes, indexes on expressions, GIN and BRIN. The partial index chapter explains that the planner uses such an index only when it can recognise that the query's WHERE condition implies the index predicate, and warns that parameterised conditions may defeat this. The BRIN chapter describes the page-range summaries, the default range of 128 pages, and why the index suits columns that correlate with physical row order. The GIN chapter covers posting lists and the pending-list fast-update option."
+    "body": "The PostgreSQL manual has separate chapters on partial indexes, indexes on expressions, GIN and BRIN. The partial index chapter explains that the planner uses such an index only when it can recognise that the query’s WHERE condition implies the index predicate, and warns that parameterised conditions may defeat this. The BRIN chapter describes the page-range summaries, the default range of 128 pages, and why the index suits columns that correlate with physical row order. The GIN chapter covers posting lists and the pending-list fast-update option."
    },
    "pitfalls": [
     {
@@ -484,7 +484,7 @@
     }
    ],
    "correctId": "b",
-   "reveal": "A partial index is usable only when the query's WHERE clause implies its condition. Either widen the index condition to status IN ('unpaid', 'overdue') or split the query in two."
+   "reveal": "A partial index is usable only when the query’s WHERE clause implies its condition. Either widen the index condition to status IN ('unpaid', 'overdue') or split the query in two."
   },
   "seeAlso": [
    {
@@ -1512,7 +1512,7 @@
     "id": "t554-c3",
     "kind": "text",
     "title": "Pruning: skipping partitions",
-    "body": "When a query's WHERE clause constrains the partition key, for example created_at >= '2026-10-01', the planner skips every partition that cannot hold matching rows. With constant values it prunes while planning; with parameters, PostgreSQL can also prune when the query runs. A query that does not mention the key has nothing to prune on, so it must visit every partition. With 36 monthly partitions, a lookup by customer_id becomes 36 index probes instead of one.",
+    "body": "When a query’s WHERE clause constrains the partition key, for example created_at >= '2026-10-01', the planner skips every partition that cannot hold matching rows. With constant values it prunes while planning; with parameters, PostgreSQL can also prune when the query runs. A query that does not mention the key has nothing to prune on, so it must visit every partition. With 36 monthly partitions, a lookup by customer_id becomes 36 index probes instead of one.",
     "teaches": [
      "partition-pruning"
     ]
@@ -1791,7 +1791,7 @@
     "steps": [
      "A partitioned table is a parent with no rows of its own and a set of child tables. Each child accepts a slice of the partition key: a range such as one month, a list such as a set of regions, or a hash bucket. Every row lives in exactly one partition.",
      "On insert, the database evaluates the partition key and routes the row to the matching partition. If none matches and there is no default partition, the insert fails. Updates that change the key move the row from one partition to another, which costs a delete plus an insert.",
-     "On read, the planner compares the WHERE clause with each partition's bounds and removes partitions that cannot match. That is pruning. It happens while planning for constants, and in PostgreSQL also during execution for parameters and join values. Queries without the key search every partition.",
+     "On read, the planner compares the WHERE clause with each partition’s bounds and removes partitions that cannot match. That is pruning. It happens while planning for constants, and in PostgreSQL also during execution for parameters and join values. Queries without the key search every partition.",
      "Indexes are created on each partition separately. That keeps each index small, so it stays in memory, but it means uniqueness is checked per partition; in PostgreSQL a unique constraint must include the partition key columns.",
      "Retention becomes a metadata operation. Detaching a partition removes it from the parent so queries stop seeing it, and dropping it deletes its files. No row-by-row log records, no dead rows and no vacuum or purge work follow.",
      "All of this stays on one server. Partitioning helps manage a big table, keep indexes small, and make archiving cheap; it does not add CPU, memory or disk. When one machine cannot carry the load, sharding is the next step, and a time-partitioned table is often easier to shard later."
@@ -1859,7 +1859,7 @@
    "india": {
     "title": "PostgreSQL partitioning chapter",
     "label": "Official documentation",
-    "body": "The PostgreSQL manual's table partitioning chapter covers range, list and hash partitioning, explains partition pruning at plan and execution time, and lists the limitations, including that unique and primary key constraints on a partitioned table must include all partition key columns. It also recommends dropping or detaching partitions for bulk removal instead of large DELETE statements, and warns that too many partitions increase planning time and memory use."
+    "body": "The PostgreSQL manual’s table partitioning chapter covers range, list and hash partitioning, explains partition pruning at plan and execution time, and lists the limitations, including that unique and primary key constraints on a partitioned table must include all partition key columns. It also recommends dropping or detaching partitions for bulk removal instead of large DELETE statements, and warns that too many partitions increase planning time and memory use."
    },
    "pitfalls": [
     {
@@ -1968,7 +1968,7 @@
     "id": "t555-c3",
     "kind": "text",
     "title": "Where deleted rows live",
-    "body": "A deleted_at column keeps deleted rows in place: a restore is one UPDATE, and foreign keys from old orders stay valid. But hidden rows still fill the table's pages, so a table where most rows are deleted spends most of every scan and most of its cached pages on rows nobody asked for. Partial indexes WHERE deleted_at IS NULL keep the indexes small, but not the table. The alternative is an archive table with the same columns. One statement moves the row, for example WITH gone AS (DELETE FROM projects WHERE id = 7 RETURNING *) INSERT INTO projects_archive SELECT * FROM gone, so the live table holds only live rows and queries need no filter. The price: no foreign key can point at an archived row, and a restore is the same move in reverse.",
+    "body": "A deleted_at column keeps deleted rows in place: a restore is one UPDATE, and foreign keys from old orders stay valid. But hidden rows still fill the table’s pages, so a table where most rows are deleted spends most of every scan and most of its cached pages on rows nobody asked for. Partial indexes WHERE deleted_at IS NULL keep the indexes small, but not the table. The alternative is an archive table with the same columns. One statement moves the row, for example WITH gone AS (DELETE FROM projects WHERE id = 7 RETURNING *) INSERT INTO projects_archive SELECT * FROM gone, so the live table holds only live rows and queries need no filter. The price: no foreign key can point at an archived row, and a restore is the same move in reverse.",
     "teaches": [
      "deleted-row-storage"
     ]
@@ -2002,7 +2002,7 @@
     "id": "t555-c6",
     "kind": "text",
     "title": "Edge case: two changes at the same moment",
-    "body": "Two sessions change product 5's price at once. Each closes \"the current row\" and inserts its own new price, and if nothing stops them the table ends up with two open versions, so the current price has two answers. Serialise changes per key, for example by locking product 5's row in products with SELECT … FOR UPDATE before touching its history. And let the schema refuse the bad state anyway: a unique index on product_id WHERE valid_to IS NULL allows only one current version, and in PostgreSQL an exclusion constraint such as EXCLUDE USING gist (product_id WITH =, tstzrange(valid_from, valid_to) WITH &&), which needs the btree_gist extension, rejects any two overlapping periods.",
+    "body": "Two sessions change product 5’s price at once. Each closes “the current row” and inserts its own new price, and if nothing stops them the table ends up with two open versions, so the current price has two answers. Serialise changes per key, for example by locking product 5’s row in products with SELECT … FOR UPDATE before touching its history. And let the schema refuse the bad state anyway: a unique index on product_id WHERE valid_to IS NULL allows only one current version, and in PostgreSQL an exclusion constraint such as EXCLUDE USING gist (product_id WITH =, tstzrange(valid_from, valid_to) WITH &&), which needs the btree_gist extension, rejects any two overlapping periods.",
     "teaches": [
      "temporal-history"
     ]
@@ -2147,7 +2147,7 @@
     "id": "t555-a6",
     "concept": "temporal-history",
     "type": "drag_order",
-    "prompt": "Order the steps that change product 5's price in prices_history, which has a unique index on product_id WHERE valid_to IS NULL.",
+    "prompt": "Order the steps that change product 5’s price in prices_history, which has a unique index on product_id WHERE valid_to IS NULL.",
     "items": [
      {
       "id": "s3",
@@ -2167,7 +2167,7 @@
      },
      {
       "id": "s2",
-      "label": "Lock product 5's row in products with FOR UPDATE"
+      "label": "Lock product 5’s row in products with FOR UPDATE"
      }
     ],
     "correctOrder": [
@@ -2626,7 +2626,7 @@
     "items": [
      {
       "id": "s3",
-      "label": "Add its amount to that day's total with an atomic UPDATE … SET total = total + amount"
+      "label": "Add its amount to that day’s total with an atomic UPDATE … SET total = total + amount"
      },
      {
       "id": "s5",
@@ -2948,7 +2948,7 @@
     "id": "t557-c4",
     "kind": "text",
     "title": "Row-level security as a backstop",
-    "body": "Row-level security makes the database add a filter to every query on a table. In PostgreSQL, a policy such as USING (tenant_id = current_setting('app.tenant_id')::bigint) means a query that forgets WHERE tenant_id = … sees only the current tenant's rows instead of everyone's; a policy for all commands also applies that condition to rows being inserted or updated. SQL Server has an equivalent feature. Two details matter. In PostgreSQL, the table owner bypasses policies unless the table is set to FORCE ROW LEVEL SECURITY, and superusers always bypass them, so the application should connect as a separate, ordinary role. And the tenant setting must be set for each transaction, from the tenant the server derived when it authenticated the request; behind a transaction pooler, use SET LOCAL so it cannot leak to the next client.",
+    "body": "Row-level security makes the database add a filter to every query on a table. In PostgreSQL, a policy such as USING (tenant_id = current_setting('app.tenant_id')::bigint) means a query that forgets WHERE tenant_id = … sees only the current tenant’s rows instead of everyone’s; a policy for all commands also applies that condition to rows being inserted or updated. SQL Server has an equivalent feature. Two details matter. In PostgreSQL, the table owner bypasses policies unless the table is set to FORCE ROW LEVEL SECURITY, and superusers always bypass them, so the application should connect as a separate, ordinary role. And the tenant setting must be set for each transaction, from the tenant the server derived when it authenticated the request; behind a transaction pooler, use SET LOCAL so it cannot leak to the next client.",
     "teaches": [
      "row-level-security"
     ]
@@ -2966,7 +2966,7 @@
     "id": "t557-c6",
     "kind": "text",
     "title": "Edge case: moving a tenant between databases",
-    "body": "A large tenant outgrows the shared tables and moves to its own database, or a small one moves back. If ids come from a sequence per database, the tenant's invoice 9001 may already exist in the target, and fixing that means renumbering every row and every foreign key that points at it. Keys that do not depend on one database's sequence copy across unchanged: UUIDs, or ids scoped to the tenant under a (tenant_id, id) key. With tenant_id in every table, extracting a tenant is the same WHERE tenant_id = 42 on each table, and the cutover is a change to connection routing.",
+    "body": "A large tenant outgrows the shared tables and moves to its own database, or a small one moves back. If ids come from a sequence per database, the tenant’s invoice 9001 may already exist in the target, and fixing that means renumbering every row and every foreign key that points at it. Keys that do not depend on one database’s sequence copy across unchanged: UUIDs, or ids scoped to the tenant under a (tenant_id, id) key. With tenant_id in every table, extracting a tenant is the same WHERE tenant_id = 42 on each table, and the cutover is a change to connection routing.",
     "teaches": [
      "tenant-keys"
     ]
@@ -3255,7 +3255,7 @@
      "Every multi-tenant system answers two questions: where each tenant’s rows live, and what stops one tenant from seeing another’s. The layouts range from pooled (everyone in the same tables) to siloed (each tenant on its own database), with schema-per-tenant in between.",
      "In shared tables, the schema can carry the tenant. tenant_id is in each row and leads the primary key, unique rules include it, foreign keys between tenant tables include it so a row cannot point at another tenant’s row, and joins match on it.",
      "Indexes lead with tenant_id, so one tenant’s queries touch only its slice of each index instead of walking past every other tenant’s entries. The same holds for the condition a row-level security policy adds.",
-     "Row-level security moves the tenant filter into the database. A policy on the table is added to every query from ordinary roles, and the application sets the current tenant for each transaction with SET LOCAL. A forgotten WHERE then returns only the current tenant's rows. It is a backstop: it trusts whatever tenant it is given.",
+     "Row-level security moves the tenant filter into the database. A policy on the table is added to every query from ordinary roles, and the application sets the current tenant for each transaction with SET LOCAL. A forgotten WHERE then returns only the current tenant’s rows. It is a backstop: it trusts whatever tenant it is given.",
      "A schema or database per tenant makes isolation structural: a query on one tenant’s tables cannot touch another’s, and per-tenant restore is a normal restore. The cost is multiplied operations: every migration runs once per tenant, the catalog holds a copy of every table and index for each, and connection routing must pick the right schema or database.",
      "Most products end up hybrid: pooled tables for the many small tenants, and dedicated databases for the few that are very large, regulated or paying for isolation. Keep one schema, and keys that do not depend on one database’s sequence, so moving a tenant between the two is a data copy, not a renumbering. Separating data does not separate load: tenants on one server still share its CPU, I/O and connections."
     ]
@@ -3434,7 +3434,7 @@
    {
     "id": "t558-c3",
     "kind": "text",
-    "title": "The working set",
+    "title": "The working set must fit in memory",
     "body": "The working set is the set of pages the current workload touches repeatedly: the upper levels of every index, recent orders, active users. It is usually much smaller than the database. A 2 TB database whose queries mostly touch the last week of data can run well with 64 GB of memory. When the working set grows past memory, because data grew, a new feature reads old history, or a new index competes for space, latency does not rise gently. Misses jump, every query waits on storage, and the slowdown seems to arrive overnight.",
     "teaches": [
      "working-set"
@@ -3891,7 +3891,7 @@
     "id": "t559-c3",
     "kind": "text",
     "title": "Instants and wall-clock times",
-    "body": "Most timestamps record an instant: when an order was paid. Store these as an instant, normally a timestamp with time zone, which PostgreSQL stores internally in UTC and converts to the session time zone on output; the zone the value was written with is not kept. A timestamp without time zone is only a wall-clock reading with no zone, so the same value means different instants in Delhi and New York. Future local events are different: \"9:00 in Berlin on 3 June next year\" should be stored as the local time plus the IANA zone name (Europe/Berlin), because zone rules can change before the date arrives. Engines differ here: MySQL TIMESTAMP converts from the session time zone to UTC and only reaches 2038-01-19, while DATETIME stores the value as written.",
+    "body": "Most timestamps record an instant: when an order was paid. Store these as an instant, normally a timestamp with time zone, which PostgreSQL stores internally in UTC and converts to the session time zone on output; the zone the value was written with is not kept. A timestamp without time zone is only a wall-clock reading with no zone, so the same value means different instants in Delhi and New York. Future local events are different: “9:00 in Berlin on 3 June next year” should be stored as the local time plus the IANA zone name (Europe/Berlin), because zone rules can change before the date arrives. Engines differ here: MySQL TIMESTAMP converts from the session time zone to UTC and only reaches 2038-01-19, while DATETIME stores the value as written.",
     "teaches": [
      "time-types"
     ]
@@ -3900,7 +3900,7 @@
     "id": "t559-c4",
     "kind": "text",
     "title": "Text: encoding, length and collation",
-    "body": "Use a Unicode encoding that covers every character, including emoji. In MySQL that means utf8mb4: the older utf8 name is an alias for utf8mb3, which stores at most 3 bytes per character and rejects 4-byte characters such as emoji. Length limits are business rules; in PostgreSQL, varchar(n) and text are stored the same way, so a limit costs nothing but should match a real rule. The collation decides sort order and equality. MySQL's default utf8mb4_0900_ai_ci is accent- and case-insensitive, so 'Jose' = 'José' and a unique index treats them as the same value; a binary or case-sensitive collation does not. It also decides what an index can do. In PostgreSQL, a B-tree index under a linguistic collation such as en_US cannot answer LIKE 'Ash%' as a range; an index built with text_pattern_ops, or a column in the C collation, can.",
+    "body": "Use a Unicode encoding that covers every character, including emoji. In MySQL that means utf8mb4: the older utf8 name is an alias for utf8mb3, which stores at most 3 bytes per character and rejects 4-byte characters such as emoji. Length limits are business rules; in PostgreSQL, varchar(n) and text are stored the same way, so a limit costs nothing but should match a real rule. The collation decides sort order and equality. MySQL’s default utf8mb4_0900_ai_ci is accent- and case-insensitive, so 'Jose' = 'José' and a unique index treats them as the same value; a binary or case-sensitive collation does not. It also decides what an index can do. In PostgreSQL, a B-tree index under a linguistic collation such as en_US cannot answer LIKE 'Ash%' as a range; an index built with text_pattern_ops, or a column in the C collation, can.",
     "teaches": [
      "text-collation"
     ]
@@ -4147,7 +4147,7 @@
      "r3": "Text sorts character by character, so 09:30+05:30 sorts after 08:00+00:00 although it is the earlier instant.",
      "r4": "Server-local values have no zone, so the local day of a user elsewhere cannot be worked out reliably, and daylight saving repeats or skips hours."
     },
-    "explanation": "Store when it happened as an instant, and apply the user’s zone only when grouping by local day."
+    "explanation": "Store the instant it happened and apply each user’s zone only when grouping by local day. Server-local times cannot reconstruct a user’s day elsewhere, and text timestamps lose correct ordering and validation."
    }
   ],
   "flashcards": [
@@ -4645,7 +4645,7 @@
      "r3": "Hundreds of mostly-null columns and a migration for every new provider field are neither simple nor complete for long.",
      "r4": "Reports must extract and cast every value from JSON, and nothing enforces types or allowed values on them."
     },
-    "explanation": "Give the fields you report and enforce on real columns, and let JSON absorb the parts that vary."
+    "explanation": "Typed columns carry amount, currency, status and merchant, the fields reports sum and enforce, while JSON absorbs each provider’s extras without migrations. All-JSON gives up constraints and exact sums; a column per provider field means a migration for every new field."
    }
   ],
   "flashcards": [
@@ -5371,7 +5371,7 @@
     "id": "t622-c3",
     "kind": "text",
     "title": "Bulk paths and batch sizes",
-    "body": "Engines provide fast paths for loading: COPY FROM in PostgreSQL, LOAD DATA in MySQL, BULK INSERT and bcp in SQL Server. Without them, multi-row INSERT … VALUES statements, or the driver's batch API, cut round trips. Batches of roughly hundreds to a few thousand rows usually capture most of the gain. Each batch should be its own transaction, so a failure loses one batch rather than the whole load, and the job should record the last key it committed so it can resume.",
+    "body": "Engines provide fast paths for loading: COPY FROM in PostgreSQL, LOAD DATA in MySQL, BULK INSERT and bcp in SQL Server. Without them, multi-row INSERT … VALUES statements, or the driver’s batch API, cut round trips. Batches of roughly hundreds to a few thousand rows usually capture most of the gain. Each batch should be its own transaction, so a failure loses one batch rather than the whole load, and the job should record the last key it committed so it can resume.",
     "teaches": [
      "batch-size"
     ]
@@ -5842,7 +5842,7 @@
     "id": "t623-c1",
     "kind": "text",
     "title": "Why use a table as a queue",
-    "body": "Many applications already have a relational database, and their background jobs are born inside a database transaction: \"send the receipt for this order\". Putting the job in a jobs table, in the same transaction as the order, means the job exists if and only if the order committed, with no second system to keep in step. A typical jobs table has an id, a status, a run_at time, an attempt count, a lease expiry and the job's payload.",
+    "body": "Many applications already have a relational database, and their background jobs are born inside a database transaction: “send the receipt for this order”. Putting the job in a jobs table, in the same transaction as the order, means the job exists if and only if the order committed, with no second system to keep in step. A typical jobs table has an id, a status, a run_at time, an attempt count, a lease expiry and the job’s payload.",
     "teaches": [
      "table-queue"
     ]
@@ -5859,7 +5859,7 @@
     "steps": [
      "Worker A: SELECT id FROM jobs WHERE status = 'ready' AND run_at <= now() ORDER BY run_at LIMIT 10 FOR UPDATE SKIP LOCKED",
      "A locks 10 rows. Worker B runs the same query, skips A’s locked rows and gets the next 10",
-     "Without SKIP LOCKED, B would wait for A's locks; with a plain SELECT, both could take the same rows",
+     "Without SKIP LOCKED, B would wait for A’s locks; with a plain SELECT, both could take the same rows",
      "Each worker sets status = 'running' and lease_until = now() + 5 minutes on its rows, then commits, so row locks last milliseconds",
      "After the work, the worker deletes the job or marks it done; if it crashes, the lease expires and another worker can claim it"
     ]
@@ -5876,7 +5876,7 @@
    {
     "id": "t623-c4",
     "kind": "text",
-    "title": "Indexes and churn",
+    "title": "Indexes and churn on the jobs table",
     "body": "A queue table is small but very busy: every job is inserted, updated at least once and then deleted. A partial index such as ON jobs (run_at) WHERE status = 'ready' keeps the claim query reading only ready jobs. In PostgreSQL each update and delete leaves a dead row version, so vacuum must keep pace. A long-running transaction anywhere in the database stops that cleanup, dead entries pile up in the queue index, and claim queries that used to take a millisecond start scanning thousands of dead entries.",
     "teaches": [
      "queue-churn"
@@ -5886,7 +5886,7 @@
     "id": "t623-c5",
     "kind": "text",
     "title": "Trap: read first, then update",
-    "body": "A worker runs SELECT … WHERE status = 'ready' LIMIT 1, then UPDATE jobs SET status = 'running' WHERE id = 42. Two workers can read job 42 in the same instant, both update it, and both run it. Make the claim one atomic step: lock with FOR UPDATE SKIP LOCKED inside the claiming statement, or use a conditional UPDATE … WHERE id = 42 AND status = 'ready' and treat zero affected rows as \"someone else got it\". Even then, jobs can run twice after a lease expires, so job handlers must be idempotent.",
+    "body": "A worker runs SELECT … WHERE status = 'ready' LIMIT 1, then UPDATE jobs SET status = 'running' WHERE id = 42. Two workers can read job 42 in the same instant, both update it, and both run it. Make the claim one atomic step: lock with FOR UPDATE SKIP LOCKED inside the claiming statement, or use a conditional UPDATE … WHERE id = 42 AND status = 'ready' and treat zero affected rows as “someone else got it”. Even then, jobs can run twice after a lease expires, so job handlers must be idempotent.",
     "teaches": [
      "job-claiming"
     ]
@@ -6855,7 +6855,7 @@
    {
     "id": "t625-c3",
     "kind": "text",
-    "title": "Where the overhead comes from",
+    "title": "Where the row overhead comes from",
     "body": "Every engine adds bytes to each row. In PostgreSQL the tuple header is 23 bytes and each row also has a 4-byte line pointer; values are aligned, so a boolean followed by a bigint wastes 7 bytes of padding, and ordering columns from widest to narrowest avoids it. A NULL takes a bit in a null bitmap, not the column’s width. InnoDB stores each row in the clustered primary-key index with a 5-byte record header and two hidden fields, a 6-byte transaction id and a 7-byte roll pointer, and every secondary index entry carries the primary key. Pages are 8 KB by default in PostgreSQL and 16 KB in InnoDB, each with its own header.",
     "teaches": [
      "row-overhead"
@@ -7316,7 +7316,7 @@
     "id": "t626-c1",
     "kind": "text",
     "title": "The database needs its own limits",
-    "body": "A client timeout ends the client's wait; it does not necessarily stop the query. The server may keep running it until it finishes or notices the connection is gone, using CPU, I/O and locks for an answer nobody will read. Server-side limits stop that work. PostgreSQL has statement_timeout, lock_timeout, idle_in_transaction_session_timeout and, from version 17, transaction_timeout. MySQL has max_execution_time for SELECT statements and innodb_lock_wait_timeout, 50 seconds by default. SQL Server has SET LOCK_TIMEOUT. Together they put a ceiling on how much one session can hold.",
+    "body": "A client timeout ends the client’s wait; it does not necessarily stop the query. The server may keep running it until it finishes or notices the connection is gone, using CPU, I/O and locks for an answer nobody will read. Server-side limits stop that work. PostgreSQL has statement_timeout, lock_timeout, idle_in_transaction_session_timeout and, from version 17, transaction_timeout. MySQL has max_execution_time for SELECT statements and innodb_lock_wait_timeout, 50 seconds by default. SQL Server has SET LOCK_TIMEOUT. Together they put a ceiling on how much one session can hold.",
     "teaches": [
      "server-timeouts"
     ]
@@ -7340,7 +7340,7 @@
    {
     "id": "t626-c3",
     "kind": "text",
-    "title": "Choosing values per workload",
+    "title": "Choosing timeout values per workload",
     "body": "One global value rarely fits. A web request with a 2-second deadline wants a statement limit at or just under that deadline, because work after the deadline is wasted. A nightly report may legitimately run for 20 minutes. Set limits per role, per database or per transaction (SET LOCAL in PostgreSQL), and give long jobs their own role or a replica. Keep lock_timeout short, a few seconds, for web traffic and schema changes, so a blocked statement fails fast instead of queueing behind a lock.",
     "teaches": [
      "timeout-values"
@@ -7349,7 +7349,7 @@
    {
     "id": "t626-c4",
     "kind": "text",
-    "title": "Idle sessions that hold things",
+    "title": "Idle-in-transaction sessions that hold locks",
     "body": "A session that opened a transaction and then waits on the application, say for an external API call, holds its locks and its snapshot while doing nothing. Other writers queue behind its locks, and in MVCC engines cleanup cannot remove row versions it might still see. idle_in_transaction_session_timeout in PostgreSQL ends such sessions after a set time. The better fix is in the code: do slow external calls before or after the transaction, never inside it. Separate settings close sessions that are idle outside a transaction, such as idle_session_timeout in PostgreSQL 14 and later or wait_timeout in MySQL.",
     "teaches": [
      "idle-transactions"
@@ -7444,13 +7444,13 @@
      },
      {
       "id": "d",
-      "label": "TCP keepalive on the connection"
+      "label": "idle_session_timeout"
      }
     ],
     "correctChoiceIds": [
      "c"
     ],
-    "explanation": "The session is idle inside a transaction, which is exactly what this setting limits; it ends the session and releases its locks. statement_timeout applies while a statement runs, and none is running. lock_timeout limits waiting for a lock, not holding one. Keepalives detect dead connections, and this one is alive."
+    "explanation": "The session is idle inside a transaction, which is exactly what this setting limits; it ends the session and releases its locks. statement_timeout applies while a statement runs, and none is running. lock_timeout limits waiting for a lock, not holding one. idle_session_timeout looks similar but only fires on sessions idle outside a transaction, which this one is not."
    },
    {
     "id": "t626-a4",
@@ -7597,7 +7597,7 @@
      "r3": "A 2-second global limit kills every report; a 20-minute one protects nothing for the API.",
      "r4": "A client timeout ends the wait, not necessarily the query on the server."
     },
-    "explanation": "Per-role settings cost one ALTER ROLE each and let both workloads have limits that make sense."
+    "explanation": "ALTER ROLE … SET gives the API role a limit near its 2-second deadline and the reporting role the minutes it needs. One global value cannot fit both, and no limit lets abandoned queries pile up until connections run out."
    }
   ],
   "flashcards": [

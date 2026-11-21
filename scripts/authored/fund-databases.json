@@ -71,7 +71,7 @@
     "id": "t261-c6",
     "kind": "text",
     "title": "Edge case: a cascade that reaches further than expected",
-    "body": "ON DELETE CASCADE removes child rows when the parent goes, and their children too if those foreign keys also cascade. Deleting one customer can then remove orders, order items, payments and shipment records in a single statement, locking each row and writing each removal to the log. A mistaken delete becomes a large, silent one. Cascade only into rows that are truly part of the parent, such as an order's line items. Use RESTRICT, or a soft delete, for records with a life of their own, such as invoices and payments. And index the referencing columns, or every parent delete scans the child tables to find matches.",
+    "body": "ON DELETE CASCADE removes child rows when the parent goes, and their children too if those foreign keys also cascade. Deleting one customer can then remove orders, order items, payments and shipment records in a single statement, locking each row and writing each removal to the log. A mistaken delete becomes a large, silent one. Cascade only into rows that are truly part of the parent, such as an order’s line items. Use RESTRICT, or a soft delete, for records with a life of their own, such as invoices and payments. And index the referencing columns, or every parent delete scans the child tables to find matches.",
     "teaches": [
      "relational-model",
      "foreign-keys"
@@ -475,7 +475,7 @@
    {
     "id": "t262-c1",
     "kind": "text",
-    "title": "Combining and summarising",
+    "title": "Joins combine, grouping summarises",
     "body": "A join combines rows from two tables where a condition matches, such as orders.customer_id = customers.id. Grouping collapses rows that share a value into one row per group, and aggregates (COUNT, SUM, AVG, MIN, MAX) summarise each group.",
     "teaches": [
      "joins",
@@ -517,7 +517,7 @@
    {
     "id": "t262-c4",
     "kind": "text",
-    "title": "Inner, left and the rest",
+    "title": "Inner, left, full and cross joins",
     "body": "An inner join keeps only matching pairs. A left (outer) join keeps every row of the left table and fills the right side with NULL where nothing matches. Right and full outer joins do the same for the other side or both. A cross join pairs every row with every row, which is rarely what you want.",
     "teaches": [
      "joins"
@@ -1388,7 +1388,7 @@
    {
     "id": "t264-c4",
     "kind": "text",
-    "title": "Hash indexes",
+    "title": "Hash indexes serve equality only",
     "body": "A hash index maps a hash of the value to rows. It supports only equality (=), not ranges or ordering. In PostgreSQL the default B-tree also handles equality well, so hash indexes are a niche choice; other engines use hashing mainly in memory.",
     "teaches": [
      "hash-index"
@@ -1514,7 +1514,7 @@
      },
      {
       "id": "c",
-      "label": "They rebuild the tree into one level nightly"
+      "label": "The root page keeps a pointer to every leaf page"
      },
      {
       "id": "d",
@@ -1524,7 +1524,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "An 8 KB page holds hundreds of keys, so each level multiplies the reach by hundreds: three levels cover tens of millions of entries and four cover billions. Keys are not squeezed into one level, the tree is never flattened nightly (it rebalances as it splits pages), and an index holds an entry for every row, not a sample."
+    "explanation": "An 8 KB page holds hundreds of keys, so each level multiplies the reach by hundreds: three levels cover tens of millions of entries and four cover billions. Keys are not squeezed into one level, the root points only at the next level down (a root with a pointer to every leaf would need millions of pointers on one page), and an index holds an entry for every row, not a sample."
    },
    {
     "id": "t264-a5",
@@ -1781,7 +1781,7 @@
    {
     "id": "t265-c3",
     "kind": "diagram",
-    "title": "Reading a plan",
+    "title": "Reading an EXPLAIN plan tree",
     "body": "Plans are trees; data flows from the leaves up.",
     "teaches": [
      "explain"
@@ -1797,7 +1797,7 @@
    {
     "id": "t265-c4",
     "kind": "text",
-    "title": "Three join algorithms",
+    "title": "Nested loop, hash and merge joins",
     "body": "A nested loop looks up matching rows for each outer row, which is ideal when the outer side is small and the inner side is indexed. A hash join builds a hash table of the smaller input and probes it, good for large unsorted inputs. A merge join walks two inputs already sorted on the join key.",
     "teaches": [
      "join-algorithms"
@@ -2169,7 +2169,7 @@
    {
     "id": "t266-c1",
     "kind": "text",
-    "title": "All or nothing",
+    "title": "Atomicity: all or nothing",
     "body": "A transaction groups statements so they commit together or not at all. Moving money means debiting one account and crediting another; if the process crashes between the two, the transaction is rolled back and neither change is visible.",
     "teaches": [
      "atomicity"
@@ -2659,7 +2659,7 @@
    {
     "id": "t267-c4",
     "kind": "text",
-    "title": "Levels in PostgreSQL",
+    "title": "What each PostgreSQL level allows",
     "body": "PostgreSQL offers Read Committed (the default; each statement sees data committed before it began), Repeatable Read (one snapshot for the whole transaction, which also prevents phantoms in PostgreSQL) and Serializable (adds detection of dangerous patterns such as write skew and aborts one transaction). Read Uncommitted behaves like Read Committed.",
     "teaches": [
      "isolation-levels"
@@ -4021,7 +4021,7 @@
    {
     "id": "t270-c1",
     "kind": "text",
-    "title": "Copies kept up to date",
+    "title": "Replicas keep copies up to date",
     "body": "Replication keeps one or more standby databases in step with a primary by shipping the primary’s changes to them. Standbys can take over if the primary fails and can serve read-only queries, but in the common asynchronous setup they are slightly behind.",
     "teaches": [
      "replication"
@@ -4062,7 +4062,7 @@
    {
     "id": "t270-c4",
     "kind": "text",
-    "title": "Physical vs logical",
+    "title": "Physical versus logical replication",
     "body": "Physical (streaming) replication ships the write-ahead log, producing an exact byte-level copy of the whole cluster, same major version. Logical replication sends row changes for chosen tables, so subscribers can be a different version or have other tables and indexes, which suits upgrades and selective copies.",
     "teaches": [
      "replication"
@@ -4156,7 +4156,7 @@
      },
      {
       "id": "b",
-      "label": "Physical streaming replication"
+      "label": "A rolling restart of the primary on the new version’s binaries"
      },
      {
       "id": "c",
@@ -4170,7 +4170,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "Logical replication sends row changes, so the target can run a newer major version; you switch over once it has caught up. Physical replication, synchronous or not, copies the binary pages, which requires the same major version, and restoring last night’s backup loses a day and takes long."
+    "explanation": "Logical replication sends row changes, so the target can run a newer major version; you switch over once it has caught up. Physical replication, synchronous or not, copies the binary pages, which requires the same major version. Restarting onto new binaries does not help either: the on-disk format differs between major versions, so the old data directory is unreadable without pg_upgrade or a dump. Restoring last night’s backup loses a day and takes long."
    },
    {
     "id": "t270-a4",
@@ -4462,7 +4462,7 @@
    {
     "id": "t271-c3",
     "kind": "diagram",
-    "title": "Picking a family",
+    "title": "Match the family to the queries",
     "body": "Start from the questions the application asks.",
     "teaches": [
      "nosql-models",
@@ -4651,7 +4651,7 @@
      "s4",
      "s5"
     ],
-    "explanation": "Queries first, then keys, sizes and duplication."
+    "explanation": "Every access pattern needs its own table, so the queries are listed first. The partition key must be chosen before the clustering columns, because it decides which partition holds the row while clustering only sorts inside it. Sizes are checked so no partition grows unbounded, and duplicating each write into every query’s table comes last."
    },
    {
     "id": "t271-a6",
@@ -5369,7 +5369,7 @@
    {
     "id": "t273-c4",
     "kind": "text",
-    "title": "Where it hides",
+    "title": "Where the N+1 pattern hides",
     "body": "Data-access layers that load related records lazily make N+1 easy to write by accident: the loop looks like it touches an object field, but each access runs a query. Templates and serialisers that read related fields per row are common culprits. Counting queries per request in logs or tests catches it.",
     "teaches": [
      "detection"
@@ -5768,7 +5768,7 @@
    {
     "id": "t274-c4",
     "kind": "text",
-    "title": "Bigger is not faster",
+    "title": "A bigger pool is not a faster one",
     "body": "A database has a fixed number of CPU cores and disks. Beyond a point, more concurrent queries just compete for them and for locks, and each gets slower. A smaller pool with a short queue in the app often gives better throughput and latency than hundreds of connections.",
     "teaches": [
      "pool-sizing"
@@ -5940,7 +5940,7 @@
      "s4",
      "s5"
     ],
-    "explanation": "Borrow, use briefly, return."
+    "explanation": "A request borrows a connection, runs its queries in one short transaction and returns it, so the pool can hand the same connection to the next request. If no connection is idle the request waits rather than opening its own, and the pool keeps the returned connection open so the next borrower skips the handshake and authentication."
    },
    {
     "id": "t274-a6",
