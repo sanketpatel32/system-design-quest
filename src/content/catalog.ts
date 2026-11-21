@@ -102,11 +102,11 @@ export const regions: RegionMeta[] = [
   // Fundamentals track: language-agnostic foundations, IDs 200+ so system-design progress (1–120) never moves
   { id: 'f1-frontend', name: 'Frontend', subtitle: 'How the browser works', theme: 'sky', topicIds: [...range(201, 220), ...range(341, 346), ...range(521, 530)], track: 'fundamentals' },
   { id: 'f2-backend', name: 'Backend', subtitle: 'How servers handle work', theme: 'green', topicIds: [...range(221, 240), ...range(351, 356), 531, 711, 712, 713, ...range(535, 540)], track: 'fundamentals' },
-  { id: 'f3-networking', name: 'Networking', subtitle: 'How packets get there', theme: 'violet', topicIds: [...range(241, 260), ...range(541, 550), ...range(601, 620)], track: 'fundamentals' },
-  { id: 'f4-databases', name: 'Databases', subtitle: 'How data is stored and queried', theme: 'emerald', topicIds: [...range(261, 275), 559, 552, 560, 553, 555, 557, 551, 558, 625, 621, 624, 626, 622, 554, 556, 623], track: 'fundamentals' },
-  { id: 'f5-os', name: 'Operating Systems & Concurrency', subtitle: 'How programs share one machine', theme: 'teal', topicIds: [281, 282, 283, 561, 562, 563, 645, 646, 284, 647, 566, 285, 568, 644, 286, 641, 642, 564, 287, 643, 288, 567, 289, 648, 570, 290, 649, 565, 569, 650], track: 'fundamentals' },
-  { id: 'f6-security', name: 'Security', subtitle: 'How systems are attacked and defended', theme: 'red', topicIds: [...range(301, 320), ...range(571, 580), ...range(661, 680)], track: 'fundamentals' },
-  { id: 'f7-cloud', name: 'Cloud & DevOps', subtitle: 'How software is shipped and run', theme: 'amber', topicIds: [...range(321, 340), 581, 582, 589, 590, 588, 681, 682, 583, 683, 684, 584, 685, 686, 688, 585, 687, 690, 689, 586, 587], track: 'fundamentals' },
+  { id: 'f3-networking', name: 'Networking', subtitle: 'How packets get there', theme: 'violet', topicIds: [...range(241, 260), ...range(541, 550), ...range(601, 620), ...range(714, 719)], track: 'fundamentals' },
+  { id: 'f4-databases', name: 'Databases', subtitle: 'How data is stored and queried', theme: 'emerald', topicIds: [...range(261, 275), 559, 552, 560, 553, 555, 557, 551, 558, 625, 621, 624, 626, 622, 554, 556, 623, ...range(720, 725)], track: 'fundamentals' },
+  { id: 'f5-os', name: 'Operating Systems & Concurrency', subtitle: 'How programs share one machine', theme: 'teal', topicIds: [281, 282, 283, 561, 562, 563, 645, 646, 284, 647, 566, 285, 568, 644, 286, 641, 642, 564, 287, 643, 288, 567, 289, 648, 570, 290, 649, 565, 569, 650, ...range(726, 731)], track: 'fundamentals' },
+  { id: 'f6-security', name: 'Security', subtitle: 'How systems are attacked and defended', theme: 'red', topicIds: [...range(301, 320), ...range(571, 580), ...range(661, 680), ...range(732, 737)], track: 'fundamentals' },
+  { id: 'f7-cloud', name: 'Cloud & DevOps', subtitle: 'How software is shipped and run', theme: 'amber', topicIds: [...range(321, 340), 581, 582, 589, 590, 588, 681, 682, 583, 683, 684, 584, 685, 686, 688, 585, 687, 690, 689, 586, 587, ...range(738, 743)], track: 'fundamentals' },
 ]
 
 function range(from: number, to: number) {
