@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ClerkProvider } from '@clerk/react'
 import './index.css'
-import App from './App.tsx'
+import { initCatalog } from './content/catalog'
 import { authEnabled, CLERK_KEY } from './lib/auth/clerk'
 
 // Clerk's modal in our look. Clerk derives its shades from real colour values, so these mirror
@@ -12,14 +12,19 @@ const appearance = {
   elements: { formButtonPrimary: { fontWeight: 900, fontSize: '1rem', textTransform: 'none' as const, letterSpacing: '0', boxShadow: '0 4px 0 #1f5600' } },
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    {authEnabled ? (
-      <ClerkProvider publishableKey={CLERK_KEY} appearance={appearance} afterSignOutUrl="/">
+// Load the catalog chunk and the app code in parallel: every module that reads
+// catalog data at eval time (sections, numbering, pages) is behind the dynamic App
+// import, which only evaluates after initCatalog resolves.
+void Promise.all([initCatalog(), import('./App')]).then(([, { default: App }]) => {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      {authEnabled ? (
+        <ClerkProvider publishableKey={CLERK_KEY} appearance={appearance} afterSignOutUrl="/">
+          <App />
+        </ClerkProvider>
+      ) : (
         <App />
-      </ClerkProvider>
-    ) : (
-      <App />
-    )}
-  </StrictMode>,
-)
+      )}
+    </StrictMode>,
+  )
+})

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
+import { validateProgress } from '../../../api/_validate.js'
 import { defaultPersistedState, type PersistedState } from '../storage/schema'
-import { fromCloud, isCloudProgress, mergeProgress, toCloud } from './merge'
+import { fromCloud, isCloudProgress, MAX_SYNC_PRACTICE_MISTAKES, MAX_SYNC_REVIEWS, mergeProgress, pruneForUpload, toCloud, type CloudProgress } from './merge'
 
 const tp = (completed: boolean, best: number, attempts: number) => ({ completed, bestScorePercent: best, attempts, firstClearXpAwarded: completed })
 function state(p: Partial<PersistedState>): PersistedState { return { ...defaultPersistedState(), ...p } }
@@ -64,5 +65,38 @@ describe('cloud progress merge', () => {
     const s = state({ xp: 99999, unlockedTopicIds: ids, topicProgress, lessonProgress, streak: { lastActiveDay: history.at(-1)!, history } })
     const gz = await new Response(new Response(JSON.stringify(toCloud(s))).body!.pipeThrough(new CompressionStream('gzip'))).arrayBuffer()
     expect(Math.ceil(gz.byteLength / 3) * 4).toBeLessThan(7000) // base64 size
+  })
+})
+
+describe('pruneForUpload (retry after a 413)', () => {
+  const review = (id: number): CloudProgress['r'][number] => [1, `f${id}`, 2.5, 3, '2026-11-01T00:00:00.000Z', id]
+  const mistake = (id: number): NonNullable<CloudProgress['pr']>['m'][number] => [1, `q${id}`, 1000 + id, 0, 1]
+
+  it('keeps the newest reviews and the soonest-due mistakes, without mutating the input', () => {
+    const r = Array.from({ length: MAX_SYNC_REVIEWS + 5 }, (_, i) => review(i))
+    const m = Array.from({ length: MAX_SYNC_PRACTICE_MISTAKES + 30 }, (_, i) => mistake(i))
+    const p: CloudProgress = { ...toCloud(defaultPersistedState()), r, pr: { g: 10, ga: null, w: 1, m, la: null } }
+    const pruned = pruneForUpload(p)
+    // `r` is least→most recently reviewed: the head (oldest) is dropped, the tail survives
+    expect(pruned.r).toHaveLength(MAX_SYNC_REVIEWS)
+    expect(pruned.r[0]).toEqual(review(5))
+    // `m` is soonest-due first: the questions that matter next are kept
+    expect(pruned.pr!.m).toHaveLength(MAX_SYNC_PRACTICE_MISTAKES)
+    expect(pruned.pr!.m.at(-1)).toEqual(mistake(MAX_SYNC_PRACTICE_MISTAKES - 1))
+    expect(p.r).toHaveLength(MAX_SYNC_REVIEWS + 5)
+    expect(p.pr!.m).toHaveLength(MAX_SYNC_PRACTICE_MISTAKES + 30)
+  })
+
+  it('returns the same blob untouched when it already fits the caps', () => {
+    const p: CloudProgress = { ...toCloud(defaultPersistedState()), r: [review(1)], pr: { g: 10, ga: null, w: 0, m: [mistake(1)], la: null } }
+    expect(pruneForUpload(p)).toBe(p)
+  })
+
+  it('leaves blobs without a practice log valid, and the pruned copy still passes server validation', () => {
+    const p: CloudProgress = { ...toCloud(defaultPersistedState()), r: Array.from({ length: 3000 }, (_, i) => review(i)) }
+    const pruned = pruneForUpload(p)
+    expect(pruned.r).toHaveLength(MAX_SYNC_REVIEWS)
+    expect('pr' in pruned).toBe(false)
+    expect(validateProgress(JSON.parse(JSON.stringify(pruned))).ok).toBe(true)
   })
 })

@@ -83,5 +83,9 @@ export function rememberSection(id: SectionId) {
   try { localStorage.setItem(LAST, id) } catch { /* private mode */ }
 }
 export function lastSection(): SectionId {
-  try { const v = localStorage.getItem(LAST) ?? undefined; return isSectionId(v) ? v : 'system-design' } catch { return 'system-design' }
+  return visitedSection() ?? 'system-design'
+}
+/** The section the learner actually visited, or null when nothing was visited yet (unlike lastSection, no fallback) */
+export function visitedSection(): SectionId | null {
+  try { const v = localStorage.getItem(LAST) ?? undefined; return isSectionId(v) ? v : null } catch { return null }
 }

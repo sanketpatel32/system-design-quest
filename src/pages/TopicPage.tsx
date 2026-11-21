@@ -12,7 +12,6 @@ import { regionPalette, transitLineColor } from '../lib/design/transitTheme'
 import { Mascot } from '../components/art/Mascot'
 import { IconCheck } from '../components/icons/HudIcons'
 import { suggestionHint } from '../lib/progression/unlocks'
-import { readingMinutes } from '../lib/fun/fun'
 import { completedTopicIds, useGameStore } from '../stores/gameStore'
 
 export function TopicPage() {
@@ -61,7 +60,7 @@ export function TopicPage() {
           <div className="min-w-0 flex-1">
             <h1 className="font-display text-[1.75rem] sm:text-4xl text-white mt-1 leading-tight" data-testid="topic-title">{topic.title}</h1>
             <p className="text-sm font-extrabold text-white">
-              {regionName} · {topicLabel(topic.id)} · <span data-testid="reading-time">{readingMinutes(topic)} min read</span>
+              {regionName} · {topicLabel(topic.id)} · <span data-testid="reading-time">About {topic.durationMinutes} min</span>
             </p>
             {topic.objectives.length > 0 && (
               <>

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { SECTIONS, questName, sectionPalette, sectionPath, sectionTopics, lastSection } from '../content/sections'
+import { SECTIONS, questName, sectionPalette, sectionPath, sectionTopics, visitedSection } from '../content/sections'
 import { useGameStore } from '../stores/gameStore'
 import { sectionXp } from '../lib/progression/sectionXp'
 import { RegionMotif } from '../components/map/RegionMotif'
@@ -44,7 +44,7 @@ function Banner({ id, regionIds, soft, deep, bright, done, total }: { id: string
 /** Home: every section with its own progress ring, XP and next topic */
 export function SectionsPage() {
   const topicProgress = useGameStore((s) => s.topicProgress)
-  const last = lastSection()
+  const last = visitedSection()
   return (
     <div className="space-y-6">
       <HomeToday />

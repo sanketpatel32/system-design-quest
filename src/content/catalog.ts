@@ -1,11 +1,25 @@
 import type { RegionMeta, Topic } from './types'
-import topicsJson from './generated/topics.json'
 
-export const allTopics = topicsJson as Topic[]
+/**
+ * topics.json (~6.4 MB) ships as its own lazy chunk. initCatalog() fetches it before
+ * the app module graph evaluates (main.tsx awaits it, then dynamic-imports App), so
+ * modules that read these bindings at eval time — sections.ts, numbering.ts — see
+ * populated data. The bindings stay stable across the async boundary.
+ */
+export const allTopics: Topic[] = []
 
-export const topicsById = new Map<number, Topic>(
-  allTopics.map((t) => [t.id, t]),
-)
+export const topicsById = new Map<number, Topic>()
+
+let loading: Promise<void> | undefined
+/** Fetches the topics chunk once and fills allTopics/topicsById. Idempotent. */
+export function initCatalog(): Promise<void> {
+  loading ??= import('./generated/topics.json').then((m) => {
+    const topics = m.default as Topic[]
+    allTopics.push(...topics)
+    for (const t of topics) topicsById.set(t.id, t)
+  })
+  return loading
+}
 
 export const regions: RegionMeta[] = [
   {

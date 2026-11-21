@@ -12,7 +12,7 @@ import { dueMistakes, recordReview, usePractice } from '../lib/fun/practice'
 
 export function RevisionPage() {
   const srs = useGameStore((s) => s.srs)
-  const unlocked = useGameStore((s) => s.unlockedTopicIds)
+
   const topicProgress = useGameStore((s) => s.topicProgress)
   const lessonProgress = useGameStore((s) => s.lessonProgress)
   const quizAttempts = useGameStore((s) => s.quizAttempts)
@@ -41,7 +41,7 @@ export function RevisionPage() {
 
   const queue = useMemo(() => {
     // Anything the learner has reached, read or tried (topics can be taken in any order)
-    const studied = allTopics.filter((t) => unlocked.includes(t.id) || topicProgress[t.id]?.completed || lessonProgress[t.id]?.viewed || Object.keys(quizAttempts[`topic-${t.id}`]?.results ?? {}).length > 0)
+    const studied = allTopics.filter((t) => topicProgress[t.id]?.completed || lessonProgress[t.id]?.viewed || Object.keys(quizAttempts[`topic-${t.id}`]?.results ?? {}).length > 0)
     const cards = studied.flatMap((t) =>
       t.flashcards.map((f) => ({
         topicId: t.id,
@@ -55,7 +55,7 @@ export function RevisionPage() {
     const due = inFilter.filter((c) => !relearn.includes(key(c)) && (!c.state || isDue(c.state.dueAt)))
     const again = relearn.map((k) => inFilter.find((c) => key(c) === k)).filter((c): c is (typeof inFilter)[number] => Boolean(c))
     return [...due, ...again]
-  }, [srs, filter, section, unlocked, topicProgress, lessonProgress, quizAttempts, relearn])
+  }, [srs, filter, section, topicProgress, lessonProgress, quizAttempts, relearn])
 
   const current = queue[0]
 

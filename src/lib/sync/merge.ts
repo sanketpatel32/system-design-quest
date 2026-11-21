@@ -25,6 +25,23 @@ export interface CloudProgress {
 
 export const STREAK_HISTORY_CAP = 120
 
+/** Upload-only trims, used when the server rejects the blob as too big for Clerk metadata. */
+export const MAX_SYNC_REVIEWS = 2000
+export const MAX_SYNC_PRACTICE_MISTAKES = 50
+
+/**
+ * Shrink a progress blob that hit the server's size cap, for the upload copy only — the local
+ * store keeps everything. `r` is ordered least→most recently reviewed (a review re-appends its
+ * card), so the newest schedules survive; `pr.m` is soonest-due first (see toCloudPractice).
+ * Still too big after this: the caller treats it as a persistent "cloud save full".
+ */
+export function pruneForUpload(p: CloudProgress): CloudProgress {
+  const r = p.r.length > MAX_SYNC_REVIEWS ? p.r.slice(-MAX_SYNC_REVIEWS) : p.r
+  const pr = p.pr && p.pr.m.length > MAX_SYNC_PRACTICE_MISTAKES ? { ...p.pr, m: p.pr.m.slice(0, MAX_SYNC_PRACTICE_MISTAKES) } : p.pr
+  if (r === p.r && pr === p.pr) return p
+  return pr === undefined ? { ...p, r } : { ...p, r, pr }
+}
+
 export function toCloud(s: PersistedState): CloudProgress {
   const t: CloudProgress['t'] = {}
   for (const [id, p] of Object.entries(s.topicProgress ?? {})) {

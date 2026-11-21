@@ -3,10 +3,10 @@ import { useAuth } from '@clerk/react'
 import { useGameStore } from '../stores/gameStore'
 import { saveState } from '../lib/storage/persistence'
 import { defaultPersistedState, type PersistedState } from '../lib/storage/schema'
-import { fromCloud, isCloudProgress, mergeProgress, toCloud } from '../lib/sync/merge'
+import { fromCloud, isCloudProgress, mergeProgress, pruneForUpload, toCloud, type CloudProgress } from '../lib/sync/merge'
 import { fromCloudPractice, mergePractice, toCloudPractice } from '../lib/sync/practiceSync'
 import { getPractice, replacePractice, subscribePractice } from '../lib/fun/practice'
-import { useSyncStatus } from '../lib/sync/syncStatus'
+import { useSyncStatus, type SyncStatus } from '../lib/sync/syncStatus'
 
 const DEBOUNCE_MS = 2000
 const KEYS = Object.keys(defaultPersistedState()) as (keyof PersistedState)[]
@@ -31,14 +31,20 @@ export function CloudSync() {
       try {
         const token = await getToken()
         const progress = { ...toCloud(pick(useGameStore.getState())), pr: toCloudPractice(getPractice()) }
-        const send = (body: typeof progress) => fetch('/api/progress', { method: 'PUT', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ progress: body }) })
+        const send = (body: CloudProgress) => fetch('/api/progress', { method: 'PUT', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ progress: body }) })
         let res = await send(progress)
-        // Too big for the 8 KB metadata limit: drop the review-card schedule, then most of the missed queue
-        if (res.status === 413) res = await send({ ...progress, r: [] })
-        if (res.status === 413) res = await send({ ...progress, r: [], pr: { ...progress.pr, m: progress.pr.m.slice(0, 20) } })
-        if (!res.ok) throw new Error(String(res.status))
-        dirty.current = false
-        if (!cancelled) setStatus('saved')
+        // Too big for the server's metadata cap: retry once with the oldest review entries dropped
+        // and the missed queue trimmed (only the uploaded copy is pruned, not the local store)
+        if (res.status === 413) res = await send(pruneForUpload(progress))
+        if (res.ok) {
+          dirty.current = false
+          if (!cancelled) setStatus('saved')
+        } else if (res.status === 413 || res.status === 503) {
+          dirty.current = true
+          if (!cancelled) setStatus(res.status === 413 ? 'full' : 'unconfigured')
+        } else {
+          throw new Error(String(res.status))
+        }
       } catch {
         dirty.current = true
         if (!cancelled) setStatus(navigator.onLine ? 'error' : 'offline')
@@ -51,6 +57,12 @@ export function CloudSync() {
       try {
         const token = await getToken()
         const res = await fetch('/api/progress', { headers: { authorization: `Bearer ${token}` } })
+        if (res.status === 503) {
+          ready.current = userId // keep playing locally; saves keep reporting the same state
+          dirty.current = true
+          if (!cancelled) setStatus('unconfigured')
+          return
+        }
         if (!res.ok) throw new Error(String(res.status))
         const { progress } = (await res.json()) as { progress: unknown }
         if (cancelled) return
@@ -82,16 +94,30 @@ export function CloudSync() {
   return null
 }
 
-const LABEL: Record<string, string> = { loading: 'Syncing…', saving: 'Saving…', saved: 'Saved', offline: 'Offline: saved on this device', error: 'Not saved to cloud; will retry' }
+const LABEL: Record<SyncStatus, string> = {
+  idle: '',
+  loading: 'Syncing…',
+  saving: 'Saving…',
+  saved: 'Saved',
+  offline: 'Offline: saved on this device',
+  error: 'Not saved to cloud; will retry',
+  full: 'Cloud save full',
+  unconfigured: 'Cloud save unavailable',
+}
+const TITLE: Partial<Record<SyncStatus, string>> = {
+  error: 'Progress is only saved on this device until the connection recovers',
+  full: 'Too much progress for the cloud save — the newest entries were kept; the rest stays on this device',
+  unconfigured: 'Cloud save is not configured on the server — progress stays on this device',
+}
 
 /** Small header indicator for cloud save state (signed-in users only). */
 export function SyncIndicator() {
   const { isSignedIn } = useAuth()
   const status = useSyncStatus((s) => s.status)
   if (!isSignedIn || status === 'idle') return null
-  const bad = status === 'offline' || status === 'error'
+  const bad = status === 'offline' || status === 'error' || status === 'unconfigured'
   return (
-    <span data-testid="sync-status" role="status" aria-live="polite" className={`hidden sm:inline text-xs font-bold ${bad ? 'text-amber-600' : 'text-dim'}`}>
+    <span data-testid="sync-status" role="status" aria-live="polite" title={TITLE[status]} className={`hidden sm:inline text-xs font-bold ${status === 'full' ? 'text-flame-ink' : bad ? 'text-amber-600' : 'text-dim'}`}>
       {LABEL[status]}
     </span>
   )

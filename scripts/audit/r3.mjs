@@ -112,7 +112,7 @@ export function checkR3(topics, root) {
   {
     const src = readFileSync(join(root, 'src/lib/interactive/models.ts'), 'utf8')
     const models = new Map()
-    for (const m of src.matchAll(/^  '?([a-z-]+)'?: \{\n    params: \[([^\]]*)\]/gm)) models.set(m[1], m[2].split(',').map((x) => x.trim().replace(/'/g, '')).filter(Boolean))
+    for (const m of src.matchAll(/^  '?([a-z-]+)'?: \{\r?\n    params: \[([^\]]*)\]/gm)) models.set(m[1], m[2].split(',').map((x) => x.trim().replace(/'/g, '')).filter(Boolean))
     const kinds = { slider: 0, predict: 0, tradeoff: 0 }
     let n = 0
     for (const t of topics) {
