@@ -487,7 +487,7 @@
    {
     "id": "t282-c2",
     "kind": "text",
-    "title": "What a context switch does",
+    "title": "Saving registers and switching address spaces",
     "body": "To switch, the kernel saves the running thread’s registers and program counter, picks the next thread, and restores its state. Switching to a thread in another process also switches the memory mappings, which can flush cached address translations. The direct cost is commonly a few microseconds; the indirect cost of colder caches can be larger.",
     "teaches": [
      "context-switch"
@@ -1045,7 +1045,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Look at available memory, which counts reclaimable cache."
+    "explanation": "Watch available memory, not free memory: the available figure counts the 9 GB of page cache the kernel can reclaim on demand, so the machine is far from short. Swapping starts and the OOM killer fires only when reclaim cannot keep pace, and turning swap off would not change that arithmetic."
    },
    {
     "id": "t283-a4",
@@ -1073,7 +1073,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "With overcommit the failure shows up at touch time, not at allocation."
+    "explanation": "With default overcommit the kernel hands out more memory than exists and hopes it is not all touched; when it is, and reclaim and swap cannot cover the gap, the OOM killer picks one process and kills it to free pages. Processes are not all paused, code pages are simply dropped and re-read rather than compressed, and the allocation call typically succeeded long before the failure surfaced."
    },
    {
     "id": "t283-a5",
@@ -1122,7 +1122,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Fault, look up, read, map, retry."
+    "explanation": "The CPU raises a page fault, the kernel sees the page belongs to the mapped file but is absent, reads it from disk into the page cache, fixes the page table entry and retries the faulting instruction, which then runs as if nothing happened. All of this is kernel work; the program just stalls for the duration of the disk read."
    }
   ],
   "flashcards": [
@@ -1311,7 +1311,7 @@
    {
     "id": "t284-c2",
     "kind": "text",
-    "title": "What a system call costs",
+    "title": "The fixed cost of entering the kernel",
     "body": "A system call switches privilege level, saves some state and runs kernel code. A trivial call costs on the order of a hundred nanoseconds to a microsecond on modern hardware, more with some security mitigations enabled. The work inside (copying data, waiting for I/O) usually dominates.",
     "teaches": [
      "syscall-cost"
@@ -1901,7 +1901,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Wait, read, handle, write, repeat."
+    "explanation": "The loop sleeps until the readiness API reports sockets it can touch, drains the bytes each one offers, runs the handlers for the requests those bytes complete, then writes as much of each response as the socket accepts. Anything still unwritten stays queued and is retried when the socket next reports writable, so no connection is ever abandoned mid-reply."
    },
    {
     "id": "t285-a6",
@@ -1961,7 +1961,7 @@
      "r3": "200,000 stacks and the switching between them cost far more memory and CPU.",
      "r4": "CPU work still costs the same and blocks the loop if done inline."
     },
-    "explanation": "Pick the I/O model by how connections spend their time: mostly waiting favours event loops."
+    "explanation": "A thread per connection would mean 200,000 kernel threads and their stacks just to sit idle; an event loop keeps each connection to a few kilobytes of state and a descriptor in epoll, and wakes it only when there is data. Small outgoing messages keep each turn of the loop short, which is exactly what the model needs."
    }
   ],
   "flashcards": [
@@ -2222,7 +2222,7 @@
      },
      {
       "id": "b",
-      "label": "Integers are not stored in memory"
+      "label": "A write can sit in one core’s cache and be dropped"
      },
      {
       "id": "c",
@@ -2236,7 +2236,7 @@
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Two threads can both read 5, both add 1 and both write 6, so one increment vanishes. The counter is ordinary shared memory, and threads share globals, which is the whole problem; nothing is skipping additions, the interleaving loses them."
+    "explanation": "Two threads can both read 5, both add 1 and both write 6, so one increment vanishes. Hardware keeps caches coherent, so no written value is silently dropped; threads share one global, which is the whole problem; and nothing is skipping additions, the interleaving loses them."
    },
    {
     "id": "t286-a2",
@@ -2264,7 +2264,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "A lock protects data only if all accesses agree to use it."
+    "explanation": "A lock protects data only if every access takes it: an unlocked reader can observe the map half-updated or read a stale snapshot, which is a data race whatever the writer does. Map reads are not atomic by default, and a single core is no escape, because preemption can pause the writer mid-update and run the reader."
    },
    {
     "id": "t286-a3",
@@ -2351,7 +2351,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Both computed from the same old value."
+    "explanation": "Both threads read 5 before either writes, so both compute 6 and the second write silently overwrites the first: one increment is gone. The order of the two reads does not matter; the losing ingredient is that both reads happen before both writes."
    },
    {
     "id": "t286-a6",
@@ -2411,7 +2411,7 @@
      "r3": "It is correct but serialises every request on one lock.",
      "r4": "Lost updates grow with contention and can be large."
     },
-    "explanation": "For single-variable updates use atomics; for multi-field invariants use a lock."
+    "explanation": "Per-endpoint counters are many independent single variables, so an atomic increment per counter does the job on every request without any thread waiting. If the counters are few and hot, shard them and sum on read; a lock is what you reach for only when a correct read must see several fields change together."
    }
   ],
   "flashcards": [
@@ -2801,7 +2801,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Each holds one lock and waits for the other."
+    "explanation": "Each thread ends up holding one lock and waiting for the other, so neither can ever proceed: all four deadlock conditions hold at once. If either thread had taken both locks in one indivisible step, or both threads took L1 before L2, the circular wait could not form."
    },
    {
     "id": "t287-a6",
@@ -3553,17 +3553,17 @@
      },
      {
       "id": "c",
-      "label": "The second read skips checksums"
+      "label": "The file’s pages are still in the CPU cache"
      },
      {
       "id": "d",
-      "label": "The file was compressed first"
+      "label": "The file system moved it to faster storage after one read"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "The kernel keeps the 2 GB of pages in memory after the first read, and with 16 GB free nothing evicts them. A drive’s own cache is tiny by comparison, and checksums and compression do not depend on whether the file was read before."
+    "explanation": "The kernel keeps the 2 GB of pages in memory after the first read, and with 16 GB free nothing evicts them. A drive’s own cache is tiny by comparison, 2 GB cannot sit in a CPU cache, and nothing relocates a file after a single read."
    },
    {
     "id": "t289-a2",
@@ -3678,7 +3678,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Data durable, then switch the name, then make the switch durable."
+    "explanation": "The new data must be durable before the rename, since a crash after the rename must find the full contents; the rename itself is atomic, so readers see the old file or the new one, never a mix. fsyncing the directory afterwards makes the new name durable too, while fsyncing it earlier would protect nothing."
    },
    {
     "id": "t289-a6",

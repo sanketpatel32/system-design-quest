@@ -20,7 +20,7 @@
    {
     "id": "t561-c1",
     "kind": "text",
-    "title": "Two places a value can live",
+    "title": "The stack dies with the call; the heap outlives it",
     "body": "Each thread has a stack: a contiguous region where every function call pushes a frame holding its locals and return address, and every return pops it. Allocating there is just moving a pointer, and it is freed automatically on return, but the size is fixed when the thread starts (commonly 1 to 8 MB, depending on the platform and settings). The heap is shared by all threads and holds data of any size whose lifetime is not tied to one call; an allocator has to find space for it and take it back later.",
     "teaches": [
      "stack-frames",
@@ -46,7 +46,7 @@
    {
     "id": "t561-c3",
     "kind": "text",
-    "title": "What sits between malloc and the kernel",
+    "title": "The allocator between your code and the kernel",
     "body": "An allocator asks the kernel for large regions (by moving the program break or mapping pages) and carves them into blocks. Most allocators round small requests up to a size class, keep free lists per class, and give each thread a small cache so common allocations need no lock. Very large requests are usually mapped directly and handed back to the kernel when freed; small freed blocks normally stay inside the process for reuse.",
     "teaches": [
      "heap-allocation"
@@ -121,13 +121,13 @@
      },
      {
       "id": "d",
-      "label": "The stack keeps a copy of every object the job allocated"
+      "label": "The kernel reclaims heap pages lazily, a few at a time"
      }
     ],
     "correctChoiceIds": [
      "a"
     ],
-    "explanation": "Allocators keep small freed blocks in their free lists and can return a page only when all of it is free, so resident memory behaves like a high-water mark. Heap pages do not turn into page cache, zeroing is not what holds them, and stacks hold frames, not copies of heap objects."
+    "explanation": "Allocators keep small freed blocks in their free lists and can return a page only when all of it is free, so resident memory behaves like a high-water mark. Heap pages do not turn into page cache, and the kernel does not trickle them back on a slow schedule: a mapped heap page stays resident until the allocator hands back a fully free region."
    },
    {
     "id": "t561-a3",
@@ -1274,7 +1274,7 @@
    {
     "id": "t564-c3",
     "kind": "text",
-    "title": "Why a plain flag is not enough",
+    "title": "A plain flag can publish data out of order",
     "body": "Compilers and CPUs reorder memory operations when a single thread cannot tell the difference, so another thread can see a ready flag set before the data it guards. A release store on the flag guarantees that earlier writes become visible first; an acquire load on the flag guarantees that later reads see them. Paired together they publish data safely, which is what a mutex does for you on lock and unlock.",
     "teaches": [
      "memory-ordering"
@@ -1648,7 +1648,7 @@
    {
     "id": "t565-c1",
     "kind": "text",
-    "title": "What a container limit really is",
+    "title": "A cgroup applies the limit, not the container runtime",
     "body": "A container is ordinary processes placed in a control group (cgroup), a kernel object that accounts for and limits resources for every process inside it. CPU can be shared by weight, which only matters when CPUs are busy, or capped by a quota: a number of CPU-microseconds the group may use in each period, 100 ms by default. Memory has a soft throttle point (memory.high) and a hard limit (memory.max).",
     "teaches": [
      "cgroup-cpu-quota"
@@ -2552,13 +2552,13 @@
      },
      {
       "id": "d",
-      "label": "The operating system can schedule at most 8 threads"
+      "label": "Context switches between 32 threads cost the extra seconds"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Amdahl’s law only flattens the curve; a job getting slower with more cores means coordination costs grow with core count, usually a contended lock, atomic or cache line. The serial code itself did not change, Amdahl never predicts a slowdown, and schedulers run far more than 8 threads."
+    "explanation": "Amdahl’s law only flattens the curve; a job getting slower with more cores means coordination costs grow with core count, usually a contended lock, atomic or cache line. The serial code itself did not change, Amdahl never predicts a slowdown, and context switches would add microseconds each, nowhere near 15 s across 32 threads."
    },
    {
     "id": "t567-a3",
@@ -3273,7 +3273,7 @@
    {
     "id": "t569-c1",
     "kind": "text",
-    "title": "A checklist beats guessing",
+    "title": "The USE method: utilisation, saturation, errors",
     "body": "For every resource (CPUs, memory, disks, network, and limits such as descriptors or a cgroup quota) ask three questions: how busy is it (utilisation), is work queueing for it (saturation), and is it reporting errors. Working through the list in the same order each time finds the bottleneck faster than staring at whichever graph looks worst, and it rules resources out as well as in.",
     "teaches": [
      "use-method"
@@ -3776,13 +3776,13 @@
      },
      {
       "id": "d",
-      "label": "Half the file, chosen by the kernel up front"
+      "label": "The file, streamed into memory in the background"
      }
     ],
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "mmap only sets up the mapping; pages are loaded on first touch through page faults, and the kernel may read a little extra ahead. Nothing is loaded at map time, mapped data still comes from disk the first time, and there is no fixed share loaded up front."
+    "explanation": "mmap only sets up the mapping; pages are loaded on first touch through page faults, and the kernel may read a little extra ahead. Nothing is loaded at map time, the kernel does not stream the file in the background, and mapped data still comes from disk the first time it is touched."
    },
    {
     "id": "t570-a2",
