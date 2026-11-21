@@ -1,0 +1,1523 @@
+[
+  {
+    "id": 732,
+    "slug": "session-management",
+    "region": "f6-security",
+    "order": 31,
+    "title": "Session Management: Fixation, Rotation and Timeouts",
+    "kind": "lesson",
+    "objectives": [
+      "Issue session ids an attacker cannot guess or plant",
+      "Rotate credentials at login and privilege changes without leaving old sessions alive",
+      "Bound stolen sessions with idle and absolute timeouts and server-side revocation"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 14,
+    "prereqIds": [304],
+    "cards": [
+      {
+        "id": "t732-c1",
+        "kind": "text",
+        "title": "The id is a key into server state",
+        "body": "A session id is an unguessable label for a record the server keeps: user id, roles and expiry. Whoever presents the id is treated as that user, so it must come from a secure random generator with at least 128 bits of entropy, and the record must live server-side where it can be revoked.",
+        "teaches": ["session-lifecycle"]
+      },
+      {
+        "id": "t732-c2",
+        "kind": "text",
+        "title": "Rotate the id at each step-up",
+        "body": "Before login the visitor may hold an anonymous session; after login, after an MFA step-up and after any privilege change, issue a fresh id and destroy the old record. Otherwise an attacker who planted a known id, on a shared machine or through a crafted link, inherits the victim’s authenticated session.",
+        "teaches": ["session-fixation", "session-rotation"]
+      },
+      {
+        "id": "t732-c3",
+        "kind": "text",
+        "title": "Two clocks: idle and absolute",
+        "body": "An idle timeout expires a session after a quiet period, so abandoned logins on shared machines die quickly. An absolute timeout forces re-authentication after a fixed span however active the user is, bounding how long a stolen id stays useful. Sensitive apps keep both short; convenience apps can stretch the idle clock but rarely skip the absolute one.",
+        "teaches": ["session-timeout"]
+      },
+      {
+        "id": "t732-c4",
+        "kind": "text",
+        "title": "Misconception: closing the tab ends the session",
+        "body": "Closing a tab, or even deleting the cookie, only removes the client’s copy of the id; the server record stays valid until it times out. Logout must delete the record, and events like a password change or an account suspension should revoke the account’s other sessions so a stolen id stops working at once.",
+        "teaches": ["session-invalidation"]
+      },
+      {
+        "id": "t732-c5",
+        "kind": "text",
+        "title": "Trap: session ids in URLs",
+        "body": "An id passed as a query parameter leaks into browser history, proxy logs and Referer headers, and lets an attacker hand a victim a link carrying a fixed id. Accept session ids only from cookies marked Secure and HttpOnly, with the scope narrowed by Domain and Path.",
+        "teaches": ["session-lifecycle", "session-fixation"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t732-a1",
+        "concept": "session-fixation",
+        "type": "multiple_choice",
+        "prompt": "Why does a login handler issue a fresh session id instead of keeping the anonymous one?",
+        "choices": [
+          { "id": "a", "label": "A planted id, fixed in the victim’s browser beforehand, becomes useless" },
+          { "id": "b", "label": "Fresh ids are shorter, so the cookies stay small" },
+          { "id": "c", "label": "The old id is needed to track the login attempt" },
+          { "id": "d", "label": "New ids carry the user’s roles inside them" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Session fixation works because the attacker already knows the id the victim will end up using. Rotating at login and at each privilege change means the planted value never becomes authenticated; cookie size and claim storage are unrelated."
+      },
+      {
+        "id": "t732-a2",
+        "concept": "session-invalidation",
+        "type": "multiple_choice",
+        "prompt": "A user’s laptop is stolen while they are signed in. Which control ends the risk fastest?",
+        "choices": [
+          { "id": "a", "label": "Delete the session record on the server" },
+          { "id": "b", "label": "Set a smaller Max-Age on the next response" },
+          { "id": "c", "label": "Wait for the absolute timeout to fire" },
+          { "id": "d", "label": "Rotate the id at the thief’s next request" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Cookie attributes and rotation only take effect when a browser talks to you again, and the thief will not cooperate. Expiry takes however long remains; deleting the record makes the stolen id meaningless on its next use."
+      },
+      {
+        "id": "t732-a3",
+        "concept": "session-timeout",
+        "type": "multiple_choice",
+        "prompt": "A banking app wants abandoned sessions dead in minutes but honest users not logged out mid-task. Which pair of settings fits?",
+        "choices": [
+          { "id": "a", "label": "A short idle timeout with an absolute cap of hours" },
+          { "id": "b", "label": "A long idle timeout with an absolute cap of minutes" },
+          { "id": "c", "label": "A single absolute timeout of one week" },
+          { "id": "d", "label": "An idle timeout alone with no absolute cap" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Idle expiry kills quiet sessions fast while normal activity renews it; the absolute cap still forces periodic re-authentication so a stolen id cannot persist for weeks. Swapping the pair defeats both goals."
+      },
+      {
+        "id": "t732-a4",
+        "concept": "session-rotation",
+        "type": "drag_order",
+        "prompt": "Order what the server does when a signed-in user is promoted to admin.",
+        "items": [
+          { "id": "s2", "label": "Verify the caller’s session and their right to grant admin" },
+          { "id": "s4", "label": "Create a new session record carrying the raised privilege" },
+          { "id": "s1", "label": "Destroy the previous session record" },
+          { "id": "s3", "label": "Send the new id back in a fresh Set-Cookie header" }
+        ],
+        "correctOrder": ["s2", "s4", "s1", "s3"],
+        "explanation": "Only an already-authorised caller may trigger the promotion. The new record carries the new claims, the old id is destroyed so it cannot be replayed at either level, and the replacement travels only in a cookie."
+      },
+      {
+        "id": "t732-a5",
+        "concept": "session-lifecycle",
+        "type": "estimation",
+        "prompt": "A site keeps sessions server-side: 400,000 live sessions at 4 KB per record including index overhead. How much memory does the session store hold?",
+        "unit": "GB",
+        "target": 1.6,
+        "assumptions": ["400,000 concurrent sessions", "4 KB per record including indexes", "Replicas not counted"],
+        "formula": "sessions × bytes per session",
+        "workedAnswer": "400,000 × 4 KB = 1,600,000 KB ≈ 1.6 GB; a replica would double that.",
+        "explanation": "Design implication: the store is cheap enough to keep sessions in memory for instant revocation; the real cost sits in checking the record on each request.",
+        "tolerance": 0.1,
+        "trapAnswers": [0.16, 160]
+      },
+      {
+        "id": "t732-a6",
+        "concept": "session-timeout",
+        "type": "tradeoff",
+        "prompt": "Case workers at a bank lose work twice a day because the 15-minute idle timeout fires during long customer calls.",
+        "constraints": [
+          "Regulated environment",
+          "Calls run 30–60 minutes",
+          "Screens may be visible to customers"
+        ],
+        "approaches": [
+          { "id": "p2", "label": "Raise the idle timeout to eight hours", "description": "Long idle window" },
+          { "id": "p1", "label": "Keep a short idle timeout and add step-up re-authentication for payouts", "description": "Short idle plus step-up" },
+          { "id": "p3", "label": "Remove timeouts and rely on screen locks", "description": "No expiry" }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          { "id": "r1", "label": "A short idle clock still bounds how long an unattended session stays live" },
+          { "id": "r2", "label": "Step-up limits damage on the actions that move money" },
+          { "id": "r3", "label": "Long sessions are safe once HTTPS is on" },
+          { "id": "r4", "label": "Screen locks remove the need for server-side expiry" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "TLS protects the wire; it does not shorten a stolen or unattended session.",
+          "r4": "A screen lock depends on the user locking it; the server cannot rely on that."
+        },
+        "explanation": "Session risk concentrates on the actions that move money and on abandoned logins. A short idle clock plus re-authentication on sensitive actions keeps routine work unblocked without opening an eight-hour window."
+      }
+    ],
+    "flashcards": [
+      { "id": "t732-f1", "front": "Session fixation defence?", "back": "Issue a fresh session id at login and at each privilege change, and destroy the old record." },
+      { "id": "t732-f2", "front": "Idle vs absolute timeout?", "back": "Idle expires a session after quiet time; absolute forces re-authentication after a fixed span however active the user." },
+      { "id": "t732-f3", "front": "Why keep session records server-side?", "back": "So logout, suspension and credential changes can revoke access immediately rather than waiting for expiry." }
+    ],
+    "sources": [
+      { "title": "OWASP: Session Management Cheat Sheet", "url": "https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html" },
+      { "title": "NIST SP 800-63B: Digital Identity Guidelines, Authentication and Authenticator Management", "url": "https://pages.nist.gov/800-63-4/sp800-63b.html" },
+      { "title": "RFC 6265: HTTP State Management Mechanism", "url": "https://www.rfc-editor.org/rfc/rfc6265" }
+    ],
+    "deep": {
+      "teaches": ["session-lifecycle", "session-fixation", "session-rotation", "session-timeout", "session-invalidation"],
+      "mechanism": {
+        "title": "The lifecycle of a safe session",
+        "steps": [
+          "Before login the app may keep an anonymous session for carts and preferences. Its id comes from a secure random source with at least 128 bits: guessable or sequential ids let an attacker walk other people’s sessions.",
+          "The id indexes a server-side record holding the user id, authorised claims, and created and last-active timestamps. Keeping the state server-side is what makes revocation possible at all.",
+          "On login, MFA step-up or privilege change, the handler builds a new record and new id, destroys the old record and returns the new id in a Secure, HttpOnly cookie scoped by Path. Rotation defeats fixation: a planted id never becomes trusted.",
+          "Each request refreshes the last-active timestamp; when the quiet period exceeds the idle limit the record is deleted. Independently the record carries an absolute expiry the request path checks, bounding the useful life of a stolen id.",
+          "Logout, suspension and password or MFA changes delete the record or flag the account’s sessions revoked. Watch for id reuse: if a rotated-away id reappears, treat it as theft and revoke the whole session family.",
+          "On failure, such as the session store being down, decide deliberately: most apps should deny rather than guess, and alert on elevated misses so an outage looks like an incident rather than a quiet bypass."
+        ]
+      },
+      "useWhen": [
+        "Use it for any interactive login where users can log out or be suspended.",
+        "Use short idle and absolute bounds where sessions unlock money or personal data."
+      ],
+      "avoidWhen": [
+        "Avoid hand-rolled ids or meaningful data inside the id; a random label is enough.",
+        "Avoid indefinite remember-me sessions on sensitive actions; step-up re-authentication is the safer pattern."
+      ],
+      "tradeoffs": {
+        "columns": ["Design choice", "Attack it limits", "Cost", "Watch out for"],
+        "rows": [
+          ["Short idle timeout", "Abandoned and stolen sessions", "Interrupts legitimate pauses", "Angry users if work is lost"],
+          ["Rotation on privilege change", "Session fixation and replay", "A little state churn per login", "Races while two requests carry the old id"],
+          ["Server-side revocation", "Compromised ids keep working", "A fast shared store to check", "Store outage becomes a user outage"],
+          ["Long-lived remember-me token", "Repeated sign-in friction", "Device theft keeps working for weeks", "Scope it to low-risk reads; step up for the rest"]
+        ]
+      },
+      "numbers": {
+        "title": "How guessable is a session id?",
+        "assumptions": [
+          "Ids carry 64 bits of entropy (weak) or 128 bits (recommended)",
+          "The attacker can try 1 million ids a second",
+          "1 million live sessions exist to hit"
+        ],
+        "steps": [
+          "A 64-bit space holds 1.8×10^19 ids; with 1 million live sessions, each guess hits one with probability about 1 in 18 trillion.",
+          "Expect about 18 trillion guesses to the first hit: at 1 million a second that is roughly 200 days of constant traffic, which rate limiting and alerting should catch far earlier.",
+          "At 128 bits the space is 3.4×10^38 ids; the same attack stretches to around 10^25 years, so brute force stops mattering.",
+          "The arithmetic collapses entirely if ids are planted, sequential or leak through URLs: theft, not guessing, becomes the real threat."
+        ],
+        "result": "128-bit random ids make guessing futile, which is why the remaining risks are fixation, theft and timeouts rather than brute force."
+      },
+      "india": {
+        "title": "OWASP’s session management rules",
+        "label": "Official documentation",
+        "body": "The OWASP Session Management Cheat Sheet requires ids from a secure random generator with at least 64 bits of entropy, recommends 128, forbids meaningful data inside the id, and insists on renewal after login and privilege changes plus server-side invalidation on logout. It also warns against carrying ids in URLs, which leak through Referer headers, caches and logs."
+      },
+      "pitfalls": [
+        { "trap": "“The cookie is HttpOnly, so the session cannot be stolen.”", "say": "“HttpOnly stops scripts reading it; theft via malware or planted ids still works, so rotation and timeouts still matter.”" },
+        { "trap": "“Our users hate logging in, so sessions should last for weeks.”", "say": "“Convenience is real, but I would still bound it with an absolute cap and step-up checks on the actions that hurt.”" }
+      ],
+      "takeaways": [
+        "Ids are lookup keys into server state: random, 128-bit, cookie-only.",
+        "Rotate the id at login and at each privilege change to kill fixation.",
+        "Bound theft with an idle and an absolute timeout.",
+        "Logout and credential changes must invalidate the record server-side."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Is the planted id a problem?",
+      "prompt": "A marketing site accepts session ids supplied in a ?sid= URL parameter and keeps them through login without changing them. An attacker emails victims a link carrying ?sid=AAA.",
+      "choices": [
+        { "id": "a", "label": "The attacker shares the victims’ authenticated sessions", "feedback": "Right: the planted id becomes authenticated at login, so the attacker holds a live session." },
+        { "id": "b", "label": "Nothing: login replaces the id anyway", "feedback": "Only if the handler rotates the id; here it keeps the supplied one." },
+        { "id": "c", "label": "Only victims who log in over plain HTTP", "feedback": "Transport encryption does not change which id the server accepts." }
+      ],
+      "correctId": "a",
+      "reveal": "Rotation at login is the fix: a session must not become authenticated under an id anyone else chose."
+    },
+    "seeAlso": [
+      { "topicId": 14, "why": "Sessions versus self-contained tokens is the same state-placement decision" },
+      { "topicId": 304, "why": "JWT pitfalls are the other side of the session-versus-token choice" },
+      { "topicId": 222, "why": "The models behind where session state lives in the first place" }
+    ]
+  },
+  {
+    "id": 733,
+    "slug": "clickjacking-and-ui-redressing",
+    "region": "f6-security",
+    "order": 32,
+    "title": "Clickjacking and UI Redressing",
+    "kind": "lesson",
+    "objectives": [
+      "Explain how a transparent frame turns a victim’s own click into a real request",
+      "Set a frame-ancestors policy for pages that must and must not be embedded",
+      "Spot sensitive flows that need protection beyond the framing headers"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 14,
+    "prereqIds": [732],
+    "cards": [
+      {
+        "id": "t733-c1",
+        "kind": "text",
+        "title": "A decoy page wearing your interface",
+        "body": "The attacker loads your page inside a transparent iframe stacked over the button the victim wants to press. The click the victim sees is harmless; the click the browser delivers hits your real control, with the victim’s real cookies. Nobody typed anything suspicious, and no script ran in your origin.",
+        "teaches": ["clickjacking"]
+      },
+      {
+        "id": "t733-c2",
+        "kind": "text",
+        "title": "frame-ancestors decides who may frame you",
+        "body": "The CSP frame-ancestors directive lists which origins may embed the page: none forbids framing, self allows your own origin, and named origins allow partners. The older X-Frame-Options header supports only DENY and SAMEORIGIN and is kept for browsers that predate CSP.",
+        "teaches": ["frame-ancestors"]
+      },
+      {
+        "id": "t733-c3",
+        "kind": "diagram",
+        "title": "Worked example: the invisible delete button",
+        "body": "A prize page steals one click that deletes the victim’s stored payment card.",
+        "teaches": ["clickjacking", "ui-redress"],
+        "steps": [
+          "The attacker publishes a game page whose real button invites a click",
+          "Your settings page loads in an iframe at opacity 0, positioned so its Delete control sits exactly under that button",
+          "The victim clicks the decoy; the browser delivers the click to the framed control",
+          "Your server receives a genuine request carrying the victim’s session and deletes the card",
+          "No request was forged and no script ran in your origin, so server-side checks see nothing wrong"
+        ]
+      },
+      {
+        "id": "t733-c4",
+        "kind": "text",
+        "title": "Misconception: a confirmation dialog stops it",
+        "body": "Extra steps just mean extra layers in the decoy. The framed page is your real page, so its confirmations, double-clicks and even drag interactions can all be staged the same way. SameSite cookies help against forged requests, but a click inside a frame is a genuine same-site request.",
+        "teaches": ["ui-redress"]
+      },
+      {
+        "id": "t733-c5",
+        "kind": "text",
+        "title": "Trap: protecting the button but not the confirmation",
+        "body": "A policy sent only on the settings page leaves the standalone confirmation screen, the error page and the post-action receipt frameable, and the attacker frames whichever one performs the act. frame-ancestors has to ride on each response that renders interactive markup; API responses returning bare JSON do not need it.",
+        "teaches": ["frame-ancestors"]
+      },
+      {
+        "id": "t733-c6",
+        "kind": "text",
+        "title": "Sometimes you choose to be framed",
+        "body": "Payment widgets, dashboards and embeddable previews exist to be framed. Give them their own origin or route with a narrow allowlist in frame-ancestors, keep privileged actions off them, and let the rest of the app keep a none policy rather than loosening the whole site.",
+        "teaches": ["embed-policy"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t733-a1",
+        "concept": "clickjacking",
+        "type": "multiple_choice",
+        "prompt": "A victim clicks a Play video button and unknowingly deletes their stored card. Why did the browser send the deletion request?",
+        "choices": [
+          { "id": "a", "label": "The click landed in a transparent frame, and the session went with it" },
+          { "id": "b", "label": "A hidden cross-site form submitted in the background" },
+          { "id": "c", "label": "Injected script called the endpoint directly" },
+          { "id": "d", "label": "The decoy site guessed the card’s deletion URL" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Clickjacking forges nothing: the browser believes the user clicked your real control and attaches the session normally. Hidden forms are CSRF and injected script is XSS; this attack needs neither code in your origin nor a forged request."
+      },
+      {
+        "id": "t733-a2",
+        "concept": "frame-ancestors",
+        "type": "multiple_choice",
+        "prompt": "A partner intranet must embed your status widget, but the main app must stay unframeable. Which pair of policies fits?",
+        "choices": [
+          { "id": "a", "label": "frame-ancestors partner.example on the widget, none on the app" },
+          { "id": "b", "label": "X-Frame-Options: ALLOW-FROM partner.example on the widget" },
+          { "id": "c", "label": "frame-ancestors none on both, with the widget proxied" },
+          { "id": "d", "label": "frame-ancestors self on the app and the widget" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "ALLOW-FROM was dropped from X-Frame-Options and modern browsers ignore it; only frame-ancestors expresses a named allowlist. Keeping none on the main app confines embedding to the widget built for it."
+      },
+      {
+        "id": "t733-a3",
+        "concept": "frame-ancestors",
+        "type": "multiple_choice",
+        "prompt": "Which responses need a frame-ancestors policy?",
+        "choices": [
+          { "id": "a", "label": "Any page the browser can render" },
+          { "id": "b", "label": "Only the settings page holding sensitive controls" },
+          { "id": "c", "label": "Only responses to requests lacking a cookie" },
+          { "id": "d", "label": "Only the API endpoints a framed page calls" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "An attacker frames whichever rendered response performs or confirms the action, including error and confirmation pages. Bare JSON is not rendered and cannot be clicked, so the sensitive button is only one of several pages that matter."
+      },
+      {
+        "id": "t733-a4",
+        "concept": "clickjacking",
+        "type": "drag_order",
+        "prompt": "Order a clickjacking attack end to end.",
+        "items": [
+          { "id": "s3", "label": "The attacker positions a transparent frame of the target page over a decoy control" },
+          { "id": "s1", "label": "The attacker publishes a page whose visible button invites a click" },
+          { "id": "s4", "label": "The victim clicks where the decoy button appears" },
+          { "id": "s2", "label": "The framed action fires carrying the victim’s session" }
+        ],
+        "correctOrder": ["s1", "s3", "s4", "s2"],
+        "explanation": "The decoy exists first, then the victim page is aligned invisibly on top, the victim supplies the click and the browser performs a genuine action. Nothing is forged; the user agent does exactly what it was told."
+      },
+      {
+        "id": "t733-a5",
+        "concept": "clickjacking",
+        "type": "estimation",
+        "prompt": "A scam site draws 800,000 visits a month, and 1 in 2,000 visitors completes the decoy double-click. About how many hijacked clicks land on the framed page each month?",
+        "unit": "hijacked clicks per month",
+        "target": 400,
+        "assumptions": ["800,000 monthly visits", "A 1-in-2,000 completion rate"],
+        "formula": "visits ÷ completion rate",
+        "workedAnswer": "800,000 ÷ 2,000 = 400 completed clicks a month, each firing a genuine action.",
+        "explanation": "Design implication: even a low completion rate scales with traffic, so a popular page cannot rely on users noticing the trick; the framing header is what closes it.",
+        "tolerance": 0.1,
+        "trapAnswers": [40, 4000]
+      },
+      {
+        "id": "t733-a6",
+        "concept": "embed-policy",
+        "type": "tradeoff",
+        "prompt": "Customers ask for your analytics dashboard to be embeddable in their intranets; the same origin also hosts account settings.",
+        "constraints": [
+          "Forty customer domains",
+          "Settings pages must stay unframeable",
+          "Widget redesign budget is one sprint"
+        ],
+        "approaches": [
+          { "id": "p3", "label": "Allow framing across the app for the forty domains", "description": "Allowlist everything" },
+          { "id": "p1", "label": "Move the dashboard to its own origin with a frame-ancestors allowlist", "description": "Isolate the widget" },
+          { "id": "p2", "label": "Refuse framing entirely and hand customers an API", "description": "No embedding" }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          { "id": "r1", "label": "Isolation keeps privileged pages unframeable while the widget stays embeddable" },
+          { "id": "r2", "label": "An allowlist of changing customer domains drifts and is easy to widen by mistake" },
+          { "id": "r3", "label": "One allowlist entry can safely cover settings and dashboards" },
+          { "id": "r4", "label": "Refusing embeds costs nothing for the customers" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "One policy on a shared origin frames the settings pages too; scope decides what is exposed.",
+          "r4": "The embed is a paid feature; removing it pushes customers to copy data by hand."
+        },
+        "explanation": "Framing is a property of an origin, so the safe shape is to move the thing meant to be framed onto its own origin with a tight allowlist and keep none everywhere else."
+      }
+    ],
+    "flashcards": [
+      { "id": "t733-f1", "front": "Clickjacking?", "back": "Tricking a user into clicking a transparent or disguised frame of your real page; the browser sends a genuine, authenticated request." },
+      { "id": "t733-f2", "front": "frame-ancestors vs X-Frame-Options?", "back": "frame-ancestors accepts a list of origins; X-Frame-Options supports only DENY and SAMEORIGIN and is the legacy fallback." },
+      { "id": "t733-f3", "front": "Why don’t SameSite cookies stop clickjacking?", "back": "A click inside a frame is a same-site request with real cookies; the defence is controlling who may frame the page." }
+    ],
+    "sources": [
+      { "title": "OWASP: Clickjacking Defense Cheat Sheet", "url": "https://cheatsheetseries.owasp.org/cheatsheets/Clickjacking_Defense_Cheat_Sheet.html" },
+      { "title": "MDN: CSP frame-ancestors", "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors" },
+      { "title": "W3C: Content Security Policy Level 3", "url": "https://www.w3.org/TR/CSP3/" }
+    ],
+    "deep": {
+      "teaches": ["clickjacking", "frame-ancestors", "ui-redress", "embed-policy"],
+      "mechanism": {
+        "title": "How the browser decides where the click lands",
+        "steps": [
+          "The embedding page writes an iframe pointing at your URL. The browser loads it as a normal navigation, so session cookies, script and layout all behave as if the user had opened the page directly.",
+          "The embedder controls the frame’s size, position and opacity. With opacity set to zero, or a decoy drawn on top, the victim sees the attacker’s page while clicks land in yours.",
+          "Before rendering, the browser reads the framed response’s frame-ancestors directive and refuses to display the page when the embedder’s origin is not listed. Older browsers do the same job with X-Frame-Options.",
+          "Because the decision is per response, the header must ride on each rendered page in the flow, not only the one holding the sensitive control.",
+          "Where framing is intended, the directive names the allowed origins. The same-origin policy still applies inside the frame, so the embedder can capture clicks but cannot read your page’s contents.",
+          "For flows that must work while framed, raise the cost instead: require recent re-authentication or a second factor for irreversible actions, so a single stolen click is not enough."
+        ]
+      },
+      "useWhen": [
+        "Use frame-ancestors none or self on any page that lets a signed-in user change state.",
+        "Use a named allowlist only on origins and widgets designed to be embedded."
+      ],
+      "avoidWhen": [
+        "Avoid relying on frame-busting script alone; the embedder can disable script in the frame with the sandbox attribute.",
+        "Avoid counting on CSRF tokens or SameSite cookies; the request they guard against is a genuine one here."
+      ],
+      "tradeoffs": {
+        "columns": ["Defence", "Stops", "Limits"],
+        "rows": [
+          ["frame-ancestors none", "All framing-based click theft", "Blocks legitimate embeds; needs care on every route"],
+          ["Named allowlist", "Strangers framing the widget", "Allowlist drifts and wildcards reopen it"],
+          ["X-Frame-Options", "Framing on older browsers", "Only DENY and SAMEORIGIN, no named origins"],
+          ["Frame-busting script", "Casual embedding", "Fails when the embedder disables script with sandbox"]
+        ]
+      },
+      "numbers": {
+        "title": "What does a stolen click cost to get?",
+        "assumptions": [
+          "A decoy page converts 1 in 2,000 visits (illustrative)",
+          "Bought traffic costs about ₹40 per 1,000 visits"
+        ],
+        "steps": [
+          "Each successful hijacked click needs about 2,000 visits, so one stolen action costs roughly ₹40.",
+          "Scaling to 10,000 stolen actions costs about ₹4 lakh of traffic: affordable for a campaign monetising card details.",
+          "The victim side needs no malware and leaves no server-side anomaly; the requests look like ordinary user clicks.",
+          "The cost asymmetry is why prevention belongs to the site owner: victims cannot see the frame, but the site can refuse to be framed for the price of one header."
+        ],
+        "result": "Clickjacking is cheap to run at scale while the header is nearly free, so the protection is overwhelmingly favourable."
+      },
+      "india": {
+        "title": "OWASP on framing defences",
+        "label": "Official documentation",
+        "body": "The OWASP Clickjacking Defense Cheat Sheet names CSP frame-ancestors as the primary defence, keeps X-Frame-Options for legacy browsers and describes frame-busting script only as a fallback, because embedders can neutralise it with the iframe sandbox attribute. It also recommends confirming sensitive actions out of band, since a determined attacker can stage multi-step flows inside frames."
+      },
+      "pitfalls": [
+        { "trap": "“We have a CSRF token, so framing cannot hurt us.”", "say": "“The token rides along with a genuine click; only controlling who may frame the page stops this.”" },
+        { "trap": "“Nobody targets our site with tricks like that.”", "say": "“The attack scales on any page with valuable one-click actions, and the header costs minutes to set.”" }
+      ],
+      "takeaways": [
+        "A framed click is a real request; the defence is controlling who may frame you.",
+        "Set frame-ancestors on each rendered page in the flow; X-Frame-Options is the legacy fallback.",
+        "Put deliberately embeddable widgets on their own origin with a named allowlist.",
+        "For actions that must work framed, add re-authentication rather than trusting the click."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Can the hidden frame act?",
+      "prompt": "Your app sends SameSite=Lax cookies, a per-form CSRF token and no frame-ancestors header. An attacker frames your settings page invisibly over a game’s button.",
+      "choices": [
+        { "id": "a", "label": "The victim’s real click still deletes the card", "feedback": "Right: both controls stop forged requests, and a framed click is genuine." },
+        { "id": "b", "label": "SameSite=Lax blocks the request", "feedback": "SameSite governs cross-site requests; an in-frame click is same-site." },
+        { "id": "c", "label": "The CSRF token blocks it", "feedback": "The framed page renders your real form, so the genuine token is already inside it." }
+      ],
+      "correctId": "a",
+      "reveal": "Forge-resistant tokens cannot help because nothing is forged. frame-ancestors is the control that matches this threat."
+    },
+    "seeAlso": [
+      { "topicId": 60, "why": "Clickjacking completes the same web-attack trio as XSS and CSRF" },
+      { "topicId": 521, "why": "frame-ancestors is a CSP directive and this lesson’s primary control" },
+      { "topicId": 208, "why": "XSS and CSRF basics are the sibling attacks this one is confused with" }
+    ]
+  },
+  {
+    "id": 734,
+    "slug": "security-response-headers",
+    "region": "f6-security",
+    "order": 33,
+    "title": "HSTS and the Other Security Headers",
+    "kind": "lesson",
+    "objectives": [
+      "Set an HSTS policy that survives rollback pressure",
+      "Use nosniff, Referrer-Policy and isolation headers to close the gaps TLS leaves",
+      "Sequence a rollout from a short max-age to preloading"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 14,
+    "prereqIds": [301],
+    "cards": [
+      {
+        "id": "t734-c1",
+        "kind": "text",
+        "title": "HSTS: HTTPS becomes a hard rule",
+        "body": "Strict-Transport-Security tells the browser that for the next max-age seconds this host is HTTPS-only: plain links are rewritten before any request leaves, and certificate errors become fatal with no click-through. The remaining gap is the first visit, which the preload list closes by shipping the policy inside the browser.",
+        "teaches": ["hsts"]
+      },
+      {
+        "id": "t734-c2",
+        "kind": "text",
+        "title": "nosniff stops the browser re-typing a file",
+        "body": "Browsers traditionally sniff content and can decide an uploaded text file is really markup. X-Content-Type-Options: nosniff forbids that guess: a response labelled text/plain stays text, so a user-supplied document cannot be coaxed into executing as a page.",
+        "teaches": ["nosniff"]
+      },
+      {
+        "id": "t734-c3",
+        "kind": "text",
+        "title": "Referrer-Policy keeps URLs out of other logs",
+        "body": "When users click out, or the page loads third-party resources, the Referer header can carry your full URL, including reset tokens, document ids and search terms. Referrer-Policy: strict-origin-when-cross-origin sends only the origin to other sites, and nothing when the destination is downgraded.",
+        "teaches": ["referrer-policy"]
+      },
+      {
+        "id": "t734-c4",
+        "kind": "text",
+        "title": "Isolation headers for cross-origin windows",
+        "body": "Cross-Origin-Opener-Policy detaches your window from the group an opener shares, and Cross-Origin-Resource-Policy tells other sites whether they may load your files at all. Together with Cross-Origin-Embedder-Policy they gate powerful features like high-resolution timers and shared memory.",
+        "teaches": ["cross-origin-isolation"]
+      },
+      {
+        "id": "t734-c5",
+        "kind": "text",
+        "title": "Misconception: TLS makes response headers redundant",
+        "body": "TLS protects bytes in flight, not decisions the browser makes. It cannot stop an attacker offering plain HTTP before TLS starts, cannot stop a sniffed upload executing, and cannot limit what a Referer reveals once a request completes. The headers cover the seams around the transport.",
+        "teaches": ["hsts"]
+      },
+      {
+        "id": "t734-c6",
+        "kind": "text",
+        "title": "Trap: includeSubDomains before the estate is ready",
+        "body": "Preload and includeSubDomains commit present and future subdomains to HTTPS. A forgotten legacy service on port 80, or a wildcard subdomain that cannot get a certificate, turns the hard rule into self-inflicted downtime. Audit the namespace first and stage max-age upward.",
+        "teaches": ["hsts"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t734-a1",
+        "concept": "hsts",
+        "type": "multiple_choice",
+        "prompt": "A returning user types http://bank.example on hostile café Wi-Fi under a live HSTS policy. What happens?",
+        "choices": [
+          { "id": "a", "label": "The browser upgrades to HTTPS before any request is sent" },
+          { "id": "b", "label": "The request goes out and the server answers with a redirect" },
+          { "id": "c", "label": "The browser warns once and then lets the user proceed" },
+          { "id": "d", "label": "The DNS lookup fails because the name is marked secure" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "HSTS rewrites the scheme inside the browser, so no plain-HTTP request exists for the attacker to intercept. A server-side redirect still exposes that first plain request, and a warning flow would defeat the point."
+      },
+      {
+        "id": "t734-a2",
+        "concept": "nosniff",
+        "type": "multiple_choice",
+        "prompt": "Uploaded incident reports must stay viewable inline as plain text. Which response header keeps browsers from rendering one as markup?",
+        "choices": [
+          { "id": "a", "label": "X-Content-Type-Options: nosniff" },
+          { "id": "b", "label": "Content-Security-Policy: default-src self" },
+          { "id": "c", "label": "Content-Disposition: attachment; filename=report" },
+          { "id": "d", "label": "Cross-Origin-Resource-Policy: same-origin" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "nosniff pins the declared type, so a text file cannot be reinterpreted as markup. Content-Disposition forces a download, which breaks the inline-viewing requirement, and CSP restricts what may run rather than how the response is typed."
+      },
+      {
+        "id": "t734-a3",
+        "concept": "referrer-policy",
+        "type": "multiple_choice",
+        "prompt": "Support tickets link out to vendor sites, and your URLs carry ticket ids. Which header limits what vendors learn?",
+        "choices": [
+          { "id": "a", "label": "Referrer-Policy" },
+          { "id": "b", "label": "Cross-Origin-Opener-Policy" },
+          { "id": "c", "label": "Cache-Control" },
+          { "id": "d", "label": "Strict-Transport-Security" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "The Referer header carries the full URL of the page that linked or loaded the resource; Referrer-Policy trims it to an origin or nothing. The other headers govern window relationships, caching and HTTPS, not the URL another site is told."
+      },
+      {
+        "id": "t734-a4",
+        "concept": "hsts",
+        "type": "drag_order",
+        "prompt": "Order a safe HSTS rollout.",
+        "items": [
+          { "id": "s1", "label": "Serve the whole site over HTTPS with valid certificates" },
+          { "id": "s3", "label": "Audit subdomains and move any plain-HTTP services" },
+          { "id": "s4", "label": "Publish a short max-age and watch error reports" },
+          { "id": "s5", "label": "Raise max-age towards a year and add includeSubDomains" },
+          { "id": "s2", "label": "Submit the domain to the preload list" }
+        ],
+        "correctOrder": ["s1", "s3", "s4", "s5", "s2"],
+        "explanation": "The hard rule only works once everything it names can be served over HTTPS, so coverage and subdomains come first. A short max-age is a cheap trial; once the estate proves clean you commit long-term and let preloading protect the first visit too."
+      },
+      {
+        "id": "t734-a5",
+        "concept": "hsts",
+        "type": "estimation",
+        "prompt": "HSTS preloading requires a max-age of at least one year: 31,536,000 seconds. How many days is that minimum?",
+        "unit": "days",
+        "target": 365,
+        "assumptions": ["31,536,000-second minimum", "86,400 seconds in a day"],
+        "formula": "seconds ÷ 86,400",
+        "workedAnswer": "31,536,000 ÷ 86,400 = 365 days: a full-year commitment the browser remembers.",
+        "explanation": "Design implication: preload is a one-way door for most teams, so stage max-age upwards and submit only once the whole subdomain estate is proven on HTTPS.",
+        "tolerance": 0.05,
+        "trapAnswers": [36.5, 3650]
+      },
+      {
+        "id": "t734-a6",
+        "concept": "hsts",
+        "type": "tradeoff",
+        "prompt": "Launch is in three days. Marketing subdomains run campaigns on an old stack that still answers only on port 80.",
+        "constraints": [
+          "Hard launch date",
+          "Two legacy campaign subdomains",
+          "Regulators want HTTPS enforced"
+        ],
+        "approaches": [
+          { "id": "p2", "label": "Submit for preloading with includeSubDomains now", "description": "Preload immediately" },
+          { "id": "p1", "label": "Ship a short max-age on the bare domain without includeSubDomains", "description": "Stage the policy" },
+          { "id": "p3", "label": "Skip HSTS until the subdomains run HTTPS", "description": "Wait for the estate" }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          { "id": "r1", "label": "A short max-age protects the main site while keeping a rollback path" },
+          { "id": "r2", "label": "Preload with unready subdomains causes failures you cannot retract quickly" },
+          { "id": "r3", "label": "HSTS only matters once the subdomains are ready" },
+          { "id": "r4", "label": "A port-80 redirect already enforces HTTPS" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "The main domain benefits immediately; staging the policy is not waiting.",
+          "r4": "The first plain request still happens before the redirect; HSTS removes it for returning users."
+        },
+        "explanation": "Preload is slow to revoke and includeSubDomains drags in the legacy campaigns. A short, scoped policy starts protecting the apex domain now and leaves room to widen once the estate is ready."
+      }
+    ],
+    "flashcards": [
+      { "id": "t734-f1", "front": "What HSTS changes?", "back": "The browser refuses plain HTTP for max-age and makes certificate errors fatal; preloading closes the first-visit gap." },
+      { "id": "t734-f2", "front": "What does nosniff do?", "back": "Forbids content-type sniffing, so a file served as text cannot be reinterpreted as executable markup." },
+      { "id": "t734-f3", "front": "Why Referrer-Policy?", "back": "Stops full URLs, which may carry tokens or private ids, leaking to other sites through the Referer header." }
+    ],
+    "sources": [
+      { "title": "RFC 6797: HTTP Strict Transport Security", "url": "https://www.rfc-editor.org/rfc/rfc6797" },
+      { "title": "OWASP: HTTP Headers Cheat Sheet", "url": "https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html" },
+      { "title": "MDN: X-Content-Type-Options", "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Content-Type-Options" }
+    ],
+    "deep": {
+      "teaches": ["hsts", "nosniff", "referrer-policy", "cross-origin-isolation"],
+      "mechanism": {
+        "title": "Headers that change browser behaviour",
+        "steps": [
+          "Strict-Transport-Security is cached by the browser with its max-age. While the policy is live, each request to the host is internally upgraded to HTTPS and certificate errors cannot be bypassed.",
+          "includeSubDomains extends the rule across the namespace, and preloading bakes it into the browser binary so even the first-ever visit is protected; revocation then takes browser release cycles.",
+          "X-Content-Type-Options: nosniff removes the sniffing step that let a text response run as markup, closing a class of content-confusion attacks on uploaded or reflected files.",
+          "Referrer-Policy trims the Referer header that outbound links and third-party subresources send, from full URL down to origin or nothing, keeping tokens and identifiers out of other parties’ logs.",
+          "Cross-Origin-Opener-Policy and Cross-Origin-Resource-Policy govern who may hold a reference to your window or load your resources; they are the headers behind cross-origin isolation and the powerful features it unlocks.",
+          "Permissions-Policy disables browser capabilities such as camera, microphone and geolocation for the page and anything it frames, shrinking what an injected script can reach."
+        ]
+      },
+      "useWhen": [
+        "Use HSTS on each HTTPS-only site, staged from a short max-age upwards.",
+        "Use nosniff and a trimming Referrer-Policy on each response; they are cheap defaults."
+      ],
+      "avoidWhen": [
+        "Avoid preload and includeSubDomains until the subdomain estate is verified on HTTPS; mistakes are sticky.",
+        "Avoid isolation headers on pages that legitimately share popups or embeds until those flows are reworked."
+      ],
+      "tradeoffs": {
+        "columns": ["Header", "Protects against", "Cost if set wrong"],
+        "rows": [
+          ["Strict-Transport-Security", "Protocol downgrades and click-through bypasses", "Self-inflicted outage across subdomains"],
+          ["X-Content-Type-Options", "Sniffing-driven content confusion", "Almost none; safe to set broadly"],
+          ["Referrer-Policy", "URL leakage to third parties", "Analytics loses path detail"],
+          ["COOP, CORP and COEP", "Window and resource abuse plus some side channels", "Breaks popups, embeds and legacy integrations"]
+        ]
+      },
+      "numbers": {
+        "title": "How much exposure does the first-visit gap leave?",
+        "assumptions": [
+          "600,000 unique visitors a month",
+          "A one-year max-age once the policy is seen",
+          "The attacker can only intercept plain-HTTP requests"
+        ],
+        "steps": [
+          "Each visitor is exposed only until their first successful HTTPS response: one request out of all they will send.",
+          "Without preloading, an attacker targeting first visits gets 600,000 fresh chances a month; once a user is seen, the rule holds for a year.",
+          "A 7-day trial max-age shrinks that protection to a week: a returning user is exposed again on day eight.",
+          "Preloading removes the gap entirely, which is why the submission bar of a one-year max-age, includeSubDomains and a port-80 redirect is deliberately demanding."
+        ],
+        "result": "Each visitor’s exposure collapses to a single first contact; preloading removes even that."
+      },
+      "india": {
+        "title": "RFC 6797: the HSTS specification",
+        "label": "Official documentation",
+        "body": "RFC 6797 defines Strict-Transport-Security: a host declares itself an HSTS host for max-age seconds, includeSubDomains extends coverage to subdomains, and certificate errors must be hard failures with no bypass option. The separate preload mechanism, run by browser vendors rather than the RFC, lets sites ship the policy inside the browser so the first insecure request never happens."
+      },
+      "pitfalls": [
+        { "trap": "“We redirect port 80 to 443, so HSTS adds nothing.”", "say": "“The first request still crosses the network in plain text; HSTS removes that request for returning users.”" },
+        { "trap": "“Set each header at maximum on day one.”", "say": "“Some of these are one-way doors; I would stage max-age and audit subdomains before committing.”" }
+      ],
+      "takeaways": [
+        "HSTS turns HTTPS from a preference into a rule the browser enforces.",
+        "nosniff and Referrer-Policy close seams TLS cannot see.",
+        "Stage max-age and audit subdomains before includeSubDomains or preloading.",
+        "Isolation headers trade legacy popups and embeds for a smaller attack surface."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Does the downgrade still work?",
+      "prompt": "Your site has served Strict-Transport-Security with a one-year max-age for months. An attacker on café Wi-Fi intercepts a returning user’s visit to http://app.example.",
+      "choices": [
+        { "id": "a", "label": "The browser upgrades internally; nothing plain is sent", "feedback": "Right: the cached policy rewrites the scheme before any request leaves." },
+        { "id": "b", "label": "One plain request slips through, then the rule applies", "feedback": "That describes a first-ever visit with no cached policy; this user already holds it." },
+        { "id": "c", "label": "The attacker resets the policy by stripping the header", "feedback": "The policy lives in the browser, not the response, so the attacker never sees it." }
+      ],
+      "correctId": "a",
+      "reveal": "HSTS fails safe once the browser knows the rule, which is why the first-visit gap and the preload list matter."
+    },
+    "seeAlso": [
+      { "topicId": 7, "why": "HTTP/HTTPS/TLS is the transport these headers harden" },
+      { "topicId": 521, "why": "Content Security Policy is the bigger response header this lesson complements" },
+      { "topicId": 662, "why": "Certificates are what the HSTS hard-failure rule leans on" }
+    ]
+  },
+  {
+    "id": 735,
+    "slug": "timing-and-side-channels",
+    "region": "f6-security",
+    "order": 34,
+    "title": "Timing and Side-Channel Leaks",
+    "kind": "lesson",
+    "objectives": [
+      "Recognise when response differences leak secrets",
+      "Apply constant-time comparisons to tags, tokens and codes",
+      "Judge when noise helps and when only removing the signal works"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 15,
+    "prereqIds": [302],
+    "cards": [
+      {
+        "id": "t735-c1",
+        "kind": "text",
+        "title": "Work leaves a time signature",
+        "body": "Code that stops at the first difference answers sooner when the guess is mostly wrong. Over a network the difference per byte is microseconds, but an attacker who can send unlimited requests and average the noise can still read it.",
+        "teaches": ["timing-attack"]
+      },
+      {
+        "id": "t735-c2",
+        "kind": "text",
+        "title": "Constant time means data-independent",
+        "body": "A constant-time compare walks the whole buffer and combines each byte’s difference with OR, so the loop count and branch pattern never depend on the secret. Any routine that checks tags, tokens or reset codes should use the library’s constant-time primitive rather than an early-exit equality.",
+        "teaches": ["constant-time"]
+      },
+      {
+        "id": "t735-c3",
+        "kind": "diagram",
+        "title": "Worked example: recovering a token byte by byte",
+        "body": "An early-exit check turns one impossible search into a few hundred easy rounds.",
+        "teaches": ["timing-attack"],
+        "steps": [
+          "The check compares the attacker’s token with the real one and returns at the first mismatch",
+          "The attacker sends the 16 possible first bytes many times and averages each candidate’s response time",
+          "The candidate matching the true first byte returns measurably later",
+          "That byte is fixed and the process repeats for byte two",
+          "A 16-byte hex token falls in about 16 × 16 = 256 timing rounds instead of 16^16 blind guesses"
+        ]
+      },
+      {
+        "id": "t735-c4",
+        "kind": "text",
+        "title": "Misconception: jitter hides the difference",
+        "body": "Random noise averages out; the bias does not. With enough samples an attacker recovers differences far below the jitter floor, which is why adding random delay fails: it raises the measurement cost without removing the dependence.",
+        "teaches": ["side-channel"]
+      },
+      {
+        "id": "t735-c5",
+        "kind": "text",
+        "title": "Trap: the error that answers yes or no",
+        "body": "A service that distinguishes bad padding from a bad tag, or an unknown user from a wrong password, offers an oracle: one bit of secret-dependent information per request. Chained over thousands of requests a single bit is enough; CBC padding oracles decrypted ciphertexts exactly this way.",
+        "teaches": ["oracle"]
+      },
+      {
+        "id": "t735-c6",
+        "kind": "text",
+        "title": "Shared caches are shared channels",
+        "body": "Leaks need not travel through response timing: shared caches, branch predictors and power draw all carry information between code meant to be isolated. Spectre showed speculative execution leaking across such boundaries; practical defence isolates sensitive code, cuts timer precision and treats co-residency as a threat.",
+        "teaches": ["side-channel"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t735-a1",
+        "concept": "timing-attack",
+        "type": "multiple_choice",
+        "prompt": "A verifier returns as soon as it finds a mismatching byte when checking a submitted MAC. What does the response time reveal?",
+        "choices": [
+          { "id": "a", "label": "How many leading bytes of the guess were correct" },
+          { "id": "b", "label": "Which hash function produced the tag" },
+          { "id": "c", "label": "Whether the request arrived over TLS" },
+          { "id": "d", "label": "The exact clock offset between client and server" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Early exit makes work proportional to the matching prefix, so timing discloses progress on the secret. Hash choice and clock offset do not depend on the guess, and with enough samples the prefix signal survives network jitter."
+      },
+      {
+        "id": "t735-a2",
+        "concept": "oracle",
+        "type": "multiple_choice",
+        "prompt": "A decryption endpoint answers “padding error” for one malformed ciphertext and “bad tag” for another. What can an attacker do with that signal alone?",
+        "choices": [
+          { "id": "a", "label": "Decrypt chosen ciphertexts one byte at a time" },
+          { "id": "b", "label": "Recover the server’s private key" },
+          { "id": "c", "label": "Forge signatures on new messages" },
+          { "id": "d", "label": "Read keys straight out of server memory" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "A padding oracle answers a secret-dependent yes/no question per request; thousands of such questions peel the plaintext off chosen ciphertexts. It exposes contents without recovering the key itself."
+      },
+      {
+        "id": "t735-a3",
+        "concept": "side-channel",
+        "type": "multiple_choice",
+        "prompt": "Why does adding a random delay to responses fail to close a timing leak?",
+        "choices": [
+          { "id": "a", "label": "Averaging removes the noise while the bias survives" },
+          { "id": "b", "label": "Random delays are logged and can be subtracted" },
+          { "id": "c", "label": "Attackers can force the delay to its minimum" },
+          { "id": "d", "label": "The delay value is visible inside the response" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Noise drawn from a distribution has a mean; enough samples cancel it while the secret-dependent bias stays fixed. Delay raises the measurement cost a little, but only removing the data dependence closes the leak."
+      },
+      {
+        "id": "t735-a4",
+        "concept": "timing-attack",
+        "type": "drag_order",
+        "prompt": "Order a remote timing attack that recovers a secret byte by byte.",
+        "items": [
+          { "id": "s2", "label": "Measure a baseline response time over many samples" },
+          { "id": "s4", "label": "Try each candidate for the next byte, averaging each one" },
+          { "id": "s1", "label": "Keep the candidate that consistently responds slowest" },
+          { "id": "s3", "label": "Move to the next position and repeat until the secret is recovered" }
+        ],
+        "correctOrder": ["s2", "s4", "s1", "s3"],
+        "explanation": "Averaging comes first because a single request is mostly noise. The slowest candidate marks the correct byte, fixing it extends the known prefix, and the loop takes one position per round."
+      },
+      {
+        "id": "t735-a5",
+        "concept": "timing-attack",
+        "type": "estimation",
+        "prompt": "An early-exit check leaks position by position. An attacker needs 4,000 requests per candidate to beat jitter, tries 16 hex values for each of a token’s 16 bytes, and each request takes 50 ms. Roughly how long does full recovery take?",
+        "unit": "hours",
+        "target": 14.2,
+        "assumptions": ["16 positions × 16 candidates", "4,000 samples per candidate", "50 ms per request, sent serially"],
+        "formula": "positions × candidates × samples × request time",
+        "workedAnswer": "16 × 16 × 4,000 = 1,024,000 requests; × 50 ms = 51,200 s ≈ 14.2 hours.",
+        "explanation": "Design implication: hours of noisy requests should trip rate limits and anomaly alerts well before the last byte falls; a constant-time compare removes the game entirely.",
+        "tolerance": 0.15,
+        "trapAnswers": [1.4, 142]
+      },
+      {
+        "id": "t735-a6",
+        "concept": "constant-time",
+        "type": "tradeoff",
+        "prompt": "Review finds an early-exit string compare inside the code that checks signed webhook tags.",
+        "constraints": [
+          "Public endpoint, unauthenticated",
+          "Tags are 32 bytes",
+          "Traffic is high, so sampling is cheap for attackers"
+        ],
+        "approaches": [
+          { "id": "p2", "label": "Add a random 0–40 ms delay to each verification", "description": "Mask with noise" },
+          { "id": "p1", "label": "Switch to the library’s constant-time compare", "description": "Remove the signal" },
+          { "id": "p3", "label": "Keep the compare but cap attempts at five per address", "description": "Rate-limit only" }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          { "id": "r1", "label": "The dependence is removed, so no amount of sampling recovers a prefix" },
+          { "id": "r2", "label": "It is a one-line change with no user-visible cost" },
+          { "id": "r3", "label": "Noise raises sampling cost enough that the leak becomes impractical" },
+          { "id": "r4", "label": "Per-address caps are enough against a rotating proxy network" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "Noise is averaged out; a patient attacker simply buys more samples.",
+          "r4": "Rotation across addresses defeats per-address caps, and the leak remains underneath."
+        },
+        "explanation": "Constant-time comparison is cheap, small and complete: it deletes the relationship between the secret and the response time rather than disguising it."
+      }
+    ],
+    "flashcards": [
+      { "id": "t735-f1", "front": "Constant-time compare?", "back": "A routine whose loop count and branches do not depend on the secret; it inspects all bytes and folds differences into one flag." },
+      { "id": "t735-f2", "front": "Padding oracle?", "back": "A service whose distinguishable “bad padding” answer lets an attacker decrypt chosen ciphertexts without the key." },
+      { "id": "t735-f3", "front": "Why doesn’t random delay fix a timing leak?", "back": "Averaging cancels noise; the secret-dependent bias remains measurable." }
+    ],
+    "sources": [
+      { "title": "CWE-208: Observable Timing Discrepancy", "url": "https://cwe.mitre.org/data/definitions/208.html" },
+      { "title": "OWASP: Authentication Cheat Sheet", "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html" },
+      { "title": "RFC 2104: HMAC: Keyed-Hashing for Message Authentication", "url": "https://www.rfc-editor.org/rfc/rfc2104" }
+    ],
+    "deep": {
+      "teaches": ["timing-attack", "constant-time", "side-channel", "oracle"],
+      "mechanism": {
+        "title": "How a bias becomes a secret",
+        "steps": [
+          "Any measurable property, such as response time, error type, cache behaviour or power draw, that varies with secret data is a channel. Early-exit code is the commonest source on the web.",
+          "One request is mostly noise. The attack works because the channel is stationary: the same guess produces the same bias, so averaging N samples shrinks the noise roughly by √N while the bias stays put.",
+          "Constant-time construction removes the bias: inspect all bytes, fold differences with OR, and avoid secret-indexed table lookups and secret-dependent branches.",
+          "Oracles widen the idea beyond timing: any answer that separates almost-right from wrong, such as padding validity, user existence or decryption success, is a one-bit channel that compounds over requests.",
+          "Hardware side channels, like Spectre-style speculation and shared caches, ride the same principle at a lower level; defence is isolation and reduced timer precision rather than application fixes.",
+          "Verify empirically: run the check over chosen inputs and confirm the distribution does not shift; a statistical test over millions of samples beats reading the code once."
+        ]
+      },
+      "useWhen": [
+        "Use constant-time primitives when comparing attacker-supplied data with secrets: tags, tokens and codes.",
+        "Use uniform error handling wherever the kind of wrong is itself secret-dependent."
+      ],
+      "avoidWhen": [
+        "Avoid fixing observed timing differences with sleep-style noise; attackers measure through it.",
+        "Avoid assuming only cryptography needs it: login, reset and licence checks leak the same way."
+      ],
+      "tradeoffs": {
+        "columns": ["Mitigation", "Effect", "Limit"],
+        "rows": [
+          ["Constant-time primitive", "Removes the data dependence", "Covers the comparison itself, not the path around it"],
+          ["Uniform error responses", "Collapses oracle bits to one", "Hides genuinely different failures from debugging"],
+          ["Random delay", "Raises the samples an attacker needs", "The bias survives averaging and users pay the delay"],
+          ["Rate limits and alerting", "Makes large-sample attacks costly and visible", "Determined distributed attackers still collect data"]
+        ]
+      },
+      "numbers": {
+        "title": "How many samples does jitter really cost the attacker?",
+        "assumptions": [
+          "The true per-byte bias is 20 µs",
+          "Request jitter has a 5 ms standard deviation",
+          "Averaging shrinks noise by the square root of the sample count"
+        ],
+        "steps": [
+          "To see a 20 µs bias under 5 ms jitter, the noise must shrink to roughly the bias size: 5,000 µs ÷ √N ≈ 20 µs.",
+          "That gives √N ≈ 250, so N ≈ 62,500 samples per candidate: about a minute at 1,000 requests a second.",
+          "A 16-byte token with 16 candidates needs about 16 × 16 × 62,500 = 16 million requests: hours of steady traffic, not weeks.",
+          "The arithmetic is why “too small to measure” fails: each order of magnitude the attacker buys in samples recovers an order of magnitude in bias."
+        ],
+        "result": "Microsecond biases are reachable with millions of requests; the fix is removing the bias rather than trusting jitter."
+      },
+      "india": {
+        "title": "Lucky Thirteen: a padding timing attack on TLS",
+        "label": "Publicly reported attack (CVE-2013-0169)",
+        "body": "In 2013 AlFardan and Paterson showed that CBC-mode TLS records could be decrypted remotely by timing how servers handled malformed padding. The attack, tracked as CVE-2013-0169 and nicknamed Lucky Thirteen, distinguished microsecond-scale differences over real networks. Major TLS libraries answered with constant-time record processing, making it a canonical demonstration that network jitter does not hide a systematic bias."
+      },
+      "pitfalls": [
+        { "trap": "“The difference is microseconds; nobody can see that over the internet.”", "say": "“They do not see one request; they average thousands, and the bias survives.”" },
+        { "trap": "“Our comparison runs on a hash, not the secret, so it is safe.”", "say": "“If the checked value is secret-derived, an early exit still leaks the matching prefix; compare it in constant time too.”" }
+      ],
+      "takeaways": [
+        "If work depends on a secret, so does time: use constant-time primitives.",
+        "Error distinctions are one-bit oracles that compound over requests.",
+        "Noise raises attack cost; only removing the dependence closes the leak.",
+        "Test for the channel statistically; reading the code once is not proof."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Does the delay hide it?",
+      "prompt": "A fix for an early-exit token compare adds a random 0–50 ms pause before responding. The bias it is meant to mask is 3 ms.",
+      "choices": [
+        { "id": "a", "label": "Averaged over enough requests, the 3 ms bias still shows", "feedback": "Right: the noise mean cancels while the stationary bias remains." },
+        { "id": "b", "label": "The bias is smaller than the jitter, so it is gone", "feedback": "Jitter only decides how many samples are needed, not whether the leak exists." },
+        { "id": "c", "label": "It works until the attacker upgrades their network", "feedback": "Sample count, not link quality, is what averages the noise out." }
+      ],
+      "correctId": "a",
+      "reveal": "Random delay multiplies the samples needed but leaves the bias intact; a constant-time check removes the signal itself."
+    },
+    "seeAlso": [
+      { "topicId": 60, "why": "Side channels are the quieter half of the attack surface Security Essentials maps" },
+      { "topicId": 302, "why": "The MAC verification this lesson times is built in Hashing, MACs, Encryption and Signatures" },
+      { "topicId": 237, "why": "Webhook signature checks are a classic place for early-exit compares" }
+    ]
+  },
+  {
+    "id": 736,
+    "slug": "sandboxing-and-privilege-separation",
+    "region": "f6-security",
+    "order": 35,
+    "title": "Sandboxing and Privilege Separation",
+    "kind": "lesson",
+    "objectives": [
+      "Split an application so most of it runs without privilege",
+      "Choose what a sandbox must remove for a given workload",
+      "Reason about the blast radius when a component is compromised"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 15,
+    "prereqIds": [666],
+    "cards": [
+      {
+        "id": "t736-c1",
+        "kind": "text",
+        "title": "Split programs at the privilege line",
+        "body": "Most code handles untrusted input; little of it needs privilege. A privilege-separated design keeps a small broker holding keys and privileged operations while large unprivileged workers parse, render and transform. The broker answers narrow requests, so a bug in a worker cannot reach what it never had.",
+        "teaches": ["privilege-separation"]
+      },
+      {
+        "id": "t736-c2",
+        "kind": "text",
+        "title": "What a sandbox takes away",
+        "body": "A sandbox cuts a process off from what it does not need: no network, a read-only or empty filesystem, a filtered syscall list, a separate user id and bounded CPU and memory. The tighter the set, the less an exploit can do next; defaults decide what an attacker inherits.",
+        "teaches": ["sandboxing"]
+      },
+      {
+        "id": "t736-c3",
+        "kind": "diagram",
+        "title": "Worked example: a document-conversion worker",
+        "body": "A hostile file meets a process that holds nothing worth taking.",
+        "teaches": ["blast-radius"],
+        "steps": [
+          "A privileged front end accepts the upload and stores it; it does not parse the bytes",
+          "A worker with no credentials, no network and a filesystem containing only the job converts the file",
+          "The worker returns its output over a narrow channel, and the front end scans and stores the result",
+          "An exploit inside the converter lands in a process holding nothing worth taking",
+          "The worker is destroyed after each job, so any persistence dies with it"
+        ]
+      },
+      {
+        "id": "t736-c4",
+        "kind": "text",
+        "title": "Misconception: namespace isolation is a strong boundary",
+        "body": "Containers give processes separate views of one shared kernel; each syscall still reaches the same kernel an exploit can attack. Namespaces plus a filtered syscall list, dropped capabilities and a non-root user are meaningfully harder to escape, and hostile multi-tenant code deserves a microVM or a separate host.",
+        "teaches": ["sandboxing"]
+      },
+      {
+        "id": "t736-c5",
+        "kind": "text",
+        "title": "Trap: dropping privilege after parsing",
+        "body": "A program that reads configuration and opens sockets while privileged, then drops to a normal user, is safe only if dangerous input arrives later. If parsing happens before the drop, through a crafted config file or a malformed handshake, the exploit runs with each privilege the program started with.",
+        "teaches": ["privilege-drop"]
+      },
+      {
+        "id": "t736-c6",
+        "kind": "text",
+        "title": "Blast radius is a design input",
+        "body": "Ask of each component: if this is fully compromised, what can it read, call and change? The answers drive the split. Credentials the worker does not need move to the broker, the network it does not need is denied, and the data it does not need is filtered before it reaches the process.",
+        "teaches": ["blast-radius"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t736-a1",
+        "concept": "privilege-separation",
+        "type": "multiple_choice",
+        "prompt": "In a privilege-separated service, where should the untrusted-document parser run?",
+        "choices": [
+          { "id": "a", "label": "In an unprivileged worker holding no credentials" },
+          { "id": "b", "label": "In the request handler, where the bytes arrive" },
+          { "id": "c", "label": "In the broker, so its results are trusted" },
+          { "id": "d", "label": "In a shared library loaded by each tier" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "The parser touches attacker-controlled bytes, so it gets the least privilege possible. The broker is the part that must stay trustworthy, and loading the parser into each tier spreads the blast radius instead of shrinking it."
+      },
+      {
+        "id": "t736-a2",
+        "concept": "privilege-drop",
+        "type": "multiple_choice",
+        "prompt": "Why must privilege be dropped before handling untrusted input rather than after?",
+        "choices": [
+          { "id": "a", "label": "An exploit in the parser inherits whatever privileges remain" },
+          { "id": "b", "label": "Dropped processes run faster on untrusted bytes" },
+          { "id": "c", "label": "Privileged code cannot allocate the buffers parsing needs" },
+          { "id": "d", "label": "The broker refuses requests from processes that drop late" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "The drop only removes powers the process still holds at that moment. Anything parsed earlier ran with full privilege, which is why network daemons bind and open files first and shed rights before reading the wire."
+      },
+      {
+        "id": "t736-a3",
+        "concept": "sandboxing",
+        "type": "multiple_choice",
+        "prompt": "Two containers on one host share the kernel. What does adding a strict syscall filter buy?",
+        "choices": [
+          { "id": "a", "label": "Fewer kernel entry points an escaping process can abuse" },
+          { "id": "b", "label": "A separate kernel for each container" },
+          { "id": "c", "label": "Encryption for the process’s memory" },
+          { "id": "d", "label": "A guarantee that the image has no bugs" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Namespace isolation limits what a process sees; a syscall filter limits what it can ask the shared kernel to do, shrinking the surface an escape exploit needs. It does not give each container its own kernel."
+      },
+      {
+        "id": "t736-a4",
+        "concept": "privilege-separation",
+        "type": "drag_order",
+        "prompt": "Order how a privilege-separated worker comes up.",
+        "items": [
+          { "id": "s3", "label": "Privileged parent loads secrets and opens the resources it needs" },
+          { "id": "s1", "label": "Parent spawns the worker and hands over only open handles" },
+          { "id": "s4", "label": "Worker drops to an unprivileged user and loses filesystem and network reach" },
+          { "id": "s2", "label": "Worker processes untrusted input and returns results over a narrow channel" },
+          { "id": "s5", "label": "Parent destroys the worker when the job ends" }
+        ],
+        "correctOrder": ["s3", "s1", "s4", "s2", "s5"],
+        "explanation": "Privilege is spent up front on the set-up that needs it, then shed before attacker-controlled bytes arrive. The narrow channel and per-job teardown keep a compromise contained and temporary."
+      },
+      {
+        "id": "t736-a5",
+        "concept": "blast-radius",
+        "type": "estimation",
+        "prompt": "A broker split shrinks trusted code from 180,000 to 12,000 lines. With a defect rate of 0.5 bugs per 1,000 lines, how many bugs remain in the trusted part?",
+        "unit": "bugs",
+        "target": 6,
+        "assumptions": ["12,000 trusted lines after the split", "0.5 defects per 1,000 lines (illustrative)"],
+        "formula": "trusted lines ÷ 1,000 × defect rate",
+        "workedAnswer": "12,000 ÷ 1,000 × 0.5 = 6 expected bugs, down from about 90.",
+        "explanation": "Design implication: a 15× smaller trusted base cuts expected privileged defects by the same factor; fewer secrets and narrower calls then do the rest.",
+        "tolerance": 0.1,
+        "trapAnswers": [90, 60]
+      },
+      {
+        "id": "t736-a6",
+        "concept": "sandboxing",
+        "type": "tradeoff",
+        "prompt": "A media pipeline converts user uploads with a library that has had three memory-safety CVEs. A rewrite in a safe language is three months away.",
+        "constraints": [
+          "Conversions are user-triggered and daily",
+          "The library is the product’s core feature",
+          "Downtime budget for a rewrite: none"
+        ],
+        "approaches": [
+          { "id": "p2", "label": "Scan uploads for known exploits and run inline", "description": "Scan then trust" },
+          { "id": "p1", "label": "Run conversion in a credential-less, network-less worker", "description": "Contain the library" },
+          { "id": "p3", "label": "Freeze the feature until the rewrite lands", "description": "Suspend conversions" }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          { "id": "r1", "label": "A library exploit lands in a process holding nothing useful" },
+          { "id": "r2", "label": "Unknown exploits are absent from any signature list" },
+          { "id": "r3", "label": "Scanning catches the dangerous files, so isolation adds little" },
+          { "id": "r4", "label": "Three months of missing features is acceptable to customers" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "Scanners match known patterns; the last three CVEs were unknown when they were exploited.",
+          "r4": "Suspending a core feature for a quarter is a business outage, not a control."
+        },
+        "explanation": "When the risky component cannot be replaced yet, contain it: a sandboxed worker turns a library bug into a failed job rather than a host compromise, buying the rewrite the time it needs."
+      }
+    ],
+    "flashcards": [
+      { "id": "t736-f1", "front": "Privilege separation?", "back": "A small privileged broker plus large unprivileged workers, so most code runs without the power worth stealing." },
+      { "id": "t736-f2", "front": "What a sandbox removes?", "back": "Network, filesystem, capabilities and syscalls the job does not need, plus bounded CPU, memory and lifetime." },
+      { "id": "t736-f3", "front": "Why drop privileges before parsing?", "back": "An exploit inherits the privileges held at the moment it fires; parsing first means it fires while privileged." }
+    ],
+    "sources": [
+      { "title": "CWE-250: Execution with Unnecessary Privileges", "url": "https://cwe.mitre.org/data/definitions/250.html" },
+      { "title": "Kubernetes: Pod Security Standards", "url": "https://kubernetes.io/docs/concepts/security/pod-security-standards/" },
+      { "title": "Docker: Isolate containers with a user namespace", "url": "https://docs.docker.com/engine/security/userns-remap/" }
+    ],
+    "deep": {
+      "teaches": ["privilege-separation", "sandboxing", "blast-radius", "privilege-drop"],
+      "mechanism": {
+        "title": "Cutting one process into privilege zones",
+        "steps": [
+          "List the operations that need privilege: reading key material, binding low ports, touching shared state. Everything else is untrusted-input-adjacent and belongs in the worker.",
+          "The parent does the privileged set-up first, then spawns workers holding only the handles they need, such as an open socket or a job description, and never the secrets behind them.",
+          "The worker sheds what remains: an unprivileged user, a no-new-privileges flag, a read-only root, a filtered syscall list and no network route. What the code does not have, its exploit cannot use.",
+          "Communication runs over a narrow channel with a strict protocol: job in, result out. The broker validates what comes back, because a compromised worker is also a liar.",
+          "Lifetime is the last boundary: one worker per job or per tenant, torn down afterwards, so a persistent foothold dies with the process.",
+          "For genuinely hostile code, such as multi-tenant converters, plugin hosts or user-supplied programs, process isolation may not be enough; a microVM or a dedicated host puts a second kernel between the attacker and yours."
+        ]
+      },
+      "useWhen": [
+        "Use it around any component that parses complex untrusted formats: documents, images, archives and fonts.",
+        "Use it when one service mixes cheap risky work with privileged calls to keys, signing or databases."
+      ],
+      "avoidWhen": [
+        "Avoid splitting so finely that the channel itself becomes a complex parser, because the broker must stay simple.",
+        "Avoid calling a plain container a sandbox for hostile multi-tenant code; upgrade the isolation to match the threat."
+      ],
+      "tradeoffs": {
+        "columns": ["Isolation level", "Holds against", "Costs"],
+        "rows": [
+          ["Same process, least privilege", "Little; a bug inherits what the process has", "Nothing, and that is the point"],
+          ["Separate unprivileged process", "Parser bugs reaching secrets or the network", "A channel to design and workers to manage"],
+          ["Container plus syscall filtering", "Routine escapes and noisy syscalls", "The shared kernel remains the wall"],
+          ["MicroVM or dedicated host", "Kernel-level escape attempts", "Extra latency, orchestration and spend"]
+        ]
+      },
+      "numbers": {
+        "title": "Sizing the trusted computing base",
+        "assumptions": [
+          "The service is 180,000 lines; the broker after separation is 12,000",
+          "Privilege-relevant defect density is about 0.5 per 1,000 lines (illustrative)"
+        ],
+        "steps": [
+          "Before the split, all 180,000 lines run with privilege: about 90 expected defects carry it.",
+          "After the split, the trusted surface is 12,000 lines: about 6 expected defects carry privilege.",
+          "The other 168,000 lines still have bugs, roughly 84 of them, but each lands where no keys, network or host powers exist.",
+          "Shrinking the trusted base by 15× cuts the privileged defect count by 15×; audits and fuzzing then concentrate where they pay."
+        ],
+        "result": "Privilege separation does not remove bugs; it moves them to where they cannot do the expensive damage."
+      },
+      "india": {
+        "title": "CWE-250: Execution with Unnecessary Privileges",
+        "label": "Public weakness catalogue",
+        "body": "CWE-250 catalogues the pattern behind countless privilege-escalation chains: a component runs with more privilege than its task requires, so a compromise inherits powers it should never have held. The recommended pattern is the privilege-separated one this lesson describes: perform privileged set-up, drop to the minimum rights the work needs, and keep risky parsing away from the parts holding keys and network access."
+      },
+      "pitfalls": [
+        { "trap": "“It runs in a container, so it is isolated.”", "say": "“Namespaces share one kernel; I would still drop capabilities, filter syscalls and treat it as a strong room rather than a vault.”" },
+        { "trap": "“Splitting is over-engineering for our size.”", "say": "“The broker can be a hundred lines; the split buys containment cheaper than the incident costs.”" }
+      ],
+      "takeaways": [
+        "Keep privilege in a small broker; let big risky code run without it.",
+        "Drop privilege before untrusted input, not after.",
+        "A sandbox works by what it removes: network, filesystem, syscalls and lifetime.",
+        "Design so a compromised component reaches nothing worth having."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What does the exploit reach?",
+      "prompt": "Your image-conversion worker runs as a dedicated user with a read-only filesystem, no network route and a filtered syscall list. A malicious upload exploits the image library.",
+      "choices": [
+        { "id": "a", "label": "A contained process holding its input and output channel", "feedback": "Right: no credentials, no network and few syscalls keep the attacker’s payoff small." },
+        { "id": "b", "label": "The host kernel, because containers share it", "feedback": "Sharing a kernel is not reaching it; the filter and missing privileges are what make an escape hard." },
+        { "id": "c", "label": "The service’s database, through the worker’s role", "feedback": "The worker was never given database credentials; separation removed that reach." }
+      ],
+      "correctId": "a",
+      "reveal": "Exploits are assumed; containment decides whether a bug becomes a failed job or a breach."
+    },
+    "seeAlso": [
+      { "topicId": 70, "why": "Containers and Kubernetes supply the isolation primitives this design composes" },
+      { "topicId": 649, "why": "Namespaces are the mechanism underneath the container boundary" },
+      { "topicId": 301, "why": "Trust boundaries drawn in threat modelling are what privilege separation enforces" }
+    ]
+  },
+  {
+    "id": 737,
+    "slug": "fail-closed-design",
+    "region": "f6-security",
+    "order": 36,
+    "title": "Fail-Closed Design and Default Deny",
+    "kind": "lesson",
+    "objectives": [
+      "Choose fail-open or fail-closed deliberately for each check",
+      "Make an unmatched rule mean deny rather than allow",
+      "Design break-glass access that stays accountable"
+    ],
+    "difficulty": "intermediate",
+    "durationMinutes": 15,
+    "prereqIds": [306],
+    "cards": [
+      {
+        "id": "t737-c1",
+        "kind": "text",
+        "title": "Two ways to fail",
+        "body": "Each security check can be wrong two ways: wrongly allow or wrongly deny. Failing closed prefers wrongful denial, which is safer for money and data but costlier for availability. Failing open prefers wrongful allowance, which suits things like spam filtering where a false block hurts more than a leak through the gap.",
+        "teaches": ["fail-closed", "fail-open"]
+      },
+      {
+        "id": "t737-c2",
+        "kind": "text",
+        "title": "Default deny: unmatched means refused",
+        "body": "An allowlist posture means the rules say what is permitted and everything else, including routes nobody wrote rules for, is refused. The dangerous version is “no rule matched, so allow”: new endpoints then launch silently unprotected until someone thinks to add a deny.",
+        "teaches": ["default-deny"]
+      },
+      {
+        "id": "t737-c3",
+        "kind": "diagram",
+        "title": "Worked example: when the policy service times out",
+        "body": "A gateway that cannot prove permission refuses instead of guessing.",
+        "teaches": ["fail-closed"],
+        "steps": [
+          "A request arrives and the gateway calls the policy service to decide",
+          "The call times out, so the gateway cannot prove the caller is allowed",
+          "Fail-closed: it answers with an unavailable error and logs the dependency failure",
+          "Monitoring sees denials spike and pages on-call before customers complain",
+          "When the dependency recovers, traffic flows again with no half-committed state to repair"
+        ]
+      },
+      {
+        "id": "t737-c4",
+        "kind": "text",
+        "title": "Misconception: failing closed is always safer",
+        "body": "A hard-fail check on a global dependency can take all customers down together, turning a small outage into a total one. Degraded modes exist for a reason: cached decisions, read-only mode, or allowing low-risk traffic while blocking payments. The trade is availability now against exposure during the failure.",
+        "teaches": ["fail-open"]
+      },
+      {
+        "id": "t737-c5",
+        "kind": "text",
+        "title": "Trap: the catch block that approves",
+        "body": "A licence or fraud check wrapped in a try block that catches errors and returns allow converts each timeout, bad response and parser bug into an approval. On error, decide on purpose: deny, degrade to a cached verdict or escalate; never inherit allow by accident.",
+        "teaches": ["fail-closed"]
+      },
+      {
+        "id": "t737-c6",
+        "kind": "text",
+        "title": "Break-glass access that stays accountable",
+        "body": "Emergencies need a path around normal checks: on-call at 3 a.m. cannot wait for an approver. Break-glass access is tightly scoped, loudly logged and triggers a next-day review. It fails open by design, but with an audit trail that makes silent use impossible.",
+        "teaches": ["break-glass"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t737-a1",
+        "concept": "fail-closed",
+        "type": "multiple_choice",
+        "prompt": "The authorisation dependency times out on a request that deletes a tenant. Which response is fail-closed?",
+        "choices": [
+          { "id": "a", "label": "Deny the request and return an unavailable error" },
+          { "id": "b", "label": "Allow it but flag the entry in the audit log" },
+          { "id": "c", "label": "Allow the read-only parts of the same call" },
+          { "id": "d", "label": "Retry inside the request until the user leaves" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Fail-closed means no proof, no action: the delete is refused and the dependency failure is surfaced. Allowing and logging still performs the destructive act, and retrying forever just hangs the caller."
+      },
+      {
+        "id": "t737-a2",
+        "concept": "default-deny",
+        "type": "multiple_choice",
+        "prompt": "Why should a policy engine treat “no matching rule” as deny rather than allow?",
+        "choices": [
+          { "id": "a", "label": "New routes are protected before their rules are written" },
+          { "id": "b", "label": "It produces clearer error messages for blocked callers" },
+          { "id": "c", "label": "Deny decisions are cheaper for the engine to compute" },
+          { "id": "d", "label": "Auditors require an explicit deny on each route" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "With a match-to-allow posture, a feature nobody wrote rules for is refused instead of silently open. Error clarity, engine cost and audit rules do not decide who may reach an unlisted route."
+      },
+      {
+        "id": "t737-a3",
+        "concept": "fail-open",
+        "type": "multiple_choice",
+        "prompt": "Which check is a reasonable candidate for failing open, with alerting?",
+        "choices": [
+          { "id": "a", "label": "A spam classifier whose false blocks lose real mail" },
+          { "id": "b", "label": "The permission check on account deletion" },
+          { "id": "c", "label": "The signature check on incoming webhooks" },
+          { "id": "d", "label": "The virus scan on uploaded files" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Failing open fits where a wrong deny costs more than a wrong allow: a spam miss delivers junk while a false block silently loses mail. Deletion, signatures and malware scans all fail the other way."
+      },
+      {
+        "id": "t737-a4",
+        "concept": "default-deny",
+        "type": "drag_order",
+        "prompt": "Order building a default-deny policy set.",
+        "items": [
+          { "id": "s2", "label": "List the resources and actions callers can request" },
+          { "id": "s4", "label": "Write explicit allow rules for each legitimate caller" },
+          { "id": "s1", "label": "Set the unmatched-decision outcome to deny" },
+          { "id": "s3", "label": "Test that removing a grant removes access" },
+          { "id": "s5", "label": "Alert on denied requests to catch drift and probing" }
+        ],
+        "correctOrder": ["s2", "s4", "s1", "s3", "s5"],
+        "explanation": "You need the resource list before grants, and grants before it is safe to flip the default; switching to deny-first after the allows keeps the build usable. Verifying that grants matter, and watching denials, catches both mistakes and probes."
+      },
+      {
+        "id": "t737-a5",
+        "concept": "fail-closed",
+        "type": "estimation",
+        "prompt": "A fail-closed gateway’s policy service is down for 3 minutes. At a steady 2,000 requests a second, how many requests are denied?",
+        "unit": "requests",
+        "target": 360000,
+        "assumptions": ["2,000 requests a second", "A 3-minute outage is 180 s", "All requests need the check"],
+        "formula": "rate × outage seconds",
+        "workedAnswer": "2,000 × 180 = 360,000 denied requests.",
+        "explanation": "Design implication: fail-closed multiplies a dependency outage into a product outage, which is why cached decisions and graceful degradation exist; quantify the denial volume before choosing.",
+        "tolerance": 0.1,
+        "trapAnswers": [36000, 6000]
+      },
+      {
+        "id": "t737-a6",
+        "concept": "fail-open",
+        "type": "tradeoff",
+        "prompt": "Your fraud screen times out under load. The product cannot pause sign-ups, and fraud losses are bounded and monitored.",
+        "constraints": [
+          "Sign-ups are revenue-critical",
+          "Fraud is detectable and reversible within a day",
+          "The screen recovers in minutes"
+        ],
+        "approaches": [
+          { "id": "p3", "label": "Fail closed: refuse sign-ups until the screen returns", "description": "Deny on timeout" },
+          { "id": "p1", "label": "Fail open for sign-ups, queue a deferred screen and alert on-call", "description": "Allow and catch up" },
+          { "id": "p2", "label": "Fail open silently and reconcile at the end of the month", "description": "Allow, reconcile later" }
+        ],
+        "correctApproachId": "p1",
+        "rationaleOptions": [
+          { "id": "r1", "label": "The wrong-allow cost is bounded and reversible; the wrong-deny cost is lost revenue" },
+          { "id": "r2", "label": "Alerting and deferred screening catch much of what slips through" },
+          { "id": "r3", "label": "A security check should deny when it cannot decide" },
+          { "id": "r4", "label": "Monthly reconciliation is fast enough for fraud" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "Default deny is a principle, not a law; here the failure-mode costs point the other way.",
+          "r4": "A month of undetected fraudulent accounts is the expensive failure mode."
+        },
+        "explanation": "Fail-open is legitimate when the wrong-allow side is bounded and monitored and the wrong-deny side is revenue. What is not legitimate is failing open silently: the trade needs deferred checks and alarms to stay honest."
+      }
+    ],
+    "flashcards": [
+      { "id": "t737-f1", "front": "Fail-open vs fail-closed?", "back": "Fail-open allows on error and favours availability; fail-closed denies on error and favours protection. Choose per check by which wrong answer costs more." },
+      { "id": "t737-f2", "front": "Default deny?", "back": "The policy grants what is listed; anything unmatched, including brand-new routes, is refused." },
+      { "id": "t737-f3", "front": "Break-glass properties?", "back": "Scoped, loudly logged and reviewed afterwards: an emergency path, not a quiet bypass." }
+    ],
+    "sources": [
+      { "title": "CWE-636: Not Failing Securely (‘Failing Open’)", "url": "https://cwe.mitre.org/data/definitions/636.html" },
+      { "title": "OWASP: Secure Product Design Cheat Sheet", "url": "https://cheatsheetseries.owasp.org/cheatsheets/Secure_Product_Design_Cheat_Sheet.html" }
+    ],
+    "deep": {
+      "teaches": ["fail-closed", "default-deny", "fail-open", "break-glass"],
+      "mechanism": {
+        "title": "Deciding what errors do",
+        "steps": [
+          "Enumerate the checks that gate a decision: authorisation, quotas, licences, fraud and validation. For each, ask what happens on timeout, exception, empty result or malformed response.",
+          "Price both wrong answers: a wrongful allow leaks data, moves money and commits actions, while a wrongful deny stops revenue, locks out users and fatigues the alert channel.",
+          "Fail-closed is the default for irreversible or sensitive operations: deletion, payment, key use and privilege grant. No proof of permission means no action, plus a logged dependency failure.",
+          "Fail-open is chosen where the wrong-deny dominates and the wrong-allow is bounded: spam classifiers, cosmetic feature gates and some rate-limit counters. Pair it with alerting and a deferred check.",
+          "Default deny is the same instinct at the policy level: match-to-allow rule sets whose catch-all is refuse, so new features are born protected rather than born open.",
+          "Break-glass is designed fail-open: emergency access with narrow scope, loud logging and mandatory review, so incidents bypass controls without bypassing accountability."
+        ]
+      },
+      "useWhen": [
+        "Fail closed on irreversible, high-value operations and whenever no decision would silently grant power.",
+        "Use default deny for any rule set that grows: routes, IAM policies and firewall lists."
+      ],
+      "avoidWhen": [
+        "Avoid fail-closed on availability-critical paths where a dependency blip becomes a self-inflicted outage; degrade deliberately instead.",
+        "Avoid silent fail-open where money, data or irreversible actions are gated; the failure becomes invisible."
+      ],
+      "tradeoffs": {
+        "columns": ["Failure mode", "Protects", "Exposes"],
+        "rows": [
+          ["Fail-closed", "Data, money and irreversible actions", "Availability; one dependency can halt the product"],
+          ["Fail-open with alerts", "Availability and user experience", "A bounded leak while the check is down"],
+          ["Default deny", "Features that are new or unlisted", "Over-blocking until grants catch up"],
+          ["Break-glass", "The incident that needs speed", "A tempting bypass, mitigated only by audit"]
+        ]
+      },
+      "numbers": {
+        "title": "What does a fail-closed dependency cost in availability?",
+        "assumptions": [
+          "The policy service is at 99.9% monthly uptime",
+          "The gateway sees 2,000 requests a second",
+          "Each request fails closed on a policy timeout"
+        ],
+        "steps": [
+          "99.9% uptime permits about 43 minutes of downtime a month, roughly 2,600 s.",
+          "2,000 × 2,600 ≈ 5.2 million requests denied in that month.",
+          "If even 0.1% of those callers sat on the checkout path, the dependency outage alone costs thousands of lost orders.",
+          "Mitigation maths: caching decisions for 60 s covers short blips, and the measured blip rate then sets how much residual exposure a fail-open window would buy."
+        ],
+        "result": "Fail-closed is a real availability commitment: quantify the denial volume and add caching or degradation where the number is unacceptable."
+      },
+      "india": {
+        "title": "CWE-636: Not Failing Securely",
+        "label": "Public weakness catalogue",
+        "body": "CWE-636 describes products that fall back to a less restrictive state on error: authentication that allows access when the identity store is unreachable, or validation that passes on malformed input. Its classic example is the licensing check that returns valid on exception, a pattern behind documented bypasses. Its guidance matches this lesson: define the failure behaviour explicitly and deny unless a bounded exception is reasoned out."
+      },
+      "pitfalls": [
+        { "trap": "“When in doubt, deny; that is the secure default.”", "say": "“Usually, yes; but on availability-critical paths I would design a bounded degrade rather than let one dependency halt the product.”" },
+        { "trap": "“Just log the failure and let the request through.”", "say": "“Allow-and-log still performs the action; on a sensitive path the failure must mean deny, degrade or escalate.”" }
+      ],
+      "takeaways": [
+        "Each check needs a chosen failure answer, not an inherited one.",
+        "Deny is the right default for irreversible or sensitive decisions.",
+        "Fail-open is legitimate only when bounded, monitored and deliberate.",
+        "Break-glass buys speed with scope, logging and review."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What does the gateway do at 3 a.m.?",
+      "prompt": "A gateway fails closed on its authorisation service. At 3 a.m. that service’s database fails for 40 minutes while traffic runs at 1,500 requests a second.",
+      "choices": [
+        { "id": "a", "label": "About 3.6 million denials and an on-call page", "feedback": "Right: 1,500 × 2,400 s ≈ 3.6 million refused requests, and the error spike should page someone." },
+        { "id": "b", "label": "Requests queue until the service returns", "feedback": "Fail-closed denies; nothing queues, so the outage hits callers directly." },
+        { "id": "c", "label": "The gateway allows reads but blocks writes", "feedback": "That is a designed degraded mode, not what a plain fail-closed check does." }
+      ],
+      "correctId": "a",
+      "reveal": "Failing closed trades availability for protection: know the denial volume and add deliberate degradation where the number is too big."
+    },
+    "seeAlso": [
+      { "topicId": 53, "why": "Timeouts and circuit breakers are where these failure decisions get exercised" },
+      { "topicId": 306, "why": "Broken Access Control is what a fail-open authorisation check becomes" },
+      { "topicId": 666, "why": "Least privilege is the policy shape default deny serves" }
+    ]
+  }
+]
