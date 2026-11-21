@@ -79,7 +79,7 @@
    {
     "id": "t241-c6",
     "kind": "text",
-    "title": "Edge case: routers that rewrite the segment size",
+    "title": "Routers that rewrite the segment size",
     "body": "To avoid path-MTU black holes, many routers on PPPoE and VPN links rewrite the maximum segment size in passing SYN packets (MSS clamping). On a 1,492-byte PPPoE link, the MSS becomes 1,452 bytes so full segments fit without fragmentation, even if “packet too big” messages are filtered.",
     "teaches": [
      "encapsulation"
@@ -200,7 +200,7 @@
      "s3",
      "s4"
     ],
-    "explanation": "Each layer wraps the one above it."
+    "explanation": "On the wire the link header comes first because it is added last and stripped first: Ethernet, then IP, then TCP, with the HTTP request innermost. Each layer’s header sits in front of everything the layers above produced."
    },
    {
     "id": "t241-a5",
@@ -236,7 +236,7 @@
      "s4",
      "s5"
     ],
-    "explanation": "Each step depends on the one before it."
+    "explanation": "Each layer depends on the ones below it: no link means no address, no route means no DNS answer, no connection means no response. Testing from the bottom up finds the first broken step instead of blaming the application for a missing route."
    },
    {
     "id": "t241-a6",
@@ -470,7 +470,7 @@
     "steps": [
      "Full form: 2001:0db8:0000:0000:0000:0000:0000:0010",
      "Drop leading zeros in each group: 2001:db8:0:0:0:0:0:10",
-     "Replace one run of all-zero groups with “::” : 2001:db8::10",
+     "Replace one run of all-zero groups with “::”: 2001:db8::10",
      "“::” may appear only once, or the address would be ambiguous",
      "The first 64 bits usually name the network, the last 64 the interface"
     ]
@@ -496,7 +496,7 @@
    {
     "id": "t242-c6",
     "kind": "text",
-    "title": "Edge case: IPv4 clients that look like IPv6",
+    "title": "IPv4 clients that look like IPv6",
     "body": "A dual-stack server socket reports IPv4 clients as IPv4-mapped IPv6 addresses such as ::ffff:192.0.2.10. An allowlist or rate limiter that compares against “192.0.2.10” silently fails to match. Normalise addresses to one form before comparing, logging or using them as keys.",
     "teaches": [
      "address-formats"
@@ -909,7 +909,7 @@
    {
     "id": "t243-c6",
     "kind": "text",
-    "title": "Edge case: clouds reserve more addresses",
+    "title": "Clouds reserve more addresses per subnet",
     "body": "Plain IPv4 subnetting loses two addresses per subnet (network and broadcast), but cloud providers often reserve more: AWS documents five reserved addresses in every VPC subnet (the first four and the last). A /28 there gives 11 usable addresses, not 14, which matters for small subnets sized for a load balancer or a few nodes.",
     "teaches": [
      "prefix-math"
@@ -971,7 +971,7 @@
     "correctChoiceIds": [
      "d"
     ],
-    "explanation": "The /26 containing .70 runs from .64 to .127."
+    "explanation": "A /26 splits the last byte into blocks of 64: .0–.63, .64–.127, .128–.191 and .192–.255. The block holding .70 covers .64 to .127, so .100 is inside it while .20 and .130 fall in neighbouring blocks, and 192.168.2.x is another network entirely."
    },
    {
     "id": "t243-a3",
@@ -1027,7 +1027,7 @@
     "correctChoiceIds": [
      "b"
     ],
-    "explanation": "Overlapping ranges need renumbering or translation (NAT) between them."
+    "explanation": "With identical numbering, a router cannot tell which side’s 10.0.0.5 is meant, so traffic reaches the wrong host or goes nowhere; the fix is renumbering one side or translating addresses between them. Public DNS is unaffected because the conflict is internal, private ranges only avoid clashes until the networks meet, and IPv6 traffic fails the same way when ranges overlap."
    },
    {
     "id": "t243-a5",
@@ -1063,7 +1063,7 @@
      "s4",
      "s5"
     ],
-    "explanation": "Same network part means local delivery; different means via the router."
+    "explanation": "Masking both addresses and comparing the network parts is the same-subnet test. Equal parts mean the destination is on the local link, so the host ARPs for it and sends direct; different parts mean the frame goes to the default gateway, which repeats the test on its own routes."
    },
    {
     "id": "t243-a6",
@@ -1324,7 +1324,7 @@
    {
     "id": "t244-c6",
     "kind": "text",
-    "title": "Edge case: idle connections silently dropped",
+    "title": "Idle connections silently dropped",
     "body": "NATs and stateful firewalls forget mappings that carry no traffic for a while; for UDP the guideline in RFC 4787 is at least 2 minutes, for established TCP RFC 5382 asks for at least 2 hours 4 minutes, and many devices use shorter values in practice. A long-lived idle connection then fails only when it is next used. Send application or TCP keepalives more often than the shortest timeout on the path.",
     "teaches": [
      "routing-tables"
@@ -1716,7 +1716,7 @@
    {
     "id": "t245-c6",
     "kind": "text",
-    "title": "Edge case: failover and stale ARP caches",
+    "title": "Failover and stale ARP caches",
     "body": "When a standby takes over a virtual IP, neighbours still map that IP to the old machine’s MAC address until their ARP entries expire, so traffic disappears into the old host. Failover tools send gratuitous ARP announcements to update every cache at once; clouds that do not use ARP this way provide an API to move the address instead.",
     "teaches": [
      "arp"
@@ -1870,7 +1870,7 @@
      "s4",
      "s5"
     ],
-    "explanation": "Routing decision first, then ARP for the next hop, then the frame."
+    "explanation": "The subnet test comes first because it decides who the next hop is: an off-subnet destination means the gateway. Only then does the host ARP, and it ARPs for the gateway’s address, not the server’s, before building the frame with the server’s IP inside."
    },
    {
     "id": "t245-a6",
@@ -2582,7 +2582,7 @@
    {
     "id": "t247-c6",
     "kind": "text",
-    "title": "Edge case: running out of ports for outbound connections",
+    "title": "Running out of ports for outbound connections",
     "body": "The side that closes a TCP connection first keeps it in TIME_WAIT for twice the maximum segment lifetime. A client opening many short connections to one destination can use up its ephemeral ports (Linux’s default range, 32768–60999, is about 28,000 ports) and new connections fail. Reuse connections with keep-alive or pooling rather than tuning TIME_WAIT away.",
     "teaches": [
      "handshake"
@@ -2736,7 +2736,7 @@
      "s4",
      "s5"
     ],
-    "explanation": "Three-way handshake, then data and acknowledgements."
+    "explanation": "SYN, SYN-ACK, ACK agrees both sides’ starting sequence numbers before any data exists to acknowledge. The third message can already carry the request, and every later byte is acknowledged in order."
    },
    {
     "id": "t247-a6",
@@ -2996,7 +2996,7 @@
    {
     "id": "t248-c6",
     "kind": "text",
-    "title": "Edge case: bufferbloat",
+    "title": "Bufferbloat: full queues add delay",
     "body": "Loss-based congestion control keeps increasing its window until packets drop, so a router with a very large buffer fills it before loss tells the sender to slow down. Every packet then waits in that queue, and latency on a busy home link can grow by hundreds of milliseconds. Active queue management in routers (for example CoDel) and delay-based algorithms such as BBR reduce it.",
     "teaches": [
      "flow-control"
@@ -3150,7 +3150,7 @@
      "s4",
      "s5"
     ],
-    "explanation": "Exponential growth, then linear, then a cut on loss."
+    "explanation": "The window starts small, doubles each round trip during slow start, then switches to adding about one segment per round trip once past the threshold. A loss signal cuts it roughly in half, and the cycle repeats, tracing the classic sawtooth."
    },
    {
     "id": "t248-a6",
@@ -3402,7 +3402,7 @@
    {
     "id": "t249-c6",
     "kind": "text",
-    "title": "Edge case: UDP reflection and amplification",
+    "title": "UDP reflection and amplification",
     "body": "UDP has no handshake, so an attacker can forge the source address. Small queries to open DNS resolvers or other UDP services that send large replies are reflected at the forged victim, multiplying the attack traffic. Services on UDP should avoid replies much larger than requests to unverified clients, and networks should drop packets with spoofed sources.",
     "teaches": [
      "ports-sockets"
@@ -3824,7 +3824,7 @@
    {
     "id": "t250-c6",
     "kind": "text",
-    "title": "Edge case: one HTTP/2 connection used for two host names",
+    "title": "One HTTP/2 connection for two host names",
     "body": "Browsers may reuse an existing HTTP/2 connection for another host name when the certificate covers it and the name resolves to the same address (connection coalescing). If that server is not configured for the second name, it should answer 421 Misdirected Request so the browser retries on a new connection; servers that answer with the wrong site instead cause confusing bugs.",
     "teaches": [
      "http-versions"
@@ -4234,7 +4234,7 @@
    {
     "id": "t251-c6",
     "kind": "text",
-    "title": "Edge case: the host name is visible in the handshake",
+    "title": "The host name is visible in the handshake",
     "body": "TLS encrypts the request, but the server name is sent in clear in the ClientHello’s SNI extension so the server can pick a certificate. Networks can therefore see, and filter on, which site you are reaching. Encrypted Client Hello (ECH) is the newer extension that hides it, where both sides support it.",
     "teaches": [
      "tls-goals"
@@ -4652,7 +4652,7 @@
    {
     "id": "t252-c6",
     "kind": "text",
-    "title": "Edge case: client addresses through a layer-4 load balancer",
+    "title": "Client addresses through a layer-4 load balancer",
     "body": "An L4 load balancer that terminates TCP cannot add an HTTP header, so the app sees the balancer’s address. The PROXY protocol solves this by sending a short header with the original client address at the start of the connection; the app must accept it only from the balancer, or anyone can claim any address.",
     "teaches": [
      "proxy-kinds"
@@ -5110,7 +5110,7 @@
    {
     "id": "t253-c6",
     "kind": "text",
-    "title": "Edge case: fast links still start slowly",
+    "title": "Fast links still start slowly",
     "body": "A new TCP connection begins with a small congestion window (commonly 10 segments, about 14 KB, per RFC 6928) and roughly doubles it each round trip. A 1 MB response on a fresh connection therefore needs several round trips however fast the link is, which is why connection reuse matters even on gigabit networks.",
     "teaches": [
      "latency-bandwidth"
@@ -5178,7 +5178,7 @@
     "id": "t253-a3",
     "concept": "latency-bound",
     "type": "multiple_choice",
-    "prompt": "A page makes 12 sequential API calls of 2 KB each to a server 80 ms away. What helps most?",
+    "prompt": "A page issues 12 dependent requests of 2 KB each, each waiting for the previous one, to a server 80 ms away. What helps most?",
     "choices": [
      {
       "id": "a",
@@ -5264,7 +5264,7 @@
      "s4",
      "s5"
     ],
-    "explanation": "Compare waiting with sending before choosing a fix."
+    "explanation": "Waiting time is round trips times the RTT; sending time is the bytes divided by the rate. Comparing the two tells you whether to cut round trips, move closer to users or buy bandwidth, so measure before picking a fix."
    },
    {
     "id": "t253-a6",
@@ -5527,7 +5527,7 @@
    {
     "id": "t254-c6",
     "kind": "text",
-    "title": "Edge case: broken IPv6 on the client’s network",
+    "title": "Broken IPv6 on the client’s network",
     "body": "If a network advertises IPv6 but it does not actually work, a naive client would wait for an IPv6 connection to time out. Browsers use Happy Eyeballs (RFC 8305): they try IPv6 first and start IPv4 after a short delay if IPv6 has not connected, using whichever succeeds first, so a broken path costs about a quarter of a second (RFC 8305 recommends a 250 ms Connection Attempt Delay) instead of a long connection timeout.",
     "teaches": [
      "page-load-steps"
@@ -5686,7 +5686,7 @@
      "s5",
      "s6"
     ],
-    "explanation": "Name, connection, security, request, then rendering work."
+    "explanation": "The order follows the dependencies: the name must resolve before a connection can open, TLS runs inside that connection, and only then can the request fetch the HTML that parsing, sub-resources and rendering depend on."
    },
    {
     "id": "t254-a6",
