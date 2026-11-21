@@ -1,0 +1,1589 @@
+[
+  {
+    "id": 726,
+    "slug": "zombies-orphans-and-reaping",
+    "region": "f5-os",
+    "order": 31,
+    "title": "Zombies, Orphans and Reaping Children",
+    "kind": "lesson",
+    "objectives": [
+      "Explain what the kernel keeps when a child exits and why",
+      "Choose the right wait call to collect children without blocking",
+      "Say who reaps orphans inside a container and what a subreaper does"
+    ],
+    "difficulty": 2,
+    "durationMinutes": 12,
+    "prereqIds": [281, 290],
+    "cards": [
+      {
+        "id": "t726-c1",
+        "kind": "text",
+        "title": "An exit frees almost everything except one small record",
+        "body": "When a process finishes, the kernel releases its memory, open files and threads. One item stays behind: a process-table record holding the exit status, resource-usage figures and the process id, kept so the parent can learn how the child ended. Until the parent collects it, the child is a zombie: dead, but still occupying a slot.",
+        "teaches": ["exit-status"]
+      },
+      {
+        "id": "t726-c2",
+        "kind": "text",
+        "title": "wait collects any child; waitpid picks which and whether to block",
+        "body": "wait blocks until any child exits and returns its status. waitpid can target a specific process id or a whole group, and its WNOHANG flag returns immediately when nothing has exited, which is how event loops reap children without stalling. The status integer packs two cases: a normal exit code in the low byte, or the signal number that killed the child.",
+        "teaches": ["reaping"]
+      },
+      {
+        "id": "t726-c3",
+        "kind": "diagram",
+        "title": "Worked example: a shell collects a finished pipeline",
+        "body": "Running one command in a pipeline, start to reaped.",
+        "teaches": ["reaping", "exit-status"],
+        "steps": [
+          "The shell forks one child per command in the pipeline and records their ids",
+          "Each command runs, then calls exit; its memory is freed and its status stored",
+          "SIGCHLD tells the shell at least one child has changed state",
+          "The shell calls waitpid until every pipeline member is collected",
+          "The last command’s status becomes the pipeline’s exit code, seen as $?"
+        ]
+      },
+      {
+        "id": "t726-c4",
+        "kind": "text",
+        "title": "Orphans climb to an ancestor that agreed to reap",
+        "body": "If a parent exits before its children, the survivors are re-parented to the nearest ancestor signed up to take them: PID 1 at the top of the process tree, or a closer process registered as a subreaper. The new parent receives their SIGCHLD and collects them. This is also how a daemon detaches: it forks, lets the intermediate parent exit, and the grandchild climbs to a known reaper.",
+        "teaches": ["subreaper"]
+      },
+      {
+        "id": "t726-c5",
+        "kind": "text",
+        "title": "Trap: zombies are already dead, so signals cannot touch them",
+        "body": "kill -9 on a zombie does nothing: there is no running process left to kill, only a record waiting to be read. The fix is upstream: signal or restart the parent so the orphans are adopted and reaped. A parent that never waits leaks one process-table slot per child, and thousands of them can exhaust the process-id space so that fork itself starts failing.",
+        "teaches": ["reaping"]
+      },
+      {
+        "id": "t726-c6",
+        "kind": "text",
+        "title": "Misconception: a zombie still holds the memory and files it had",
+        "body": "Everything the process owned was released at exit. The zombie keeps only the small status record, so zombies consume no memory, sockets or CPU. The real dangers are slot exhaustion and what they reveal about the parent: a supervisor that never reaps has a bug, and inside a container the un-reaping process is often PID 1 itself.",
+        "teaches": ["exit-status", "reaping"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t726-a1",
+        "concept": "exit-status",
+        "type": "multiple_choice",
+        "prompt": "A child exits while its parent is busy in a long computation. Where is the child’s result kept meanwhile?",
+        "choices": [
+          { "id": "a", "label": "A small process-table record the parent can read later" },
+          { "id": "b", "label": "A queued byte in the parent’s signal mask" },
+          { "id": "c", "label": "The child’s stack, kept mapped until collected" },
+          { "id": "d", "label": "A kernel log entry written under /proc" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Exit frees the child’s memory and files but keeps a compact record holding its status, so the parent can learn the outcome whenever it next calls wait. Nothing is queued in the signal mask or written to a log; SIGCHLD is just a nudge that a record is ready."
+      },
+      {
+        "id": "t726-a2",
+        "concept": "reaping",
+        "type": "multiple_choice",
+        "prompt": "A server must keep answering requests and also collect children promptly. Which pattern fits?",
+        "choices": [
+          { "id": "a", "label": "waitpid with WNOHANG whenever SIGCHLD arrives" },
+          { "id": "b", "label": "wait inside the request loop until a child exits" },
+          { "id": "c", "label": "sleep briefly, then wait for each known child" },
+          { "id": "d", "label": "poll every child’s entry under /proc on a timer" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "SIGCHLD already says a child changed state, and WNOHANG lets waitpid collect every exited child in a short loop without blocking the server. Blocking on wait stalls the loop until one exits, and timers or sleeps reap late while still not saying which child finished."
+      },
+      {
+        "id": "t726-a3",
+        "concept": "subreaper",
+        "type": "multiple_choice",
+        "prompt": "Inside a container, workers spawn grandchildren and exit before them. Who is expected to collect the grandchildren?",
+        "choices": [
+          { "id": "a", "label": "PID 1 inside the container, their new parent" },
+          { "id": "b", "label": "A kernel thread that reaps stale processes" },
+          { "id": "c", "label": "Each grandchild’s original grandparent" },
+          { "id": "d", "label": "The container runtime running on the host" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Orphans are re-parented to PID 1 in their pid namespace, which then owes them a wait; a runtime on the host cannot reach inside the namespace. If PID 1 never calls wait, the records pile up, which is why containers want an init that reaps."
+      },
+      {
+        "id": "t726-a4",
+        "concept": "reaping",
+        "type": "drag_order",
+        "prompt": "Order the lifecycle of a finished child until its slot is freed.",
+        "items": [
+          { "id": "s1", "label": "The child exits; its memory and files are released" },
+          { "id": "s3", "label": "The kernel keeps a status record and sends SIGCHLD" },
+          { "id": "s4", "label": "The parent calls wait and reads the status" },
+          { "id": "s2", "label": "The record is freed and the id can be reused" }
+        ],
+        "correctOrder": ["s1", "s3", "s4", "s2"],
+        "explanation": "Exit releases resources, the status record waits as a zombie for the parent, wait collects it, and only then is the slot freed for a new process."
+      },
+      {
+        "id": "t726-a5",
+        "concept": "reaping",
+        "type": "estimation",
+        "prompt": "A supervisor leaks 300 zombie records an hour on a host with a process-id limit of 32,768. Roughly how many hours until id allocation could start failing?",
+        "unit": "hours",
+        "target": 109,
+        "assumptions": [
+          "Every leaked child keeps one id slot",
+          "Nothing else frees the records"
+        ],
+        "formula": "id limit ÷ leak rate",
+        "workedAnswer": "32,768 ÷ 300 ≈ 109 hours, about four and a half days.",
+        "explanation": "Design implication: a leaking parent looks fine for days, then fork fails everywhere at once; alert on zombie count, not on memory.",
+        "tolerance": 0.05,
+        "trapAnswers": [11, 1090]
+      },
+      {
+        "id": "t726-a6",
+        "concept": "subreaper",
+        "type": "tradeoff",
+        "prompt": "A job runner inside a container spawns helpers that spawn short-lived tools; zombie records accumulate and the weekly restart is not enough.",
+        "constraints": [
+          "The runner’s code cannot change",
+          "Grandchildren outlive their parents",
+          "Zombies already exhaust the container’s id limit weekly"
+        ],
+        "approaches": [
+          { "id": "a", "label": "A tiny init as PID 1 that reaps and forwards signals", "description": "Run a minimal init inside the container so every adopted orphan is collected." },
+          { "id": "b", "label": "A reaper thread inside each worker", "description": "Add a thread that calls wait so workers collect their own children sooner." },
+          { "id": "c", "label": "A periodic job that signals zombie ids", "description": "Send signals to the stale records on a timer to force them away." }
+        ],
+        "correctApproachId": "a",
+        "rationaleOptions": [
+          { "id": "r1", "label": "PID 1 inherits every orphan and is the only process that can collect them all" },
+          { "id": "r2", "label": "A real init also forwards stop and terminate signals correctly" },
+          { "id": "r3", "label": "Zombies hold memory that only PID 1 can release" },
+          { "id": "r4", "label": "Signalling a zombie forces the kernel to reap it early" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "A zombie’s memory was already released at exit; only a status record remains.",
+          "r4": "There is nothing running to signal; the record disappears only when a parent waits."
+        },
+        "explanation": "Orphans climb to PID 1 in the namespace, so a minimal init that calls wait collects them all and forwards signals properly, without touching the runner. Threads inside workers cannot reap grandchildren, and signalling a zombie is meaningless because it is already dead; it holds no memory for anyone to release."
+      }
+    ],
+    "flashcards": [
+      { "id": "t726-f1", "front": "What is a zombie process?", "back": "An exited child whose small status record waits in the process table until the parent calls wait." },
+      { "id": "t726-f2", "front": "What does WNOHANG do?", "back": "Makes waitpid return at once when no child has exited, so a loop can reap without blocking." },
+      { "id": "t726-f3", "front": "Who reaps an orphan?", "back": "Its new parent: the nearest subreaper, or PID 1 in its pid namespace." }
+    ],
+    "deep": {
+      "teaches": ["exit-status", "reaping", "subreaper"],
+      "mechanism": {
+        "title": "How exit, reaping and re-parenting are wired",
+        "steps": [
+          "When a process calls exit or dies on a signal, the kernel tears down almost everything: the address space, threads, open files and pending timers. What remains is a compact task record holding the exit status, the signal number if any, and usage statistics.",
+          "The parent is sent SIGCHLD. Until a wait-family call reads the status, the child is a zombie. The record exists only so the parent can ask how it ended, which is why a zombie can be neither killed nor revived.",
+          "wait blocks for any child. waitpid selects one child or a process group and takes flags: WNOHANG returns at once, which is how shells and supervisors reap inside event loops. waitid offers finer control, including leaving the record readable with WNOWAIT.",
+          "The status integer encodes two outcomes: WIFEXITED plus an 8-bit code for a normal exit, or WIFSIGNALED plus the signal number and whether a core dump was produced. Reading it without the macros turns a killed child into a strange exit code.",
+          "If a parent exits first, its children are re-parented to the nearest subreaper or to PID 1. Any process can volunteer for the role, and container runtimes use it so orphaned grandchildren are still collected inside the namespace.",
+          "Each zombie keeps a process-id slot. The default ceiling is often 32,768, so a parent leaking a few children a minute can make fork fail days later, long after the buggy release shipped."
+        ]
+      },
+      "useWhen": [
+        "Reap in a loop: on SIGCHLD, call waitpid with WNOHANG until it reports no more exited children.",
+        "Run a minimal init, or register a supervisor as a subreaper, wherever grandchildren outlive parents, such as containers."
+      ],
+      "avoidWhen": [
+        "Do not let a long-lived parent skip waiting; records accumulate quietly for weeks before fork fails.",
+        "Do not try to kill or restart a zombie itself; signal or restart the parent so adoption and reaping happen."
+      ],
+      "tradeoffs": {
+        "columns": ["Reaping approach", "How it works", "Where it fits"],
+        "rows": [
+          ["wait in a dedicated loop", "Blocks until the next child exits", "Shells and short-lived batch parents"],
+          ["SIGCHLD plus WNOHANG", "Collects every exited child without blocking", "Servers that must keep responding"],
+          ["Minimal init or subreaper", "Adopts orphans and reaps the whole subtree", "Containers spawning grandchildren"]
+        ]
+      },
+      "numbers": {
+        "title": "How long a reaping leak takes to exhaust process ids",
+        "assumptions": [
+          "A supervisor leaks 200 zombie records an hour",
+          "The id limit is 32,768 and about 300 are already in use"
+        ],
+        "steps": [
+          "Roughly 32,400 id slots are free at the start.",
+          "At 200 leaked slots an hour, exhaustion arrives after about 32,400 ÷ 200 ≈ 162 hours.",
+          "That is nearly a week of healthy-looking service before fork starts failing for every process on the host."
+        ],
+        "result": "Zombie leaks fail late and all at once, so they belong in metrics and alerts, not just in code review."
+      },
+      "india": {
+        "title": "A tiny init whose whole job is reaping",
+        "label": "Official documentation",
+        "body": "Docker’s documentation describes the problem directly: the process used as PID 1 in a container is treated specially by the kernel, and an application that never waits leaves zombies behind. The runtime ships a minimal init, enabled with a run flag, whose job is to forward signals and reap adopted orphans. Several base images bake in a similar small init for exactly the same reason."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Zombies mean the kernel is leaking memory.”",
+          "say": "“Each zombie is one process-table record; the leak is the parent that never calls wait.”"
+        },
+        {
+          "trap": "“I will clean them up with kill -9.”",
+          "say": "“A zombie is already dead; I would restart the parent so its orphans are adopted and reaped.”"
+        }
+      ],
+      "takeaways": [
+        "An exited child keeps only a small status record until a parent waits.",
+        "waitpid with WNOHANG reaps without blocking an event loop.",
+        "Orphans climb to the nearest subreaper or to PID 1, which must reap them.",
+        "Un-reaped children eventually exhaust the id space and break fork for everyone."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "What is actually running out?",
+      "prompt": "A worker manager spawns 40 short-lived helpers an hour and calls wait once, at startup. After six days, new tasks fail and ps shows thousands of entries in state Z.",
+      "choices": [
+        { "id": "a", "label": "Process-table slots: un-reaped children still hold ids", "feedback": "Right: every helper left a record, and id exhaustion is what blocks fork." },
+        { "id": "b", "label": "Open file descriptors left behind by each helper", "feedback": "Descriptors are freed at exit; a zombie holds nothing but its status record." },
+        { "id": "c", "label": "Kernel threads stuck inside an exit handler", "feedback": "Nothing executes for a zombie; the cost is a record, not a thread." }
+      ],
+      "correctId": "a",
+      "reveal": "The manager only had to call waitpid in a loop; the helpers did nothing wrong. Watch zombie count as a metric, because the failure lands days after the leak starts."
+    },
+    "seeAlso": [
+      { "topicId": 70, "why": "PID 1 in a container must reap adopted orphans, and most apps do not" },
+      { "topicId": 649, "why": "A pid namespace makes a new PID 1 responsible for the orphans inside" },
+      { "topicId": 290, "why": "SIGCHLD and exit codes are the other half of this lifecycle" }
+    ],
+    "sources": [
+      { "title": "Linux man-pages: wait(2)", "url": "https://man7.org/linux/man-pages/man2/wait.2.html" },
+      { "title": "Linux man-pages: prctl(2), PR_SET_CHILD_SUBREAPER", "url": "https://man7.org/linux/man-pages/man2/prctl.2.html" },
+      { "title": "POSIX: wait, waitpid specification", "url": "https://pubs.opengroup.org/onlinepubs/9699919799/functions/wait.html" }
+    ]
+  },
+  {
+    "id": 727,
+    "slug": "numa-locality-and-affinity",
+    "region": "f5-os",
+    "order": 32,
+    "title": "NUMA: Local Memory, Remote Memory and Affinity",
+    "kind": "lesson",
+    "objectives": [
+      "Describe a NUMA node and why remote access costs more",
+      "Explain first-touch allocation and what thread migration does to it",
+      "Pick policies and pinning that keep memory near its readers"
+    ],
+    "difficulty": 4,
+    "durationMinutes": 13,
+    "prereqIds": [283, 563],
+    "cards": [
+      {
+        "id": "t727-c1",
+        "kind": "text",
+        "title": "Each socket owns part of the machine’s RAM",
+        "body": "On a multi-socket machine, DRAM is attached to particular CPU packages rather than to the machine as a whole. A core reading memory on its own NUMA node goes straight to the local memory controller; reading memory on a remote node crosses the socket-to-socket interconnect, which adds latency and shares a narrower link. The gap is commonly about 1.5–2× latency and noticeably less bandwidth.",
+        "teaches": ["numa-locality"]
+      },
+      {
+        "id": "t727-c2",
+        "kind": "text",
+        "title": "First touch decides where a page lives",
+        "body": "With the default policy, a page is allocated on the node of whichever thread first writes to it. A service that allocates its whole working set from one startup thread parks all of it on that thread’s node, and every thread later scheduled on other nodes pays the remote toll on each access. Placement is decided once, at first write, not where the memory ends up being read.",
+        "teaches": ["first-touch"]
+      },
+      {
+        "id": "t727-c3",
+        "kind": "diagram",
+        "title": "Worked example: a worker drifts to the far socket",
+        "body": "How one scheduler decision doubles memory latency.",
+        "teaches": ["numa-locality", "first-touch"],
+        "steps": [
+          "A worker thread allocates and warms a 30 GB cache; its pages land on node 0",
+          "Load rises and the scheduler moves the thread to a free core on node 1",
+          "Every lookup now crosses the interconnect: roughly double the memory latency",
+          "Latency climbs while CPU graphs still look balanced, so the cause hides",
+          "Binding the worker back to node 0, or re-warming on node 1, restores locality"
+        ]
+      },
+      {
+        "id": "t727-c4",
+        "kind": "text",
+        "title": "CPU affinity and memory affinity are separate knobs",
+        "body": "Two controls must agree: where a thread runs, set with sched_setaffinity or numactl’s CPU binding, and where its pages are allocated, set with set_mempolicy or numactl’s memory binding. Local allocation is the usual default, interleave spreads pages round-robin across nodes for bandwidth, and a strict bind fails the allocation rather than spill remote. numastat reports local versus remote hits per node.",
+        "teaches": ["affinity-policy"]
+      },
+      {
+        "id": "t727-c5",
+        "kind": "text",
+        "title": "Trap: a second socket can make a memory-bound service slower",
+        "body": "Doubling cores doubles memory sockets too. If threads spread across both while the data stays on one node, about half of all accesses go remote and the upgrade makes things worse. The kernel’s automatic NUMA balancing migrates pages slowly and only when enabled; a memory-bound service usually needs explicit placement, not hope that the kernel will notice.",
+        "teaches": ["numa-locality", "affinity-policy"]
+      },
+      {
+        "id": "t727-c6",
+        "kind": "text",
+        "title": "Misconception: interleaving gives every thread fast, fair access",
+        "body": "Interleave spreads pages evenly across nodes, which means every access has a fixed chance of being remote: with two nodes, roughly half are remote all the time, for every thread. It is a good fit for bandwidth-hungry streaming that can use both nodes’ controllers, but for latency-bound random access it guarantees the average case instead of avoiding it.",
+        "teaches": ["affinity-policy"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t727-a1",
+        "concept": "numa-locality",
+        "type": "multiple_choice",
+        "prompt": "A core on socket 1 reads a page backed by DRAM attached to socket 0. Compared with a local read, the access is:",
+        "choices": [
+          { "id": "a", "label": "Slower, across a shared socket-to-socket link" },
+          { "id": "b", "label": "The same: the interconnect is transparent" },
+          { "id": "c", "label": "Slower only while the page is dirty" },
+          { "id": "d", "label": "Converted into a page fault on node 1" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Remote reads cross the interconnect between sockets, adding latency and sharing a narrower link than the local controller. It is still an ordinary memory access: no fault, no copy, and whether the page is dirty does not matter."
+      },
+      {
+        "id": "t727-a2",
+        "concept": "first-touch",
+        "type": "multiple_choice",
+        "prompt": "A service allocates its whole 60 GB cache from one startup thread on node 0, then runs the rest of its threads across all cores of a two-node box. What follows?",
+        "choices": [
+          { "id": "a", "label": "Pages migrate to whichever node reads them most" },
+          { "id": "b", "label": "Workers on node 1 pay remote access on nearly every lookup" },
+          { "id": "c", "label": "The allocator rebalances the pages across both nodes" },
+          { "id": "d", "label": "Locality stays fine because caches absorb the distance" }
+        ],
+        "correctChoiceIds": ["b"],
+        "explanation": "First touch placed all 60 GB on node 0, and nothing moves pages just because remote threads read them. Node 1 workers cross the interconnect per lookup; automatic balancing migrates slowly and only when enabled."
+      },
+      {
+        "id": "t727-a3",
+        "concept": "affinity-policy",
+        "type": "multiple_choice",
+        "prompt": "A latency-sensitive cache must keep all access local on a two-socket host. Which setup fits?",
+        "choices": [
+          { "id": "a", "label": "Interleave its pages evenly across both nodes" },
+          { "id": "b", "label": "Let threads float and trust automatic balancing" },
+          { "id": "c", "label": "Pin threads but leave memory on the default policy" },
+          { "id": "d", "label": "Bind each instance’s threads and memory to one node" }
+        ],
+        "correctChoiceIds": ["d"],
+        "explanation": "Guaranteed locality needs both halves: threads confined to the node’s cores and a memory policy that allocates there. Interleave deliberately spreads remote traffic, automatic balancing reacts late, and pinning threads alone does not move pages that were already placed."
+      },
+      {
+        "id": "t727-a4",
+        "concept": "numa-locality",
+        "type": "estimation",
+        "prompt": "Local DRAM access is 100 ns and remote is 200 ns. A worker does 20 million random lookups a second. If half its data sits on the remote node, how much extra stall accrues per second?",
+        "unit": "s",
+        "target": 1,
+        "assumptions": [
+          "Lookups are serial and stall on memory",
+          "Half of the 20 million accesses pay an extra 100 ns"
+        ],
+        "formula": "remote share × accesses × extra latency",
+        "workedAnswer": "10 million × 100 ns = 1,000 million ns = 1 s of extra stall each second.",
+        "explanation": "Design implication: the worker falls a full second behind every second, so it cannot keep up; splitting the data per node fixes it in a way more CPU cannot.",
+        "tolerance": 0.1,
+        "trapAnswers": [0.5, 2]
+      },
+      {
+        "id": "t727-a5",
+        "concept": "first-touch",
+        "type": "drag_order",
+        "prompt": "Order a NUMA-aware startup for a two-node batch job.",
+        "items": [
+          { "id": "s1", "label": "Bind each worker group to one node’s cores" },
+          { "id": "s3", "label": "Allocate and warm each group’s data from its local workers" },
+          { "id": "s2", "label": "Run the job so reads stay close to their data" },
+          { "id": "s4", "label": "Audit remote hits with numastat or numa_maps" }
+        ],
+        "correctOrder": ["s1", "s3", "s2", "s4"],
+        "explanation": "Affinity comes first, then allocation, because first touch fixes placement; only then does the workload run, and remote-hit counters confirm the placement held."
+      },
+      {
+        "id": "t727-a6",
+        "concept": "affinity-policy",
+        "type": "tradeoff",
+        "prompt": "A 120 GB in-memory search index outgrows one 96 GB NUMA node on a two-node box.",
+        "constraints": [
+          "Random lookups dominate; latency matters",
+          "Threads are spread across both sockets today",
+          "Splitting into a cluster is out of scope"
+        ],
+        "approaches": [
+          { "id": "a", "label": "Two shard processes, one pinned per node, behind a small router", "description": "Each half of the index lives with the threads that serve it." },
+          { "id": "b", "label": "One process with an interleaved memory policy", "description": "Spread pages evenly so no single node is the bottleneck." },
+          { "id": "c", "label": "One process with all memory bound to node 0", "description": "Force the index onto the first node and keep every read local to it." }
+        ],
+        "correctApproachId": "a",
+        "rationaleOptions": [
+          { "id": "r1", "label": "Each shard’s threads read only their own node’s memory" },
+          { "id": "r2", "label": "Routing is one cheap local step before a local read" },
+          { "id": "r3", "label": "Interleaving keeps every access equally fast" },
+          { "id": "r4", "label": "A node bind spills over when node 0 fills up" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "Interleaving makes a remote access a fixed share of every thread’s traffic, not a fast one.",
+          "r4": "A strict bind refuses to spill and fails allocation; a soft one still leaves most reads remote."
+        },
+        "explanation": "Sharding per node keeps every lookup local and adds only a routing step, while one process guarantees a large fixed share of remote accesses whether it interleaves or binds. Binding everything to node 0 is impossible anyway: 120 GB no longer fits on it."
+      }
+    ],
+    "flashcards": [
+      { "id": "t727-f1", "front": "What is a NUMA node?", "back": "A set of cores with directly attached memory; other nodes are reachable but slower to access." },
+      { "id": "t727-f2", "front": "What is first-touch allocation?", "back": "A page is placed on the node of the thread that first writes to it." },
+      { "id": "t727-f3", "front": "Which two affinities must agree?", "back": "Where threads run (CPU binding) and where pages are allocated (memory policy)." }
+    ],
+    "deep": {
+      "teaches": ["numa-locality", "first-touch", "affinity-policy"],
+      "mechanism": {
+        "title": "How memory locality is decided and lost",
+        "steps": [
+          "Each socket or die connects to its own DRAM controllers. The machine presents one address space, but access time depends on the path: the local controller for nearby pages, the socket interconnect for remote ones.",
+          "The kernel numbers the NUMA nodes and exposes the distances between them. A remote hop typically costs around 1.5–2× a local access, and every cross-socket transfer shares the interconnect link.",
+          "The default policy is local allocation at first touch: whichever thread faults a page in first gets it on its own node. Nothing re-checks placement when that thread is later scheduled somewhere else.",
+          "Threads and pages are steered by separate knobs. sched_setaffinity chooses the allowed cores; set_mempolicy and mbind choose nodes for new allocations, with modes for bind, preferred and interleave.",
+          "Automatic NUMA balancing can migrate hot pages towards their readers, but it works by sampling faults over minutes. Latency-tight services usually pin explicitly and confirm placement in /proc/pid/numa_maps.",
+          "The same physics appear inside large single sockets split into sub-NUMA clusters, and inside virtual machines whose virtual topology may not match the host’s real one."
+        ]
+      },
+      "useWhen": [
+        "Pin threads and memory per node for latency-bound services whose working set fits inside one node.",
+        "Interleave when sequential, bandwidth-hungry work needs more memory controllers than one node has."
+      ],
+      "avoidWhen": [
+        "Avoid letting one startup thread allocate data that threads on every node will read at random.",
+        "Avoid a strict node bind when the working set could outgrow the node’s free memory; it fails rather than spilling."
+      ],
+      "tradeoffs": {
+        "columns": ["Policy", "Where pages land", "Good fit", "Cost"],
+        "rows": [
+          ["Local at first touch", "Node of the first writer", "Workloads already split per node", "Bad placement if the wrong thread allocates"],
+          ["Interleave", "Round-robin across nodes", "Streaming over shared data", "A guaranteed remote share on each access"],
+          ["Strict bind", "Only the named nodes", "Latency-critical services that fit", "Allocation fails instead of spilling remote"]
+        ]
+      },
+      "numbers": {
+        "title": "What remote access costs a lookup-heavy worker",
+        "assumptions": [
+          "A worker makes 30 million lookups a second",
+          "Local access is 90 ns and remote is 170 ns (illustrative)",
+          "Half the working set sits on the remote node"
+        ],
+        "steps": [
+          "All-local would cost 30 million × 90 ns = 2.7 s of memory stall per second.",
+          "With half remote: 15 million × 90 ns plus 15 million × 170 ns = 1.35 + 2.55 = 3.9 s.",
+          "The remote share alone adds 1.2 s of stall each second: more than one whole core’s worth."
+        ],
+        "result": "Moving the data, not adding cores, is what buys back the lost second of capacity."
+      },
+      "india": {
+        "title": "One socket can hide several nodes",
+        "label": "Public documentation",
+        "body": "Processor vendors document sub-NUMA clustering modes that split a single package into several NUMA nodes, each with its own memory controllers and cache slice, precisely so the kernel can schedule against locality. Vendor and kernel guidance treats each cluster like a separate node, which is why even a one-socket database host can benefit from per-node pinning and memory policy."
+      },
+      "pitfalls": [
+        {
+          "trap": "“We added a second socket and it got slower.”",
+          "say": "“Threads probably spread across nodes while the data stayed on one; I would check numa_maps before blaming the upgrade.”"
+        },
+        {
+          "trap": "“The kernel will migrate the pages for us.”",
+          "say": "“Automatic balancing reacts over minutes and only when enabled; explicit pinning is the reliable fix.”"
+        }
+      ],
+      "takeaways": [
+        "Memory has a home node; remote access costs roughly 1.5–2× local latency.",
+        "First touch fixes placement; thread migration does not move pages.",
+        "Pin CPU and memory together, then verify with numastat or numa_maps.",
+        "Interleave spreads the pain evenly; choose it for bandwidth, not for latency."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Why did the upgrade raise latency?",
+      "prompt": "A cache moves from one 32-core socket to two 32-core sockets. Threads double, p50 latency is flat, but p99 memory latency nearly doubles at the same load.",
+      "choices": [
+        { "id": "a", "label": "Half the reads now cross to the remote node", "feedback": "Right: the working set still lives near the old socket while threads run on both." },
+        { "id": "b", "label": "The new cores run at a lower clock speed", "feedback": "A frequency change would move p50 as well, and clocks are easy to check; placement is the hidden one." },
+        { "id": "c", "label": "The second socket evicts the first’s cache", "feedback": "Sockets do not evict each other’s caches; this is distance, not capacity." }
+      ],
+      "correctId": "a",
+      "reveal": "More sockets mean more memory controllers, but data still lives in one place. Check numa_maps and remote-hit counters before trusting a bigger box to be faster."
+    },
+    "seeAlso": [
+      { "topicId": 3, "why": "Vertical scaling eventually meets NUMA; this is the wall it hits" },
+      { "topicId": 30, "why": "Pinning a shard per node is partitioning applied inside one machine" },
+      { "topicId": 563, "why": "Remote reads ride the same coherence fabric the cache lesson describes" }
+    ],
+    "sources": [
+      { "title": "Linux man-pages: numa(7)", "url": "https://man7.org/linux/man-pages/man7/numa.7.html" },
+      { "title": "Linux man-pages: numactl(8)", "url": "https://man7.org/linux/man-pages/man8/numactl.8.html" },
+      { "title": "Linux man-pages: sched_setaffinity(2)", "url": "https://man7.org/linux/man-pages/man2/sched_setaffinity.2.html" },
+      { "title": "Kernel documentation: NUMA memory policy", "url": "https://docs.kernel.org/admin-guide/mm/numa_memory_policy.html" }
+    ]
+  },
+  {
+    "id": 728,
+    "slug": "io-uring-submission-and-completion",
+    "region": "f5-os",
+    "order": 33,
+    "title": "io_uring: Submissions In, Completions Out",
+    "kind": "lesson",
+    "objectives": [
+      "Contrast readiness notification with completion-based I/O",
+      "Describe the submission and completion rings and what batching saves",
+      "Judge when io_uring beats epoll and what it costs"
+    ],
+    "difficulty": 4,
+    "durationMinutes": 13,
+    "prereqIds": [285, 284],
+    "cards": [
+      {
+        "id": "t728-c1",
+        "kind": "text",
+        "title": "Readiness says try now; completion says it is done",
+        "body": "epoll answers a question: which sockets can I touch without blocking? The program still issues each read or write itself, one system call per operation. io_uring works the other way round: the program describes the whole operation in advance, the kernel performs it asynchronously, and a completion event arrives when it finishes. The program stops asking “may I?” and starts saying “do this”.",
+        "teaches": ["completion-model"]
+      },
+      {
+        "id": "t728-c2",
+        "kind": "text",
+        "title": "Two shared rings replace per-call handshakes",
+        "body": "io_uring_setup creates two ring buffers mapped into the process. The program writes submission entries describing each operation onto the submission ring and rings the doorbell once with io_uring_enter; the kernel does the work and writes completion entries onto the completion ring. Because both sides share the memory, a batch of operations crosses the user-kernel boundary with a single call instead of one per operation.",
+        "teaches": ["ring-queues"]
+      },
+      {
+        "id": "t728-c3",
+        "kind": "diagram",
+        "title": "Worked example: forty reads for two system calls",
+        "body": "What a batched io_uring round trip looks like.",
+        "teaches": ["ring-queues", "batching-registration"],
+        "steps": [
+          "The program fills forty submission entries: read this file offset into that buffer",
+          "One io_uring_enter submits the batch and waits for completions",
+          "The kernel runs the reads concurrently, in whatever order finishes first",
+          "Completion entries appear on the completion ring with each result or error",
+          "The program drains them and matches each to its request by a user tag"
+        ]
+      },
+      {
+        "id": "t728-c4",
+        "kind": "text",
+        "title": "Trap: submissions run concurrently, so order is not promised",
+        "body": "Entries are attempted in ring order but complete in any order, and two overlapping writes to the same file can interleave. Protocols needing strict ordering can chain entries with the link flag, and every request should carry a user tag so completions can be matched back. Treating the completion ring as an in-order queue silently corrupts protocols that assumed it.",
+        "teaches": ["ring-queues"]
+      },
+      {
+        "id": "t728-c5",
+        "kind": "text",
+        "title": "Misconception: io_uring makes the storage device faster",
+        "body": "It removes per-operation overhead: system calls, buffer pinning, file-table lookups. If requests are already few, or dominated by device and network latency, the win is small. It shines where the interface itself is the cost: high operation rates, many connections, small reads and writes, and workloads that can batch submissions.",
+        "teaches": ["completion-model"]
+      },
+      {
+        "id": "t728-c6",
+        "kind": "text",
+        "title": "Pre-registration moves fixed costs out of the loop",
+        "body": "File descriptors and buffers can be registered once, so each operation skips the reference counting and page pinning it would otherwise redo. Polling modes go further: a kernel thread can watch the submission ring, removing even the enter call, at the price of a busy CPU. These knobs target the extremes, such as a drive serving hundreds of thousands of operations a second.",
+        "teaches": ["batching-registration"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t728-a1",
+        "concept": "completion-model",
+        "type": "multiple_choice",
+        "prompt": "epoll reports a socket readable. What is still left for the program to do?",
+        "choices": [
+          { "id": "a", "label": "Make the read call itself and copy out the data" },
+          { "id": "b", "label": "Nothing: the data has already been delivered" },
+          { "id": "c", "label": "Wait for a matching completion entry" },
+          { "id": "d", "label": "Re-arm the socket with a one-shot flag" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Readiness only says the call will not block; the program still performs the I/O, paying a system call per operation. Delivery-already-done is the io_uring model, and completion entries do not exist on the epoll path."
+      },
+      {
+        "id": "t728-a2",
+        "concept": "ring-queues",
+        "type": "multiple_choice",
+        "prompt": "A program submits thirty requests on one ring, and the first completion carries tag 29. What happened?",
+        "choices": [
+          { "id": "a", "label": "The kernel dropped requests 1 to 28" },
+          { "id": "b", "label": "A bug: completions must follow submission order" },
+          { "id": "c", "label": "The ring wrapped around and restarted" },
+          { "id": "d", "label": "Request 29 simply finished first; order is not promised" }
+        ],
+        "correctChoiceIds": ["d"],
+        "explanation": "Submissions are attempted in order but executed concurrently, so completions arrive in completion order, which is arbitrary. The user tag on each request is what ties a completion back to its submission."
+      },
+      {
+        "id": "t728-a3",
+        "concept": "batching-registration",
+        "type": "multiple_choice",
+        "prompt": "Which io_uring feature removes the system call used to submit new work?",
+        "choices": [
+          { "id": "a", "label": "A kernel thread polling the submission ring" },
+          { "id": "b", "label": "Registering buffers ahead of time" },
+          { "id": "c", "label": "Larger submission ring entries" },
+          { "id": "d", "label": "Chained submission entries" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Submission-queue polling keeps a kernel thread watching the ring, so new entries are picked up without an io_uring_enter call. Buffer registration removes per-operation mapping work, and chaining only enforces order; neither removes the doorbell."
+      },
+      {
+        "id": "t728-a4",
+        "concept": "batching-registration",
+        "type": "estimation",
+        "prompt": "A service performs 60,000 file reads a second, one system call each. After switching to batches of 30 submissions per call, how many submission calls happen per second?",
+        "unit": "calls/s",
+        "target": 2000,
+        "assumptions": [
+          "Every read is one submission entry",
+          "Reads still complete asynchronously"
+        ],
+        "formula": "reads ÷ batch size",
+        "workedAnswer": "60,000 ÷ 30 = 2,000 submission calls a second.",
+        "explanation": "Design implication: the doorbell cost drops by the batch factor, which is why high-rate storage servers gain so much; completions still arrive one per request.",
+        "tolerance": 0.05,
+        "trapAnswers": [60000, 300]
+      },
+      {
+        "id": "t728-a5",
+        "concept": "ring-queues",
+        "type": "drag_order",
+        "prompt": "Order one batched io_uring round trip.",
+        "items": [
+          { "id": "s1", "label": "Write request entries onto the submission ring" },
+          { "id": "s2", "label": "Notify the kernel with io_uring_enter" },
+          { "id": "s4", "label": "The kernel performs the operations and posts completions" },
+          { "id": "s3", "label": "The program reads completions and matches them by tag" }
+        ],
+        "correctOrder": ["s1", "s2", "s4", "s3"],
+        "explanation": "Requests go onto the submission ring, one call delivers them, the kernel does the work and posts results, and the program pairs each completion with its request."
+      },
+      {
+        "id": "t728-a6",
+        "concept": "completion-model",
+        "type": "tradeoff",
+        "prompt": "A static-file server saturates its CPU serving 400,000 small file reads a second across many connections.",
+        "constraints": [
+          "Per-call overhead dominates the CPU profile",
+          "A Linux-only interface is acceptable",
+          "Each file’s device latency is already minimal"
+        ],
+        "approaches": [
+          { "id": "a", "label": "io_uring with batched submissions and registered buffers", "description": "Describe each read once, submit in batches, and pre-register the buffers." },
+          { "id": "b", "label": "epoll plus one read call per request", "description": "Keep the readiness loop and accept a system call for every operation." },
+          { "id": "c", "label": "A larger pool of blocking worker threads", "description": "Add threads so more blocking reads can run side by side." }
+        ],
+        "correctApproachId": "a",
+        "rationaleOptions": [
+          { "id": "r1", "label": "Batched rings remove most per-operation calls" },
+          { "id": "r2", "label": "Registered buffers skip the pinning each operation repeats" },
+          { "id": "r3", "label": "More threads remove system-call overhead too" },
+          { "id": "r4", "label": "epoll performs the reads on the program’s behalf" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "Threads still pay one call per operation; they change who pays, not how much.",
+          "r4": "epoll only reports readiness; the program still makes every read call."
+        },
+        "explanation": "The profile says crossing the boundary is the cost, so shrinking calls per operation and per-buffer pinning is the direct fix, and io_uring does both. A readiness loop keeps one read call per request, and extra threads multiply the same per-call cost instead of removing it."
+      }
+    ],
+    "flashcards": [
+      { "id": "t728-f1", "front": "Readiness vs completion models?", "back": "Readiness asks which sockets are safe to touch; completion delivers the finished result of a described operation." },
+      { "id": "t728-f2", "front": "What are the two io_uring rings?", "back": "A submission ring the program fills with requests, and a completion ring the kernel fills with results." },
+      { "id": "t728-f3", "front": "What does buffer registration save?", "back": "The repeated pinning and lookup work that each operation would otherwise redo." }
+    ],
+    "deep": {
+      "teaches": ["completion-model", "ring-queues", "batching-registration"],
+      "mechanism": {
+        "title": "How a request travels the rings",
+        "steps": [
+          "io_uring_setup creates a submission queue and a completion queue as ring buffers shared between user space and the kernel. No data is copied in either direction: both sides read and write the same memory.",
+          "The program writes one submission entry per operation: an opcode such as read, write, accept or fsync, plus the target, the buffer and a user tag. Many entries can be queued before the kernel is told about any of them.",
+          "io_uring_enter is the doorbell: it submits the queued entries and can also wait for a minimum number of completions. With submission-queue polling, a kernel thread watches the ring instead and the call can be skipped entirely.",
+          "The kernel executes entries concurrently. Ordering is not guaranteed unless entries are chained, and each finished operation appends a completion entry carrying its result and the tag it was submitted with.",
+          "The program drains the completion ring, matches tags to its table of in-flight requests, and recycles the slots. Errors arrive as negative values inside the completion entry rather than through errno.",
+          "Fixed files and registered buffers front-load the per-operation work: descriptor lookup and page pinning happen once at registration, so the hot loop becomes nothing but ring traffic."
+        ]
+      },
+      "useWhen": [
+        "High operation rates where system calls dominate: small I/O, many connections, fast storage.",
+        "Workloads that can batch submissions or keep many operations in flight at once."
+      ],
+      "avoidWhen": [
+        "A handful of calls per second, or workloads bound on device latency, gain little.",
+        "Portable code, or teams without capacity for the sharper API surface; epoll remains the safe default."
+      ],
+      "tradeoffs": {
+        "columns": ["Aspect", "epoll readiness", "io_uring completion"],
+        "rows": [
+          ["Calls per operation", "At least one: the I/O itself", "A fraction of one when batched or polled"],
+          ["Who does the work", "Kernel says when; the app does it", "App describes it; the kernel does it"],
+          ["Ordering", "Implicit: each call is explicit", "Unordered; chaining or tags enforce it"],
+          ["Portability", "Linux, with poll and kqueue cousins", "Linux only, on recent kernels"]
+        ]
+      },
+      "numbers": {
+        "title": "Boundary crossings saved by batching and polling",
+        "assumptions": [
+          "500,000 read operations a second",
+          "Readiness model: one extra call per operation plus occasional waits",
+          "Ring model: batches of 50 submissions per call"
+        ],
+        "steps": [
+          "Readiness path: 500,000 read calls plus about 10,000 wait calls ≈ 510,000 crossings a second.",
+          "Ring path: 500,000 ÷ 50 = 10,000 submission calls a second, or none while the poll thread runs.",
+          "At roughly 1 µs per crossing, that is about 0.5 s of CPU saved per second: half a core."
+        ],
+        "result": "The rings do not speed the device; they cut the per-operation tax that high-rate servers pay most."
+      },
+      "india": {
+        "title": "Adopted where operation rate is the bottleneck",
+        "label": "Public documentation",
+        "body": "The io_uring manual page and its published design notes centre on the same workloads: fast drives delivering hundreds of thousands of operations a second, and proxies holding many connections. Storage and database projects have documented io_uring backends for exactly this reason, while keeping a readiness-based path as the portable default elsewhere."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Completions come back in order, so I can just pop them.”",
+          "say": "“They complete in any order; I match each one by its user tag.”"
+        },
+        {
+          "trap": "“io_uring is faster, so we should rewrite the server.”",
+          "say": "“Only if per-call overhead shows up in profiles; for most servers epoll is plenty.”"
+        }
+      ],
+      "takeaways": [
+        "epoll reports readiness; io_uring delivers completions for described operations.",
+        "Shared rings turn a batch of operations into roughly one boundary crossing.",
+        "Completions are unordered; tag every request and chain the ones that must serialise.",
+        "Registration and polling shave fixed costs that only matter at high rates."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The rewrite that gained nothing",
+      "prompt": "A chat server holding 200,000 mostly idle connections is moved from epoll to io_uring. Throughput and latency barely change. What was the real bottleneck all along?",
+      "choices": [
+        { "id": "a", "label": "Idle-connection memory and rare wake-ups, not per-call cost", "feedback": "Right: io_uring cuts per-operation cost, and this server had almost no operations a second." },
+        { "id": "b", "label": "An old kernel silently ignoring the rings", "feedback": "Setup would fail loudly on an old kernel, not run slowly in silence." },
+        { "id": "c", "label": "Too few ring slots for the connection count", "feedback": "Ring size bounds in-flight work; idle connections submit nothing to queue." }
+      ],
+      "correctId": "a",
+      "reveal": "Measure the boundary first: io_uring shines when system calls dominate. A mostly idle fan-out workload pays almost none."
+    },
+    "seeAlso": [
+      { "topicId": 36, "why": "The two rings are queues between user and kernel, the same shape as a broker" },
+      { "topicId": 570, "why": "Registered buffers are the zero-copy idea applied to the call path" },
+      { "topicId": 285, "why": "The readiness model this interface was built to replace" }
+    ],
+    "sources": [
+      { "title": "Linux man-pages: io_uring(7)", "url": "https://man7.org/linux/man-pages/man7/io_uring.7.html" },
+      { "title": "Linux man-pages: io_uring_setup(2)", "url": "https://man7.org/linux/man-pages/man2/io_uring_setup.2.html" },
+      { "title": "Linux man-pages: epoll(7)", "url": "https://man7.org/linux/man-pages/man7/epoll.7.html" }
+    ]
+  },
+  {
+    "id": 729,
+    "slug": "read-copy-update",
+    "region": "f5-os",
+    "order": 34,
+    "title": "Read-Copy-Update: Readers That Never Wait",
+    "kind": "lesson",
+    "objectives": [
+      "Explain how RCU lets readers run without locking",
+      "Order a safe update: publish, grace period, then reclaim",
+      "Choose RCU only where reads massively outnumber writes"
+    ],
+    "difficulty": 4,
+    "durationMinutes": 13,
+    "prereqIds": [286, 641],
+    "cards": [
+      {
+        "id": "t729-c1",
+        "kind": "text",
+        "title": "Readers outnumber writers but still pay for them",
+        "body": "Many shared structures are read on every request and changed rarely: routing tables, config snapshots, feature flags, kernel lookup caches. A read-write lock makes every reader touch shared lock state, costing cache-line traffic on every lookup even with no writer in sight. RCU asks a different question: what if readers did almost nothing, and the writer worked around them instead?",
+        "teaches": ["read-mostly"]
+      },
+      {
+        "id": "t729-c2",
+        "kind": "text",
+        "title": "Publish a new version beside the old one",
+        "body": "A writer never edits the structure readers see. It copies it, changes the copy, then swaps a single pointer so new readers find the new version. Readers already inside keep following the old copy, so every reader sees one whole version, never a half-written mix. The swap is one ordered pointer write; making the copy is where the cost went.",
+        "teaches": ["rcu-publish"]
+      },
+      {
+        "id": "t729-c3",
+        "kind": "diagram",
+        "title": "Worked example: swapping a feature-flag table",
+        "body": "One update under RCU, end to end.",
+        "teaches": ["rcu-publish", "grace-period"],
+        "steps": [
+          "The writer copies the current table and sets the new flag on the copy",
+          "One ordered store points the shared reference at the new table",
+          "New lookups see the new table; lookups already running finish on the old",
+          "The writer waits out a grace period: every in-flight reader must finish",
+          "Only then is the old table freed"
+        ]
+      },
+      {
+        "id": "t729-c4",
+        "kind": "text",
+        "title": "The grace period is how you learn readers finished",
+        "body": "After the swap, some readers may still hold the previous version. Reclaim must wait for a grace period: a span after which every thread that could hold the old pointer has provably left its read-side section. In the classic kernel design those sections cannot sleep, so a context switch on every CPU proves they all ended. synchronize_rcu blocks for it; call_rcu defers the free to a callback.",
+        "teaches": ["grace-period"]
+      },
+      {
+        "id": "t729-c5",
+        "kind": "text",
+        "title": "Trap: freeing the old copy the moment the pointer swaps",
+        "body": "The swap does not move existing readers: a thread that fetched the old pointer a microsecond earlier is still inside the old structure. Freeing at once is a use-after-free that appears only under load, when a reader lands between the swap and the free. Deferred reclaim, by waiting or by callback, is not optional machinery; it is what makes lock-free reads safe.",
+        "teaches": ["grace-period"]
+      },
+      {
+        "id": "t729-c6",
+        "kind": "text",
+        "title": "Misconception: RCU removes synchronisation for everyone",
+        "body": "RCU frees readers, not writers. Two writers updating the same structure still need a lock or a single-writer rule between themselves, and each update pays for a copy plus a grace period. It is a trade: nearly free reads bought with slower, more complex writes, which is why it fits data updated far less often than it is read.",
+        "teaches": ["read-mostly", "rcu-publish"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t729-a1",
+        "concept": "rcu-publish",
+        "type": "multiple_choice",
+        "prompt": "What does a reader do to look at an RCU-protected table?",
+        "choices": [
+          { "id": "a", "label": "Fetch the current pointer and read through it" },
+          { "id": "b", "label": "Take the table’s shared read lock first" },
+          { "id": "c", "label": "Increment a counter the writer watches" },
+          { "id": "d", "label": "Wait for any grace period in progress" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "That is the point of the design: readers just follow the pointer, so a lookup costs about the same as an unsynchronised read. The writer carries all the machinery: copying, publishing and deferring reclaim."
+      },
+      {
+        "id": "t729-a2",
+        "concept": "grace-period",
+        "type": "multiple_choice",
+        "prompt": "The shared pointer has just been swapped to a new version. When may the old version be freed?",
+        "choices": [
+          { "id": "a", "label": "At once: no new reader can reach it" },
+          { "id": "b", "label": "When its reference count reaches zero" },
+          { "id": "c", "label": "After a grace period covering earlier readers" },
+          { "id": "d", "label": "On the next scheduled collection cycle" }
+        ],
+        "correctChoiceIds": ["c"],
+        "explanation": "New readers cannot find the old copy, but readers that fetched the pointer just before the swap may still hold it. The grace period exists precisely to cover those stragglers before reclaim."
+      },
+      {
+        "id": "t729-a3",
+        "concept": "read-mostly",
+        "type": "multiple_choice",
+        "prompt": "Two writers want to update an RCU-protected structure at the same time. What keeps them apart?",
+        "choices": [
+          { "id": "a", "label": "Nothing: writers are as free as readers" },
+          { "id": "b", "label": "RCU itself rejects the second update" },
+          { "id": "c", "label": "The grace period serialises the writers" },
+          { "id": "d", "label": "A lock or single-writer rule between them" }
+        ],
+        "correctChoiceIds": ["d"],
+        "explanation": "RCU only guarantees that readers see one coherent version. Writers must still serialise among themselves, because two concurrent copy-modify-publish cycles would each lose the other’s update."
+      },
+      {
+        "id": "t729-a4",
+        "concept": "rcu-publish",
+        "type": "drag_order",
+        "prompt": "Order a safe RCU update.",
+        "items": [
+          { "id": "s1", "label": "Copy the structure and modify the copy" },
+          { "id": "s3", "label": "Swap the shared pointer to the new copy" },
+          { "id": "s2", "label": "Wait out a grace period for in-flight readers" },
+          { "id": "s4", "label": "Reclaim the old copy" }
+        ],
+        "correctOrder": ["s1", "s3", "s2", "s4"],
+        "explanation": "Publish first, then wait for everyone who could still hold the old pointer, and only then free it."
+      },
+      {
+        "id": "t729-a5",
+        "concept": "read-mostly",
+        "type": "estimation",
+        "prompt": "A read-side lock touch costs 20 ns even uncontended. A router performs 80 million lookups a second. Roughly how much CPU per second would lock-free readers free?",
+        "unit": "cores",
+        "target": 1.6,
+        "assumptions": [
+          "Every lookup touches lock state once",
+          "The RCU read side costs about nothing"
+        ],
+        "formula": "lookups × lock cost ÷ 1 s",
+        "workedAnswer": "80,000,000 × 20 ns = 1,600,000,000 ns ≈ 1.6 s of CPU a second, about 1.6 cores.",
+        "explanation": "Design implication: nearly two cores exist only to take and release a lock; on a forwarding path that is real capacity, which is why it favours lock-free reads.",
+        "tolerance": 0.1,
+        "trapAnswers": [0.16, 16]
+      },
+      {
+        "id": "t729-a6",
+        "concept": "read-mostly",
+        "type": "tradeoff",
+        "prompt": "A service reads a 50,000-entry routing table on every request, and an operator updates it about once a minute.",
+        "constraints": [
+          "Lookups must stay constant-time and cheap",
+          "Updates are rare but must be visible quickly",
+          "A torn table would misroute requests"
+        ],
+        "approaches": [
+          { "id": "a", "label": "Copy-on-publish with deferred reclaim", "description": "Build each update beside the live table, swap the pointer, free the old copy later." },
+          { "id": "b", "label": "A read-write lock around the table", "description": "Readers share a lock; the writer takes it exclusively for each update." },
+          { "id": "c", "label": "One mutex around the table", "description": "Serialise every reader and writer behind a single lock." }
+        ],
+        "correctApproachId": "a",
+        "rationaleOptions": [
+          { "id": "r1", "label": "Readers pay nothing while updates still arrive whole" },
+          { "id": "r2", "label": "A once-a-minute copy is cheap to build and free" },
+          { "id": "r3", "label": "RCU lets writers skip serialising as well" },
+          { "id": "r4", "label": "An uncontended read lock costs nothing anyway" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "Writers still serialise among themselves; RCU frees only the read side.",
+          "r4": "Even an uncontended lock costs shared-cache-line traffic on every one of millions of lookups."
+        },
+        "explanation": "Reads dominate by orders of magnitude, so moving all cost onto the rare writer wins: readers follow a pointer, updates publish whole copies, and deferred reclaim covers stragglers. A mutex serialises readers needlessly, a read-write lock still makes every reader touch shared state, and writers need their own rule either way."
+      }
+    ],
+    "flashcards": [
+      { "id": "t729-f1", "front": "What does RCU stand for and mean?", "back": "Read-Copy-Update: publish a modified copy and let existing readers finish on the old one." },
+      { "id": "t729-f2", "front": "What is a grace period?", "back": "A wait long enough to prove that every reader who could hold the old version has finished." },
+      { "id": "t729-f3", "front": "Do RCU writers need a lock?", "back": "Yes: RCU frees readers; writers still serialise among themselves." }
+    ],
+    "deep": {
+      "teaches": ["rcu-publish", "grace-period", "read-mostly"],
+      "mechanism": {
+        "title": "How publish, grace and reclaim fit together",
+        "steps": [
+          "The shared structure is reachable through one pointer. Readers fetch it and traverse freely; they never write to shared lock state, so their cost is indistinguishable from an unsynchronised read.",
+          "To update, the writer copies the structure, modifies the copy privately, then publishes it with a single ordered pointer store. Readers get the old pointer or the new one whole, never a torn mix.",
+          "Publication splits the reader population in two. Readers that fetched before the swap keep the old copy; new fetches get the new one. Both groups see a complete version.",
+          "The writer cannot reclaim yet: pre-swap readers still hold the old pointer. It waits for a grace period, the interval after which every such reader has provably left its read-side section.",
+          "Grace periods are detected cheaply. In the classic kernel design read-side sections cannot sleep, so once every CPU has context-switched, all earlier sections are known closed; user-space variants track per-thread quiescent states instead.",
+          "Reclaim runs after the grace period: synchronously via a blocking call, or handed to a callback so the writer does not stall. Memory overhead stays bounded to the extra copy plus in-flight deferred frees."
+        ]
+      },
+      "useWhen": [
+        "Data read constantly and changed rarely: routing tables, config snapshots, lookup caches.",
+        "Read paths where even an uncontended lock’s cache traffic shows up in profiles."
+      ],
+      "avoidWhen": [
+        "Frequently updated structures: copies and grace periods make writes slower and memory peaky.",
+        "Read sections that might block or hold long-term references without adding reference counting."
+      ],
+      "tradeoffs": {
+        "columns": ["Scheme", "Reader cost", "Writer cost", "What readers may see"],
+        "rows": [
+          ["Mutex", "One lock operation each", "One lock operation", "Nothing stale while holding it"],
+          ["Read-write lock", "A shared-state write each", "Excluded until readers drain", "Nothing stale while holding it"],
+          ["RCU", "Almost nothing", "A copy plus a grace period", "One version behind, briefly"]
+        ]
+      },
+      "numbers": {
+        "title": "Lock traffic on a read-mostly table",
+        "assumptions": [
+          "60 million lookups a second",
+          "Each read-side lock touch costs about 15 ns of cache and fence work",
+          "One table update per minute"
+        ],
+        "steps": [
+          "Lock path: 60 million × 15 ns ≈ 0.9 s of CPU each second spent touching lock state.",
+          "RCU path: readers pay about zero; the writer copies a 4 MB table once a minute, trivial next to the reads.",
+          "The update still pays a full copy plus one grace period, typically milliseconds to tens of milliseconds."
+        ],
+        "result": "For read-heavy structures the expensive part is the lock, not the data; RCU moves the cost to the rare writer."
+      },
+      "india": {
+        "title": "RCU protects the kernel’s own hottest lookups",
+        "label": "Official documentation",
+        "body": "The kernel’s RCU documentation describes the mechanism guarding some of the busiest read paths in Linux: the directory-entry cache consulted on every file open, packet-routing and filtering tables hit per packet, and the task structures walked by monitoring tools. These are textbook read-mostly structures, which is why readers there run with essentially no synchronisation at all."
+      },
+      "pitfalls": [
+        {
+          "trap": "“The pointer is swapped, so the old copy can go.”",
+          "say": "“A reader that fetched it earlier can still be inside; I reclaim only after a grace period.”"
+        },
+        {
+          "trap": "“RCU means no locking anywhere.”",
+          "say": "“Readers run free; my writers still serialise and still pay for a copy each time.”"
+        }
+      ],
+      "takeaways": [
+        "RCU makes reads nearly free by moving all synchronisation cost to writers.",
+        "Publish a new copy with one pointer swap; never edit the version readers see.",
+        "Reclaim only after a grace period; freeing early is a use-after-free.",
+        "Fit it where reads dominate; writers still lock and still copy."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "The crash that only appears under load",
+      "prompt": "A developer swaps the shared config pointer and frees the old table in the same function. Tests pass; in production the process crashes about once an hour at peak.",
+      "choices": [
+        { "id": "a", "label": "A reader fetched the old pointer just before the swap", "feedback": "Right: it is still inside the freed table. The grace period exists for exactly this gap." },
+        { "id": "b", "label": "Two writers swapped the pointer at once", "feedback": "Writers do need their own rule, but here a single writer runs; the freed old copy is the suspect." },
+        { "id": "c", "label": "The new table was built corrupted", "feedback": "Corruption would fail deterministically, not once an hour under concurrency." }
+      ],
+      "correctId": "a",
+      "reveal": "Publication does not move existing readers. Defer freeing until every reader that could hold the old pointer is done, whether by waiting or by callback."
+    },
+    "seeAlso": [
+      { "topicId": 72, "why": "RCU is the extreme end of optimistic concurrency for the read side" },
+      { "topicId": 34, "why": "Readers on an old copy are a single-node taste of consistency models" },
+      { "topicId": 641, "why": "The read-write lock this technique most often replaces" }
+    ],
+    "sources": [
+      { "title": "Kernel documentation: What is RCU?", "url": "https://docs.kernel.org/RCU/whatisRCU.html" },
+      { "title": "Kernel documentation: RCU index", "url": "https://docs.kernel.org/RCU/index.html" },
+      { "title": "Kernel documentation: review checklist for RCU", "url": "https://docs.kernel.org/RCU/checklist.html" }
+    ]
+  },
+  {
+    "id": 730,
+    "slug": "work-stealing-schedulers",
+    "region": "f5-os",
+    "order": 35,
+    "title": "Work Stealing: Idle Workers Pull Tasks",
+    "kind": "lesson",
+    "objectives": [
+      "Describe per-worker deques and which end each side uses",
+      "Explain why stealing balances divide-and-conquer work",
+      "Judge when stealing helps and when task size defeats it"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 12,
+    "prereqIds": [282, 644],
+    "cards": [
+      {
+        "id": "t730-c1",
+        "kind": "text",
+        "title": "Fixed chunks strand idle cores; one queue serialises",
+        "body": "Split a job into fixed chunks, one per worker, and the finish time is the slowest worker’s chunk: uneven tasks and uneven machines guarantee stragglers. Feed everyone from a single shared queue and balance comes naturally, but every take is a contended lock operation and the queue becomes the hot spot. Work stealing splits the difference: work lives near its owner, and idle workers come and take it.",
+        "teaches": ["local-deques"]
+      },
+      {
+        "id": "t730-c2",
+        "kind": "text",
+        "title": "Each worker owns a deque; thieves take the far end",
+        "body": "Every worker keeps a double-ended queue of runnable tasks. The owner pushes new sub-tasks and pops them from the tail, which stays hot in its own cache and is uncontended most of the time. A worker that finds its deque empty becomes a thief and pops from the head of a victim’s deque: the oldest, usually largest, least-cached task. Owner and thief rarely touch the same end, so steals stay cheap.",
+        "teaches": ["local-deques", "steal-balance"]
+      },
+      {
+        "id": "t730-c3",
+        "kind": "diagram",
+        "title": "Worked example: a divide-and-conquer job on four workers",
+        "body": "How stealing spreads a splitting task across a pool.",
+        "teaches": ["steal-balance"],
+        "steps": [
+          "Worker 1 splits the job and pushes the halves it will not run onto its tail",
+          "Workers 2 to 4, idle, each steal one half from its head",
+          "Every worker keeps splitting and pushing; thieves keep taking whole sub-trees",
+          "A worker with an empty deque steals again instead of sleeping",
+          "The job ends when every deque is drained: finish tracks total work, not the largest chunk"
+        ]
+      },
+      {
+        "id": "t730-c4",
+        "kind": "text",
+        "title": "Trap: stealing cannot rescue tasks that are too small",
+        "body": "A steal is a contested atomic operation plus a cold trip through another core’s cache. If tasks average a few microseconds, the steal can cost more than the task it moves, and splitting finer makes it worse. Recursive pools need a granularity floor: split until pieces are big enough that moving them is worth it, then run them in place.",
+        "teaches": ["task-granularity"]
+      },
+      {
+        "id": "t730-c5",
+        "kind": "text",
+        "title": "Misconception: work stealing balances priorities too",
+        "body": "Stealing balances occupancy: any idle worker grabs the next available task. It knows nothing about deadlines, importance or latency. Urgent interactive tasks behind a stolen batch still wait, and one un-splittable long task still straggles at the end. It answers “is every core busy?”, not “is the right work running?”.",
+        "teaches": ["steal-balance"]
+      },
+      {
+        "id": "t730-c6",
+        "kind": "text",
+        "title": "The same pull pattern appears at every scale",
+        "body": "Fork/join frameworks use it for recursive CPU work; async runtimes use it to balance lightweight tasks between carrier threads; parallel batch engines use it to even out partitions; and cluster schedulers apply the same pull-on-idle idea when moving jobs to free machines. Wherever work arrives unevenly, a deque per worker plus steal-on-idle is the standard answer.",
+        "teaches": ["steal-balance", "local-deques"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t730-a1",
+        "concept": "local-deques",
+        "type": "multiple_choice",
+        "prompt": "Why does a worker pop its own tasks from the tail while thieves take from the head?",
+        "choices": [
+          { "id": "a", "label": "Both ends are identical; the choice is arbitrary" },
+          { "id": "b", "label": "Thieves must always take the newest tasks first" },
+          { "id": "c", "label": "The tail is hottest in its cache and least contended" },
+          { "id": "d", "label": "The head is where newly pushed tasks arrive" }
+        ],
+        "correctChoiceIds": ["c"],
+        "explanation": "The owner’s most recent tasks are likely still in its cache, and only the owner touches the tail, so pops are cheap. The head holds the oldest, usually largest task, so taking it leaves the victim work for longer."
+      },
+      {
+        "id": "t730-a2",
+        "concept": "steal-balance",
+        "type": "multiple_choice",
+        "prompt": "Worker 3 drains its deque while workers 1 and 2 still hold large tasks. What happens next in a work-stealing pool?",
+        "choices": [
+          { "id": "a", "label": "Worker 3 pops one task from a victim’s head" },
+          { "id": "b", "label": "Worker 3 sleeps until new work is submitted" },
+          { "id": "c", "label": "A dispatcher reassigns a task to worker 3" },
+          { "id": "d", "label": "All tasks migrate to even out every deque" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "There is no central reassignment: the idle worker steals one task itself, usually the oldest and largest, from a busy victim. Nothing sleeps while work exists, and no global rebalancing pass runs."
+      },
+      {
+        "id": "t730-a3",
+        "concept": "task-granularity",
+        "type": "multiple_choice",
+        "prompt": "A pool splits a job into 2 µs tasks, and each steal costs about 15 µs of coordination. What does splitting finer achieve?",
+        "choices": [
+          { "id": "a", "label": "Better balance, since small tasks spread evenly" },
+          { "id": "b", "label": "Fewer steals, because deques stay fuller" },
+          { "id": "c", "label": "Lower latency, because thieves wait less" },
+          { "id": "d", "label": "More overhead than the stolen work is worth" }
+        ],
+        "correctChoiceIds": ["d"],
+        "explanation": "When the coordination costs more than the task, stealing spends more than it saves, and finer splitting multiplies the bill. A split threshold stops the recursion once pieces are cheap enough to just run."
+      },
+      {
+        "id": "t730-a4",
+        "concept": "steal-balance",
+        "type": "estimation",
+        "prompt": "A job is 4,000 tasks of 1 ms each on 8 workers. With no stealing and an unlucky static assignment, one worker holds 70% of them. How long does the job take?",
+        "unit": "ms",
+        "target": 2800,
+        "assumptions": [
+          "Each worker runs its tasks serially",
+          "The busiest worker’s share bounds the finish"
+        ],
+        "formula": "tasks × duration × busiest share",
+        "workedAnswer": "4,000 × 0.7 = 2,800 tasks × 1 ms = 2,800 ms.",
+        "explanation": "Sanity check: perfectly balanced, the job takes 500 ms, so the unlucky static split runs about 5.6× longer; stealing pulls the finish back towards balance.",
+        "tolerance": 0.05,
+        "trapAnswers": [500, 350]
+      },
+      {
+        "id": "t730-a5",
+        "concept": "steal-balance",
+        "type": "drag_order",
+        "prompt": "Order one steal.",
+        "items": [
+          { "id": "s1", "label": "A worker’s own deque runs empty" },
+          { "id": "s3", "label": "It picks a busy victim and pops from the head" },
+          { "id": "s2", "label": "The stolen task runs on the thief" },
+          { "id": "s4", "label": "The thief may split it and push halves for others" }
+        ],
+        "correctOrder": ["s1", "s3", "s2", "s4"],
+        "explanation": "Idle first, then steal the oldest task from a victim, run it, and split further if it spawns sub-tasks."
+      },
+      {
+        "id": "t730-a6",
+        "concept": "steal-balance",
+        "type": "tradeoff",
+        "prompt": "A renderer divides frames into sub-tasks that spawn more sub-tasks unpredictably; four workers share the box.",
+        "constraints": [
+          "Task sizes vary a hundredfold",
+          "New tasks appear mid-run",
+          "All workers should stay busy to the end"
+        ],
+        "approaches": [
+          { "id": "a", "label": "Per-worker deques with steal-on-idle", "description": "Each worker owns a deque; idle workers pull from busy ones." },
+          { "id": "b", "label": "A static split into four equal queues", "description": "Divide the frame list upfront and hand each worker a fixed share." },
+          { "id": "c", "label": "One shared queue feeding all workers", "description": "Every take comes from a single queue behind one lock." }
+        ],
+        "correctApproachId": "a",
+        "rationaleOptions": [
+          { "id": "r1", "label": "Sub-tasks appear anywhere and idle workers pull them in" },
+          { "id": "r2", "label": "Owner-end pops stay local and uncontended" },
+          { "id": "r3", "label": "A shared queue cannot keep four workers busy" },
+          { "id": "r4", "label": "Stealing gives urgent tasks higher priority" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "It can; the cost is a contended lock on every take rather than imbalance.",
+          "r4": "Stealing keeps workers busy but knows nothing about priority or deadlines."
+        },
+        "explanation": "Work that spawns more work mid-run suits pull-on-idle: new sub-tasks are consumed wherever capacity frees up, and owner-end access avoids the contention a single queue adds to every take. A static split leaves stragglers, and stealing balances busyness, not urgency."
+      }
+    ],
+    "flashcards": [
+      { "id": "t730-f1", "front": "What is work stealing?", "back": "Idle workers pull tasks from busy workers’ deques instead of waiting for assignment." },
+      { "id": "t730-f2", "front": "Why the head for thieves and the tail for the owner?", "back": "The owner’s tail is cache-hot and uncontended; the head is the oldest, biggest task." },
+      { "id": "t730-f3", "front": "What defeats work stealing?", "back": "Tasks so small that each steal costs more than the work it moves." }
+    ],
+    "deep": {
+      "teaches": ["local-deques", "steal-balance", "task-granularity"],
+      "mechanism": {
+        "title": "How stealing keeps a pool balanced",
+        "steps": [
+          "Each worker owns a deque of runnable tasks. Locally spawned sub-tasks are pushed on the owner’s tail and popped from the same end, so the common case touches only that worker’s cache.",
+          "A worker whose deque is empty steals: it picks a victim and pops one task from the head, the opposite end, so owner and thief almost never compete for the same slot.",
+          "The head is deliberately the oldest task: in divide-and-conquer work the earliest-pushed item is the largest un-split sub-tree, so a single steal moves a lot of work.",
+          "Recursion keeps the deques fed. Each stolen chunk can split and push again, so stealing spreads a tree of work across every worker without a central dispatcher.",
+          "Balance is emergent rather than computed: the finish time approaches total work ÷ workers, because any worker that could run ahead keeps pulling until every deque is drained.",
+          "The costs are the steal itself, a contested atomic plus cold cache lines, and the locality the thief loses on stolen work. Both argue for a minimum task size. Thieves also hunt for victims in some order, so a poor victim policy can become a search loop of its own when many workers go idle together."
+        ]
+      },
+      "useWhen": [
+        "Recursive, irregular parallelism: divide-and-conquer, renders, searches, tree walks.",
+        "Runtime schedulers balancing lightweight tasks across a fixed set of carrier threads.",
+        "Splitting frameworks where sub-tasks are born mid-flight and their sizes vary widely."
+      ],
+      "avoidWhen": [
+        "Tiny uniform tasks: a plain shared queue or array partition costs less than steals.",
+        "Work with priorities or deadlines: stealing balances busyness, not importance."
+      ],
+      "tradeoffs": {
+        "columns": ["Distribution", "Balance", "Per-take cost", "Best fit"],
+        "rows": [
+          ["Static partition", "Poor: bounded by the unluckiest chunk", "Zero", "Uniform, predictable work"],
+          ["One shared queue", "Good while tasks stay similar", "A contended lock on every take", "Simple pools of similar jobs"],
+          ["Work stealing", "Good even for irregular work", "Cheap owner pops, costlier steals", "Recursive or uneven workloads"]
+        ]
+      },
+      "numbers": {
+        "title": "What a straggler costs without stealing",
+        "assumptions": [
+          "8 workers sharing 4,000 one-millisecond tasks",
+          "A static assignment lands 70% on one worker (illustrative skew)"
+        ],
+        "steps": [
+          "Balanced finish: 4,000 ÷ 8 = 500 tasks × 1 ms = 500 ms.",
+          "Unlucky static split: the busiest worker alone runs 2,800 tasks ≈ 2,800 ms.",
+          "With stealing, idle workers keep pulling until the deques drain, so the finish returns towards 500 ms."
+        ],
+        "result": "The pool’s speed is set by its slowest assignment; stealing removes the assignment."
+      },
+      "india": {
+        "title": "Fork/join pools document the algorithm",
+        "label": "Official documentation",
+        "body": "The standard fork/join framework documentation describes exactly this design: a pool where each worker holds its own deque and idle workers steal from busy ones. It is the engine behind common parallel collection operations in that ecosystem, and the same pattern is documented in async runtimes that spread lightweight tasks across a small set of carrier threads. The research paper that popularised the approach describes the same split at the deque’s two ends: owners work one end, thieves the other."
+      },
+      "pitfalls": [
+        {
+          "trap": "“Split finer and it balances itself.”",
+          "say": "“Below a few tens of microseconds each steal costs more than the task; I set a split threshold.”"
+        },
+        {
+          "trap": "“Stealing will keep my urgent jobs first.”",
+          "say": "“It balances busyness only; urgent work still needs priorities or a separate pool.”"
+        }
+      ],
+      "takeaways": [
+        "Static assignment finishes when the unluckiest worker finishes; stealing pulls towards the average.",
+        "The owner pops the tail, thieves pop the head: locality for one, big chunks for the other.",
+        "Recursive splitting keeps every deque fed without a dispatcher.",
+        "Steals cost more than tiny tasks are worth; pick a granularity floor.",
+        "Balance comes from idle workers pulling, not from a dispatcher pushing."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Four workers, one finishing last",
+      "prompt": "A batch job is split statically into 8 chunks for 8 workers, and chunk sizes vary threefold. What predicts the finish time?",
+      "choices": [
+        { "id": "a", "label": "The largest single chunk on one worker", "feedback": "Right: nobody can help that worker, so its chunk sets the end." },
+        { "id": "b", "label": "The average chunk size across workers", "feedback": "Averages predict the balanced case; a static split cannot reach it." },
+        { "id": "c", "label": "The time to run the whole job on one core", "feedback": "Only if chunks were single items; skew, not serialisation, is the limit." }
+      ],
+      "correctId": "a",
+      "reveal": "Without stealing, a pool is only as fast as its unluckiest assignment. Steal-on-idle is what turns 8 chunks into 8 workers that actually help each other."
+    },
+    "seeAlso": [
+      { "topicId": 64, "why": "Cluster engines move straggler tasks to idle machines the same way" },
+      { "topicId": 644, "why": "A pool with per-worker deques is where the stealing lives" },
+      { "topicId": 567, "why": "The straggler is the serial fraction that stealing shrinks" }
+    ],
+    "sources": [
+      { "title": "Oracle Java Tutorials: Fork/Join", "url": "https://docs.oracle.com/javase/tutorial/essential/concurrency/forkjoin.html" },
+      { "title": "Oracle: ForkJoinPool API documentation", "url": "https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ForkJoinPool.html" },
+      { "title": "The implementation of the Cilk-5 multithreaded language (PLDI 1998)", "url": "https://dl.acm.org/doi/10.1145/277650.277725" }
+    ]
+  },
+  {
+    "id": 731,
+    "slug": "oom-killer-overcommit-and-psi",
+    "region": "f5-os",
+    "order": 36,
+    "title": "The OOM Killer, Overcommit and Memory Pressure",
+    "kind": "lesson",
+    "objectives": [
+      "Explain why Linux lets promises exceed memory and when it kills",
+      "Say how the OOM killer picks a victim and how to steer it",
+      "Read pressure-stall metrics as the warning before the kill"
+    ],
+    "difficulty": 3,
+    "durationMinutes": 12,
+    "prereqIds": [283, 565],
+    "cards": [
+      {
+        "id": "t731-c1",
+        "kind": "text",
+        "title": "The kernel hands out memory it hopes you will not use",
+        "body": "Programs reserve far more address space than they ever touch, so Linux overcommits: an allocation succeeds if it looks plausible, and a real frame is only found when the page is first written. The vm.overcommit_memory knob controls the strictness: a heuristic by default, always allow, or strict accounting that fails allocations early instead of killing later.",
+        "teaches": ["overcommit"]
+      },
+      {
+        "id": "t731-c2",
+        "kind": "text",
+        "title": "When nothing is left to reclaim, a victim is chosen",
+        "body": "The kernel first reclaims what it can: clean page cache is dropped, dirty pages written back, anonymous pages swapped out. When reclaim cannot keep up and memory is truly exhausted, the OOM killer scores every process by how much memory it holds, adjusted by its oom_score_adj, and sends SIGKILL to the highest scorer. The kill is written to the kernel log with every candidate’s score.",
+        "teaches": ["victim-choice"]
+      },
+      {
+        "id": "t731-c3",
+        "kind": "diagram",
+        "title": "Worked example: reading last night’s kill",
+        "body": "What an OOM event looks like in the hours around it.",
+        "teaches": ["victim-choice", "memory-pressure"],
+        "steps": [
+          "A worker’s resident memory creeps from 4 GB to 11 GB over six hours",
+          "Pressure stalls climb as reclaim starts failing to keep up",
+          "Free memory hits the minimum; the kernel dumps every task’s score",
+          "The worker is killed; the log line names it and lists the scores",
+          "Next morning you raise its neighbours’ protection and cap its group"
+        ]
+      },
+      {
+        "id": "t731-c4",
+        "kind": "text",
+        "title": "Pressure stalls announce trouble before the kill",
+        "body": "Pressure Stall Information reports how much wall-clock time tasks spend stuck waiting on memory, as well as CPU and I/O. A rising memory “some” figure means at least one task stalled on reclaim; a rising “full” means every runnable task stalled and the machine is effectively thrashing. Watching the trend catches exhaustion many minutes before the kernel is forced to choose a corpse.",
+        "teaches": ["memory-pressure"]
+      },
+      {
+        "id": "t731-c5",
+        "kind": "text",
+        "title": "Trap: the container dies while the host looks idle",
+        "body": "A cgroup memory limit creates a private cliff. When a container reaches memory.max and its own pages cannot be reclaimed, the kernel kills inside that cgroup even if the host has gigabytes free. Host-level graphs show a quiet machine; the container’s memory.pressure and event counters tell the real story. Always check both scopes before ruling memory out.",
+        "teaches": ["victim-choice", "memory-pressure"]
+      },
+      {
+        "id": "t731-c6",
+        "kind": "text",
+        "title": "Misconception: the fattest process is always the one killed",
+        "body": "Badness is roughly share of memory, but oom_score_adj skews it: a valued service can be pushed towards −1,000 to be nearly immune, and a disposable worker towards +1,000 to go first. And the victim is not always the cause: a leaky 2 GB process can trigger the exhaustion that takes the innocent 10 GB one. The score picks who dies, not who is guilty.",
+        "teaches": ["victim-choice"]
+      }
+    ],
+    "questions": [
+      {
+        "id": "t731-a1",
+        "concept": "overcommit",
+        "type": "multiple_choice",
+        "prompt": "A process allocates 8 GB successfully, then is killed minutes later while writing to it. What does that sequence show?",
+        "choices": [
+          { "id": "a", "label": "Allocation succeeded on paper; frames ran out on first touch" },
+          { "id": "b", "label": "The allocator freed the reservation too early" },
+          { "id": "c", "label": "The kernel miscounted the process’s real size" },
+          { "id": "d", "label": "Another process stole its already-mapped pages" }
+        ],
+        "correctChoiceIds": ["a"],
+        "explanation": "Overcommit means the reservation is a promise, not a frame: pages materialise as they are written, and that is where the shortage bites. The allocator and the accounting were both fine; the machine simply could not honour the promise."
+      },
+      {
+        "id": "t731-a2",
+        "concept": "victim-choice",
+        "type": "multiple_choice",
+        "prompt": "Which knob steers the kernel’s choice of OOM victim?",
+        "choices": [
+          { "id": "a", "label": "The process’s nice value" },
+          { "id": "b", "label": "oom_score_adj on each process" },
+          { "id": "c", "label": "The order the processes started in" },
+          { "id": "d", "label": "The size of each process’s binary" }
+        ],
+        "correctChoiceIds": ["b"],
+        "explanation": "Badness starts from memory share but is shifted by oom_score_adj, from −1,000 (nearly immune) to +1,000 (kill me first). Nice steers CPU time, not death; start order and binary size play no part."
+      },
+      {
+        "id": "t731-a3",
+        "concept": "memory-pressure",
+        "type": "multiple_choice",
+        "prompt": "A host shows 18 GB free, yet a container’s main process was OOM-killed overnight. How do the two facts fit?",
+        "choices": [
+          { "id": "a", "label": "The kill log must be from a different host" },
+          { "id": "b", "label": "Free memory is counted after dropping caches" },
+          { "id": "c", "label": "Swap filled up, forcing a global kill" },
+          { "id": "d", "label": "Its cgroup limit was hit; the kill is scoped" }
+        ],
+        "correctChoiceIds": ["d"],
+        "explanation": "A cgroup limit is a private ceiling: reaching memory.max triggers an OOM kill inside that container regardless of host headroom. The host graph stays green, so container-scope metrics are where the story lives."
+      },
+      {
+        "id": "t731-a4",
+        "concept": "overcommit",
+        "type": "drag_order",
+        "prompt": "Order the slide into an OOM kill.",
+        "items": [
+          { "id": "s1", "label": "Allocations outpace what reclaim can free" },
+          { "id": "s3", "label": "Memory pressure stalls climb" },
+          { "id": "s2", "label": "Reclaim runs out: nothing left to drop or swap" },
+          { "id": "s4", "label": "The kernel scores tasks and kills one" }
+        ],
+        "correctOrder": ["s1", "s3", "s2", "s4"],
+        "explanation": "Demand first exceeds reclaim, pressure metrics show the stall, the last reclaimable page goes, and only then does the kernel pick a victim."
+      },
+      {
+        "id": "t731-a5",
+        "concept": "memory-pressure",
+        "type": "estimation",
+        "prompt": "Pressure metrics report memory full avg300 = 12. Over that 300-second window, how many seconds were all non-idle tasks stalled on memory?",
+        "unit": "s",
+        "target": 36,
+        "assumptions": [
+          "The full figure is a percentage of wall-clock time",
+          "The average held across the whole window"
+        ],
+        "formula": "percentage × window",
+        "workedAnswer": "12% × 300 s = 36 s.",
+        "explanation": "Sanity check: a full stall means all productive work stopped, so 36 s in five minutes is already thrashing territory, well before any kill shows in the logs.",
+        "tolerance": 0.05,
+        "trapAnswers": [12, 3.6]
+      },
+      {
+        "id": "t731-a6",
+        "concept": "overcommit",
+        "type": "tradeoff",
+        "prompt": "A host runs a latency service beside revocable batch workers, and memory occasionally exhausts at peaks.",
+        "constraints": [
+          "Batch workers may die; the service must not",
+          "Strict accounting would leave 40% of RAM unused",
+          "Exhaustion is rare but happens at peaks"
+        ],
+        "approaches": [
+          { "id": "a", "label": "Keep overcommit; cap batch memory and protect the service’s score", "description": "Bound the cause and choose the victim in advance." },
+          { "id": "b", "label": "Switch to strict accounting so nothing is ever killed", "description": "Refuse allocations early so the killer never runs." },
+          { "id": "c", "label": "Leave the defaults and hope the service wins the draw", "description": "Keep the heuristic and accept whichever victim it picks." }
+        ],
+        "correctApproachId": "a",
+        "rationaleOptions": [
+          { "id": "r1", "label": "oom_score_adj decides who dies first" },
+          { "id": "r2", "label": "Cgroup caps stop batch from triggering the storm" },
+          { "id": "r3", "label": "Strict mode means no process ever dies" },
+          { "id": "r4", "label": "The default heuristic already protects services" }
+        ],
+        "correctRationaleIds": ["r1", "r2"],
+        "distractorRationaleIds": ["r3", "r4"],
+        "rationaleConflicts": {
+          "r3": "Strict mode refuses the allocation instead; a sudden need simply fails in a different place.",
+          "r4": "The heuristic only judges whether each request looks plausible; it protects nobody by name."
+        },
+        "explanation": "The fix is choosing the victim and capping the cause, not banning promises: batch gets a memory ceiling and a high score adjustment, the service gets a low one, so the rare exhaustion kills work that can be retried. Strict accounting would waste headroom all year to survive one bad hour, and the default offers no protection at all."
+      }
+    ],
+    "flashcards": [
+      { "id": "t731-f1", "front": "What does the OOM killer do?", "back": "When reclaim fails, it SIGKILLs the process with the worst badness score to free memory." },
+      { "id": "t731-f2", "front": "What does oom_score_adj change?", "back": "How likely a process is to be picked as victim, from nearly immune to first in line." },
+      { "id": "t731-f3", "front": "What does memory pressure measure?", "back": "Wall-clock time tasks spent stalled waiting for memory, split into some and full." }
+    ],
+    "deep": {
+      "teaches": ["overcommit", "victim-choice", "memory-pressure"],
+      "mechanism": {
+        "title": "From promise to kill",
+        "steps": [
+          "An allocation reserves address space and is checked against the overcommit policy: a heuristic by default, which accepts plausible-looking requests, or strict accounting, which bounds total commit and fails requests early.",
+          "The first write faults the page in, and the kernel must find a real frame for it. While frames exist, overcommit is invisible.",
+          "When frames run short, reclaim works the lists: clean file pages are dropped, dirty ones written back, anonymous pages swapped out. Pressure metrics record the stall as tasks wait on each stage.",
+          "If reclaim cannot keep pace, the OOM killer computes a badness score per process, roughly its share of memory adjusted by oom_score_adj, plus rules that spare kernel-critical tasks.",
+          "The loser receives SIGKILL; its frames return to the pool and the machine breathes again. The kernel logs the candidate list and scores, which is the post-mortem evidence.",
+          "Cgroup limits scope all of this: hitting memory.max invokes the same machinery inside the group, so a container can OOM on a host with plenty free. The victim is then chosen from tasks inside the exhausted group, not from the whole machine, which is why the innocent-looking host graphs can hide a very real kill."
+        ]
+      },
+      "useWhen": [
+        "Set oom_score_adj so the process you can least afford to lose is the last candidate picked.",
+        "Read memory.pressure for early warning; a rising stall precedes the kill by minutes."
+      ],
+      "avoidWhen": [
+        "Avoid strict overcommit where services fork copy-on-write helpers; the reservation doubles and fork fails.",
+        "Avoid treating a kill as bad luck: the logged scores and the pressure trend say what to cap or fix."
+      ],
+      "tradeoffs": {
+        "columns": ["Overcommit mode", "Allocation check", "Failure arrives as", "Best fit"],
+        "rows": [
+          ["Heuristic (default)", "Plausibility of each request", "Rare OOM kills at peaks", "General-purpose hosts"],
+          ["Always overcommit", "None at all", "Kills under real pressure", "Fork-heavy stores like caches"],
+          ["Strict accounting", "Commit bounded in advance", "Failed allocations, ENOMEM", "Hosts that must never kill"]
+        ]
+      },
+      "numbers": {
+        "title": "What a full memory stall costs",
+        "assumptions": [
+          "A 64 GB host under memory pressure",
+          "memory full avg300 reports 12%",
+          "The window is 300 s"
+        ],
+        "steps": [
+          "12% × 300 s = 36 s in the window when every non-idle task was stalled on memory.",
+          "With 40 request threads, up to 36 × 40 = 1,440 thread-seconds of capacity vanished.",
+          "That stall landed before any kill: pressure is the warning, the kill is the last resort."
+        ],
+        "result": "The full-stall percentage is the closest thing to a countdown timer for an OOM event."
+      },
+      "india": {
+        "title": "Fork-heavy caches ask for always-overcommit",
+        "label": "Official documentation",
+        "body": "Redis administration documentation advises setting vm.overcommit_memory to 1 on Linux. Background saves fork the server, and copy-on-write keeps the child cheap, but the default heuristic can refuse the fork on a host where promised memory already looks large. Always-overcommit accepts the reservation, trading a theoretical risk for snapshots that do not randomly fail. The same guidance recommends an explicit memory ceiling, because the kernel’s killer can still strike an over-limit instance while headroom remains elsewhere."
+      },
+      "pitfalls": [
+        {
+          "trap": "“The biggest process caused it, so it deserved the kill.”",
+          "say": "“The victim is picked by score, not guilt; a small leaker can trigger the kill that takes a bystander.”"
+        },
+        {
+          "trap": "“There was free memory, so it cannot be OOM.”",
+          "say": "“Inside the container’s limit it was OOM; host-wide free space does not apply.”"
+        }
+      ],
+      "takeaways": [
+        "Overcommit makes allocation a promise; first touch is where it is honoured.",
+        "The OOM killer shoots the worst badness score; oom_score_adj steers it.",
+        "The full-stall metric is the early warning that arrives before the corpse.",
+        "Cgroup limits create private OOMs that host metrics never show."
+      ]
+    },
+    "interactive": {
+      "kind": "predict",
+      "title": "Who dies when memory runs out?",
+      "prompt": "A 32 GB host runs a 2 GB monitoring agent and a 26 GB analytics job, both on default scores. Memory exhausts. Which process does the kernel kill?",
+      "choices": [
+        { "id": "a", "label": "The analytics job: it has the largest score", "feedback": "Right: badness roughly tracks memory share, and 26 GB dwarfs the agent’s 2 GB." },
+        { "id": "b", "label": "The agent: small processes are cheaper to kill", "feedback": "The score favours the kill that returns the most memory, not the most convenient one." },
+        { "id": "c", "label": "Whichever allocated most recently", "feedback": "Allocation time is not in the score; size and oom_score_adj are." }
+      ],
+      "correctId": "a",
+      "reveal": "If the big job is the one you must keep, say so with a negative oom_score_adj; the default treats size as the thing to reclaim."
+    },
+    "seeAlso": [
+      { "topicId": 20, "why": "Redis documents needing always-overcommit so its forked saves succeed" },
+      { "topicId": 565, "why": "The same killer, scoped to one cgroup’s limit" },
+      { "topicId": 569, "why": "Pressure metrics are the counterpart to load and iowait" }
+    ],
+    "sources": [
+      { "title": "Linux man-pages: proc(5), oom_score_adj and overcommit", "url": "https://man7.org/linux/man-pages/man5/proc.5.html" },
+      { "title": "Kernel documentation: Pressure Stall Information", "url": "https://docs.kernel.org/accounting/psi.html" },
+      { "title": "Kernel documentation: /proc/sys/vm tunables", "url": "https://docs.kernel.org/admin-guide/sysctl/vm.html" },
+      { "title": "Redis documentation: administration and overcommit", "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/admin/" }
+    ]
+  }
+]
